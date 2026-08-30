@@ -1,0 +1,67 @@
+using Mutants.Core.Classes;
+using Mutants.Core.Items;
+
+namespace Mutants.Core.Tests.Items;
+
+public class ItemTests
+{
+    [Fact]
+    public void Create_HigherTierYieldsHigherValueAtSameRarity()
+    {
+        var lowTier = Item.Create("Rusty Shiv", ItemType.Weapon, tier: 1, Rarity.Common);
+        var highTier = Item.Create("Void Shiv", ItemType.Weapon, tier: 5, Rarity.Common);
+
+        Assert.True(highTier.Value > lowTier.Value);
+    }
+
+    [Fact]
+    public void Create_HigherRarityYieldsHigherValueAtSameTier()
+    {
+        var common = Item.Create("Plain Blade", ItemType.Weapon, tier: 3, Rarity.Common);
+        var legendary = Item.Create("Blade of Ages", ItemType.Weapon, tier: 3, Rarity.Legendary);
+
+        Assert.True(legendary.Value > common.Value);
+    }
+
+    [Fact]
+    public void ConvertValue_MatchesIonEconomyFormula()
+    {
+        var item = Item.Create("Junk Scrap", ItemType.Junk, tier: 2, Rarity.Common); // value = 20
+
+        Assert.Equal(8, item.ConvertValue()); // floor(20 * 0.4) = 8
+    }
+
+    [Fact]
+    public void IsWieldable_TrueOnlyForWeaponsAndArmor()
+    {
+        var weapon = Item.Create("Sword", ItemType.Weapon, 1, Rarity.Common);
+        var armor = Item.Create("Plate", ItemType.Armor, 1, Rarity.Common);
+        var potion = Item.Create("Elixir", ItemType.Consumable, 1, Rarity.Common);
+        var junk = Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common);
+
+        Assert.True(weapon.IsWieldable);
+        Assert.True(armor.IsWieldable);
+        Assert.False(potion.IsWieldable);
+        Assert.False(junk.IsWieldable);
+    }
+
+    [Fact]
+    public void IsClassCompatible_TrueWhenUnrestrictedOrMatching()
+    {
+        var unrestricted = Item.Create("Generic Dagger", ItemType.Weapon, 1, Rarity.Common);
+        var warriorOnly = Item.Create("Great Axe", ItemType.Weapon, 1, Rarity.Common, CharacterClass.Warrior);
+
+        Assert.True(unrestricted.IsClassCompatible(CharacterClass.Mage));
+        Assert.True(warriorOnly.IsClassCompatible(CharacterClass.Warrior));
+        Assert.False(warriorOnly.IsClassCompatible(CharacterClass.Mage));
+    }
+
+    [Fact]
+    public void WieldEffectiveness_FullForCompatible_PenalizedForIncompatible()
+    {
+        var warriorOnly = Item.Create("Great Axe", ItemType.Weapon, 1, Rarity.Common, CharacterClass.Warrior);
+
+        Assert.Equal(1.0, warriorOnly.WieldEffectiveness(CharacterClass.Warrior));
+        Assert.True(warriorOnly.WieldEffectiveness(CharacterClass.Mage) < 1.0);
+    }
+}

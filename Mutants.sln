@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{297D288E-B196-4903-A8F5-8B03BA413588}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mutants.Core", "src\Mutants.Core\Mutants.Core.csproj", "{BC2CA43B-A1A3-4F8A-AEF0-2EE7D23A3D3C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{21C11B2B-FDDD-44CC-9978-81052EE235D3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mutants.Core.Tests", "tests\Mutants.Core.Tests\Mutants.Core.Tests.csproj", "{108762D2-3136-4FD9-A474-F8D05F4E51F5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BC2CA43B-A1A3-4F8A-AEF0-2EE7D23A3D3C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BC2CA43B-A1A3-4F8A-AEF0-2EE7D23A3D3C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BC2CA43B-A1A3-4F8A-AEF0-2EE7D23A3D3C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BC2CA43B-A1A3-4F8A-AEF0-2EE7D23A3D3C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{108762D2-3136-4FD9-A474-F8D05F4E51F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{108762D2-3136-4FD9-A474-F8D05F4E51F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{108762D2-3136-4FD9-A474-F8D05F4E51F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{108762D2-3136-4FD9-A474-F8D05F4E51F5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{BC2CA43B-A1A3-4F8A-AEF0-2EE7D23A3D3C} = {297D288E-B196-4903-A8F5-8B03BA413588}
+		{108762D2-3136-4FD9-A474-F8D05F4E51F5} = {21C11B2B-FDDD-44CC-9978-81052EE235D3}
+	EndGlobalSection
+EndGlobal
