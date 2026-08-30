@@ -190,4 +190,96 @@ public class MutantTests
 
         Assert.Throws<InvalidOperationException>(() => mutant.SpendRiblets(11));
     }
+
+    [Fact]
+    public void Sell_RemovesItemAndAddsRiblets()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // value 20
+        mutant.AddToInventory(item);
+
+        var gained = mutant.Sell(item);
+
+        Assert.Equal(20, gained);
+        Assert.DoesNotContain(item, mutant.Inventory);
+        Assert.Equal(20, mutant.Riblets);
+    }
+
+    [Fact]
+    public void Sell_ThrowsIfItemNotInInventory()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var item = Item.Create("Ghost Item", ItemType.Junk, 1, Rarity.Common);
+
+        Assert.Throws<InvalidOperationException>(() => mutant.Sell(item));
+    }
+
+    [Fact]
+    public void Convert_UnequipsTheItemIfItWasWielded()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var weapon = Item.Create("Axe", ItemType.Weapon, 1, Rarity.Common);
+        mutant.AddToInventory(weapon);
+        mutant.Wield(weapon);
+
+        mutant.Convert(weapon);
+
+        Assert.Null(mutant.EquippedWeapon);
+    }
+
+    [Fact]
+    public void Sell_UnequipsTheItemIfItWasWielded()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var armor = Item.Create("Plate", ItemType.Armor, 1, Rarity.Common);
+        mutant.AddToInventory(armor);
+        mutant.Wield(armor);
+
+        mutant.Sell(armor);
+
+        Assert.Null(mutant.EquippedArmor);
+    }
+
+    [Fact]
+    public void EffectiveAttackPower_IsPrimaryStatWhenUnarmed()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        Assert.Equal(mutant.Stats.Strength, mutant.EffectiveAttackPower);
+    }
+
+    [Fact]
+    public void EffectiveAttackPower_AddsFullWeaponBonusForClassCompatibleGear()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var weapon = Item.Create("Axe", ItemType.Weapon, 3, Rarity.Common, CharacterClass.Warrior);
+        mutant.AddToInventory(weapon);
+        mutant.Wield(weapon);
+
+        Assert.Equal(mutant.Stats.Strength + weapon.AttackBonus, mutant.EffectiveAttackPower);
+    }
+
+    [Fact]
+    public void EffectiveAttackPower_PenalizesOffClassWeapon()
+    {
+        var mage = new Mutant("Zeta", CharacterClass.Mage);
+        var warriorAxe = Item.Create("Great Axe", ItemType.Weapon, 3, Rarity.Common, CharacterClass.Warrior);
+        mage.AddToInventory(warriorAxe);
+        mage.Wield(warriorAxe);
+
+        var fullBonusAttack = mage.Stats.Get(mage.ClassDefinition.PrimaryStat) + warriorAxe.AttackBonus;
+        Assert.True(mage.EffectiveAttackPower < fullBonusAttack);
+    }
+
+    [Fact]
+    public void EffectiveDefense_AddsArmorBonus()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var unarmoredDefense = mutant.EffectiveDefense;
+
+        var armor = Item.Create("Plate", ItemType.Armor, 3, Rarity.Common, CharacterClass.Warrior);
+        mutant.AddToInventory(armor);
+        mutant.Wield(armor);
+
+        Assert.Equal(unarmoredDefense + armor.DefenseBonus, mutant.EffectiveDefense);
+    }
 }

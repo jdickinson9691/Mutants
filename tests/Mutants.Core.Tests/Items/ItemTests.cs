@@ -64,4 +64,41 @@ public class ItemTests
         Assert.Equal(1.0, warriorOnly.WieldEffectiveness(CharacterClass.Warrior));
         Assert.True(warriorOnly.WieldEffectiveness(CharacterClass.Mage) < 1.0);
     }
+
+    [Fact]
+    public void Create_WeaponsGetAttackBonusOnly()
+    {
+        var weapon = Item.Create("Sword", ItemType.Weapon, 2, Rarity.Common);
+
+        Assert.True(weapon.AttackBonus > 0);
+        Assert.Equal(0, weapon.DefenseBonus);
+    }
+
+    [Fact]
+    public void Create_ArmorGetsDefenseBonusOnly()
+    {
+        var armor = Item.Create("Plate", ItemType.Armor, 2, Rarity.Common);
+
+        Assert.Equal(0, armor.AttackBonus);
+        Assert.True(armor.DefenseBonus > 0);
+    }
+
+    [Fact]
+    public void Create_NonEquipmentGetsNoCombatBonus()
+    {
+        var potion = Item.Create("Elixir", ItemType.Consumable, 2, Rarity.Common);
+        var junk = Item.Create("Scrap", ItemType.Junk, 2, Rarity.Common);
+
+        Assert.Equal(0, potion.AttackBonus);
+        Assert.Equal(0, potion.DefenseBonus);
+        Assert.Equal(0, junk.AttackBonus);
+        Assert.Equal(0, junk.DefenseBonus);
+    }
+
+    [Fact]
+    public void SellValue_EqualsItemValue()
+    {
+        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // value 20
+        Assert.Equal(item.Value, item.SellValue());
+    }
 }

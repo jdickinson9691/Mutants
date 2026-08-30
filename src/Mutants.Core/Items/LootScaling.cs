@@ -22,4 +22,14 @@ public static class LootScaling
     /// <summary>Final item value = tier baseline, modulated by rarity — docs/GDD.md §5.</summary>
     public static int ValueFor(int tier, Rarity rarity) =>
         (int)Math.Round(TierBaseValue(tier) * rarity.ValueMultiplier());
+
+    /// <summary>
+    /// Combat stat baseline for a weapon's AttackBonus or armor's
+    /// DefenseBonus — same tier/rarity shape as <see cref="ValueFor"/> but
+    /// a smaller base so gear bonuses stay in scale with the flat combat
+    /// numbers in <c>Mutants.Engine.CombatResolver</c>. Not GDD-specified;
+    /// original tuning pending Design Agent sign-off.
+    /// </summary>
+    public static int CombatBonusFor(int tier, Rarity rarity) =>
+        (int)Math.Round(2 * tier * rarity.ValueMultiplier());
 }

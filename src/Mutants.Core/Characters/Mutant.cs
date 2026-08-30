@@ -42,6 +42,45 @@ public sealed class Mutant
     public Item? EquippedWeapon { get; private set; }
     public Item? EquippedArmor { get; private set; }
 
+    /// <summary>
+    /// Turn order / "who acts first" stat for combat — original design
+    /// (not GDD-specified), currently just the raw Agility stat.
+    /// </summary>
+    public int Speed => Stats.Agility;
+
+    /// <summary>
+    /// Combat attack power: primary stat + equipped weapon's AttackBonus,
+    /// scaled by <see cref="Item.WieldEffectiveness"/> (so off-class
+    /// weapons contribute less, per docs/GDD.md §4.3). Original design —
+    /// the GDD confirms "a primary attack" per class but not its formula.
+    /// </summary>
+    public int EffectiveAttackPower
+    {
+        get
+        {
+            var basePower = Stats.Get(ClassDefinition.PrimaryStat);
+            var weaponBonus = EquippedWeapon is null
+                ? 0
+                : (int)Math.Round(EquippedWeapon.AttackBonus * EquippedWeapon.WieldEffectiveness(Class));
+
+            return basePower + weaponBonus;
+        }
+    }
+
+    /// <summary>Combat defense: half of Agility + equipped armor's DefenseBonus (scaled by wield effectiveness). Original design.</summary>
+    public int EffectiveDefense
+    {
+        get
+        {
+            var baseDefense = Stats.Agility / 2;
+            var armorBonus = EquippedArmor is null
+                ? 0
+                : (int)Math.Round(EquippedArmor.DefenseBonus * EquippedArmor.WieldEffectiveness(Class));
+
+            return baseDefense + armorBonus;
+        }
+    }
+
     public Mutant(string name, CharacterClass characterClass, int unlockedTimeLevel = 1)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -144,16 +183,45 @@ public sealed class Mutant
     /// <summary>
     /// Destroys an item from inventory for Ions — docs/GDD.md §2/§5.
     /// Returns the number of Ions actually gained (may be less than the
-    /// item's convert value if it would overflow the Ion pool).
+    /// item's convert value if it would overflow the Ion pool). Unequips
+    /// the item first if it was wielded.
     /// </summary>
     public int Convert(Item item)
+    {
+        RemoveFromInventoryOrThrow(item);
+        return Ions.Add(item.ConvertValue());
+    }
+
+    /// <summary>
+    /// Sells an item from inventory for Riblets — docs/GDD.md §5/§6. See
+    /// <see cref="Item.SellValue"/> for why this is a flat placeholder
+    /// price pending the real store system (milestone 5). Unequips the
+    /// item first if it was wielded.
+    /// </summary>
+    public int Sell(Item item)
+    {
+        RemoveFromInventoryOrThrow(item);
+        var riblets = item.SellValue();
+        AddRiblets(riblets);
+        return riblets;
+    }
+
+    private void RemoveFromInventoryOrThrow(Item item)
     {
         if (!_inventory.Remove(item))
         {
             throw new InvalidOperationException($"'{item.Name}' is not in {Name}'s inventory.");
         }
 
-        return Ions.Add(item.ConvertValue());
+        if (EquippedWeapon == item)
+        {
+            EquippedWeapon = null;
+        }
+
+        if (EquippedArmor == item)
+        {
+            EquippedArmor = null;
+        }
     }
 
     /// <summary>

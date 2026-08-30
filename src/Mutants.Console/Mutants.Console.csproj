@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Mutants.Core\Mutants.Core.csproj" />
+    <ProjectReference Include="..\Mutants.Engine\Mutants.Engine.csproj" />
   </ItemGroup>
 
 </Project>

@@ -25,4 +25,15 @@ public class LootScalingTests
         Assert.Equal(10, LootScaling.ValueFor(tier: 1, Rarity.Common));
         Assert.Equal(20, LootScaling.ValueFor(tier: 1, Rarity.Legendary));
     }
+
+    [Fact]
+    public void CombatBonusFor_ScalesWithTierAndRarity()
+    {
+        var lowTierCommon = LootScaling.CombatBonusFor(tier: 1, Rarity.Common);
+        var highTierCommon = LootScaling.CombatBonusFor(tier: 5, Rarity.Common);
+        var lowTierLegendary = LootScaling.CombatBonusFor(tier: 1, Rarity.Legendary);
+
+        Assert.True(highTierCommon > lowTierCommon);
+        Assert.True(lowTierLegendary > lowTierCommon);
+    }
 }
