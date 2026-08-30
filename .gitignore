@@ -1,0 +1,21 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+
+## Build/publish output
+publish/
+out/
+
+## Installer build artifacts
+installer/Output/
+
+## IDE
+.vs/
+.vscode/
+.idea/
+
+## OS
+.DS_Store
+Thumbs.db
