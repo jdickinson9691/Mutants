@@ -13,9 +13,9 @@ time travel, save/load with leaderboards, and a Windows installer build/
 release pipeline. Content is data-driven (`src/Mutants.Content/*.json`,
 loaded by `Mutants.Engine.Content.ContentLoader`) rather than hardcoded —
 5 real levels, a full item/monster catalog, store catalogs, and complete
-per-class ability tables; see `docs/CONTENT_PLAN.md` for exactly what's
-shipped versus still open (levels 6–8, and ability *execution* — the
-tables exist as data but nothing in combat uses them yet).
+per-class ability tables that are castable in combat; see
+`docs/CONTENT_PLAN.md` for exactly what's shipped versus still open
+(levels 6–8, more monsters/items per level).
 
 ## Building & running
 
@@ -53,9 +53,7 @@ attaches the installer to a GitHub Release automatically — see
   be picked up consistently across sessions and contributors.
 - [`src/Mutants.Console/Program.cs`](src/Mutants.Console/Program.cs) — the
   playable console app; its file header notes exactly what's real vs.
-  still simplified at any given point (e.g. NPCs currently only roam
-  time-travel level 1 — full multi-level NPC simulation is flagged there
-  as follow-up work).
+  still simplified at any given point.
 - [`docs/CONTENT_PLAN.md`](docs/CONTENT_PLAN.md) — what's actually in
   `src/Mutants.Content/*.json` today, and what's still open.
 
@@ -72,8 +70,8 @@ attaches the installer to a GitHub Release automatically — see
 
 Each step above is engine-complete (tested, playable end to end) with
 data-driven content behind it — see `docs/CONTENT_PLAN.md` for exactly
-what's shipped and what's still open (more levels, ability execution,
-multi-level NPCs).
+what's shipped and what's still open (more levels, more monsters/items
+per level).
 
 ## License / provenance
 

@@ -46,12 +46,14 @@ using Spectre.Console;
 // not a folder relative to the exe, since an installed copy typically
 // lives under Program Files, unwritable without elevation.
 //
-// NPCs deliberately stay on level 1 - giving WorldSimulation full
-// multi-level NPC awareness (each NPC on its own level, wandering/
-// fighting/trading against ITS level's content) is a bigger architectural
-// change than fits alongside everything else built so far; flagged here
-// as follow-up work rather than rushed in. Content.NpcPopulationData has
-// entries ready for every level regardless, for whenever that lands.
+// Every level gets its own native NPC population (Content.NpcPopulationData's
+// per-level count + starting character-level range - see
+// SpawnNpcPopulation() below) - each NPC wanders/fights/trades against ITS
+// OWN current level's content, resolved fresh every tick from GameWorld
+// (WorldSimulation.Tick), and may independently push one level deeper on
+// its own (NpcController's Travel goal, GDD §7's "attempt a time-travel
+// jump if it has both the Ions and the level-unlock") - the exact same
+// TimeTravelResolver the player's own "travel" command uses.
 //
 // There's still no spatial monster placement (rooms don't carry
 // monsters) — "fight" spawns a random monster from the current level's
@@ -102,18 +104,16 @@ if (mutant is null)
 }
 
 // GDD §7 calls for "a configurable population" - Content.NpcPopulationData
-// is that config; level 1's Count is the only entry actually consumed
-// right now (NPCs stay on level 1 - see file header note), so entries
-// for deeper levels sit ready for whenever that follow-up work lands.
-var npcPopulationCount = LoadNpcPopulationCountForLevel(1, fallback: 5);
-var npcLevel = world.GetLevel(1);
-var npcs = NpcPopulation.Spawn(npcPopulationCount, npcLevel.Map, random);
-var simulation = new WorldSimulation(npcLevel.Map, npcs, random, npcLevel.StoreSlots);
+// is that config, one entry per level (count + starting character-level
+// range); every level in the world gets its own native population now,
+// each already unlocked up through its home level.
+var npcs = SpawnNpcPopulation(world, random);
+var simulation = new WorldSimulation(world, npcs, random);
 var shownBroadcastCount = 0;
 
 AnsiConsole.WriteLine();
 AnsiConsole.MarkupLine($"Welcome, [bold]{Markup.Escape(mutant.Name)}[/] the [bold]{mutant.Class}[/]. Type [yellow]help[/] for commands.");
-AnsiConsole.MarkupLine($"[grey]{npcPopulationCount} other Mutants are already out there, fending for themselves.[/]");
+AnsiConsole.MarkupLine($"[grey]{npcs.Count} other Mutants are already out there, fending for themselves.[/]");
 AnsiConsole.WriteLine();
 
 RenderRoom(mutant, world);
@@ -370,24 +370,40 @@ static IReadOnlyList<AbilityData> LoadAbilities()
     }
 }
 
-static int LoadNpcPopulationCountForLevel(int levelNumber, int fallback)
+/// <summary>Spawns every level's native NPC population per npc-population.json, skipping any configured level the loaded world doesn't actually have (e.g. TestWorld's 3-level sandbox against the real 5-level config). Falls back to 5 level-1 NPCs, matching this game's original level-1-only behavior, if the config is missing/malformed entirely.</summary>
+static List<Mutant> SpawnNpcPopulation(GameWorld world, IRandomSource random)
+{
+    var config = LoadNpcPopulationConfig();
+    var npcs = new List<Mutant>();
+
+    foreach (var entry in config)
+    {
+        var levelDefinition = world.TryGetLevel(entry.LevelNumber);
+        if (levelDefinition is null)
+        {
+            continue;
+        }
+
+        npcs.AddRange(NpcPopulation.Spawn(entry.Count, levelDefinition.Map, random, entry.LevelNumber, entry.MinLevel, entry.MaxLevel));
+    }
+
+    if (npcs.Count == 0)
+    {
+        npcs.AddRange(NpcPopulation.Spawn(5, world.GetLevel(1).Map, random));
+    }
+
+    return npcs;
+}
+
+static IReadOnlyList<NpcPopulationData> LoadNpcPopulationConfig()
 {
     try
     {
-        var config = ContentLoader.LoadNpcPopulation(Path.Combine(ContentDirectory(), "npc-population.json"));
-        foreach (var entry in config)
-        {
-            if (entry.LevelNumber == levelNumber)
-            {
-                return entry.Count;
-            }
-        }
-
-        return fallback;
+        return ContentLoader.LoadNpcPopulation(Path.Combine(ContentDirectory(), "npc-population.json"));
     }
     catch (ContentException)
     {
-        return fallback;
+        return [];
     }
 }
 
@@ -1016,7 +1032,7 @@ static void HandleTravel(Mutant mutant, GameWorld world, IRandomSource random, B
     }
 
     AnsiConsole.MarkupLine($"[bold]You travel to level {targetLevel}: {Markup.Escape(world.GetLevel(targetLevel).Map.Name)}.[/]");
-    broadcast.Publish(new GameEvent($"{mutant.Name} time traveled to level {targetLevel}."));
+    broadcast.Publish(GameEvent.TimeTraveled(mutant.Name, targetLevel));
     RenderRoom(mutant, world);
 }
 
@@ -1026,6 +1042,7 @@ static void RenderNpcs(IReadOnlyList<Mutant> npcs)
     table.AddColumn("Name");
     table.AddColumn("Class");
     table.AddColumn("Level");
+    table.AddColumn("Time Level");
     table.AddColumn("HP");
     table.AddColumn("Ions");
     table.AddColumn("Location");
@@ -1037,6 +1054,7 @@ static void RenderNpcs(IReadOnlyList<Mutant> npcs)
             Markup.Escape(npc.Name),
             npc.Class.ToString(),
             npc.Level.ToString(),
+            npc.CurrentTimeLevel.ToString(),
             $"{npc.Health.Current}/{npc.Health.Max}",
             $"{npc.Ions.Current}/{npc.Ions.Max}",
             Markup.Escape(npc.Position.ToString()),

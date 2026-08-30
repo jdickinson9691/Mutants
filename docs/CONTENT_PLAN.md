@@ -28,12 +28,15 @@ not launch content.
       — `stores.json`: a government store on levels 1–2 and 4–5 (level 3
       has none yet), plus purchasable empty slots on levels 1, 2, and 4 for
       player ownership.
-- [x] NPC population parameters per level (count, class distribution, level range)
-      — `npc-population.json`: an entry for every level. Only level 1's is
-      actually consumed today — NPCs stay on level 1 until the multi-level
-      NPC simulation follow-up (flagged in `Mutants.Console/Program.cs`'s
-      file header) lands; the other levels' entries are ready for when it
-      does.
+- [x] NPC population parameters per level (count, starting character-level range)
+      — `npc-population.json`: an entry for every level, all now consumed.
+      Every level gets its own native NPC population (already unlocked
+      through its home level, fast-leveled into its `minLevel`–`maxLevel`
+      range and topped off to full HP/Ions), each acting against its own
+      current level's map/roster/stores every tick and able to
+      independently push one level deeper on its own (see
+      `Mutants.Engine.Npc.NpcController`'s Travel goal). Character class
+      per NPC is still uniform-random, not config-driven.
 - [x] Full ability tables for Warrior, Thief, Priest, Mage, Wizard (tiers 1–6 each)
       — `abilities.json`: Warrior and Priest are docs/GDD.md §4.2-sourced;
       Thief, Mage, and Wizard are original design (each entry's `source`
@@ -54,9 +57,6 @@ not launch content.
 
 ## Open follow-up work (not content — engine features content is now blocked on or ready for)
 
-- Multi-level NPC simulation: `WorldSimulation` giving each NPC its own
-  level's map/monsters/stores instead of only level 1.
-  `npc-population.json` already has entries for every level.
 - Levels 6–8, more monsters/items per level, and a second store per level
   3 — the content pipeline supports all of this already; it's pure volume,
   not new plumbing.
