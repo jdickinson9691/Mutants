@@ -37,5 +37,26 @@
   { "id": "deep-current", "name": "Deep Current Residue", "type": "Junk", "tier": 5, "rarity": "Common" },
   { "id": "resonant-core", "name": "Resonant Core", "type": "Junk", "tier": 5, "rarity": "Epic" },
   { "id": "bunker-stim", "name": "Bunker Stim", "type": "Consumable", "tier": 5, "rarity": "Uncommon" },
-  { "id": "gatekeepers-trophy-5", "name": "The Sovereign's Seal", "type": "Weapon", "tier": 5, "rarity": "Legendary" }
+  { "id": "gatekeepers-trophy-5", "name": "The Sovereign's Seal", "type": "Weapon", "tier": 5, "rarity": "Legendary" },
+
+  { "id": "glacial-cleaver", "name": "Glacial Cleaver", "type": "Weapon", "tier": 6, "rarity": "Rare", "restrictedClass": "Priest" },
+  { "id": "frostbound-plating", "name": "Frostbound Plating", "type": "Armor", "tier": 6, "rarity": "Rare" },
+  { "id": "rime-fang", "name": "Rime Fang", "type": "Junk", "tier": 6, "rarity": "Common" },
+  { "id": "cryo-core", "name": "Cryo Core", "type": "Junk", "tier": 6, "rarity": "Epic" },
+  { "id": "frost-tonic", "name": "Frost Tonic", "type": "Consumable", "tier": 6, "rarity": "Common" },
+  { "id": "gatekeepers-trophy-6", "name": "The Custodian's Frostblade", "type": "Weapon", "tier": 6, "rarity": "Legendary" },
+
+  { "id": "null-lance", "name": "Null Lance", "type": "Weapon", "tier": 7, "rarity": "Rare", "restrictedClass": "Wizard" },
+  { "id": "breach-plating", "name": "Breach Plating", "type": "Armor", "tier": 7, "rarity": "Rare" },
+  { "id": "drifter-alloy", "name": "Drifter Alloy", "type": "Junk", "tier": 7, "rarity": "Common" },
+  { "id": "vacuum-core", "name": "Vacuum Core", "type": "Junk", "tier": 7, "rarity": "Epic" },
+  { "id": "oxy-canister", "name": "Oxy Canister", "type": "Consumable", "tier": 7, "rarity": "Common" },
+  { "id": "gatekeepers-trophy-7", "name": "The Helmsman's Ion Blade", "type": "Weapon", "tier": 7, "rarity": "Legendary" },
+
+  { "id": "paradox-edge", "name": "Paradox Edge", "type": "Weapon", "tier": 8, "rarity": "Rare", "restrictedClass": "Thief" },
+  { "id": "bulwark-plating", "name": "Bulwark Plating", "type": "Armor", "tier": 8, "rarity": "Epic" },
+  { "id": "fractured-shard", "name": "Fractured Shard", "type": "Junk", "tier": 8, "rarity": "Common" },
+  { "id": "paradox-core", "name": "Paradox Core", "type": "Junk", "tier": 8, "rarity": "Epic" },
+  { "id": "temporal-salve", "name": "Temporal Salve", "type": "Consumable", "tier": 8, "rarity": "Common" },
+  { "id": "gatekeepers-trophy-8", "name": "The Chronarch's Origin Blade", "type": "Weapon", "tier": 8, "rarity": "Legendary" }
 ]

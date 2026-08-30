@@ -1,0 +1,24 @@
+{
+  "levelNumber": 8,
+  "name": "Level 8 — The Chronofracture",
+  "start": { "east": 0, "north": 0 },
+  "minCharacterLevelToUnlock": 35,
+  "gatekeeperMonsterId": "the-chronarch",
+  "monsterRosterIds": ["fracture-wisp", "paradox-wraith", "bulwark-construct"],
+  "rooms": [
+    { "east": 0, "north": 0, "description": "Reality stutters here — the edges of the room double and flicker out of sync with themselves.",
+      "exits": { "North": "area continues.", "South": "area continues.", "East": "area continues.", "West": "area continues." } },
+    { "east": 0, "north": 1, "description": "Fragments of a dozen different moments overlap in this hallway, none of them quite solid.",
+      "exits": { "South": "area continues.", "East": "area continues." } },
+    { "east": 1, "north": 1, "description": "A doorway hangs caught mid-collapse, forever falling — and something ancient watches from just beyond it.",
+      "exits": { "West": "area continues." } },
+    { "east": 0, "north": -1, "description": "Old broadcasts loop endlessly here, voices reciting news from eras that never happened.",
+      "exits": { "North": "area continues.", "West": "area continues." } },
+    { "east": -1, "north": -1, "description": "A market that exists in three timelines at once; the goods are somehow all still fresh.",
+      "exits": { "East": "area continues." } },
+    { "east": 1, "north": 0, "description": "The walls here remember being built, and unbuilt, over and over, and still haven't decided.",
+      "exits": { "West": "area continues." } },
+    { "east": -1, "north": 0, "description": "A mirror-still pool reflects a sky that hasn't existed yet.",
+      "exits": { "East": "area continues." } }
+  ]
+}

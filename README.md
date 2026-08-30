@@ -12,10 +12,11 @@ a playable console game with combat, loot, an NPC economy, multi-level
 time travel, save/load with leaderboards, and a Windows installer build/
 release pipeline. Content is data-driven (`src/Mutants.Content/*.json`,
 loaded by `Mutants.Engine.Content.ContentLoader`) rather than hardcoded —
-5 real levels, a full item/monster catalog, store catalogs, and complete
-per-class ability tables that are castable in combat; see
-`docs/CONTENT_PLAN.md` for exactly what's shipped versus still open
-(levels 6–8, more monsters/items per level).
+all 8 levels of the GDD's "5–8 levels for v1 launch" range, a full
+item/monster catalog, store catalogs, and complete per-class ability
+tables that are castable in combat; see `docs/CONTENT_PLAN.md` for
+exactly what's shipped versus still open (mostly just more volume —
+more monsters/items per level).
 
 ## Building & running
 
@@ -70,8 +71,8 @@ attaches the installer to a GitHub Release automatically — see
 
 Each step above is engine-complete (tested, playable end to end) with
 data-driven content behind it — see `docs/CONTENT_PLAN.md` for exactly
-what's shipped and what's still open (more levels, more monsters/items
-per level).
+what's shipped and what's still open (mostly just more volume — more
+monsters/items per level).
 
 ## License / provenance
 

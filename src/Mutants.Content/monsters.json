@@ -149,5 +149,101 @@
     "lootTable": [
       { "itemId": "gatekeepers-trophy-5", "dropChance": 1.0 }
     ]
+  },
+
+  {
+    "id": "rime-stalker", "name": "Rime Stalker", "tier": 6, "tags": [],
+    "maxHp": 64, "attackPower": 17, "defense": 6, "speed": 17, "xpReward": 240,
+    "lootTable": [
+      { "itemId": "rime-fang", "dropChance": 0.6 },
+      { "itemId": "glacial-cleaver", "dropChance": 0.2 }
+    ]
+  },
+  {
+    "id": "cryo-revenant", "name": "Cryo Revenant", "tier": 6, "tags": ["undead"],
+    "maxHp": 52, "attackPower": 19, "defense": 5, "speed": 19, "xpReward": 240,
+    "lootTable": [
+      { "itemId": "cryo-core", "dropChance": 0.3 },
+      { "itemId": "frost-tonic", "dropChance": 0.45 }
+    ]
+  },
+  {
+    "id": "vault-sentinel", "name": "Vault Sentinel", "tier": 6, "tags": [],
+    "maxHp": 76, "attackPower": 13, "defense": 11, "speed": 10, "xpReward": 240,
+    "lootTable": [
+      { "itemId": "frostbound-plating", "dropChance": 0.3 },
+      { "itemId": "rime-fang", "dropChance": 0.4 }
+    ]
+  },
+  {
+    "id": "frostbound-custodian", "name": "The Frostbound Custodian", "tier": 6, "tags": [],
+    "maxHp": 204, "attackPower": 15, "defense": 7, "speed": 14, "xpReward": 1200,
+    "lootTable": [
+      { "itemId": "gatekeepers-trophy-6", "dropChance": 1.0 }
+    ]
+  },
+
+  {
+    "id": "void-drifter", "name": "Void Drifter", "tier": 7, "tags": [],
+    "maxHp": 72, "attackPower": 19, "defense": 7, "speed": 18, "xpReward": 280,
+    "lootTable": [
+      { "itemId": "drifter-alloy", "dropChance": 0.6 },
+      { "itemId": "null-lance", "dropChance": 0.2 }
+    ]
+  },
+  {
+    "id": "vacuum-wraith", "name": "Vacuum Wraith", "tier": 7, "tags": ["undead"],
+    "maxHp": 58, "attackPower": 21, "defense": 6, "speed": 20, "xpReward": 280,
+    "lootTable": [
+      { "itemId": "vacuum-core", "dropChance": 0.3 },
+      { "itemId": "oxy-canister", "dropChance": 0.45 }
+    ]
+  },
+  {
+    "id": "hull-breacher", "name": "Hull Breacher", "tier": 7, "tags": [],
+    "maxHp": 84, "attackPower": 15, "defense": 12, "speed": 11, "xpReward": 280,
+    "lootTable": [
+      { "itemId": "breach-plating", "dropChance": 0.3 },
+      { "itemId": "drifter-alloy", "dropChance": 0.4 }
+    ]
+  },
+  {
+    "id": "last-helmsman", "name": "The Last Helmsman", "tier": 7, "tags": [],
+    "maxHp": 228, "attackPower": 17, "defense": 8, "speed": 15, "xpReward": 1400,
+    "lootTable": [
+      { "itemId": "gatekeepers-trophy-7", "dropChance": 1.0 }
+    ]
+  },
+
+  {
+    "id": "fracture-wisp", "name": "Fracture Wisp", "tier": 8, "tags": [],
+    "maxHp": 80, "attackPower": 21, "defense": 8, "speed": 19, "xpReward": 320,
+    "lootTable": [
+      { "itemId": "fractured-shard", "dropChance": 0.6 },
+      { "itemId": "paradox-edge", "dropChance": 0.2 }
+    ]
+  },
+  {
+    "id": "paradox-wraith", "name": "Paradox Wraith", "tier": 8, "tags": ["undead"],
+    "maxHp": 64, "attackPower": 23, "defense": 7, "speed": 21, "xpReward": 320,
+    "lootTable": [
+      { "itemId": "paradox-core", "dropChance": 0.3 },
+      { "itemId": "temporal-salve", "dropChance": 0.45 }
+    ]
+  },
+  {
+    "id": "bulwark-construct", "name": "Bulwark Construct", "tier": 8, "tags": [],
+    "maxHp": 92, "attackPower": 17, "defense": 13, "speed": 12, "xpReward": 320,
+    "lootTable": [
+      { "itemId": "bulwark-plating", "dropChance": 0.3 },
+      { "itemId": "fractured-shard", "dropChance": 0.4 }
+    ]
+  },
+  {
+    "id": "the-chronarch", "name": "The Chronarch", "tier": 8, "tags": [],
+    "maxHp": 252, "attackPower": 19, "defense": 9, "speed": 16, "xpReward": 1600,
+    "lootTable": [
+      { "itemId": "gatekeepers-trophy-8", "dropChance": 1.0 }
+    ]
   }
 ]

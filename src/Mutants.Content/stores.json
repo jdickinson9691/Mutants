@@ -24,6 +24,7 @@
       { "itemId": "dune-ration", "askingPrice": 39 },
       { "itemId": "ash-cloak", "askingPrice": 45 }
     ] },
+  { "levelNumber": 3, "name": "Buried Convoy Rig", "location": { "east": 1, "north": 0 }, "purchaseCost": 400, "isGovernment": false, "listings": [] },
 
   { "levelNumber": 4, "name": "Flooded Terminal", "location": { "east": 2, "north": 1 }, "purchaseCost": 0, "isGovernment": true,
     "listings": [
@@ -35,5 +36,26 @@
   { "levelNumber": 5, "name": "The Undercroft Bazaar", "location": { "east": 1, "north": 1 }, "purchaseCost": 0, "isGovernment": true,
     "listings": [
       { "itemId": "bunker-stim", "askingPrice": 75 }
-    ] }
+    ] },
+
+  { "levelNumber": 6, "name": "Frostbound Cache", "location": { "east": -1, "north": 0 }, "purchaseCost": 0, "isGovernment": true,
+    "listings": [
+      { "itemId": "frost-tonic", "askingPrice": 78 },
+      { "itemId": "frostbound-plating", "askingPrice": 105 }
+    ] },
+  { "levelNumber": 6, "name": "Sealed Cold-Storage Unit", "location": { "east": 0, "north": -1 }, "purchaseCost": 650, "isGovernment": false, "listings": [] },
+
+  { "levelNumber": 7, "name": "Orbital Depot", "location": { "east": 2, "north": 0 }, "purchaseCost": 0, "isGovernment": true,
+    "listings": [
+      { "itemId": "oxy-canister", "askingPrice": 91 },
+      { "itemId": "breach-plating", "askingPrice": 123 }
+    ] },
+  { "levelNumber": 7, "name": "Sealed Cargo Vault", "location": { "east": 2, "north": 1 }, "purchaseCost": 800, "isGovernment": false, "listings": [] },
+
+  { "levelNumber": 8, "name": "The Timeless Market", "location": { "east": -1, "north": -1 }, "purchaseCost": 0, "isGovernment": true,
+    "listings": [
+      { "itemId": "temporal-salve", "askingPrice": 104 },
+      { "itemId": "bulwark-plating", "askingPrice": 166 }
+    ] },
+  { "levelNumber": 8, "name": "A Storefront That Hasn't Opened Yet", "location": { "east": 1, "north": 0 }, "purchaseCost": 1000, "isGovernment": false, "listings": [] }
 ]

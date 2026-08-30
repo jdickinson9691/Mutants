@@ -3,5 +3,8 @@
   { "levelNumber": 2, "count": 4, "minLevel": 4, "maxLevel": 8 },
   { "levelNumber": 3, "count": 4, "minLevel": 8, "maxLevel": 14 },
   { "levelNumber": 4, "count": 3, "minLevel": 13, "maxLevel": 19 },
-  { "levelNumber": 5, "count": 3, "minLevel": 18, "maxLevel": 25 }
+  { "levelNumber": 5, "count": 3, "minLevel": 18, "maxLevel": 25 },
+  { "levelNumber": 6, "count": 3, "minLevel": 24, "maxLevel": 29 },
+  { "levelNumber": 7, "count": 2, "minLevel": 29, "maxLevel": 34 },
+  { "levelNumber": 8, "count": 2, "minLevel": 34, "maxLevel": 40 }
 ]

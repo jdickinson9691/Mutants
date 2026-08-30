@@ -24,10 +24,11 @@ using Spectre.Console;
 // per docs/AGENTS.md's Console/UI Agent contract.
 //
 // The world is loaded from Mutants.Content's JSON (see LoadWorld() below)
-// - 5 real levels, a tier-1..5 monster roster, an item catalog, and store
-// catalogs, all per docs/CONTENT_PLAN.md - falling back to
-// Levels.TestWorld's tiny 3-level sandbox only if content is missing or
-// malformed. Ability tables (Mutants.Content/abilities.json) are loaded
+// - all 8 levels of the GDD's "5-8 levels for v1 launch" range, a
+// tier-1..8 monster roster, an item catalog, and store catalogs, all per
+// docs/CONTENT_PLAN.md - falling back to Levels.TestWorld's tiny 3-level
+// sandbox only if content is missing or malformed. Ability tables
+// (Mutants.Content/abilities.json) are loaded
 // too (LoadAbilities() below) and now execute via Engine.Combat.
 // CombatSession: the player's own "fight" is interactive and round-by-
 // round ("attack" or "cast <ability>" each round; "abilities" lists what's
@@ -73,7 +74,7 @@ using Spectre.Console;
 // instead of throwing, which we treat as "quit."
 
 AnsiConsole.Write(new FigletText("Chronomutants").Color(Color.Green));
-AnsiConsole.MarkupLine("[grey](pre-release build — 5 levels of content, abilities now castable in combat)[/]");
+AnsiConsole.MarkupLine("[grey](pre-release build — 8 levels of content, abilities now castable in combat)[/]");
 AnsiConsole.WriteLine();
 
 // %APPDATA%\Chronomutants — not a folder relative to the exe: an

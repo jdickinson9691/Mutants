@@ -1,0 +1,22 @@
+{
+  "levelNumber": 6,
+  "name": "Level 6 — The Frostbound Vaults",
+  "start": { "east": 0, "north": 0 },
+  "minCharacterLevelToUnlock": 25,
+  "gatekeeperMonsterId": "frostbound-custodian",
+  "monsterRosterIds": ["rime-stalker", "cryo-revenant", "vault-sentinel"],
+  "rooms": [
+    { "east": 0, "north": 0, "description": "A wall of frost blooms across cracked vault doors; your breath fogs in the dead air.",
+      "exits": { "North": "area continues.", "South": "area continues.", "East": "area continues.", "West": "area continues." } },
+    { "east": 0, "north": 1, "description": "Frozen conveyor lines hang mid-motion, cargo locked under a decade of rime.",
+      "exits": { "South": "area continues.", "North": "area continues." } },
+    { "east": 0, "north": 2, "description": "Something vast is sealed behind a wall of blue ice at the end of this hall.",
+      "exits": { "South": "area continues." } },
+    { "east": 0, "north": -1, "description": "Sublevel cryo-pods line the walls, most shattered, a few still faintly humming.",
+      "exits": { "North": "area continues." } },
+    { "east": 1, "north": 0, "description": "Ice has crept over an old command console; the screen beneath still glows.",
+      "exits": { "West": "area continues." } },
+    { "east": -1, "north": 0, "description": "A frostbitten market stall, goods long since freeze-dried solid.",
+      "exits": { "East": "area continues." } }
+  ]
+}
