@@ -75,6 +75,13 @@ public static class CombatResolver
             return new FightResult(MutantWon: false, rounds, XpAwarded: 0, ItemsDropped: [], log);
         }
 
+        var loot = AwardVictory(mutant, monster, random, log);
+        return new FightResult(MutantWon: true, rounds, XpAwarded: monster.XpReward, ItemsDropped: loot, log);
+    }
+
+    /// <summary>Grants XP and rolls/adds loot for defeating <paramref name="monster"/> — shared with CombatSession's interactive fights.</summary>
+    internal static IReadOnlyList<Core.Items.Item> AwardVictory(Mutant mutant, Monster monster, IRandomSource random, List<string> log)
+    {
         var levelsGained = mutant.GainXp(monster.XpReward);
         if (levelsGained > 0)
         {
@@ -88,7 +95,15 @@ public static class CombatResolver
             log.Add($"{mutant.Name} looted {item.Name}.");
         }
 
-        return new FightResult(MutantWon: true, rounds, XpAwarded: monster.XpReward, ItemsDropped: loot, log);
+        return loot;
+    }
+
+    /// <summary>Rolls one attack's damage with the standard variance band — shared with CombatSession.</summary>
+    internal static int RollDamage(int attackerPower, int defenderDefense, IRandomSource random)
+    {
+        var raw = attackerPower - defenderDefense;
+        var varianceFactor = 1 - DamageVariance + random.NextDouble() * (2 * DamageVariance);
+        return Math.Max(1, (int)Math.Round(raw * varianceFactor));
     }
 
     private static void ResolveAttack(
@@ -97,10 +112,7 @@ public static class CombatResolver
         Core.Stats.HealthPool defenderHealth,
         IRandomSource random, List<string> log)
     {
-        var raw = attackerPower - defenderDefense;
-        var varianceFactor = 1 - DamageVariance + random.NextDouble() * (2 * DamageVariance);
-        var damage = Math.Max(1, (int)Math.Round(raw * varianceFactor));
-
+        var damage = RollDamage(attackerPower, defenderDefense, random);
         var actualDamage = defenderHealth.Damage(damage);
         log.Add($"{attackerName} hits {defenderName} for {actualDamage} damage.");
     }

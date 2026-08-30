@@ -81,8 +81,9 @@ public static class ContentLoader
             var defense = template.Defense;
             var speed = template.Speed;
             var xpReward = template.XpReward;
+            var tags = template.Tags;
 
-            if (!catalog.TryAdd(template.Id, () => new Monster(name, tier, maxHp, attackPower, defense, speed, xpReward, lootTable)))
+            if (!catalog.TryAdd(template.Id, () => new Monster(name, tier, maxHp, attackPower, defense, speed, xpReward, lootTable, tags)))
             {
                 throw new ContentException($"Duplicate monster id '{template.Id}'.");
             }

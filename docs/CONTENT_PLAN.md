@@ -16,7 +16,7 @@ not launch content.
 - [x] Monster roster per time-travel level (stats, XP, loot table, tags e.g. "undead")
       — `monsters.json`: 3 regular monsters + 1 gatekeeper per level, tiers 1–5.
       A couple per level are tagged `"undead"` (matches docs/GDD.md §4.2's
-      Priest "Turn Undead" ability, once ability execution exists).
+      Priest "Turn Undead" ability, which now checks this tag in combat).
 - [x] Item catalog per tier/rarity (weapons, armor, consumables, "junk"/convertible items)
       — `items.json`: ~34 items across tiers 1–5, including a few
       class-restricted pieces and a guaranteed-rare "trophy" per gatekeeper.
@@ -40,15 +40,20 @@ not launch content.
       field says which) filling the gap the GDD explicitly left open,
       following its own stated pattern (6 tiers, single-target → group/
       area → capstone) and each class's flavor from the GDD's class table.
-      **Not yet wired to anything** — no engine code executes an ability in
-      combat; that's a separate, larger Systems/Engine feature (Ion-cost
-      resolution, targeting, effects) than authoring the table itself.
+      **Wired and executable**: `abilities.json` now carries mechanical
+      fields (`effect`, `magnitude`, `ionCost`, `condition`, `tag`,
+      `durationRounds`) consumed by `Mutants.Engine.Combat.CombatSession`
+      — the player's own fights are interactive (`fight` → each round
+      `attack` or `cast <ability>`; `abilities` lists what's unlocked).
+      Every multi-target/ally GDD ability was adapted to a single-target
+      equivalent for this 1v1 engine (see `ContentDtos.AbilityData`'s doc
+      comment for the full mapping); 4 abilities with no honest 1v1
+      translation (Resurrect Lite, Fence's Favor, Blink, Mana Well) are
+      `effect: "None"` and refused at cast time with no Ion cost rather
+      than silently doing nothing.
 
 ## Open follow-up work (not content — engine features content is now blocked on or ready for)
 
-- Ability execution: actually spending Ions and applying an ability's
-  effect in `Mutants.Engine.Combat.CombatResolver`, plus a console command
-  to use one. `abilities.json` is ready and waiting for this.
 - Multi-level NPC simulation: `WorldSimulation` giving each NPC its own
   level's map/monsters/stores instead of only level 1.
   `npc-population.json` already has entries for every level.

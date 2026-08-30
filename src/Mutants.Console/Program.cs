@@ -27,10 +27,15 @@ using Spectre.Console;
 // - 5 real levels, a tier-1..5 monster roster, an item catalog, and store
 // catalogs, all per docs/CONTENT_PLAN.md - falling back to
 // Levels.TestWorld's tiny 3-level sandbox only if content is missing or
-// malformed. Ability tables exist as data (Mutants.Content/abilities.json)
-// but nothing executes them yet - combat is still primary-attack-only;
-// that's a separate, larger Engine feature than content authoring, out of
-// scope here and clearly flagged as such in the content file itself.
+// malformed. Ability tables (Mutants.Content/abilities.json) are loaded
+// too (LoadAbilities() below) and now execute via Engine.Combat.
+// CombatSession: the player's own "fight" is interactive and round-by-
+// round ("attack" or "cast <ability>" each round; "abilities" lists what's
+// unlocked so far) - NPC auto-combat and gatekeeper fights still use
+// CombatResolver.Fight's instant, fully-automated resolution unchanged.
+// A handful of GDD abilities (Resurrect Lite, Fence's Favor, Blink, Mana
+// Well) have no 1v1 combat translation and are refused at cast time with
+// no Ion cost - see AbilityEffectType.None's doc comment.
 //
 // Only the player's own character is saved/loaded as a full character
 // (see Persistence.CharacterSaveData) - NPCs are re-simulated fresh each
@@ -66,7 +71,7 @@ using Spectre.Console;
 // instead of throwing, which we treat as "quit."
 
 AnsiConsole.Write(new FigletText("Chronomutants").Color(Color.Green));
-AnsiConsole.MarkupLine("[grey](pre-release build — 5 levels of content, no ability execution yet)[/]");
+AnsiConsole.MarkupLine("[grey](pre-release build — 5 levels of content, abilities now castable in combat)[/]");
 AnsiConsole.WriteLine();
 
 // %APPDATA%\Chronomutants — not a folder relative to the exe: an
@@ -87,6 +92,7 @@ RenderLeaderboards(repository);
 AnsiConsole.WriteLine();
 
 var world = LoadWorld();
+var abilities = LoadAbilities();
 var random = new SystemRandomSource();
 
 var mutant = HandleStartScreen(repository, world);
@@ -147,11 +153,15 @@ while (running)
             break;
 
         case "fight" or "f":
-            if (!HandleFight(mutant, world, random, simulation.Broadcast))
+            if (!HandleFight(mutant, world, random, simulation.Broadcast, abilities))
             {
                 running = false; // defeated - see HandleFight
             }
 
+            break;
+
+        case "abilities" or "spells":
+            RenderAbilities(mutant, abilities);
             break;
 
         case "inventory" or "i":
@@ -344,6 +354,19 @@ static GameWorld LoadWorld()
     {
         AnsiConsole.MarkupLine($"[red]Couldn't load content ({Markup.Escape(ex.Message)}) - falling back to the built-in sandbox world.[/]");
         return TestWorld.Build();
+    }
+}
+
+/// <summary>Loads abilities.json's mechanical ability tables (see AbilityData). An empty list on missing/malformed content just means 'abilities' and 'cast' have nothing to show/use - not fatal, unlike LoadWorld.</summary>
+static IReadOnlyList<AbilityData> LoadAbilities()
+{
+    try
+    {
+        return ContentLoader.LoadAbilities(Path.Combine(ContentDirectory(), "abilities.json"));
+    }
+    catch (ContentException)
+    {
+        return [];
     }
 }
 
@@ -776,7 +799,16 @@ static void HandleStoreManagement(Mutant mutant, GameWorld world, string command
 }
 
 /// <summary>Spawns a random monster from the current level's tier-scaled roster and resolves combat. Returns false if the Mutant was defeated (caller should end the session).</summary>
-static bool HandleFight(Mutant mutant, GameWorld world, IRandomSource random, BroadcastChannel broadcast)
+/// <summary>
+/// The player's own fights are interactive and round-by-round via
+/// CombatSession - "attack" or "cast <ability>" each round - unlike NPC
+/// auto-combat and gatekeeper fights (still CombatResolver.Fight's instant,
+/// fully-automated resolution; see this file's header). End-of-input
+/// mid-fight (e.g. piped stdin running out) auto-attacks each remaining
+/// round rather than getting stuck, since a fight is otherwise unbounded
+/// mid-prompt and the outer loop needs to reach its own end-of-input to quit.
+/// </summary>
+static bool HandleFight(Mutant mutant, GameWorld world, IRandomSource random, BroadcastChannel broadcast, IReadOnlyList<AbilityData> abilities)
 {
     var levelDefinition = world.GetLevel(mutant.CurrentTimeLevel);
     var roster = levelDefinition.MonsterRoster;
@@ -785,15 +817,57 @@ static bool HandleFight(Mutant mutant, GameWorld world, IRandomSource random, Br
 
     AnsiConsole.MarkupLine($"A [bold]{Markup.Escape(monster.Name)}[/] (tier {monster.Tier}) attacks!");
 
-    var result = CombatResolver.Fight(mutant, monster, random);
-    foreach (var line in result.Log)
+    var usableAbilities = abilities
+        .Where(a => string.Equals(a.Class, mutant.Class.ToString(), StringComparison.OrdinalIgnoreCase) && a.Level <= mutant.Level)
+        .ToList();
+
+    var session = new CombatSession(mutant, monster, random);
+    var loggedSoFar = 0;
+
+    while (!session.IsOver)
     {
-        AnsiConsole.MarkupLine(Markup.Escape(line));
+        AnsiConsole.Markup("[green]  (attack)[/] or [green]cast <ability>[/]? > ");
+        var rawInput = Console.ReadLine();
+
+        if (rawInput is not null)
+        {
+            var trimmed = rawInput.Trim();
+
+            if (trimmed.Length > 0 && !string.Equals(trimmed, "attack", StringComparison.OrdinalIgnoreCase) && !string.Equals(trimmed, "a", StringComparison.OrdinalIgnoreCase))
+            {
+                if (trimmed.StartsWith("cast", StringComparison.OrdinalIgnoreCase))
+                {
+                    var abilityName = trimmed.Length > 4 ? trimmed[4..].Trim() : "";
+                    var ability = usableAbilities.FirstOrDefault(a => string.Equals(a.Name, abilityName, StringComparison.OrdinalIgnoreCase));
+                    if (ability is null)
+                    {
+                        AnsiConsole.MarkupLine($"[red]No ability named '{Markup.Escape(abilityName)}' available.[/] Type 'abilities' outside combat to see your list.");
+                        continue; // doesn't consume a round
+                    }
+
+                    var castResult = session.Cast(ability);
+                    AnsiConsole.MarkupLine(castResult.Success ? $"[blue]{Markup.Escape(castResult.Message)}[/]" : $"[red]{Markup.Escape(castResult.Message)}[/]");
+                    if (!castResult.Success)
+                    {
+                        continue; // failed cast doesn't consume a round
+                    }
+
+                    PrintNewLogLines(session, ref loggedSoFar);
+                    continue;
+                }
+
+                AnsiConsole.MarkupLine("[red]Type 'attack' or 'cast <ability name>'.[/]");
+                continue;
+            }
+        }
+
+        session.Attack();
+        PrintNewLogLines(session, ref loggedSoFar);
     }
 
-    if (result.MutantWon)
+    if (session.MutantWon)
     {
-        AnsiConsole.MarkupLine($"[green]You defeated the {Markup.Escape(monster.Name)}! +{result.XpAwarded} XP.[/]");
+        AnsiConsole.MarkupLine($"[green]You defeated the {Markup.Escape(monster.Name)}! +{session.XpAwarded} XP.[/]");
         broadcast.Publish(GameEvent.Slain(monster.Name, mutant.Name));
         if (mutant.Level > levelBefore)
         {
@@ -810,6 +884,56 @@ static bool HandleFight(Mutant mutant, GameWorld world, IRandomSource random, Br
     AnsiConsole.MarkupLine($"[red]You were defeated by the {Markup.Escape(monster.Name)}...[/]");
     broadcast.Publish(GameEvent.Slain(mutant.Name, monster.Name));
     return false;
+}
+
+static void PrintNewLogLines(CombatSession session, ref int loggedSoFar)
+{
+    for (var i = loggedSoFar; i < session.Log.Count; i++)
+    {
+        AnsiConsole.MarkupLine(Markup.Escape(session.Log[i]));
+    }
+
+    loggedSoFar = session.Log.Count;
+}
+
+/// <summary>Lists the player's class's abilities - locked ones (by level) shown greyed, and the handful with no combat effect flagged as such (see AbilityEffectType.None).</summary>
+static void RenderAbilities(Mutant mutant, IReadOnlyList<AbilityData> abilities)
+{
+    var classAbilities = abilities
+        .Where(a => string.Equals(a.Class, mutant.Class.ToString(), StringComparison.OrdinalIgnoreCase))
+        .OrderBy(a => a.Tier)
+        .ToList();
+
+    if (classAbilities.Count == 0)
+    {
+        AnsiConsole.MarkupLine("[grey]No ability data loaded.[/]");
+        return;
+    }
+
+    var table = new Table().Expand();
+    table.AddColumn("Level");
+    table.AddColumn("Name");
+    table.AddColumn("Ion Cost");
+    table.AddColumn("Description");
+    table.AddColumn("Status");
+
+    foreach (var ability in classAbilities)
+    {
+        var unlocked = mutant.Level >= ability.Level;
+        var hasCombatEffect = !string.Equals(ability.Effect, "None", StringComparison.OrdinalIgnoreCase);
+        var status = !unlocked
+            ? "[grey]locked[/]"
+            : hasCombatEffect ? "[green]ready[/]" : "[yellow]no combat effect[/]";
+
+        table.AddRow(
+            ability.Level.ToString(),
+            Markup.Escape(ability.Name),
+            ability.IonCost.ToString(),
+            Markup.Escape(ability.Description),
+            status);
+    }
+
+    AnsiConsole.Write(table);
 }
 
 /// <summary>Handles "travel next/prev/&lt;level&gt;" — docs/GDD.md §3.2.</summary>
@@ -1122,6 +1246,8 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]n[/]/[green]s[/]/[green]e[/]/[green]w[/] (or north/south/east/west) - move");
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room");
     AnsiConsole.MarkupLine("  [green]fight[/] (or f)        - fight a random monster from this level's roster");
+    AnsiConsole.MarkupLine("    (each round, type [green]attack[/] or [green]cast <ability>[/])");
+    AnsiConsole.MarkupLine("  [green]abilities[/] (or spells) - list your class's abilities unlocked so far");
     AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]/[green]<N>[/] - jump between time-travel levels");
     AnsiConsole.MarkupLine("  [green]inventory[/] (or i)    - list what you're carrying");
     AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Mutants out in the world");

@@ -20,6 +20,13 @@ public sealed class Monster
     public int XpReward { get; }
     public IReadOnlyList<LootTableEntry> LootTable { get; }
 
+    /// <summary>
+    /// Free-form tags (e.g. "undead") — docs/CONTENT_PLAN.md's monster
+    /// roster item calls these out explicitly, matched against by tag-
+    /// conditioned abilities like Priest's Turn Undead.
+    /// </summary>
+    public IReadOnlyList<string> Tags { get; }
+
     public Monster(
         string name,
         int tier,
@@ -28,7 +35,8 @@ public sealed class Monster
         int defense,
         int speed,
         int xpReward,
-        IReadOnlyList<LootTableEntry>? lootTable = null)
+        IReadOnlyList<LootTableEntry>? lootTable = null,
+        IReadOnlyList<string>? tags = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -48,15 +56,19 @@ public sealed class Monster
         Speed = speed;
         XpReward = xpReward;
         LootTable = lootTable ?? [];
+        Tags = tags ?? [];
     }
 
+    public bool HasTag(string tag) => Tags.Contains(tag, StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Builds a monster from <see cref="MonsterScaling"/>'s tier baselines instead of specifying stats directly.</summary>
-    public static Monster Create(string name, int tier, IReadOnlyList<LootTableEntry>? lootTable = null) =>
+    public static Monster Create(string name, int tier, IReadOnlyList<LootTableEntry>? lootTable = null, IReadOnlyList<string>? tags = null) =>
         new(name, tier,
             maxHp: MonsterScaling.BaseHp(tier),
             attackPower: MonsterScaling.BaseAttackPower(tier),
             defense: MonsterScaling.BaseDefense(tier),
             speed: MonsterScaling.BaseSpeed(tier),
             xpReward: MonsterScaling.XpReward(tier),
-            lootTable: lootTable);
+            lootTable: lootTable,
+            tags: tags);
 }
