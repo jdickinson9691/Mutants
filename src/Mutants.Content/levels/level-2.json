@@ -1,0 +1,18 @@
+{
+  "levelNumber": 2,
+  "name": "Level 2 — Neon Undercity",
+  "start": { "east": 0, "north": 0 },
+  "minCharacterLevelToUnlock": 5,
+  "gatekeeperMonsterId": "undercity-warden",
+  "monsterRosterIds": ["rust-crawler", "circuit-wraith", "riot-drone"],
+  "rooms": [
+    { "east": 0, "north": 0, "description": "Flickering neon signage buzzes over a flooded platform.",
+      "exits": { "East": "area continues.", "North": "area continues." } },
+    { "east": 1, "north": 0, "description": "Rusted turnstiles block a half-collapsed tunnel.",
+      "exits": { "West": "area continues.", "North": "area continues." } },
+    { "east": 0, "north": 1, "description": "A vending machine hums, selling nothing anyone recognizes.",
+      "exits": { "South": "area continues.", "East": "area continues." } },
+    { "east": 1, "north": 1, "description": "Graffiti tags cover every surface of this transit hub.",
+      "exits": { "South": "area continues.", "West": "area continues." } }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "levelNumber": 1,
+  "name": "Level 1 — Ruined City",
+  "start": { "east": 0, "north": 0 },
+  "minCharacterLevelToUnlock": 1,
+  "gatekeeperMonsterId": null,
+  "monsterRosterIds": ["scavenger", "junk-golem", "feral-dog"],
+  "rooms": [
+    { "east": 0, "north": 0, "description": "You are standing at the crossroads of a ruined city block.",
+      "exits": { "North": "area continues.", "South": "area continues.", "East": "area continues.", "West": "area continues." } },
+    { "east": 1, "north": 0, "description": "You're in a maintenance shop, shelves stripped bare.",
+      "exits": { "North": "area continues.", "South": "area continues.", "West": "area continues." } },
+    { "east": -1, "north": 0, "description": "You see rubble everywhere; the street has collapsed into it.",
+      "exits": { "North": "area continues.", "South": "area continues.", "East": "area continues." } },
+    { "east": 0, "north": 1, "description": "You feel a cold breeze cutting between the buildings.",
+      "exits": { "South": "area continues.", "East": "area continues.", "West": "area continues." } },
+    { "east": 0, "north": -1, "description": "A flickering streetlamp buzzes over cracked asphalt.",
+      "exits": { "North": "area continues.", "East": "area continues.", "West": "area continues." } },
+    { "east": 1, "north": 1, "description": "Broken glass crunches underfoot outside a gutted storefront.",
+      "exits": { "South": "area continues.", "West": "area continues." } },
+    { "east": 1, "north": -1, "description": "You smell smoke drifting from a fire burning somewhere nearby.",
+      "exits": { "North": "area continues.", "West": "area continues." } },
+    { "east": -1, "north": 1, "description": "Twisted rebar juts from a collapsed parking structure.",
+      "exits": { "South": "area continues.", "East": "area continues." } },
+    { "east": -1, "north": -1, "description": "An old subway entrance yawns open into darkness.",
+      "exits": { "North": "area continues.", "East": "area continues." } }
+  ]
+}

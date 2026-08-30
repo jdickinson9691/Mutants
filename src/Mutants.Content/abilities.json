@@ -1,0 +1,36 @@
+[
+  { "class": "Warrior", "tier": 1, "level": 5, "name": "Cleave", "description": "Hit up to 2 additional adjacent enemies.", "source": "gdd" },
+  { "class": "Warrior", "tier": 2, "level": 10, "name": "Second Wind", "description": "Once per fight, heal 20% max HP for free (no Ions).", "source": "gdd" },
+  { "class": "Warrior", "tier": 3, "level": 15, "name": "Guard Break", "description": "Bypass a portion of the target's armor.", "source": "gdd" },
+  { "class": "Warrior", "tier": 4, "level": 20, "name": "Rally", "description": "Nearby NPC allies gain a temporary damage buff.", "source": "gdd" },
+  { "class": "Warrior", "tier": 5, "level": 25, "name": "Juggernaut", "description": "Temporary damage reduction stance.", "source": "gdd" },
+  { "class": "Warrior", "tier": 6, "level": 30, "name": "Executioner", "description": "Bonus damage vs. targets below 25% HP.", "source": "gdd" },
+
+  { "class": "Priest", "tier": 1, "level": 5, "name": "Mend", "description": "Single-target heal (Ion cost).", "source": "gdd" },
+  { "class": "Priest", "tier": 2, "level": 10, "name": "Bless", "description": "Temporary to-hit/damage buff for self or target.", "source": "gdd" },
+  { "class": "Priest", "tier": 3, "level": 15, "name": "Turn Undead", "description": "Strong bonus damage + fear vs. undead-tagged monsters.", "source": "gdd" },
+  { "class": "Priest", "tier": 4, "level": 20, "name": "Circle Heal", "description": "Heal self + adjacent party/NPC allies.", "source": "gdd" },
+  { "class": "Priest", "tier": 5, "level": 25, "name": "Resurrect Lite", "description": "Revive a fallen ally NPC with partial HP (rare, long cooldown).", "source": "gdd" },
+  { "class": "Priest", "tier": 6, "level": 30, "name": "Sanctuary", "description": "Brief immunity window.", "source": "gdd" },
+
+  { "class": "Thief", "tier": 1, "level": 5, "name": "Backstab", "description": "Bonus damage on the first hit against an undamaged target.", "source": "original" },
+  { "class": "Thief", "tier": 2, "level": 10, "name": "Vanish", "description": "Brief stealth that guarantees your next attack crits.", "source": "original" },
+  { "class": "Thief", "tier": 3, "level": 15, "name": "Poison Blade", "description": "Attacks apply a damage-over-time effect for several rounds.", "source": "original" },
+  { "class": "Thief", "tier": 4, "level": 20, "name": "Shadow Step", "description": "Instantly reposition to strike an ally's target, hitting twice this round.", "source": "original" },
+  { "class": "Thief", "tier": 5, "level": 25, "name": "Fence's Favor", "description": "Permanent store discount: buy cheaper, sell for more.", "source": "original" },
+  { "class": "Thief", "tier": 6, "level": 30, "name": "Death Mark", "description": "Mark a target; all damage against it is increased for the rest of the fight.", "source": "original" },
+
+  { "class": "Mage", "tier": 1, "level": 5, "name": "Firebolt", "description": "Single-target burst damage spell (Ion cost).", "source": "original" },
+  { "class": "Mage", "tier": 2, "level": 10, "name": "Chain Lightning", "description": "Damage that arcs to a second nearby enemy.", "source": "original" },
+  { "class": "Mage", "tier": 3, "level": 15, "name": "Arcane Overload", "description": "Your next spell costs no Ions and deals bonus damage.", "source": "original" },
+  { "class": "Mage", "tier": 4, "level": 20, "name": "Meteor", "description": "Area damage hitting every enemy in the fight.", "source": "original" },
+  { "class": "Mage", "tier": 5, "level": 25, "name": "Mana Well", "description": "Passively regenerate Ions faster.", "source": "original" },
+  { "class": "Mage", "tier": 6, "level": 30, "name": "Cataclysm", "description": "Capstone: a massive area nuke on a long cooldown.", "source": "original" },
+
+  { "class": "Wizard", "tier": 1, "level": 5, "name": "Slow", "description": "Reduce a target's Speed for several rounds.", "source": "original" },
+  { "class": "Wizard", "tier": 2, "level": 10, "name": "Blink", "description": "Short-range teleport to escape or reposition.", "source": "original" },
+  { "class": "Wizard", "tier": 3, "level": 15, "name": "Weaken", "description": "Reduce a target's attack power for the rest of the fight.", "source": "original" },
+  { "class": "Wizard", "tier": 4, "level": 20, "name": "Mirror Image", "description": "Create a decoy that absorbs one hit.", "source": "original" },
+  { "class": "Wizard", "tier": 5, "level": 25, "name": "Time Skip", "description": "Briefly act twice in a row.", "source": "original" },
+  { "class": "Wizard", "tier": 6, "level": 30, "name": "Banish", "description": "Capstone: remove a non-boss enemy from the fight entirely.", "source": "original" }
+]

@@ -1,0 +1,153 @@
+[
+  {
+    "id": "scavenger", "name": "Scavenger", "tier": 1, "tags": [],
+    "maxHp": 28, "attackPower": 5, "defense": 2, "speed": 9, "xpReward": 40,
+    "lootTable": [
+      { "itemId": "scrap-metal", "dropChance": 0.6 },
+      { "itemId": "rusty-shiv", "dropChance": 0.25 }
+    ]
+  },
+  {
+    "id": "junk-golem", "name": "Junk Golem", "tier": 1, "tags": [],
+    "maxHp": 28, "attackPower": 5, "defense": 2, "speed": 9, "xpReward": 40,
+    "lootTable": [
+      { "itemId": "scrap-plating", "dropChance": 0.35 },
+      { "itemId": "warped-gear", "dropChance": 0.4 }
+    ]
+  },
+  {
+    "id": "feral-dog", "name": "Feral Dog", "tier": 1, "tags": [],
+    "maxHp": 28, "attackPower": 5, "defense": 2, "speed": 9, "xpReward": 40,
+    "lootTable": [
+      { "itemId": "torn-hide", "dropChance": 0.7 }
+    ]
+  },
+
+  {
+    "id": "rust-crawler", "name": "Rust Crawler", "tier": 2, "tags": [],
+    "maxHp": 40, "attackPower": 7, "defense": 3, "speed": 9, "xpReward": 80,
+    "lootTable": [
+      { "itemId": "circuit-scrap", "dropChance": 0.55 },
+      { "itemId": "riot-baton", "dropChance": 0.2 }
+    ]
+  },
+  {
+    "id": "circuit-wraith", "name": "Circuit Wraith", "tier": 2, "tags": ["undead"],
+    "maxHp": 30, "attackPower": 9, "defense": 2, "speed": 13, "xpReward": 80,
+    "lootTable": [
+      { "itemId": "neon-shard", "dropChance": 0.25 },
+      { "itemId": "circuit-scrap", "dropChance": 0.4 }
+    ]
+  },
+  {
+    "id": "riot-drone", "name": "Riot Drone", "tier": 2, "tags": [],
+    "maxHp": 36, "attackPower": 6, "defense": 5, "speed": 8, "xpReward": 80,
+    "lootTable": [
+      { "itemId": "kevlar-vest", "dropChance": 0.25 },
+      { "itemId": "taser-prod", "dropChance": 0.2 }
+    ]
+  },
+  {
+    "id": "undercity-warden", "name": "The Undercity Warden", "tier": 2, "tags": [],
+    "maxHp": 108, "attackPower": 7, "defense": 3, "speed": 10, "xpReward": 400,
+    "lootTable": [
+      { "itemId": "gatekeepers-trophy-2", "dropChance": 1.0 }
+    ]
+  },
+
+  {
+    "id": "dune-stalker", "name": "Dune Stalker", "tier": 3, "tags": [],
+    "maxHp": 48, "attackPower": 9, "defense": 4, "speed": 12, "xpReward": 120,
+    "lootTable": [
+      { "itemId": "sandworm-chitin", "dropChance": 0.3 },
+      { "itemId": "static-charm", "dropChance": 0.5 }
+    ]
+  },
+  {
+    "id": "ash-wraith", "name": "Ash Wraith", "tier": 3, "tags": ["undead"],
+    "maxHp": 38, "attackPower": 11, "defense": 3, "speed": 15, "xpReward": 120,
+    "lootTable": [
+      { "itemId": "static-charm", "dropChance": 0.4 },
+      { "itemId": "ash-cloak", "dropChance": 0.2 }
+    ]
+  },
+  {
+    "id": "sand-reaver", "name": "Sand Reaver", "tier": 3, "tags": [],
+    "maxHp": 50, "attackPower": 8, "defense": 5, "speed": 10, "xpReward": 120,
+    "lootTable": [
+      { "itemId": "bone-blade", "dropChance": 0.2 },
+      { "itemId": "dune-ration", "dropChance": 0.5 }
+    ]
+  },
+  {
+    "id": "ashfall-colossus", "name": "The Ashfall Colossus", "tier": 3, "tags": [],
+    "maxHp": 132, "attackPower": 9, "defense": 4, "speed": 11, "xpReward": 600,
+    "lootTable": [
+      { "itemId": "gatekeepers-trophy-3", "dropChance": 1.0 }
+    ]
+  },
+
+  {
+    "id": "drowned-archivist", "name": "Drowned Archivist", "tier": 4, "tags": ["undead"],
+    "maxHp": 46, "attackPower": 13, "defense": 4, "speed": 14, "xpReward": 160,
+    "lootTable": [
+      { "itemId": "data-shard", "dropChance": 0.5 },
+      { "itemId": "archive-token", "dropChance": 0.2 }
+    ]
+  },
+  {
+    "id": "flood-serpent", "name": "Flood Serpent", "tier": 4, "tags": [],
+    "maxHp": 58, "attackPower": 11, "defense": 6, "speed": 11, "xpReward": 160,
+    "lootTable": [
+      { "itemId": "pressure-suit", "dropChance": 0.25 },
+      { "itemId": "preserved-rations", "dropChance": 0.4 }
+    ]
+  },
+  {
+    "id": "static-eel", "name": "Static Eel", "tier": 4, "tags": [],
+    "maxHp": 52, "attackPower": 12, "defense": 5, "speed": 13, "xpReward": 160,
+    "lootTable": [
+      { "itemId": "signal-lance", "dropChance": 0.15 },
+      { "itemId": "data-shard", "dropChance": 0.4 }
+    ]
+  },
+  {
+    "id": "drowned-king", "name": "The Archive Drowned King", "tier": 4, "tags": ["undead"],
+    "maxHp": 156, "attackPower": 11, "defense": 5, "speed": 12, "xpReward": 800,
+    "lootTable": [
+      { "itemId": "gatekeepers-trophy-4", "dropChance": 1.0 }
+    ]
+  },
+
+  {
+    "id": "undercroft-sentinel", "name": "Undercroft Sentinel", "tier": 5, "tags": [],
+    "maxHp": 66, "attackPower": 13, "defense": 8, "speed": 11, "xpReward": 200,
+    "lootTable": [
+      { "itemId": "undercroft-plating", "dropChance": 0.25 },
+      { "itemId": "deep-current", "dropChance": 0.5 }
+    ]
+  },
+  {
+    "id": "bone-choir", "name": "Bone Choir", "tier": 5, "tags": ["undead"],
+    "maxHp": 48, "attackPower": 16, "defense": 5, "speed": 16, "xpReward": 200,
+    "lootTable": [
+      { "itemId": "resonant-core", "dropChance": 0.2 },
+      { "itemId": "deep-current", "dropChance": 0.4 }
+    ]
+  },
+  {
+    "id": "deep-warden", "name": "Deep Warden", "tier": 5, "tags": [],
+    "maxHp": 70, "attackPower": 12, "defense": 9, "speed": 10, "xpReward": 200,
+    "lootTable": [
+      { "itemId": "bunker-stim", "dropChance": 0.4 },
+      { "itemId": "sovereign-blade", "dropChance": 0.1 }
+    ]
+  },
+  {
+    "id": "undercroft-sovereign", "name": "The Undercroft Sovereign", "tier": 5, "tags": [],
+    "maxHp": 180, "attackPower": 13, "defense": 6, "speed": 13, "xpReward": 1000,
+    "lootTable": [
+      { "itemId": "gatekeepers-trophy-5", "dropChance": 1.0 }
+    ]
+  }
+]

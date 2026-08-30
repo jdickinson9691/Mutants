@@ -1,0 +1,20 @@
+{
+  "levelNumber": 4,
+  "name": "Level 4 — Drowned Archives",
+  "start": { "east": 0, "north": 0 },
+  "minCharacterLevelToUnlock": 15,
+  "gatekeeperMonsterId": "drowned-king",
+  "monsterRosterIds": ["drowned-archivist", "flood-serpent", "static-eel"],
+  "rooms": [
+    { "east": 0, "north": 0, "description": "Waist-deep water laps at a collapsed atrium, papers dissolving in the murk.",
+      "exits": { "East": "area continues." } },
+    { "east": 1, "north": 0, "description": "Server racks lean at odd angles, still faintly blinking.",
+      "exits": { "West": "area continues.", "East": "area continues." } },
+    { "east": 2, "north": 0, "description": "A flooded reading room, shelves long since surrendered to the water.",
+      "exits": { "West": "area continues.", "North": "area continues.", "South": "area continues." } },
+    { "east": 2, "north": 1, "description": "A terminal bay, mostly submerged, one screen still flickering static.",
+      "exits": { "South": "area continues." } },
+    { "east": 2, "north": -1, "description": "An abandoned maintenance bay, dry enough to still be useful.",
+      "exits": { "North": "area continues." } }
+  ]
+}

@@ -34,6 +34,29 @@
   <ItemGroup>
     <ProjectReference Include="..\Mutants.Core\Mutants.Core.csproj" />
     <ProjectReference Include="..\Mutants.Engine\Mutants.Engine.csproj" />
+    <ProjectReference Include="..\Mutants.Content\Mutants.Content.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Mutants.Content has no compiled output to reference, so its JSON
+      files don't flow through the ProjectReference above — copy them
+      directly into our own output under Content\, where
+      Mutants.Engine.Content.ContentLoader expects to find them (see
+      Program.cs) and where the published single-file exe needs them
+      alongside it (CopyToPublishDirectory) since they can't be bundled
+      into the exe itself.
+    -->
+    <Content Include="..\Mutants.Content\*.json">
+      <Link>Content\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\Mutants.Content\levels\*.json">
+      <Link>Content\levels\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

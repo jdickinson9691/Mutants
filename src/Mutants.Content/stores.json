@@ -1,0 +1,39 @@
+[
+  { "levelNumber": 1, "name": "Ration Depot", "location": { "east": 1, "north": 0 }, "purchaseCost": 0, "isGovernment": true,
+    "listings": [
+      { "itemId": "stale-ration-pack", "askingPrice": 13 },
+      { "itemId": "patch-kit", "askingPrice": 13 },
+      { "itemId": "cracked-shiv", "askingPrice": 13 }
+    ] },
+  { "levelNumber": 1, "name": "Streetside Exchange", "location": { "east": 0, "north": -1 }, "purchaseCost": 0, "isGovernment": true,
+    "listings": [
+      { "itemId": "salvaged-plating", "askingPrice": 13 },
+      { "itemId": "pipe-wrench", "askingPrice": 13 }
+    ] },
+  { "levelNumber": 1, "name": "Gutted Storefront", "location": { "east": 1, "north": 1 }, "purchaseCost": 150, "isGovernment": false, "listings": [] },
+
+  { "levelNumber": 2, "name": "Tunnel Outpost", "location": { "east": 0, "north": 1 }, "purchaseCost": 0, "isGovernment": true,
+    "listings": [
+      { "itemId": "sealed-nutrient-pack", "askingPrice": 26 },
+      { "itemId": "riot-baton", "askingPrice": 26 }
+    ] },
+  { "levelNumber": 2, "name": "Flooded Kiosk", "location": { "east": 1, "north": 1 }, "purchaseCost": 300, "isGovernment": false, "listings": [] },
+
+  { "levelNumber": 3, "name": "Dune Waystation", "location": { "east": -1, "north": 0 }, "purchaseCost": 0, "isGovernment": true,
+    "listings": [
+      { "itemId": "dune-ration", "askingPrice": 39 },
+      { "itemId": "ash-cloak", "askingPrice": 45 }
+    ] },
+
+  { "levelNumber": 4, "name": "Flooded Terminal", "location": { "east": 2, "north": 1 }, "purchaseCost": 0, "isGovernment": true,
+    "listings": [
+      { "itemId": "preserved-rations", "askingPrice": 52 },
+      { "itemId": "pressure-suit", "askingPrice": 60 }
+    ] },
+  { "levelNumber": 4, "name": "Abandoned Terminal Bay", "location": { "east": 2, "north": -1 }, "purchaseCost": 500, "isGovernment": false, "listings": [] },
+
+  { "levelNumber": 5, "name": "The Undercroft Bazaar", "location": { "east": 1, "north": 1 }, "purchaseCost": 0, "isGovernment": true,
+    "listings": [
+      { "itemId": "bunker-stim", "askingPrice": 75 }
+    ] }
+]

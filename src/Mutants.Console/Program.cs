@@ -8,22 +8,29 @@ using Mutants.Core.Levels;
 using Mutants.Core.World;
 using Mutants.Engine;
 using Mutants.Engine.Combat;
+using Mutants.Engine.Content;
 using Mutants.Engine.Npc;
 using Mutants.Engine.Persistence;
 using Mutants.Engine.Simulation;
 using Spectre.Console;
 
-// Sandbox build covering milestones 2 (grid movement, single hardcoded
-// level), 3 (combat, loot drops, convert/sell/wield), 4 (NPC simulation
-// loop), 5 (stores and the Riblet economy), 6 (multi-level time travel
-// with scaling), and 7 (leaderboards + start screen + save/load) per
-// docs/TECH_STACK.md's milestone sequencing. Milestone 8 (Windows
-// installer packaging) wraps this project up — see installer/*.iss and
-// .github/workflows/. All game rules here (movement legality, combat
-// resolution, NPC AI, store transactions, time travel, persistence,
-// character state) live in Mutants.Core / Mutants.Engine; this file is
-// presentation/input only, per docs/AGENTS.md's Console/UI Agent
-// contract.
+// Covers all 8 of docs/TECH_STACK.md's milestones: grid movement, combat/
+// loot/convert/sell/wield, NPC simulation, stores and the Riblet economy,
+// multi-level time travel, leaderboards/start screen/save-load, and
+// Windows installer packaging (installer/*.iss, .github/workflows/). All
+// game rules here (movement legality, combat resolution, NPC AI, store
+// transactions, time travel, persistence, character state) live in
+// Mutants.Core / Mutants.Engine; this file is presentation/input only,
+// per docs/AGENTS.md's Console/UI Agent contract.
+//
+// The world is loaded from Mutants.Content's JSON (see LoadWorld() below)
+// - 5 real levels, a tier-1..5 monster roster, an item catalog, and store
+// catalogs, all per docs/CONTENT_PLAN.md - falling back to
+// Levels.TestWorld's tiny 3-level sandbox only if content is missing or
+// malformed. Ability tables exist as data (Mutants.Content/abilities.json)
+// but nothing executes them yet - combat is still primary-attack-only;
+// that's a separate, larger Engine feature than content authoring, out of
+// scope here and clearly flagged as such in the content file itself.
 //
 // Only the player's own character is saved/loaded as a full character
 // (see Persistence.CharacterSaveData) - NPCs are re-simulated fresh each
@@ -34,23 +41,22 @@ using Spectre.Console;
 // not a folder relative to the exe, since an installed copy typically
 // lives under Program Files, unwritable without elevation.
 //
-// The player can now freely time-travel across Levels.TestWorld's 3
-// sandbox levels. NPCs deliberately stay on level 1 this milestone —
-// giving WorldSimulation full multi-level NPC awareness (each NPC on its
-// own level, wandering/fighting/trading against ITS level's content) is a
-// bigger architectural change than fits alongside building time travel
-// itself; flagged here as follow-up work rather than rushed in.
+// NPCs deliberately stay on level 1 - giving WorldSimulation full
+// multi-level NPC awareness (each NPC on its own level, wandering/
+// fighting/trading against ITS level's content) is a bigger architectural
+// change than fits alongside everything else built so far; flagged here
+// as follow-up work rather than rushed in. Content.NpcPopulationData has
+// entries ready for every level regardless, for whenever that lands.
 //
 // There's still no spatial monster placement (rooms don't carry
 // monsters) — "fight" spawns a random monster from the current level's
 // tier-scaled roster on demand, same as NpcController does for NPCs.
-// Stores, unlike monsters, ARE placed spatially per level (see
-// Economy.TestStores / Levels.TestWorld) — buying/selling requires
-// standing in the right room, same as movement already works.
-// docs/GDD.md §9's real background tick (every ~2 seconds, independent of
-// player input) isn't implemented — this console instead advances the
-// world by one tick per player command, a synchronous stand-in that
-// keeps the sandbox simple and scriptable.
+// Stores, unlike monsters, ARE placed spatially per level — buying/
+// selling requires standing in the right room, same as movement already
+// works. docs/GDD.md §9's real background tick (every ~2 seconds,
+// independent of player input) isn't implemented — this console instead
+// advances the world by one tick per player command, a synchronous
+// stand-in that keeps the loop simple and scriptable.
 
 // Input is read via plain Console.ReadLine() rather than Spectre's
 // interactive prompts (TextPrompt/SelectionPrompt): those require a real
@@ -60,7 +66,7 @@ using Spectre.Console;
 // instead of throwing, which we treat as "quit."
 
 AnsiConsole.Write(new FigletText("Chronomutants").Color(Color.Green));
-AnsiConsole.MarkupLine("[grey](engine sandbox build — time travel across a 3-level test world)[/]");
+AnsiConsole.MarkupLine("[grey](pre-release build — 5 levels of content, no ability execution yet)[/]");
 AnsiConsole.WriteLine();
 
 // %APPDATA%\Chronomutants — not a folder relative to the exe: an
@@ -80,7 +86,7 @@ using var repository = new GameRepository(savePath);
 RenderLeaderboards(repository);
 AnsiConsole.WriteLine();
 
-var world = TestWorld.Build();
+var world = LoadWorld();
 var random = new SystemRandomSource();
 
 var mutant = HandleStartScreen(repository, world);
@@ -89,15 +95,19 @@ if (mutant is null)
     return;
 }
 
-const int NpcPopulationSize = 5; // arbitrary sandbox default - GDD §7 calls this "a configurable population"
-var npcLevel = world.GetLevel(1); // NPCs stay on level 1 for now - see file header note
-var npcs = NpcPopulation.Spawn(NpcPopulationSize, npcLevel.Map, random);
+// GDD §7 calls for "a configurable population" - Content.NpcPopulationData
+// is that config; level 1's Count is the only entry actually consumed
+// right now (NPCs stay on level 1 - see file header note), so entries
+// for deeper levels sit ready for whenever that follow-up work lands.
+var npcPopulationCount = LoadNpcPopulationCountForLevel(1, fallback: 5);
+var npcLevel = world.GetLevel(1);
+var npcs = NpcPopulation.Spawn(npcPopulationCount, npcLevel.Map, random);
 var simulation = new WorldSimulation(npcLevel.Map, npcs, random, npcLevel.StoreSlots);
 var shownBroadcastCount = 0;
 
 AnsiConsole.WriteLine();
 AnsiConsole.MarkupLine($"Welcome, [bold]{Markup.Escape(mutant.Name)}[/] the [bold]{mutant.Class}[/]. Type [yellow]help[/] for commands.");
-AnsiConsole.MarkupLine($"[grey]{NpcPopulationSize} other Mutants are already out there, fending for themselves.[/]");
+AnsiConsole.MarkupLine($"[grey]{npcPopulationCount} other Mutants are already out there, fending for themselves.[/]");
 AnsiConsole.WriteLine();
 
 RenderRoom(mutant, world);
@@ -315,6 +325,49 @@ static CharacterClass? ReadClassChoice()
 }
 
 /// <summary>The title-screen "new game or load a save" flow. Returns null only on end-of-input (quit).</summary>
+static string ContentDirectory() => Path.Combine(AppContext.BaseDirectory, "Content");
+
+/// <summary>
+/// Loads the real, authored world from Mutants.Content (see
+/// docs/CONTENT_PLAN.md). Falls back to Levels.TestWorld's small sandbox
+/// world if the content files are missing or malformed, so a broken or
+/// incomplete deployment degrades to something playable instead of
+/// crashing outright.
+/// </summary>
+static GameWorld LoadWorld()
+{
+    try
+    {
+        return ContentLoader.LoadWorld(ContentDirectory());
+    }
+    catch (ContentException ex)
+    {
+        AnsiConsole.MarkupLine($"[red]Couldn't load content ({Markup.Escape(ex.Message)}) - falling back to the built-in sandbox world.[/]");
+        return TestWorld.Build();
+    }
+}
+
+static int LoadNpcPopulationCountForLevel(int levelNumber, int fallback)
+{
+    try
+    {
+        var config = ContentLoader.LoadNpcPopulation(Path.Combine(ContentDirectory(), "npc-population.json"));
+        foreach (var entry in config)
+        {
+            if (entry.LevelNumber == levelNumber)
+            {
+                return entry.Count;
+            }
+        }
+
+        return fallback;
+    }
+    catch (ContentException)
+    {
+        return fallback;
+    }
+}
+
 static Mutant? HandleStartScreen(GameRepository repository, GameWorld world)
 {
     var savedNames = repository.ListSavedCharacterNames();

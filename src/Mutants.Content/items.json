@@ -1,0 +1,41 @@
+[
+  { "id": "rusty-shiv", "name": "Rusty Shiv", "type": "Weapon", "tier": 1, "rarity": "Common" },
+  { "id": "pipe-wrench", "name": "Pipe Wrench", "type": "Weapon", "tier": 1, "rarity": "Common" },
+  { "id": "cracked-shiv", "name": "Cracked Shiv", "type": "Weapon", "tier": 1, "rarity": "Common" },
+  { "id": "scrap-plating", "name": "Scrap Plating", "type": "Armor", "tier": 1, "rarity": "Common" },
+  { "id": "salvaged-plating", "name": "Salvaged Plating", "type": "Armor", "tier": 1, "rarity": "Common" },
+  { "id": "scrap-metal", "name": "Scrap Metal", "type": "Junk", "tier": 1, "rarity": "Common" },
+  { "id": "torn-hide", "name": "Torn Hide", "type": "Junk", "tier": 1, "rarity": "Common" },
+  { "id": "warped-gear", "name": "Warped Gear", "type": "Junk", "tier": 1, "rarity": "Uncommon" },
+  { "id": "stale-ration-pack", "name": "Stale Ration Pack", "type": "Consumable", "tier": 1, "rarity": "Common" },
+  { "id": "patch-kit", "name": "Patch Kit", "type": "Consumable", "tier": 1, "rarity": "Common" },
+
+  { "id": "riot-baton", "name": "Riot Baton", "type": "Weapon", "tier": 2, "rarity": "Common" },
+  { "id": "taser-prod", "name": "Taser Prod", "type": "Weapon", "tier": 2, "rarity": "Uncommon" },
+  { "id": "kevlar-vest", "name": "Kevlar Vest", "type": "Armor", "tier": 2, "rarity": "Uncommon" },
+  { "id": "circuit-scrap", "name": "Circuit Scrap", "type": "Junk", "tier": 2, "rarity": "Common" },
+  { "id": "neon-shard", "name": "Neon Shard", "type": "Junk", "tier": 2, "rarity": "Rare" },
+  { "id": "sealed-nutrient-pack", "name": "Sealed Nutrient Pack", "type": "Consumable", "tier": 2, "rarity": "Common" },
+  { "id": "gatekeepers-trophy-2", "name": "Undercity Warden's Baton", "type": "Weapon", "tier": 2, "rarity": "Rare" },
+
+  { "id": "bone-blade", "name": "Bone Blade", "type": "Weapon", "tier": 3, "rarity": "Uncommon", "restrictedClass": "Thief" },
+  { "id": "ash-cloak", "name": "Ash Cloak", "type": "Armor", "tier": 3, "rarity": "Uncommon" },
+  { "id": "sandworm-chitin", "name": "Sandworm Chitin", "type": "Junk", "tier": 3, "rarity": "Rare" },
+  { "id": "static-charm", "name": "Static Charm", "type": "Junk", "tier": 3, "rarity": "Common" },
+  { "id": "dune-ration", "name": "Dune Ration", "type": "Consumable", "tier": 3, "rarity": "Common" },
+  { "id": "gatekeepers-trophy-3", "name": "Ashfall Colossus's Fang", "type": "Weapon", "tier": 3, "rarity": "Epic" },
+
+  { "id": "signal-lance", "name": "Signal Lance", "type": "Weapon", "tier": 4, "rarity": "Uncommon", "restrictedClass": "Mage" },
+  { "id": "pressure-suit", "name": "Pressure Suit", "type": "Armor", "tier": 4, "rarity": "Uncommon" },
+  { "id": "data-shard", "name": "Data Shard", "type": "Junk", "tier": 4, "rarity": "Common" },
+  { "id": "archive-token", "name": "Archive Token", "type": "Junk", "tier": 4, "rarity": "Rare" },
+  { "id": "preserved-rations", "name": "Preserved Rations", "type": "Consumable", "tier": 4, "rarity": "Common" },
+  { "id": "gatekeepers-trophy-4", "name": "Drowned King's Crown", "type": "Weapon", "tier": 4, "rarity": "Epic" },
+
+  { "id": "sovereign-blade", "name": "Sovereign Blade", "type": "Weapon", "tier": 5, "rarity": "Rare", "restrictedClass": "Warrior" },
+  { "id": "undercroft-plating", "name": "Undercroft Plating", "type": "Armor", "tier": 5, "rarity": "Rare" },
+  { "id": "deep-current", "name": "Deep Current Residue", "type": "Junk", "tier": 5, "rarity": "Common" },
+  { "id": "resonant-core", "name": "Resonant Core", "type": "Junk", "tier": 5, "rarity": "Epic" },
+  { "id": "bunker-stim", "name": "Bunker Stim", "type": "Consumable", "tier": 5, "rarity": "Uncommon" },
+  { "id": "gatekeepers-trophy-5", "name": "The Sovereign's Seal", "type": "Weapon", "tier": 5, "rarity": "Legendary" }
+]
