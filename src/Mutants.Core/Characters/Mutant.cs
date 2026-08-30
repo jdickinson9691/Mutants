@@ -295,6 +295,35 @@ public sealed class Mutant
     }
 
     /// <summary>
+    /// Heals by spending Ions — docs/GDD.md §2 [SOURCE]: "spend Ions to
+    /// heal wounds directly," usable at any time (not gated to combat or
+    /// a location, unlike Convert/Sell which need an inventory item or a
+    /// store). Heals as much as both missing HP and available Ions allow
+    /// at <see cref="IonEconomy.HpPerIonHealed"/> per Ion — never
+    /// overheals past max HP, never spends more Ions than it needs to.
+    /// Returns the HP actually restored (0 if already at full health or
+    /// out of Ions, in which case no Ions are spent).
+    /// </summary>
+    public int Heal()
+    {
+        var missingHp = Health.Max - Health.Current;
+        if (missingHp <= 0)
+        {
+            return 0;
+        }
+
+        var ionsNeeded = (int)Math.Ceiling(missingHp / (double)IonEconomy.HpPerIonHealed);
+        var ionsToSpend = Math.Min(ionsNeeded, Ions.Current);
+        if (ionsToSpend <= 0)
+        {
+            return 0;
+        }
+
+        Ions.Spend(ionsToSpend);
+        return Health.Heal(ionsToSpend * IonEconomy.HpPerIonHealed);
+    }
+
+    /// <summary>
     /// Sells an item from inventory for Riblets — docs/GDD.md §5/§6.
     /// Unequips the item first if it was wielded. Pass
     /// <paramref name="riblets"/> for a store-negotiated price (see

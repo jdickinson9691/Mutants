@@ -102,6 +102,58 @@ public class MutantTests
     }
 
     [Fact]
+    public void Heal_AlreadyAtFullHealth_DoesNothingAndSpendsNoIons()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+
+        var healed = mutant.Heal();
+
+        Assert.Equal(0, healed);
+        Assert.Equal(mutant.Ions.Max, mutant.Ions.Current);
+    }
+
+    [Fact]
+    public void Heal_SpendsIonsOneToOneForHp()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        mutant.Health.Damage(10);
+        var ionsBefore = mutant.Ions.Current;
+
+        var healed = mutant.Heal();
+
+        Assert.Equal(10, healed);
+        Assert.Equal(mutant.Health.Max, mutant.Health.Current);
+        Assert.Equal(ionsBefore - 10, mutant.Ions.Current);
+    }
+
+    [Fact]
+    public void Heal_NotEnoughIonsToFullyHeal_HealsOnlyAsMuchAsAffordable()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        mutant.Health.Damage(25);
+        mutant.Ions.Spend(mutant.Ions.Current - 10); // leave exactly 10 Ions
+
+        var healed = mutant.Heal();
+
+        Assert.Equal(10, healed);
+        Assert.Equal(mutant.Health.Max - 15, mutant.Health.Current); // healed 10 of the 25 missing
+        Assert.Equal(0, mutant.Ions.Current);
+    }
+
+    [Fact]
+    public void Heal_NoIonsAvailable_DoesNothing()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        mutant.Health.Damage(10);
+        mutant.Ions.Spend(mutant.Ions.Current);
+
+        var healed = mutant.Heal();
+
+        Assert.Equal(0, healed);
+        Assert.Equal(mutant.Health.Max - 10, mutant.Health.Current);
+    }
+
+    [Fact]
     public void Wield_EquipsWeaponAndArmorIntoSeparateSlots()
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);

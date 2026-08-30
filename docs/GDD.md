@@ -26,7 +26,9 @@ same rules you are.
 
 Ions are the single unified resource for:
 - **Survival** — passive drain per turn/tick; hitting 0 starts costing HP.
-- **Healing** — spend Ions to heal wounds directly.
+- **Healing** — the `heal` command spends Ions to heal wounds directly,
+  usable at any time (no location or combat requirement) and, like every
+  other action, advances one tick `[SOURCE]`.
 - **Spellcasting** — arcane/divine classes spend Ions per ability.
 - **Time travel** — spend a (level-dependent) lump of Ions to travel to another
   time-travel level.
@@ -46,6 +48,11 @@ it** `[SOURCE]`.
   the "quasi semi-flawed but usable" economy the original was known for,
   without the parts that made it exploitable.
 - Time travel cost = `25 * target_level` Ions (see §4).
+- `heal` restores HP at 1 Ion per 1 HP — no specific ratio survives in the
+  historical record, and this one is deliberately steep (not a cheap
+  top-off) so healing genuinely competes with travel/casting/survival for
+  the same Ion pool, matching the "single unified resource" framing above
+  rather than making it a trivial no-cost habit.
 
 ## 3. Movement & the world map
 

@@ -153,6 +153,10 @@ while (running)
             RenderStatusBar(mutant, world);
             break;
 
+        case "heal":
+            HandleHeal(mutant);
+            break;
+
         case "fight" or "f":
             if (!HandleFight(mutant, world, random, simulation.Broadcast, abilities))
             {
@@ -745,6 +749,25 @@ static void HandleCollect(Mutant mutant, GameWorld world)
         : "[grey]Nothing to collect yet.[/]");
 }
 
+/// <summary>docs/GDD.md §2 [SOURCE]: "spend Ions to heal wounds directly," usable at any time - no location, no combat, no item required, unlike every other resource-spending command in this game.</summary>
+static void HandleHeal(Mutant mutant)
+{
+    if (mutant.Health.Current >= mutant.Health.Max)
+    {
+        AnsiConsole.MarkupLine("[grey]You're already at full health.[/]");
+        return;
+    }
+
+    if (mutant.Ions.Current <= 0)
+    {
+        AnsiConsole.MarkupLine("[red]Not enough Ions to heal.[/]");
+        return;
+    }
+
+    var healed = mutant.Heal();
+    AnsiConsole.MarkupLine($"[green]You heal for {healed} HP.[/] ({mutant.Health.Current}/{mutant.Health.Max} HP, {mutant.Ions.Current}/{mutant.Ions.Max} Ions left)");
+}
+
 static void HandleStoreManagement(Mutant mutant, GameWorld world, string command, string argument)
 {
     var storeSlots = world.GetLevel(mutant.CurrentTimeLevel).StoreSlots;
@@ -1266,6 +1289,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room");
     AnsiConsole.MarkupLine("  [green]fight[/] (or f)        - fight a random monster from this level's roster");
     AnsiConsole.MarkupLine("    (each round, type [green]attack[/] or [green]cast <ability>[/])");
+    AnsiConsole.MarkupLine("  [green]heal[/]                - spend Ions to recover HP (usable any time)");
     AnsiConsole.MarkupLine("  [green]abilities[/] (or spells) - list your class's abilities unlocked so far");
     AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]/[green]<N>[/] - jump between time-travel levels");
     AnsiConsole.MarkupLine("  [green]inventory[/] (or i)    - list what you're carrying");

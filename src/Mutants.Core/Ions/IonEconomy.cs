@@ -22,6 +22,17 @@ public static class IonEconomy
         return Math.Max(1, (int)Math.Floor(baseItemValue * 0.4));
     }
 
+    /// <summary>
+    /// HP restored per Ion spent via the "heal" command — docs/GDD.md §2
+    /// [SOURCE] confirms "spend Ions to heal wounds directly," usable at
+    /// any time, but no specific ratio survives in the historical record.
+    /// 1:1 is original tuning, deliberately steep (not a cheap top-off) so
+    /// healing genuinely competes with travel/casting/survival for the
+    /// same Ion pool, matching Ions' "single unified resource" design
+    /// intent rather than making it a trivial no-cost habit.
+    /// </summary>
+    public const int HpPerIonHealed = 1;
+
     /// <summary>Time travel costs 25 * target_level Ions — docs/GDD.md §3.2.</summary>
     public static int TimeTravelCost(int targetLevel)
     {
