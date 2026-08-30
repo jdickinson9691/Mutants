@@ -9,17 +9,29 @@ using Mutants.Core.World;
 using Mutants.Engine;
 using Mutants.Engine.Combat;
 using Mutants.Engine.Npc;
+using Mutants.Engine.Persistence;
 using Mutants.Engine.Simulation;
 using Spectre.Console;
 
 // Sandbox build covering milestones 2 (grid movement, single hardcoded
 // level), 3 (combat, loot drops, convert/sell/wield), 4 (NPC simulation
-// loop), 5 (stores and the Riblet economy), and 6 (multi-level time
-// travel with scaling) per docs/TECH_STACK.md's milestone sequencing. All
-// game rules here (movement legality, combat resolution, NPC AI, store
-// transactions, time travel, character state) live in Mutants.Core /
+// loop), 5 (stores and the Riblet economy), 6 (multi-level time travel
+// with scaling), and 7 (leaderboards + start screen + save/load) per
+// docs/TECH_STACK.md's milestone sequencing. All game rules here
+// (movement legality, combat resolution, NPC AI, store transactions,
+// time travel, persistence, character state) live in Mutants.Core /
 // Mutants.Engine; this file is presentation/input only, per
 // docs/AGENTS.md's Console/UI Agent contract.
+//
+// Only the player's own character is saved/loaded as a full character
+// (see Persistence.CharacterSaveData) - NPCs are re-simulated fresh each
+// session (docs/GDD.md doesn't ask for NPC persistence, only for the
+// leaderboard to have "meaning across NPC-simulated seasons," which is
+// satisfied by recording their personal bests, not their full state).
+// The save/leaderboard file lives at ./saves/mutants.db relative to
+// wherever the console runs - a real packaged build would use a
+// platform-appropriate app-data directory instead (packaging work,
+// milestone 8).
 //
 // The player can now freely time-travel across Levels.TestWorld's 3
 // sandbox levels. NPCs deliberately stay on level 1 this milestone —
@@ -50,22 +62,21 @@ AnsiConsole.Write(new FigletText("Chronomutants").Color(Color.Green));
 AnsiConsole.MarkupLine("[grey](engine sandbox build — time travel across a 3-level test world)[/]");
 AnsiConsole.WriteLine();
 
-var name = ReadNonEmptyLine("What is your name, Mutant? ");
-if (name is null)
-{
-    return;
-}
+var savePath = Path.Combine("saves", "mutants.db");
+Directory.CreateDirectory("saves");
+using var repository = new GameRepository(savePath);
 
-var characterClass = ReadClassChoice();
-if (characterClass is null)
-{
-    return;
-}
+RenderLeaderboards(repository);
+AnsiConsole.WriteLine();
 
-var mutant = new Mutant(name, characterClass.Value);
 var world = TestWorld.Build();
-mutant.PlaceAt(world.GetLevel(mutant.CurrentTimeLevel).Map.Start);
 var random = new SystemRandomSource();
+
+var mutant = HandleStartScreen(repository, world);
+if (mutant is null)
+{
+    return;
+}
 
 const int NpcPopulationSize = 5; // arbitrary sandbox default - GDD §7 calls this "a configurable population"
 var npcLevel = world.GetLevel(1); // NPCs stay on level 1 for now - see file header note
@@ -151,6 +162,15 @@ while (running)
             HandleCollect(mutant, world);
             break;
 
+        case "save":
+            HandleSave(mutant, repository);
+            RecordNpcLeaderboardBests(npcs, repository);
+            break;
+
+        case "leaderboard" or "board":
+            RenderLeaderboards(repository, mutant.Name);
+            break;
+
         default:
             var (command, argument) = SplitCommand(input);
 
@@ -201,10 +221,33 @@ while (running)
     }
 }
 
+if (!mutant.Health.IsDead)
+{
+    HandleSave(mutant, repository);
+}
+
+RecordNpcLeaderboardBests(npcs, repository);
+
 AnsiConsole.MarkupLine(mutant.Health.IsDead
     ? "[grey]Game over.[/]"
-    : "[grey]Farewell, Mutant.[/]");
+    : "[grey]Farewell, Mutant. Progress saved.[/]");
 return;
+
+static void HandleSave(Mutant mutant, GameRepository repository)
+{
+    repository.SaveCharacter(CharacterMapper.ToSaveData(mutant));
+    repository.RecordPersonalBests(mutant.Name, isPlayer: true, mutant.UnlockedTimeLevel, mutant.Level);
+    AnsiConsole.MarkupLine("[green]Game saved.[/]");
+}
+
+/// <summary>NPCs aren't saved as full characters (see file header), but their personal bests still count toward the leaderboard - docs/GDD.md §8's "across player + NPCs."</summary>
+static void RecordNpcLeaderboardBests(IReadOnlyList<Mutant> npcs, GameRepository repository)
+{
+    foreach (var npc in npcs)
+    {
+        repository.RecordPersonalBests(npc.Name, isPlayer: false, npc.UnlockedTimeLevel, npc.Level);
+    }
+}
 
 static string? ReadNonEmptyLine(string prompt)
 {
@@ -258,6 +301,125 @@ static CharacterClass? ReadClassChoice()
 
         AnsiConsole.MarkupLine("[red]Please enter a number from the list, or a class name.[/]");
     }
+}
+
+/// <summary>The title-screen "new game or load a save" flow. Returns null only on end-of-input (quit).</summary>
+static Mutant? HandleStartScreen(GameRepository repository, GameWorld world)
+{
+    var savedNames = repository.ListSavedCharacterNames();
+    if (savedNames.Count > 0)
+    {
+        AnsiConsole.MarkupLine($"[yellow]Saved characters:[/] {string.Join(", ", savedNames.Select(Markup.Escape))}");
+        AnsiConsole.MarkupLine("Type [green]new[/] to create a Mutant, or a saved name to continue them.");
+    }
+    else
+    {
+        AnsiConsole.MarkupLine("No saved characters yet. Type [green]new[/] to create a Mutant.");
+    }
+
+    string choice;
+    while (true)
+    {
+        var input = ReadNonEmptyLine("> ");
+        if (input is null)
+        {
+            return null; // end of input
+        }
+
+        if (string.Equals(input, "new", StringComparison.OrdinalIgnoreCase))
+        {
+            choice = "new";
+            break;
+        }
+
+        var matchedName = savedNames.FirstOrDefault(n => string.Equals(n, input, StringComparison.OrdinalIgnoreCase));
+        if (matchedName is not null)
+        {
+            choice = matchedName;
+            break;
+        }
+
+        AnsiConsole.MarkupLine("[red]Type 'new', or the exact name of a saved character.[/]");
+    }
+
+    if (choice == "new")
+    {
+        var name = ReadNonEmptyLine("What is your name, Mutant? ");
+        if (name is null)
+        {
+            return null;
+        }
+
+        var characterClass = ReadClassChoice();
+        if (characterClass is null)
+        {
+            return null;
+        }
+
+        var mutant = new Mutant(name, characterClass.Value);
+        mutant.PlaceAt(world.GetLevel(mutant.CurrentTimeLevel).Map.Start);
+        return mutant;
+    }
+
+    var saveData = repository.LoadCharacter(choice)!;
+    var loaded = CharacterMapper.FromSaveData(saveData);
+
+    // Defensive: if the world's content ever changes, a saved position
+    // might no longer exist - fall back to that level's start room rather
+    // than crash on the next GetRoom() call.
+    var levelDefinition = world.TryGetLevel(loaded.CurrentTimeLevel);
+    if (levelDefinition is null || levelDefinition.Map.TryGetRoom(loaded.Position) is null)
+    {
+        levelDefinition ??= world.GetLevel(1);
+        loaded.SetCurrentTimeLevel(levelDefinition.LevelNumber);
+        loaded.PlaceAt(levelDefinition.Map.Start);
+    }
+
+    AnsiConsole.MarkupLine($"[green]Welcome back, {Markup.Escape(loaded.Name)}![/]");
+    return loaded;
+}
+
+static void RenderLeaderboards(GameRepository repository, string? highlightName = null)
+{
+    AnsiConsole.MarkupLine("[yellow]═══ Leaderboards ═══[/]");
+    RenderLeaderboardBoard(repository, "Deepest Time Level Reached", repository.TopByTimeLevel(10), e => e.DeepestTimeLevelReached, highlightName);
+    RenderLeaderboardBoard(repository, "Highest Character Level", repository.TopByCharacterLevel(10), e => e.HighestCharacterLevelReached, highlightName);
+}
+
+static void RenderLeaderboardBoard(
+    GameRepository repository, string title, IReadOnlyList<LeaderboardEntry> top,
+    Func<LeaderboardEntry, int> value, string? highlightName)
+{
+    if (top.Count == 0)
+    {
+        AnsiConsole.MarkupLine($"[grey]{Markup.Escape(title)}: no records yet.[/]");
+        return;
+    }
+
+    var table = new Table().Title(Markup.Escape(title)).Expand();
+    table.AddColumn("#");
+    table.AddColumn("Name");
+    table.AddColumn("Value");
+    table.AddColumn("Who");
+
+    foreach (var (entry, index) in top.Select((e, i) => (e, i)))
+    {
+        var isHighlighted = highlightName is not null && string.Equals(entry.Name, highlightName, StringComparison.OrdinalIgnoreCase);
+        var nameCell = isHighlighted ? $"[bold green]{Markup.Escape(entry.Name)} (you)[/]" : Markup.Escape(entry.Name);
+        table.AddRow((index + 1).ToString(), nameCell, value(entry).ToString(), entry.IsPlayer ? "player" : "NPC");
+    }
+
+    // docs/GDD.md §8: the player's own best is shown even if outside the top 10.
+    if (highlightName is not null && !top.Any(e => string.Equals(e.Name, highlightName, StringComparison.OrdinalIgnoreCase)))
+    {
+        var own = repository.GetLeaderboardEntry(highlightName);
+        if (own is not null)
+        {
+            table.AddRow("-", $"[bold green]{Markup.Escape(own.Name)} (you)[/]", value(own).ToString(), "player");
+        }
+    }
+
+    AnsiConsole.Write(table);
 }
 
 static (string Command, string Argument) SplitCommand(string input)
@@ -912,7 +1074,9 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]withdraw <item>[/]    - pull a listing back into your inventory");
     AnsiConsole.MarkupLine("  [green]reprice <item> <price>[/] - change a listing's asking price");
     AnsiConsole.MarkupLine("  [green]collect[/]             - withdraw your store's earnings into your Riblets");
+    AnsiConsole.MarkupLine("  [green]save[/]                - save your character now");
+    AnsiConsole.MarkupLine("  [green]leaderboard[/] (or board) - show the leaderboards, your best highlighted");
     AnsiConsole.MarkupLine("  [green]status[/]              - show the status bar");
     AnsiConsole.MarkupLine("  [green]help[/] (or ?)         - show this list");
-    AnsiConsole.MarkupLine("  [green]quit[/] (or exit)      - leave the game");
+    AnsiConsole.MarkupLine("  [green]quit[/] (or exit)      - leave the game (auto-saves unless you died)");
 }

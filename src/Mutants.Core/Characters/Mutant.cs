@@ -106,6 +106,46 @@ public sealed class Mutant
         Ions = new IonPool(ClassDefinition.MaxIonsAtLevel(Level));
     }
 
+    /// <summary>Reconstructs a Mutant directly from a full state snapshot, bypassing normal gameplay mutation (GainXp/LevelUp/etc.) — for save/load. Inventory (and re-wielding equipped items) is the caller's job afterward via AddToInventory/Wield.</summary>
+    private Mutant(
+        string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
+        int currentHp, int maxHp, int currentIons, int maxIons, int riblets,
+        int unlockedTimeLevel, int currentTimeLevel, Coordinate position,
+        IEnumerable<int> defeatedGatekeepers)
+    {
+        Name = name;
+        Class = characterClass;
+        ClassDefinition = ClassDefinition.For(characterClass);
+        Level = level;
+        Xp = xp;
+        Stats = stats;
+        Health = new HealthPool(maxHp, currentHp);
+        Ions = new IonPool(maxIons, currentIons);
+        Riblets = riblets;
+        UnlockedTimeLevel = unlockedTimeLevel;
+        CurrentTimeLevel = currentTimeLevel;
+        Position = position;
+        _defeatedGatekeepers = new HashSet<int>(defeatedGatekeepers);
+    }
+
+    /// <summary>See the private snapshot constructor above — this is its public entry point, used by Mutants.Engine.Persistence when loading a save.</summary>
+    public static Mutant Restore(
+        string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
+        int currentHp, int maxHp, int currentIons, int maxIons, int riblets,
+        int unlockedTimeLevel, int currentTimeLevel, Coordinate position,
+        IEnumerable<int> defeatedGatekeepers)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Name cannot be empty.", nameof(name));
+        }
+
+        return new Mutant(
+            name, characterClass, level, xp, stats,
+            currentHp, maxHp, currentIons, maxIons, riblets,
+            unlockedTimeLevel, currentTimeLevel, position, defeatedGatekeepers);
+    }
+
     /// <summary>
     /// Awards XP and applies as many level-ups as the new total supports,
     /// capped by <see cref="Leveling.SoftLevelCap"/> for the current

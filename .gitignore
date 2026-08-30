@@ -11,6 +11,11 @@ out/
 ## Installer build artifacts
 installer/Output/
 
+## Local save/leaderboard database (Mutants.Console) - player-specific, never checked in
+saves/
+*.db
+*.db-log
+
 ## IDE
 .vs/
 .vscode/

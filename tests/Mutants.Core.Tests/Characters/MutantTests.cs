@@ -396,6 +396,57 @@ public class MutantTests
     }
 
     [Fact]
+    public void Restore_ReconstructsFullStateExactly()
+    {
+        var stats = new StatBlock(20, 15, 10, 12);
+        var mutant = Mutant.Restore(
+            "Rook", CharacterClass.Warrior, level: 7, xp: 555, stats,
+            currentHp: 40, maxHp: 60, currentIons: 5, maxIons: 30, riblets: 250,
+            unlockedTimeLevel: 3, currentTimeLevel: 2, position: new Coordinate(2, -1),
+            defeatedGatekeepers: [2, 3]);
+
+        Assert.Equal("Rook", mutant.Name);
+        Assert.Equal(CharacterClass.Warrior, mutant.Class);
+        Assert.Equal(7, mutant.Level);
+        Assert.Equal(555, mutant.Xp);
+        Assert.Equal(stats, mutant.Stats);
+        Assert.Equal(40, mutant.Health.Current);
+        Assert.Equal(60, mutant.Health.Max);
+        Assert.Equal(5, mutant.Ions.Current);
+        Assert.Equal(30, mutant.Ions.Max);
+        Assert.Equal(250, mutant.Riblets);
+        Assert.Equal(3, mutant.UnlockedTimeLevel);
+        Assert.Equal(2, mutant.CurrentTimeLevel);
+        Assert.Equal(new Coordinate(2, -1), mutant.Position);
+        Assert.True(mutant.HasDefeatedGatekeeper(2));
+        Assert.True(mutant.HasDefeatedGatekeeper(3));
+        Assert.False(mutant.HasDefeatedGatekeeper(4));
+        Assert.Empty(mutant.Inventory);
+        Assert.Null(mutant.EquippedWeapon);
+    }
+
+    [Fact]
+    public void Restore_RejectsEmptyName()
+    {
+        Assert.Throws<ArgumentException>(() => Mutant.Restore(
+            "", CharacterClass.Warrior, 1, 0, new StatBlock(10, 10, 10, 10),
+            30, 30, 20, 20, 0, 1, 1, Coordinate.Origin, []));
+    }
+
+    [Fact]
+    public void Restore_ThenAddToInventoryAndWield_WorksNormally()
+    {
+        var mutant = Mutant.Restore(
+            "Rook", CharacterClass.Warrior, 1, 0, ClassDefinition.For(CharacterClass.Warrior).BaseStats,
+            30, 30, 20, 20, 0, 1, 1, Coordinate.Origin, []);
+        var weapon = Item.Create("Axe", ItemType.Weapon, 1, Rarity.Common);
+        mutant.AddToInventory(weapon);
+        mutant.Wield(weapon);
+
+        Assert.Equal(weapon, mutant.EquippedWeapon);
+    }
+
+    [Fact]
     public void GatekeeperDefeat_StartsFalseAndCanBeRecorded()
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);
