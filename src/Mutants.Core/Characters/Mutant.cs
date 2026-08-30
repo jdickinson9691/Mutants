@@ -2,6 +2,7 @@ using Mutants.Core.Classes;
 using Mutants.Core.Ions;
 using Mutants.Core.Items;
 using Mutants.Core.Stats;
+using Mutants.Core.World;
 
 namespace Mutants.Core.Characters;
 
@@ -24,6 +25,16 @@ public sealed class Mutant
 
     /// <summary>The deepest time-travel level this Mutant has unlocked — drives the soft level cap.</summary>
     public int UnlockedTimeLevel { get; private set; }
+
+    /// <summary>Current grid position on whichever <see cref="LevelMap"/> this Mutant is on — docs/GDD.md §3.1.</summary>
+    public Coordinate Position { get; private set; } = Coordinate.Origin;
+
+    /// <summary>
+    /// Riblets on hand — docs/GDD.md §6's store currency. Full store
+    /// buy/sell logic is future work (milestone 5); this is just the
+    /// balance, needed now for the console status bar (§10).
+    /// </summary>
+    public int Riblets { get; private set; }
 
     private readonly List<Item> _inventory = [];
     public IReadOnlyList<Item> Inventory => _inventory;
@@ -95,6 +106,37 @@ public sealed class Mutant
         {
             UnlockedTimeLevel = timeLevel;
         }
+    }
+
+    /// <summary>Places the Mutant at a specific grid position — e.g. spawning them at a level's start room.</summary>
+    public void PlaceAt(Coordinate coordinate) => Position = coordinate;
+
+    /// <summary>Moves the Mutant to an adjacent coordinate. Legality (is there really an exit there?) is the caller's job — see <see cref="LevelMap.TryMove"/>.</summary>
+    public void MoveTo(Coordinate coordinate) => Position = coordinate;
+
+    public void AddRiblets(int amount)
+    {
+        if (amount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount), amount, "Amount cannot be negative.");
+        }
+
+        Riblets += amount;
+    }
+
+    public void SpendRiblets(int amount)
+    {
+        if (amount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount), amount, "Amount cannot be negative.");
+        }
+
+        if (amount > Riblets)
+        {
+            throw new InvalidOperationException($"Cannot spend {amount} Riblets with only {Riblets} available.");
+        }
+
+        Riblets -= amount;
     }
 
     public void AddToInventory(Item item) => _inventory.Add(item);

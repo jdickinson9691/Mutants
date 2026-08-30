@@ -2,6 +2,7 @@ using Mutants.Core.Characters;
 using Mutants.Core.Classes;
 using Mutants.Core.Items;
 using Mutants.Core.Stats;
+using Mutants.Core.World;
 
 namespace Mutants.Core.Tests.Characters;
 
@@ -146,5 +147,47 @@ public class MutantTests
         var weapon = Item.Create("Axe", ItemType.Weapon, 1, Rarity.Common);
 
         Assert.Throws<InvalidOperationException>(() => mutant.Wield(weapon));
+    }
+
+    [Fact]
+    public void Position_DefaultsToOrigin()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        Assert.Equal(Coordinate.Origin, mutant.Position);
+    }
+
+    [Fact]
+    public void PlaceAt_AndMoveTo_UpdatePosition()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var start = new Coordinate(3, 1);
+        mutant.PlaceAt(start);
+        Assert.Equal(start, mutant.Position);
+
+        var next = start.Move(Direction.North);
+        mutant.MoveTo(next);
+        Assert.Equal(next, mutant.Position);
+    }
+
+    [Fact]
+    public void Riblets_AddAndSpendTrackBalance()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        Assert.Equal(0, mutant.Riblets);
+
+        mutant.AddRiblets(50);
+        Assert.Equal(50, mutant.Riblets);
+
+        mutant.SpendRiblets(20);
+        Assert.Equal(30, mutant.Riblets);
+    }
+
+    [Fact]
+    public void SpendRiblets_ThrowsWhenUnaffordable()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        mutant.AddRiblets(10);
+
+        Assert.Throws<InvalidOperationException>(() => mutant.SpendRiblets(11));
     }
 }
