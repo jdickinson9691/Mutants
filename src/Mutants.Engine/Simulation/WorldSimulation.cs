@@ -1,4 +1,5 @@
 using Mutants.Core.Characters;
+using Mutants.Core.Economy;
 using Mutants.Core.Events;
 using Mutants.Core.Ions;
 using Mutants.Core.World;
@@ -20,22 +21,30 @@ public sealed class WorldSimulation
     public LevelMap Level { get; }
     public BroadcastChannel Broadcast { get; }
     public IReadOnlyList<Mutant> Npcs { get; }
+    public IReadOnlyList<StoreSlot> StoreSlots { get; }
 
     private readonly IRandomSource _random;
 
-    public WorldSimulation(LevelMap level, IReadOnlyList<Mutant> npcs, IRandomSource random, BroadcastChannel? broadcast = null)
+    public WorldSimulation(
+        LevelMap level,
+        IReadOnlyList<Mutant> npcs,
+        IRandomSource random,
+        IReadOnlyList<StoreSlot>? storeSlots = null,
+        BroadcastChannel? broadcast = null)
     {
         Level = level;
         Npcs = npcs;
         _random = random;
+        StoreSlots = storeSlots ?? [];
         Broadcast = broadcast ?? new BroadcastChannel();
     }
 
     /// <summary>
     /// Advances the world by one tick: passive Ion drain for every living
     /// mutant (all NPCs plus <paramref name="player"/>), then one AI
-    /// action per living NPC, publishing kill/level-up events to
-    /// <see cref="Broadcast"/> along the way.
+    /// action per living NPC (which may trade at a store — see
+    /// <see cref="Npc.NpcController"/>), publishing kill/level-up events
+    /// to <see cref="Broadcast"/> along the way.
     /// </summary>
     public void Tick(Mutant player)
     {
@@ -50,6 +59,11 @@ public sealed class WorldSimulation
             mutant.AdvanceIonDrainTick(ticksPerDrain);
         }
 
+        var activeStores = StoreSlots
+            .Where(slot => slot.Store is not null)
+            .Select(slot => slot.Store!)
+            .ToList();
+
         foreach (var npc in Npcs)
         {
             if (npc.Health.IsDead)
@@ -58,7 +72,7 @@ public sealed class WorldSimulation
             }
 
             var levelBefore = npc.Level;
-            var result = NpcController.Act(npc, Level, _random);
+            var result = NpcController.Act(npc, Level, _random, activeStores);
 
             if (result.Fight is { } fight)
             {

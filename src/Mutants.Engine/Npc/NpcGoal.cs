@@ -3,9 +3,9 @@ namespace Mutants.Engine.Npc;
 /// <summary>
 /// What an NPC decided to do on a given tick — docs/GDD.md §7's behavior
 /// loop ("assess Ion level ... assess HP ... otherwise pursue its current
-/// goal"). Store-visiting and time-travel goals from that section aren't
-/// modeled yet — they depend on systems that don't exist (stores =
-/// milestone 5, time travel = milestone 6).
+/// goal (grind monsters ..., path to a store to trade, ..., occasionally
+/// visit/stock a store it owns)"). Time-travel is still deferred — that
+/// system doesn't exist yet (milestone 6).
 /// </summary>
 public enum NpcGoal
 {
@@ -17,6 +17,9 @@ public enum NpcGoal
 
     /// <summary>HP is low; sits out this tick rather than fighting. A placeholder for real heal/flee behavior.</summary>
     Retreat,
+
+    /// <summary>Visited a store this tick — sold excess junk, or bought a needed weapon/armor.</summary>
+    Trade,
 
     /// <summary>Default goal: wander a step, then fight a monster.</summary>
     Grind,

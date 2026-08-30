@@ -228,18 +228,26 @@ public sealed class Mutant
     }
 
     /// <summary>
-    /// Sells an item from inventory for Riblets — docs/GDD.md §5/§6. See
-    /// <see cref="Item.SellValue"/> for why this is a flat placeholder
-    /// price pending the real store system (milestone 5). Unequips the
-    /// item first if it was wielded.
+    /// Sells an item from inventory for Riblets — docs/GDD.md §5/§6.
+    /// Unequips the item first if it was wielded. Pass
+    /// <paramref name="riblets"/> for a store-negotiated price (see
+    /// Mutants.Core.Economy.Store.BuyFromMutant); omitted, it falls back
+    /// to <see cref="Item.SellValue"/>'s flat rate.
     /// </summary>
-    public int Sell(Item item)
+    public int Sell(Item item, int? riblets = null)
     {
         RemoveFromInventoryOrThrow(item);
-        var riblets = item.SellValue();
-        AddRiblets(riblets);
-        return riblets;
+        var amount = riblets ?? item.SellValue();
+        AddRiblets(amount);
+        return amount;
     }
+
+    /// <summary>
+    /// Removes an item from inventory with no payout — e.g. depositing it
+    /// into a store the Mutant owns (Mutants.Core.Economy.Store.Deposit).
+    /// Unequips the item first if it was wielded.
+    /// </summary>
+    public void RemoveFromInventory(Item item) => RemoveFromInventoryOrThrow(item);
 
     private void RemoveFromInventoryOrThrow(Item item)
     {

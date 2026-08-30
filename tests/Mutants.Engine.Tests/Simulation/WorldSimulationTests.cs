@@ -1,5 +1,7 @@
 using Mutants.Core.Characters;
 using Mutants.Core.Classes;
+using Mutants.Core.Economy;
+using Mutants.Core.Items;
 using Mutants.Core.World;
 using Mutants.Engine.Simulation;
 
@@ -76,6 +78,46 @@ public class WorldSimulationTests
 
         Assert.Equal(2, npc.Level);
         Assert.Contains(simulation.Broadcast.Events, e => e.Message == "Vex reached level 2!");
+    }
+
+    [Fact]
+    public void Tick_PassesActiveStoresThroughToNpcTrading()
+    {
+        var level = TestLevel.Build();
+        var player = NewMutant("Player", level);
+        var npc = NewMutant("Vex", level);
+        for (var tier = 1; tier <= 4; tier++)
+        {
+            npc.AddToInventory(Item.Create($"Junk Tier {tier}", ItemType.Junk, tier, Rarity.Common));
+        }
+
+        var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
+        var slot = new StoreSlot("Test Store", level.Start, homeLevel: 1, purchaseCost: 0, store);
+        var simulation = new WorldSimulation(level, [npc], StubRandomSource.Fixed(0.5), [slot]);
+
+        simulation.Tick(player);
+
+        Assert.Equal(3, npc.Inventory.Count(i => i.Type == ItemType.Junk));
+        Assert.True(npc.Riblets > 0);
+    }
+
+    [Fact]
+    public void Tick_IgnoresUnpurchasedStoreSlots()
+    {
+        var level = TestLevel.Build();
+        var player = NewMutant("Player", level);
+        var npc = NewMutant("Vex", level);
+        for (var tier = 1; tier <= 4; tier++)
+        {
+            npc.AddToInventory(Item.Create($"Junk Tier {tier}", ItemType.Junk, tier, Rarity.Common));
+        }
+
+        var emptySlot = new StoreSlot("Empty Storefront", level.Start, homeLevel: 1, purchaseCost: 150); // no Store yet
+        var simulation = new WorldSimulation(level, [npc], StubRandomSource.Fixed(0.5), [emptySlot]);
+
+        simulation.Tick(player);
+
+        Assert.Equal(4, npc.Inventory.Count(i => i.Type == ItemType.Junk)); // nothing to sell to - falls through to Grind
     }
 
     [Fact]

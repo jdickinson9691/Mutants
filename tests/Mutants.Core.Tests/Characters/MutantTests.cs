@@ -206,6 +206,47 @@ public class MutantTests
     }
 
     [Fact]
+    public void Sell_WithExplicitPrice_OverridesTheFlatRate()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // flat value 20
+        mutant.AddToInventory(item);
+
+        var gained = mutant.Sell(item, riblets: 7);
+
+        Assert.Equal(7, gained);
+        Assert.Equal(7, mutant.Riblets);
+    }
+
+    [Fact]
+    public void RemoveFromInventory_RemovesWithNoPayout()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var startingIons = mutant.Ions.Current;
+        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common);
+        mutant.AddToInventory(item);
+
+        mutant.RemoveFromInventory(item);
+
+        Assert.DoesNotContain(item, mutant.Inventory);
+        Assert.Equal(0, mutant.Riblets);
+        Assert.Equal(startingIons, mutant.Ions.Current); // no side effect on Ions either
+    }
+
+    [Fact]
+    public void RemoveFromInventory_UnequipsIfWielded()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var weapon = Item.Create("Axe", ItemType.Weapon, 1, Rarity.Common);
+        mutant.AddToInventory(weapon);
+        mutant.Wield(weapon);
+
+        mutant.RemoveFromInventory(weapon);
+
+        Assert.Null(mutant.EquippedWeapon);
+    }
+
+    [Fact]
     public void Sell_ThrowsIfItemNotInInventory()
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);

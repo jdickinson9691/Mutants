@@ -1,0 +1,66 @@
+using Mutants.Core.Characters;
+using Mutants.Core.World;
+
+namespace Mutants.Core.Economy;
+
+/// <summary>
+/// A store location in the world — docs/GDD.md §6.2: "a player ... can
+/// purchase an available government-built store slot in a level's city."
+/// A null <see cref="Store"/> means the slot is unclaimed and available to
+/// purchase; a pre-seeded government store or a purchased player store
+/// both just mean <see cref="Store"/> is populated.
+/// </summary>
+public sealed class StoreSlot
+{
+    public string Name { get; }
+    public Coordinate Location { get; }
+    public int HomeLevel { get; }
+    public int PurchaseCost { get; }
+    public Store? Store { get; private set; }
+
+    public bool IsAvailableForPurchase => Store is null;
+
+    public StoreSlot(string name, Coordinate location, int homeLevel, int purchaseCost, Store? store = null)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Name cannot be empty.", nameof(name));
+        }
+
+        if (homeLevel < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(homeLevel), homeLevel, "Home level must be at least 1.");
+        }
+
+        if (purchaseCost < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(purchaseCost), purchaseCost, "Purchase cost cannot be negative.");
+        }
+
+        Name = name;
+        Location = location;
+        HomeLevel = homeLevel;
+        PurchaseCost = purchaseCost;
+        Store = store;
+    }
+
+    /// <summary>
+    /// Buys this slot for <paramref name="buyer"/> — docs/GDD.md §6.2.
+    /// Spends <see cref="PurchaseCost"/> Riblets and seeds the new store
+    /// with <paramref name="startingCapital"/> (an original placeholder —
+    /// the GDD doesn't specify how a fresh player store is capitalized;
+    /// depositing more Riblets into an existing store isn't modeled yet).
+    /// Throws if the slot is already occupied.
+    /// </summary>
+    public Store Purchase(Mutant buyer, int startingCapital = 100)
+    {
+        if (Store is not null)
+        {
+            throw new InvalidOperationException($"'{Name}' is already occupied.");
+        }
+
+        buyer.SpendRiblets(PurchaseCost);
+        Store = new Store($"{buyer.Name}'s Store", HomeLevel, startingCapital, buyer);
+        return Store;
+    }
+}

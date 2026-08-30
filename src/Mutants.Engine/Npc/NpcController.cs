@@ -1,4 +1,5 @@
 using Mutants.Core.Characters;
+using Mutants.Core.Economy;
 using Mutants.Core.Items;
 using Mutants.Core.Monsters;
 using Mutants.Core.World;
@@ -10,25 +11,31 @@ namespace Mutants.Engine.Npc;
 /// The per-tick NPC behavior loop — docs/GDD.md §7: "assess Ion level
 /// (seek conversion fodder or a store if low), assess HP (retreat/heal if
 /// low), otherwise pursue its current goal (grind monsters near its
-/// level...)." The GDD also lists store-visiting and time-travel goals;
-/// those are deferred (see <see cref="NpcGoal"/>) since stores/time
-/// travel don't exist yet. Decision-making is intentionally simple and
-/// rule-based per the GDD's own "not full pathfinding AI/ML" note; the
-/// specific Ion/HP thresholds below are original tuning, not
-/// GDD-specified.
+/// level, path to a store to trade, ..., occasionally visit/stock a store
+/// it owns)." Time travel is still deferred — that system doesn't exist
+/// yet (milestone 6). There's no spatial store placement/pathing here
+/// either: like Mutants.Console's "fight" command, an NPC's store visit
+/// picks a random known store rather than actually traveling to one — a
+/// deliberate simplification consistent with the GDD's own "not full
+/// pathfinding AI/ML" note. Decision-making is intentionally simple and
+/// rule-based; the specific Ion/HP/inventory thresholds below are
+/// original tuning, not GDD-specified.
 /// </summary>
 public static class NpcController
 {
     private const double LowIonThreshold = 0.25;
     private const double LowHealthThreshold = 0.30;
+    private const int ExcessJunkThreshold = 3;
 
     /// <summary>
     /// Decides and executes one tick's action for <paramref name="npc"/>.
     /// A defeated NPC does nothing (<see cref="NpcGoal.Idle"/>) — callers
     /// should generally skip calling this for dead NPCs entirely, but it's
-    /// safe to call anyway.
+    /// safe to call anyway. <paramref name="stores"/> may be omitted or
+    /// empty, in which case the NPC never trades (falls straight through
+    /// to grinding).
     /// </summary>
-    public static NpcTickResult Act(Mutant npc, LevelMap level, IRandomSource random)
+    public static NpcTickResult Act(Mutant npc, LevelMap level, IRandomSource random, IReadOnlyList<Store>? stores = null)
     {
         if (npc.Health.IsDead)
         {
@@ -52,6 +59,15 @@ public static class NpcController
             return new NpcTickResult(npc.Name, NpcGoal.Retreat);
         }
 
+        if (stores is { Count: > 0 })
+        {
+            var tradeResult = TryTrade(npc, stores, random);
+            if (tradeResult is not null)
+            {
+                return tradeResult;
+            }
+        }
+
         Wander(npc, level, random);
 
         var monster = TestMonsters.All[(int)(random.NextDouble() * TestMonsters.All.Count)]();
@@ -61,6 +77,52 @@ public static class NpcController
     }
 
     private static bool IsLow(int current, int max, double threshold) => max > 0 && current < max * threshold;
+
+    /// <summary>
+    /// Sells one excess junk item, or buys the cheapest affordable weapon
+    /// if unarmed — at most one action, at a randomly picked store. Null
+    /// if there was nothing worth doing (falls through to grinding).
+    /// </summary>
+    private static NpcTickResult? TryTrade(Mutant npc, IReadOnlyList<Store> stores, IRandomSource random)
+    {
+        var junkCount = npc.Inventory.Count(i => i.Type == ItemType.Junk);
+        var wantsToSell = junkCount > ExcessJunkThreshold;
+        var wantsToBuyWeapon = npc.EquippedWeapon is null && npc.Riblets > 0;
+
+        if (!wantsToSell && !wantsToBuyWeapon)
+        {
+            return null;
+        }
+
+        var store = stores[(int)(random.NextDouble() * stores.Count)];
+
+        if (wantsToSell)
+        {
+            var junk = npc.Inventory.First(i => i.Type == ItemType.Junk);
+            var price = store.BuyFromMutant(npc, junk);
+            if (price is not null)
+            {
+                return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"sold {junk.Name} to {store.Name} for {price} Riblets");
+            }
+        }
+
+        if (wantsToBuyWeapon)
+        {
+            var affordable = store.Listings
+                .Where(l => l.Item.Type == ItemType.Weapon && l.AskingPrice <= npc.Riblets)
+                .OrderBy(l => l.AskingPrice)
+                .FirstOrDefault();
+
+            if (affordable is not null)
+            {
+                store.SellToMutant(npc, affordable);
+                npc.Wield(affordable.Item);
+                return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"bought and wielded {affordable.Item.Name} from {store.Name}");
+            }
+        }
+
+        return null; // wanted to trade but nothing worked out this tick
+    }
 
     private static void Wander(Mutant npc, LevelMap level, IRandomSource random)
     {

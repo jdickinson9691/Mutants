@@ -1,5 +1,6 @@
 using Mutants.Core.Characters;
 using Mutants.Core.Classes;
+using Mutants.Core.Economy;
 using Mutants.Core.Items;
 using Mutants.Core.World;
 using Mutants.Engine.Npc;
@@ -81,5 +82,54 @@ public class NpcControllerTests
         Assert.NotNull(result.MonsterName);
         Assert.NotNull(result.Fight);
         Assert.NotEqual(Coordinate.Origin, npc.Position); // wandered off the start room
+    }
+
+    [Fact]
+    public void Act_ExcessJunkWithAStoreAvailable_SellsOneItem()
+    {
+        var npc = FreshNpc();
+        for (var tier = 1; tier <= 4; tier++)
+        {
+            npc.AddToInventory(Item.Create($"Junk Tier {tier}", ItemType.Junk, tier, Rarity.Common));
+        }
+
+        var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
+        var level = TestLevel.Build();
+
+        var result = NpcController.Act(npc, level, StubRandomSource.Fixed(0.5), [store]);
+
+        Assert.Equal(NpcGoal.Trade, result.Goal);
+        Assert.Equal(3, npc.Inventory.Count(i => i.Type == ItemType.Junk));
+        Assert.True(npc.Riblets > 0);
+        Assert.Single(store.Listings); // the sold item was immediately re-listed
+    }
+
+    [Fact]
+    public void Act_UnarmedWithRiblets_BuysAndWieldsAnAffordableWeapon()
+    {
+        var npc = FreshNpc();
+        npc.AddRiblets(100);
+        var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
+        var weapon = Item.Create("Cracked Shiv", ItemType.Weapon, 1, Rarity.Common);
+        store.Stock(weapon, askingPrice: 50);
+        var level = TestLevel.Build();
+
+        var result = NpcController.Act(npc, level, StubRandomSource.Fixed(0.5), [store]);
+
+        Assert.Equal(NpcGoal.Trade, result.Goal);
+        Assert.Equal(weapon, npc.EquippedWeapon);
+        Assert.Equal(50, npc.Riblets);
+    }
+
+    [Fact]
+    public void Act_StoresAvailableButNothingToTrade_StillGrinds()
+    {
+        var npc = FreshNpc(); // no junk, no Riblets - nothing to sell or buy
+        var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
+        var level = TestLevel.Build();
+
+        var result = NpcController.Act(npc, level, StubRandomSource.Fixed(0.5), [store]);
+
+        Assert.Equal(NpcGoal.Grind, result.Goal);
     }
 }
