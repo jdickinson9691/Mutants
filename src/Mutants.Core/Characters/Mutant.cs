@@ -36,6 +36,8 @@ public sealed class Mutant
     /// </summary>
     public int Riblets { get; private set; }
 
+    private int _ticksSinceIonDrain;
+
     private readonly List<Item> _inventory = [];
     public IReadOnlyList<Item> Inventory => _inventory;
 
@@ -145,6 +147,39 @@ public sealed class Mutant
         {
             UnlockedTimeLevel = timeLevel;
         }
+    }
+
+    /// <summary>
+    /// Advances passive Ion drain by one world tick — docs/GDD.md §2:
+    /// "Survival — passive drain per turn/tick; hitting 0 starts costing
+    /// HP." Every <paramref name="ticksPerDrain"/> ticks (see
+    /// <see cref="Ions.IonEconomy.TicksPerIonDrain"/>), spends 1 Ion, or
+    /// deals 1 HP damage instead if none are available. Returns true if
+    /// HP was lost this call.
+    /// </summary>
+    public bool AdvanceIonDrainTick(int ticksPerDrain)
+    {
+        if (ticksPerDrain < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ticksPerDrain), ticksPerDrain, "Ticks per drain must be at least 1.");
+        }
+
+        _ticksSinceIonDrain++;
+        if (_ticksSinceIonDrain < ticksPerDrain)
+        {
+            return false;
+        }
+
+        _ticksSinceIonDrain = 0;
+
+        if (Ions.CanAfford(1))
+        {
+            Ions.Spend(1);
+            return false;
+        }
+
+        Health.Damage(1);
+        return true;
     }
 
     /// <summary>Places the Mutant at a specific grid position — e.g. spawning them at a level's start room.</summary>

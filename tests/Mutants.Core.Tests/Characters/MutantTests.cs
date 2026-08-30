@@ -282,4 +282,50 @@ public class MutantTests
 
         Assert.Equal(unarmoredDefense + armor.DefenseBonus, mutant.EffectiveDefense);
     }
+
+    [Fact]
+    public void AdvanceIonDrainTick_DoesNothingBeforeTheInterval()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var startingIons = mutant.Ions.Current;
+
+        var hpLost = mutant.AdvanceIonDrainTick(ticksPerDrain: 5);
+
+        Assert.False(hpLost);
+        Assert.Equal(startingIons, mutant.Ions.Current);
+    }
+
+    [Fact]
+    public void AdvanceIonDrainTick_SpendsOneIonOnceIntervalElapses()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var startingIons = mutant.Ions.Current;
+
+        mutant.AdvanceIonDrainTick(ticksPerDrain: 3);
+        mutant.AdvanceIonDrainTick(ticksPerDrain: 3);
+        var hpLost = mutant.AdvanceIonDrainTick(ticksPerDrain: 3);
+
+        Assert.False(hpLost);
+        Assert.Equal(startingIons - 1, mutant.Ions.Current);
+    }
+
+    [Fact]
+    public void AdvanceIonDrainTick_DamagesHealthWhenOutOfIons()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        mutant.Ions.Spend(mutant.Ions.Current); // drain to 0
+        var startingHp = mutant.Health.Current;
+
+        var hpLost = mutant.AdvanceIonDrainTick(ticksPerDrain: 1);
+
+        Assert.True(hpLost);
+        Assert.Equal(startingHp - 1, mutant.Health.Current);
+    }
+
+    [Fact]
+    public void AdvanceIonDrainTick_RejectsNonPositiveInterval()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        Assert.Throws<ArgumentOutOfRangeException>(() => mutant.AdvanceIonDrainTick(0));
+    }
 }

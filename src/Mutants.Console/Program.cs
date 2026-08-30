@@ -1,21 +1,29 @@
 using Mutants.Core.Characters;
 using Mutants.Core.Classes;
+using Mutants.Core.Events;
 using Mutants.Core.Items;
 using Mutants.Core.Monsters;
 using Mutants.Core.World;
 using Mutants.Engine;
 using Mutants.Engine.Combat;
+using Mutants.Engine.Npc;
+using Mutants.Engine.Simulation;
 using Spectre.Console;
 
 // Sandbox build covering milestones 2 (grid movement, single hardcoded
-// level) and 3 (combat, loot drops, convert/sell/wield) per
-// docs/TECH_STACK.md's milestone sequencing. NPCs, stores/economy, and
-// time travel are later milestones. All game rules here (movement
-// legality, combat resolution, character state) live in Mutants.Core /
-// Mutants.Engine; this file is presentation/input only, per
-// docs/AGENTS.md's Console/UI Agent contract. There's no spatial monster
-// placement yet (rooms don't carry monsters) — "fight" spawns a random
-// test monster on demand so the full loot loop is playable ahead of that.
+// level), 3 (combat, loot drops, convert/sell/wield), and 4 (NPC
+// simulation loop) per docs/TECH_STACK.md's milestone sequencing.
+// Stores/economy and time travel are later milestones. All game rules
+// here (movement legality, combat resolution, NPC AI, character state)
+// live in Mutants.Core / Mutants.Engine; this file is presentation/input
+// only, per docs/AGENTS.md's Console/UI Agent contract. There's no
+// spatial monster placement yet (rooms don't carry monsters) — "fight"
+// spawns a random test monster on demand so the full loot loop is
+// playable ahead of that; NPCs use the same on-demand spawn via
+// NpcController. docs/GDD.md §9's real background tick (every ~2 seconds,
+// independent of player input) isn't implemented — this console instead
+// advances the world by one tick per player command, a synchronous
+// stand-in that keeps the sandbox simple and scriptable.
 
 // Input is read via plain Console.ReadLine() rather than Spectre's
 // interactive prompts (TextPrompt/SelectionPrompt): those require a real
@@ -45,8 +53,14 @@ var level = TestLevel.Build();
 mutant.PlaceAt(level.Start);
 var random = new SystemRandomSource();
 
+const int NpcPopulationSize = 5; // arbitrary sandbox default - GDD §7 calls this "a configurable population"
+var npcs = NpcPopulation.Spawn(NpcPopulationSize, level, random);
+var simulation = new WorldSimulation(level, npcs, random);
+var shownBroadcastCount = 0;
+
 AnsiConsole.WriteLine();
 AnsiConsole.MarkupLine($"Welcome, [bold]{Markup.Escape(mutant.Name)}[/] the [bold]{mutant.Class}[/]. Type [yellow]help[/] for commands.");
+AnsiConsole.MarkupLine($"[grey]{NpcPopulationSize} other Mutants are already out there, fending for themselves.[/]");
 AnsiConsole.WriteLine();
 
 RenderRoom(mutant, level);
@@ -86,7 +100,7 @@ while (running)
             break;
 
         case "fight" or "f":
-            if (!HandleFight(mutant, level, random))
+            if (!HandleFight(mutant, level, random, simulation.Broadcast))
             {
                 running = false; // defeated - see HandleFight
             }
@@ -95,6 +109,15 @@ while (running)
 
         case "inventory" or "i":
             RenderInventory(mutant);
+            break;
+
+        case "npcs" or "who":
+            RenderNpcs(npcs);
+            break;
+
+        case "news" or "broadcast":
+            RenderBroadcast(simulation.Broadcast, count: 10);
+            shownBroadcastCount = simulation.Broadcast.Events.Count;
             break;
 
         default:
@@ -113,6 +136,12 @@ while (running)
 
             HandleMove(mutant, level, direction.Value);
             break;
+    }
+
+    if (running && !mutant.Health.IsDead)
+    {
+        simulation.Tick(mutant);
+        shownBroadcastCount = RenderNewBroadcastEvents(simulation.Broadcast, shownBroadcastCount);
     }
 }
 
@@ -247,9 +276,10 @@ static Item? FindInventoryItem(Mutant mutant, string argument)
 }
 
 /// <summary>Spawns a random test monster and resolves combat. Returns false if the Mutant was defeated (caller should end the session).</summary>
-static bool HandleFight(Mutant mutant, LevelMap level, IRandomSource random)
+static bool HandleFight(Mutant mutant, LevelMap level, IRandomSource random, BroadcastChannel broadcast)
 {
     var monster = TestMonsters.All[System.Random.Shared.Next(TestMonsters.All.Count)]();
+    var levelBefore = mutant.Level;
 
     AnsiConsole.MarkupLine($"A [bold]{Markup.Escape(monster.Name)}[/] (tier {monster.Tier}) attacks!");
 
@@ -262,6 +292,12 @@ static bool HandleFight(Mutant mutant, LevelMap level, IRandomSource random)
     if (result.MutantWon)
     {
         AnsiConsole.MarkupLine($"[green]You defeated the {Markup.Escape(monster.Name)}! +{result.XpAwarded} XP.[/]");
+        broadcast.Publish(GameEvent.Slain(monster.Name, mutant.Name));
+        if (mutant.Level > levelBefore)
+        {
+            broadcast.Publish(GameEvent.LevelReached(mutant.Name, mutant.Level));
+        }
+
         RenderStatusBar(mutant, level);
         return true;
     }
@@ -270,7 +306,62 @@ static bool HandleFight(Mutant mutant, LevelMap level, IRandomSource random)
     // home base with an Ion penalty) is not implemented yet; a defeat here
     // just ends the session.
     AnsiConsole.MarkupLine($"[red]You were defeated by the {Markup.Escape(monster.Name)}...[/]");
+    broadcast.Publish(GameEvent.Slain(mutant.Name, monster.Name));
     return false;
+}
+
+static void RenderNpcs(IReadOnlyList<Mutant> npcs)
+{
+    var table = new Table().Expand();
+    table.AddColumn("Name");
+    table.AddColumn("Class");
+    table.AddColumn("Level");
+    table.AddColumn("HP");
+    table.AddColumn("Ions");
+    table.AddColumn("Location");
+    table.AddColumn("Status");
+
+    foreach (var npc in npcs)
+    {
+        table.AddRow(
+            Markup.Escape(npc.Name),
+            npc.Class.ToString(),
+            npc.Level.ToString(),
+            $"{npc.Health.Current}/{npc.Health.Max}",
+            $"{npc.Ions.Current}/{npc.Ions.Max}",
+            Markup.Escape(npc.Position.ToString()),
+            npc.Health.IsDead ? "[red]defeated[/]" : "[green]active[/]");
+    }
+
+    AnsiConsole.Write(table);
+}
+
+static void RenderBroadcast(BroadcastChannel broadcast, int count)
+{
+    var recent = broadcast.Recent(count);
+    if (recent.Count == 0)
+    {
+        AnsiConsole.MarkupLine("[grey]Nothing has happened yet.[/]");
+        return;
+    }
+
+    AnsiConsole.MarkupLine("[cyan]Recent broadcasts:[/]");
+    foreach (var evt in recent)
+    {
+        AnsiConsole.MarkupLine($"  [cyan]*[/] {Markup.Escape(evt.Message)}");
+    }
+}
+
+/// <summary>Prints any broadcast events published since <paramref name="alreadyShownCount"/>. Returns the new total shown.</summary>
+static int RenderNewBroadcastEvents(BroadcastChannel broadcast, int alreadyShownCount)
+{
+    var events = broadcast.Events;
+    for (var i = alreadyShownCount; i < events.Count; i++)
+    {
+        AnsiConsole.MarkupLine($"[cyan]* {Markup.Escape(events[i].Message)}[/]");
+    }
+
+    return events.Count;
 }
 
 static void RenderInventory(Mutant mutant)
@@ -366,6 +457,8 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room");
     AnsiConsole.MarkupLine("  [green]fight[/] (or f)        - fight a random monster");
     AnsiConsole.MarkupLine("  [green]inventory[/] (or i)    - list what you're carrying");
+    AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Mutants out in the world");
+    AnsiConsole.MarkupLine("  [green]news[/] (or broadcast) - show recent kill-feed events");
     AnsiConsole.MarkupLine("  [green]convert <item>[/]     - destroy an item for Ions");
     AnsiConsole.MarkupLine("  [green]sell <item>[/]        - sell an item for Riblets");
     AnsiConsole.MarkupLine("  [green]wield <item>[/]       - equip a weapon or armor item");
