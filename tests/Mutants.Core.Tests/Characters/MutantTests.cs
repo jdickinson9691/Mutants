@@ -369,4 +369,41 @@ public class MutantTests
         var mutant = new Mutant("Rook", CharacterClass.Warrior);
         Assert.Throws<ArgumentOutOfRangeException>(() => mutant.AdvanceIonDrainTick(0));
     }
+
+    [Fact]
+    public void CurrentTimeLevel_DefaultsToOne()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        Assert.Equal(1, mutant.CurrentTimeLevel);
+    }
+
+    [Fact]
+    public void SetCurrentTimeLevel_UpdatesTheValue()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        mutant.SetCurrentTimeLevel(3);
+        Assert.Equal(3, mutant.CurrentTimeLevel);
+
+        mutant.SetCurrentTimeLevel(1); // unlike UnlockedTimeLevel, this can move back down freely
+        Assert.Equal(1, mutant.CurrentTimeLevel);
+    }
+
+    [Fact]
+    public void SetCurrentTimeLevel_RejectsLevelBelowOne()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        Assert.Throws<ArgumentOutOfRangeException>(() => mutant.SetCurrentTimeLevel(0));
+    }
+
+    [Fact]
+    public void GatekeeperDefeat_StartsFalseAndCanBeRecorded()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        Assert.False(mutant.HasDefeatedGatekeeper(2));
+
+        mutant.RecordGatekeeperDefeat(2);
+
+        Assert.True(mutant.HasDefeatedGatekeeper(2));
+        Assert.False(mutant.HasDefeatedGatekeeper(3)); // per-level, not global
+    }
 }

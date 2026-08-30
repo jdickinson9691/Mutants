@@ -26,8 +26,13 @@ public sealed class Mutant
     /// <summary>The deepest time-travel level this Mutant has unlocked — drives the soft level cap.</summary>
     public int UnlockedTimeLevel { get; private set; }
 
+    /// <summary>Which time-travel level this Mutant is currently standing in — docs/GDD.md §3.2.</summary>
+    public int CurrentTimeLevel { get; private set; } = 1;
+
     /// <summary>Current grid position on whichever <see cref="LevelMap"/> this Mutant is on — docs/GDD.md §3.1.</summary>
     public Coordinate Position { get; private set; } = Coordinate.Origin;
+
+    private readonly HashSet<int> _defeatedGatekeepers = [];
 
     /// <summary>
     /// Riblets on hand — docs/GDD.md §6's store currency. Full store
@@ -148,6 +153,28 @@ public sealed class Mutant
             UnlockedTimeLevel = timeLevel;
         }
     }
+
+    /// <summary>
+    /// Moves this Mutant to a different time-travel level — docs/GDD.md
+    /// §3.2. Legality (unlocked? affordable?) and the actual Ion charge
+    /// are Mutants.Engine.Simulation.TimeTravelResolver's job; this just
+    /// records where the Mutant now is.
+    /// </summary>
+    public void SetCurrentTimeLevel(int timeLevel)
+    {
+        if (timeLevel < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeLevel), timeLevel, "Time level must be at least 1.");
+        }
+
+        CurrentTimeLevel = timeLevel;
+    }
+
+    /// <summary>Whether this Mutant has already defeated the given level's gatekeeper — docs/GDD.md §3.2.</summary>
+    public bool HasDefeatedGatekeeper(int timeLevel) => _defeatedGatekeepers.Contains(timeLevel);
+
+    /// <summary>Records a gatekeeper defeat, so future travel to that level doesn't require refighting it.</summary>
+    public void RecordGatekeeperDefeat(int timeLevel) => _defeatedGatekeepers.Add(timeLevel);
 
     /// <summary>
     /// Advances passive Ion drain by one world tick — docs/GDD.md §2:

@@ -2,8 +2,9 @@ using Mutants.Core.Characters;
 using Mutants.Core.Classes;
 using Mutants.Core.Economy;
 using Mutants.Core.Events;
+using Mutants.Core.Ions;
 using Mutants.Core.Items;
-using Mutants.Core.Monsters;
+using Mutants.Core.Levels;
 using Mutants.Core.World;
 using Mutants.Engine;
 using Mutants.Engine.Combat;
@@ -13,21 +14,30 @@ using Spectre.Console;
 
 // Sandbox build covering milestones 2 (grid movement, single hardcoded
 // level), 3 (combat, loot drops, convert/sell/wield), 4 (NPC simulation
-// loop), and 5 (stores and the Riblet economy) per docs/TECH_STACK.md's
-// milestone sequencing. Time travel is the next milestone. All game rules
-// here (movement legality, combat resolution, NPC AI, store transactions,
-// character state) live in Mutants.Core / Mutants.Engine; this file is
-// presentation/input only, per docs/AGENTS.md's Console/UI Agent
-// contract. There's no spatial monster placement yet (rooms don't carry
-// monsters) — "fight" spawns a random test monster on demand so the full
-// loot loop is playable ahead of that; NPCs use the same on-demand spawn
-// via NpcController. Stores, unlike monsters, ARE placed spatially (see
-// Economy.TestStores) — buying/selling requires standing in the right
-// room, same as movement already works. docs/GDD.md §9's real background
-// tick (every ~2 seconds, independent of player input) isn't implemented
-// — this console instead advances the world by one tick per player
-// command, a synchronous stand-in that keeps the sandbox simple and
-// scriptable.
+// loop), 5 (stores and the Riblet economy), and 6 (multi-level time
+// travel with scaling) per docs/TECH_STACK.md's milestone sequencing. All
+// game rules here (movement legality, combat resolution, NPC AI, store
+// transactions, time travel, character state) live in Mutants.Core /
+// Mutants.Engine; this file is presentation/input only, per
+// docs/AGENTS.md's Console/UI Agent contract.
+//
+// The player can now freely time-travel across Levels.TestWorld's 3
+// sandbox levels. NPCs deliberately stay on level 1 this milestone —
+// giving WorldSimulation full multi-level NPC awareness (each NPC on its
+// own level, wandering/fighting/trading against ITS level's content) is a
+// bigger architectural change than fits alongside building time travel
+// itself; flagged here as follow-up work rather than rushed in.
+//
+// There's still no spatial monster placement (rooms don't carry
+// monsters) — "fight" spawns a random monster from the current level's
+// tier-scaled roster on demand, same as NpcController does for NPCs.
+// Stores, unlike monsters, ARE placed spatially per level (see
+// Economy.TestStores / Levels.TestWorld) — buying/selling requires
+// standing in the right room, same as movement already works.
+// docs/GDD.md §9's real background tick (every ~2 seconds, independent of
+// player input) isn't implemented — this console instead advances the
+// world by one tick per player command, a synchronous stand-in that
+// keeps the sandbox simple and scriptable.
 
 // Input is read via plain Console.ReadLine() rather than Spectre's
 // interactive prompts (TextPrompt/SelectionPrompt): those require a real
@@ -37,7 +47,7 @@ using Spectre.Console;
 // instead of throwing, which we treat as "quit."
 
 AnsiConsole.Write(new FigletText("Chronomutants").Color(Color.Green));
-AnsiConsole.MarkupLine("[grey](engine sandbox build — grid movement, single test level)[/]");
+AnsiConsole.MarkupLine("[grey](engine sandbox build — time travel across a 3-level test world)[/]");
 AnsiConsole.WriteLine();
 
 var name = ReadNonEmptyLine("What is your name, Mutant? ");
@@ -53,14 +63,14 @@ if (characterClass is null)
 }
 
 var mutant = new Mutant(name, characterClass.Value);
-var level = TestLevel.Build();
-mutant.PlaceAt(level.Start);
+var world = TestWorld.Build();
+mutant.PlaceAt(world.GetLevel(mutant.CurrentTimeLevel).Map.Start);
 var random = new SystemRandomSource();
-var storeSlots = TestStores.Build();
 
 const int NpcPopulationSize = 5; // arbitrary sandbox default - GDD §7 calls this "a configurable population"
-var npcs = NpcPopulation.Spawn(NpcPopulationSize, level, random);
-var simulation = new WorldSimulation(level, npcs, random, storeSlots);
+var npcLevel = world.GetLevel(1); // NPCs stay on level 1 for now - see file header note
+var npcs = NpcPopulation.Spawn(NpcPopulationSize, npcLevel.Map, random);
+var simulation = new WorldSimulation(npcLevel.Map, npcs, random, npcLevel.StoreSlots);
 var shownBroadcastCount = 0;
 
 AnsiConsole.WriteLine();
@@ -68,7 +78,7 @@ AnsiConsole.MarkupLine($"Welcome, [bold]{Markup.Escape(mutant.Name)}[/] the [bol
 AnsiConsole.MarkupLine($"[grey]{NpcPopulationSize} other Mutants are already out there, fending for themselves.[/]");
 AnsiConsole.WriteLine();
 
-RenderRoom(mutant, level, storeSlots);
+RenderRoom(mutant, world);
 
 var running = true;
 while (running)
@@ -97,15 +107,15 @@ while (running)
             break;
 
         case "look" or "l":
-            RenderRoom(mutant, level, storeSlots);
+            RenderRoom(mutant, world);
             break;
 
         case "status" or "stat":
-            RenderStatusBar(mutant, level);
+            RenderStatusBar(mutant, world);
             break;
 
         case "fight" or "f":
-            if (!HandleFight(mutant, level, random, simulation.Broadcast))
+            if (!HandleFight(mutant, world, random, simulation.Broadcast))
             {
                 running = false; // defeated - see HandleFight
             }
@@ -126,39 +136,45 @@ while (running)
             break;
 
         case "stores":
-            RenderStores(storeSlots);
+            RenderStores(world.GetLevel(mutant.CurrentTimeLevel).StoreSlots);
             break;
 
         case "shop":
-            HandleShop(mutant, storeSlots);
+            HandleShop(mutant, world);
             break;
 
         case "buy-store":
-            HandleBuyStore(mutant, storeSlots);
+            HandleBuyStore(mutant, world);
             break;
 
         case "collect":
-            HandleCollect(mutant, storeSlots);
+            HandleCollect(mutant, world);
             break;
 
         default:
             var (command, argument) = SplitCommand(input);
 
+            if (command is "travel")
+            {
+                HandleTravel(mutant, world, random, simulation.Broadcast, argument);
+                break;
+            }
+
             if (command is "sell")
             {
-                HandleSellToStore(mutant, storeSlots, argument);
+                HandleSellToStore(mutant, world, argument);
                 break;
             }
 
             if (command is "buy")
             {
-                HandleBuyFromStore(mutant, storeSlots, argument);
+                HandleBuyFromStore(mutant, world, argument);
                 break;
             }
 
             if (command is "deposit" or "withdraw" or "reprice")
             {
-                HandleStoreManagement(mutant, storeSlots, command, argument);
+                HandleStoreManagement(mutant, world, command, argument);
                 break;
             }
 
@@ -174,7 +190,7 @@ while (running)
                 break;
             }
 
-            HandleMove(mutant, level, direction.Value, storeSlots);
+            HandleMove(mutant, world, direction.Value);
             break;
     }
 
@@ -340,8 +356,9 @@ static (string ItemArg, int Price)? SplitItemAndPrice(string argument)
     return (string.Join(' ', tokens[..^1]), price);
 }
 
-static void HandleShop(Mutant mutant, IReadOnlyList<StoreSlot> storeSlots)
+static void HandleShop(Mutant mutant, GameWorld world)
 {
+    var storeSlots = world.GetLevel(mutant.CurrentTimeLevel).StoreSlots;
     var slot = FindStoreSlotAt(storeSlots, mutant.Position);
     if (slot?.Store is not { } store)
     {
@@ -352,8 +369,9 @@ static void HandleShop(Mutant mutant, IReadOnlyList<StoreSlot> storeSlots)
     RenderShop(store);
 }
 
-static void HandleBuyFromStore(Mutant mutant, IReadOnlyList<StoreSlot> storeSlots, string argument)
+static void HandleBuyFromStore(Mutant mutant, GameWorld world, string argument)
 {
+    var storeSlots = world.GetLevel(mutant.CurrentTimeLevel).StoreSlots;
     var slot = FindStoreSlotAt(storeSlots, mutant.Position);
     if (slot?.Store is not { } store)
     {
@@ -380,8 +398,9 @@ static void HandleBuyFromStore(Mutant mutant, IReadOnlyList<StoreSlot> storeSlot
     AnsiConsole.MarkupLine($"[green]Bought {Markup.Escape(listing.Item.Name)} for {listing.AskingPrice} Riblets.[/]");
 }
 
-static void HandleSellToStore(Mutant mutant, IReadOnlyList<StoreSlot> storeSlots, string argument)
+static void HandleSellToStore(Mutant mutant, GameWorld world, string argument)
 {
+    var storeSlots = world.GetLevel(mutant.CurrentTimeLevel).StoreSlots;
     var slot = FindStoreSlotAt(storeSlots, mutant.Position);
     if (slot?.Store is not { } store)
     {
@@ -408,8 +427,9 @@ static void HandleSellToStore(Mutant mutant, IReadOnlyList<StoreSlot> storeSlots
     AnsiConsole.MarkupLine($"[yellow]Sold {Markup.Escape(item.Name)} to {Markup.Escape(store.Name)} for {price} Riblets.[/]");
 }
 
-static void HandleBuyStore(Mutant mutant, IReadOnlyList<StoreSlot> storeSlots)
+static void HandleBuyStore(Mutant mutant, GameWorld world)
 {
+    var storeSlots = world.GetLevel(mutant.CurrentTimeLevel).StoreSlots;
     var slot = FindStoreSlotAt(storeSlots, mutant.Position);
     if (slot is null)
     {
@@ -433,9 +453,11 @@ static void HandleBuyStore(Mutant mutant, IReadOnlyList<StoreSlot> storeSlots)
     AnsiConsole.MarkupLine($"[green]You now own a store here: {Markup.Escape(slot.Store!.Name)}![/] Use [yellow]deposit[/]/[yellow]withdraw[/]/[yellow]reprice[/]/[yellow]collect[/] to run it.");
 }
 
-static void HandleCollect(Mutant mutant, IReadOnlyList<StoreSlot> storeSlots)
+/// <summary>Collects from every store the Mutant owns, across every level — an owner needn't be standing there to collect (docs/GDD.md §6.2's "idle-income loop").</summary>
+static void HandleCollect(Mutant mutant, GameWorld world)
 {
-    var owned = storeSlots.Where(s => s.Store?.Owner == mutant).ToList();
+    var allSlots = Enumerable.Range(1, world.MaxLevel).SelectMany(n => world.GetLevel(n).StoreSlots);
+    var owned = allSlots.Where(s => s.Store?.Owner == mutant).ToList();
     if (owned.Count == 0)
     {
         AnsiConsole.MarkupLine("[red]You don't own a store.[/] Find an empty slot and use [yellow]buy-store[/].");
@@ -457,8 +479,9 @@ static void HandleCollect(Mutant mutant, IReadOnlyList<StoreSlot> storeSlots)
         : "[grey]Nothing to collect yet.[/]");
 }
 
-static void HandleStoreManagement(Mutant mutant, IReadOnlyList<StoreSlot> storeSlots, string command, string argument)
+static void HandleStoreManagement(Mutant mutant, GameWorld world, string command, string argument)
 {
+    var storeSlots = world.GetLevel(mutant.CurrentTimeLevel).StoreSlots;
     var slot = FindStoreSlotAt(storeSlots, mutant.Position);
     if (slot?.Store is not { } store || store.Owner != mutant)
     {
@@ -526,10 +549,12 @@ static void HandleStoreManagement(Mutant mutant, IReadOnlyList<StoreSlot> storeS
     }
 }
 
-/// <summary>Spawns a random test monster and resolves combat. Returns false if the Mutant was defeated (caller should end the session).</summary>
-static bool HandleFight(Mutant mutant, LevelMap level, IRandomSource random, BroadcastChannel broadcast)
+/// <summary>Spawns a random monster from the current level's tier-scaled roster and resolves combat. Returns false if the Mutant was defeated (caller should end the session).</summary>
+static bool HandleFight(Mutant mutant, GameWorld world, IRandomSource random, BroadcastChannel broadcast)
 {
-    var monster = TestMonsters.All[System.Random.Shared.Next(TestMonsters.All.Count)]();
+    var levelDefinition = world.GetLevel(mutant.CurrentTimeLevel);
+    var roster = levelDefinition.MonsterRoster;
+    var monster = roster[System.Random.Shared.Next(roster.Count)]();
     var levelBefore = mutant.Level;
 
     AnsiConsole.MarkupLine($"A [bold]{Markup.Escape(monster.Name)}[/] (tier {monster.Tier}) attacks!");
@@ -549,7 +574,7 @@ static bool HandleFight(Mutant mutant, LevelMap level, IRandomSource random, Bro
             broadcast.Publish(GameEvent.LevelReached(mutant.Name, mutant.Level));
         }
 
-        RenderStatusBar(mutant, level);
+        RenderStatusBar(mutant, world);
         return true;
     }
 
@@ -559,6 +584,90 @@ static bool HandleFight(Mutant mutant, LevelMap level, IRandomSource random, Bro
     AnsiConsole.MarkupLine($"[red]You were defeated by the {Markup.Escape(monster.Name)}...[/]");
     broadcast.Publish(GameEvent.Slain(mutant.Name, monster.Name));
     return false;
+}
+
+/// <summary>Handles "travel next/prev/&lt;level&gt;" — docs/GDD.md §3.2.</summary>
+static void HandleTravel(Mutant mutant, GameWorld world, IRandomSource random, BroadcastChannel broadcast, string argument)
+{
+    int targetLevel;
+    switch (argument.Trim().ToLowerInvariant())
+    {
+        case "":
+            AnsiConsole.MarkupLine("[red]Travel where?[/] Try 'travel next', 'travel prev', or 'travel <level number>'.");
+            return;
+
+        case "next":
+            targetLevel = mutant.CurrentTimeLevel + 1;
+            break;
+
+        case "prev" or "previous":
+            targetLevel = mutant.CurrentTimeLevel - 1;
+            if (targetLevel < 1)
+            {
+                AnsiConsole.MarkupLine("[red]You're already at the shallowest level.[/]");
+                return;
+            }
+
+            break;
+
+        default:
+            if (!int.TryParse(argument.Trim(), out targetLevel))
+            {
+                AnsiConsole.MarkupLine("[red]'travel' needs 'next', 'prev', or a level number.[/]");
+                return;
+            }
+
+            break;
+    }
+
+    if (targetLevel == mutant.CurrentTimeLevel)
+    {
+        AnsiConsole.MarkupLine("[grey]You're already there.[/]");
+        return;
+    }
+
+    var levelBefore = mutant.Level;
+    var result = TimeTravelResolver.Travel(mutant, world, targetLevel, random);
+
+    var gatekeeperFight = result.GatekeeperFight;
+    if (gatekeeperFight is not null)
+    {
+        AnsiConsole.MarkupLine($"[bold]The Gatekeeper of Level {targetLevel} blocks your way![/]");
+        foreach (var line in gatekeeperFight.Log)
+        {
+            AnsiConsole.MarkupLine(Markup.Escape(line));
+        }
+    }
+
+    if (!result.Success)
+    {
+        AnsiConsole.MarkupLine(result.FailureReason switch
+        {
+            TimeTravelFailureReason.UnknownLevel => $"[red]There is no level {targetLevel}.[/]",
+            TimeTravelFailureReason.BelowMinimumCharacterLevel =>
+                $"[red]You need to be at least character level {world.GetLevel(targetLevel).MinCharacterLevelToUnlock} to attempt level {targetLevel}.[/]",
+            TimeTravelFailureReason.LostToGatekeeper => $"[red]The gatekeeper defeated you. Level {targetLevel} remains locked.[/]",
+            TimeTravelFailureReason.InsufficientIons =>
+                $"[red]Not enough Ions ({IonEconomy.TimeTravelCost(targetLevel)} needed; you have {mutant.Ions.Current}).[/]",
+            _ => "[red]Travel failed.[/]",
+        });
+        return;
+    }
+
+    if (gatekeeperFight is { MutantWon: true })
+    {
+        AnsiConsole.MarkupLine($"[green]You defeated the Gatekeeper of Level {targetLevel}! Level {targetLevel} is now unlocked.[/]");
+        broadcast.Publish(GameEvent.Slain($"The Gatekeeper of Level {targetLevel}", mutant.Name));
+    }
+
+    if (mutant.Level > levelBefore)
+    {
+        broadcast.Publish(GameEvent.LevelReached(mutant.Name, mutant.Level));
+    }
+
+    AnsiConsole.MarkupLine($"[bold]You travel to level {targetLevel}: {Markup.Escape(world.GetLevel(targetLevel).Map.Name)}.[/]");
+    broadcast.Publish(new GameEvent($"{mutant.Name} time traveled to level {targetLevel}."));
+    RenderRoom(mutant, world);
 }
 
 static void RenderNpcs(IReadOnlyList<Mutant> npcs)
@@ -617,6 +726,12 @@ static int RenderNewBroadcastEvents(BroadcastChannel broadcast, int alreadyShown
 
 static void RenderStores(IReadOnlyList<StoreSlot> storeSlots)
 {
+    if (storeSlots.Count == 0)
+    {
+        AnsiConsole.MarkupLine("[grey]No stores on this level yet.[/]");
+        return;
+    }
+
     var table = new Table().Expand();
     table.AddColumn("Name");
     table.AddColumn("Location");
@@ -708,9 +823,10 @@ static void RenderInventory(Mutant mutant)
     AnsiConsole.Write(table);
 }
 
-static void HandleMove(Mutant mutant, LevelMap level, Direction direction, IReadOnlyList<StoreSlot> storeSlots)
+static void HandleMove(Mutant mutant, GameWorld world, Direction direction)
 {
-    var result = level.TryMove(mutant.Position, direction);
+    var map = world.GetLevel(mutant.CurrentTimeLevel).Map;
+    var result = map.TryMove(mutant.Position, direction);
     if (!result.Success)
     {
         AnsiConsole.MarkupLine("[red]You can't go that way.[/]");
@@ -718,14 +834,15 @@ static void HandleMove(Mutant mutant, LevelMap level, Direction direction, IRead
     }
 
     mutant.MoveTo(result.Destination!.Value);
-    RenderRoom(mutant, level, storeSlots);
+    RenderRoom(mutant, world);
 }
 
-static void RenderRoom(Mutant mutant, LevelMap level, IReadOnlyList<StoreSlot> storeSlots)
+static void RenderRoom(Mutant mutant, GameWorld world)
 {
-    var room = level.GetRoom(mutant.Position);
+    var levelDefinition = world.GetLevel(mutant.CurrentTimeLevel);
+    var room = levelDefinition.Map.GetRoom(mutant.Position);
 
-    RenderStatusBar(mutant, level);
+    RenderStatusBar(mutant, world);
     AnsiConsole.WriteLine();
     AnsiConsole.MarkupLine(Markup.Escape(room.Description));
 
@@ -744,7 +861,7 @@ static void RenderRoom(Mutant mutant, LevelMap level, IReadOnlyList<StoreSlot> s
         AnsiConsole.MarkupLine("[green]There are no exits. You are stuck.[/]");
     }
 
-    var slot = FindStoreSlotAt(storeSlots, mutant.Position);
+    var slot = FindStoreSlotAt(levelDefinition.StoreSlots, mutant.Position);
     if (slot is not null)
     {
         AnsiConsole.MarkupLine(slot.Store switch
@@ -758,16 +875,18 @@ static void RenderRoom(Mutant mutant, LevelMap level, IReadOnlyList<StoreSlot> s
     AnsiConsole.WriteLine();
 }
 
-static void RenderStatusBar(Mutant mutant, LevelMap level)
+static void RenderStatusBar(Mutant mutant, GameWorld world)
 {
+    var levelDefinition = world.GetLevel(mutant.CurrentTimeLevel);
     var status = $"[red]HP {mutant.Health.Current}/{mutant.Health.Max}[/]  " +
                  $"[blue]Ions {mutant.Ions.Current}/{mutant.Ions.Max}[/]  " +
                  $"[yellow]Riblets {mutant.Riblets}[/]  " +
-                 $"Level {mutant.Level}  " +
+                 $"Char Level {mutant.Level}  " +
+                 $"Time Level {mutant.CurrentTimeLevel}/{mutant.UnlockedTimeLevel} unlocked  " +
                  $"Location {Markup.Escape(mutant.Position.ToString())}";
 
     AnsiConsole.Write(new Panel(status)
-        .Header($"[bold]{Markup.Escape(mutant.Name)}[/] — {Markup.Escape(level.Name)}")
+        .Header($"[bold]{Markup.Escape(mutant.Name)}[/] — {Markup.Escape(levelDefinition.Map.Name)}")
         .Expand());
 }
 
@@ -776,14 +895,15 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("[yellow]Commands:[/]");
     AnsiConsole.MarkupLine("  [green]n[/]/[green]s[/]/[green]e[/]/[green]w[/] (or north/south/east/west) - move");
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room");
-    AnsiConsole.MarkupLine("  [green]fight[/] (or f)        - fight a random monster");
+    AnsiConsole.MarkupLine("  [green]fight[/] (or f)        - fight a random monster from this level's roster");
+    AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]/[green]<N>[/] - jump between time-travel levels");
     AnsiConsole.MarkupLine("  [green]inventory[/] (or i)    - list what you're carrying");
     AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Mutants out in the world");
     AnsiConsole.MarkupLine("  [green]news[/] (or broadcast) - show recent kill-feed events");
     AnsiConsole.MarkupLine("  [green]convert <item>[/]     - destroy an item for Ions");
     AnsiConsole.MarkupLine("  [green]wield <item>[/]       - equip a weapon or armor item");
     AnsiConsole.MarkupLine("    ('<item>' is either its inventory number or its name)");
-    AnsiConsole.MarkupLine("  [green]stores[/]              - list every store in the world");
+    AnsiConsole.MarkupLine("  [green]stores[/]              - list every store on this level");
     AnsiConsole.MarkupLine("  [green]shop[/]                - browse the store in your current room");
     AnsiConsole.MarkupLine("  [green]buy <item>[/]         - buy a listed item (must be at a store)");
     AnsiConsole.MarkupLine("  [green]sell <item>[/]        - sell an item to the store here (must be at a store)");

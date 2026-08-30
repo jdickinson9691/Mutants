@@ -6,12 +6,11 @@ namespace Mutants.Core.World;
 /// This is engine-sandbox content only — NOT launch content. Real level
 /// themes/room text/monster-loot-store population are future Content Agent
 /// work per docs/CONTENT_PLAN.md, loaded from data files once
-/// Mutants.Content exists.
+/// Mutants.Content exists. Serves as time-travel level 1 in
+/// Levels.TestWorld.
 /// </summary>
 public static class TestLevel
 {
-    private const string ExitFlavor = "area continues.";
-
     public static LevelMap Build()
     {
         // Flavor lines loosely match the style of docs/GDD.md §3.1's
@@ -30,17 +29,6 @@ public static class TestLevel
             [new Coordinate(-1, -1)] = "An old subway entrance yawns open into darkness.",
         };
 
-        var rooms = new Dictionary<Coordinate, Room>();
-        foreach (var (coordinate, description) in descriptions)
-        {
-            var exits = Enum.GetValues<Direction>()
-                .Where(direction => descriptions.ContainsKey(coordinate.Move(direction)))
-                .Select(direction => (direction, ExitFlavor))
-                .ToArray();
-
-            rooms[coordinate] = Room.Create(description, exits);
-        }
-
-        return new LevelMap("Test Level 1 — Engine Sandbox", Coordinate.Origin, rooms);
+        return GridLevelBuilder.Build("Level 1 — Ruined City", Coordinate.Origin, descriptions);
     }
 }
