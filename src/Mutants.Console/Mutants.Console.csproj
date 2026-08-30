@@ -5,6 +5,26 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <!-- Player-facing app identity (installer/Chronomutants.iss, exe file properties). -->
+    <AssemblyName>Chronomutants</AssemblyName>
+    <Product>Chronomutants</Product>
+    <Version>0.1.0</Version>
+    <Authors>Chronomutants Project</Authors>
+
+    <!--
+      Publish settings for the packaged Windows build — docs/TECH_STACK.md:
+      "dotnet publish produces a self-contained single-file EXE." These are
+      inert for plain `dotnet build`/`dotnet test`; they only take effect
+      with `dotnet publish -r win-x64`, e.g.:
+        dotnet publish src/Mutants.Console -c Release -r win-x64 -o publish/win-x64
+      (see installer/Chronomutants.iss, which packages that output).
+    -->
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishReadyToRun>false</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>

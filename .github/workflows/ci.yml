@@ -1,0 +1,43 @@
+name: CI
+
+# Build and run the full test suite on every push/PR to main — the
+# "passing CI (dotnet test) required before merge" bar docs/AGENTS.md's
+# QA Agent sets. Windows because the whole stack targets Windows
+# (docs/TECH_STACK.md) and windows-latest ships everything this repo
+# needs out of the box.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore Mutants.sln
+
+      - name: Build
+        run: dotnet build Mutants.sln --no-restore -c Release
+
+      - name: Test
+        run: dotnet test Mutants.sln --no-build -c Release --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/*.trx

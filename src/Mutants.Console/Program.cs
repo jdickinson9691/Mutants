@@ -17,21 +17,22 @@ using Spectre.Console;
 // level), 3 (combat, loot drops, convert/sell/wield), 4 (NPC simulation
 // loop), 5 (stores and the Riblet economy), 6 (multi-level time travel
 // with scaling), and 7 (leaderboards + start screen + save/load) per
-// docs/TECH_STACK.md's milestone sequencing. All game rules here
-// (movement legality, combat resolution, NPC AI, store transactions,
-// time travel, persistence, character state) live in Mutants.Core /
-// Mutants.Engine; this file is presentation/input only, per
-// docs/AGENTS.md's Console/UI Agent contract.
+// docs/TECH_STACK.md's milestone sequencing. Milestone 8 (Windows
+// installer packaging) wraps this project up — see installer/*.iss and
+// .github/workflows/. All game rules here (movement legality, combat
+// resolution, NPC AI, store transactions, time travel, persistence,
+// character state) live in Mutants.Core / Mutants.Engine; this file is
+// presentation/input only, per docs/AGENTS.md's Console/UI Agent
+// contract.
 //
 // Only the player's own character is saved/loaded as a full character
 // (see Persistence.CharacterSaveData) - NPCs are re-simulated fresh each
 // session (docs/GDD.md doesn't ask for NPC persistence, only for the
 // leaderboard to have "meaning across NPC-simulated seasons," which is
 // satisfied by recording their personal bests, not their full state).
-// The save/leaderboard file lives at ./saves/mutants.db relative to
-// wherever the console runs - a real packaged build would use a
-// platform-appropriate app-data directory instead (packaging work,
-// milestone 8).
+// The save/leaderboard file lives at %APPDATA%\Chronomutants\mutants.db —
+// not a folder relative to the exe, since an installed copy typically
+// lives under Program Files, unwritable without elevation.
 //
 // The player can now freely time-travel across Levels.TestWorld's 3
 // sandbox levels. NPCs deliberately stay on level 1 this milestone —
@@ -62,8 +63,18 @@ AnsiConsole.Write(new FigletText("Chronomutants").Color(Color.Green));
 AnsiConsole.MarkupLine("[grey](engine sandbox build — time travel across a 3-level test world)[/]");
 AnsiConsole.WriteLine();
 
-var savePath = Path.Combine("saves", "mutants.db");
-Directory.CreateDirectory("saves");
+// %APPDATA%\Chronomutants — not a folder relative to the exe: an
+// installed copy typically lives under Program Files, which a
+// non-elevated player can't write to, so the save file needs a real
+// per-user, always-writable location (docs/TECH_STACK.md's installer
+// milestone). Falls back to a local "saves" folder if ApplicationData
+// somehow isn't available (e.g. some minimal/CI environments).
+var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+var savesDirectory = string.IsNullOrEmpty(appDataFolder)
+    ? "saves"
+    : Path.Combine(appDataFolder, "Chronomutants");
+Directory.CreateDirectory(savesDirectory);
+var savePath = Path.Combine(savesDirectory, "mutants.db");
 using var repository = new GameRepository(savePath);
 
 RenderLeaderboards(repository);

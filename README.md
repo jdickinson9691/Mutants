@@ -7,9 +7,34 @@ restrictions as the human player.
 
 ## Status
 
-Pre-production / design phase. No game code has been written yet — this
-repository currently holds the research, game design document, tech stack
-recommendation, and agent/role contracts that will drive implementation.
+All 8 milestones of the planned sequence (see Roadmap below) have an
+engine-sandbox implementation: a playable console build with combat, loot,
+an NPC economy, multi-level time travel, save/load with leaderboards, and
+a Windows installer build/release pipeline. Content is still sandbox-grade
+throughout — small hardcoded levels/monster rosters/store catalogs, clearly
+marked as such in code — not the 5–8 fully realized launch levels
+`docs/CONTENT_PLAN.md` calls for. That's the natural next phase of work.
+
+## Building & running
+
+```
+dotnet build Mutants.sln
+dotnet test Mutants.sln
+dotnet run --project src/Mutants.Console
+```
+
+To produce the distributable Windows build locally (requires
+[Inno Setup 6](https://jrsoftware.org/isinfo.php)):
+
+```
+dotnet publish src/Mutants.Console -c Release -r win-x64 -o publish/win-x64
+iscc installer/Chronomutants.iss
+```
+
+The installer lands in `installer/Output/`. Pushing a `v*` tag (e.g.
+`git tag v0.1.0 && git push origin v0.1.0`) runs the same steps in CI and
+attaches the installer to a GitHub Release automatically — see
+[`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 ## Start here
 
@@ -24,17 +49,27 @@ recommendation, and agent/role contracts that will drive implementation.
 - [`docs/AGENTS.md`](docs/AGENTS.md) — the project's agent/role contracts
   (planning, design, engine, UI, content, QA, packaging, docs), so work can
   be picked up consistently across sessions and contributors.
+- [`src/Mutants.Console/Program.cs`](src/Mutants.Console/Program.cs) — the
+  playable console app; its file header notes exactly what's real vs.
+  sandbox-simplified at any given point (e.g. NPCs currently only roam
+  time-travel level 1 — full multi-level NPC simulation is flagged there
+  as follow-up work).
 
 ## Roadmap (see `docs/TECH_STACK.md` for detail)
 
-1. Core domain model (classes, stats, Ions, items) + unit tests
-2. Grid movement on a single level
-3. Combat, loot drops, convert/sell/wield
-4. NPC simulation loop
-5. Stores (government + player-owned) and the Riblet economy
-6. Multi-level time travel with scaling
-7. Leaderboards + start screen + save/load
-8. Windows installer packaging
+1. ✅ Core domain model (classes, stats, Ions, items) + unit tests
+2. ✅ Grid movement on a single level
+3. ✅ Combat, loot drops, convert/sell/wield
+4. ✅ NPC simulation loop
+5. ✅ Stores (government + player-owned) and the Riblet economy
+6. ✅ Multi-level time travel with scaling
+7. ✅ Leaderboards + start screen + save/load
+8. ✅ Windows installer packaging
+
+Each step above is engine-sandbox complete (tested, playable end to end)
+but not launch-content complete — see `docs/CONTENT_PLAN.md` for what's
+still tracked as content work (full ability trees, a real monster roster
+and level set, store catalogs, etc.).
 
 ## License / provenance
 
