@@ -107,8 +107,9 @@ stretch goal, not in the original).
   travelling past a Gatekeeper year was never restricted.
 - **Persistence**: map layouts are regenerated from the seed, not stored.
   What the save keeps per character is the world seed, the current and
-  furthest-reached year, and the set of cleared Gatekeeper years. (Player
-  store ownership is currently session-only — a known limitation.)
+  furthest-reached year, the set of cleared Gatekeeper years, and every
+  store the player owns (which year, its Riblet capital, and its
+  listings — re-attached to the regenerated world on load).
 
 ### 3.3 Death & recall
 - Dying drops a portion of unconverted inventory at the death location (loot
@@ -224,8 +225,8 @@ area/group to a capstone — is the standard every class follows.)
 
 ### 6.2 Player-owned stores `[SOURCE: players can buy government stores]`
 - A player (human or NPC) can purchase an available government-built store
-  slot in a year for a Riblet cost scaled to that year's tier.
-  (Ownership currently lasts only for the session — see §3.2.)
+  slot in a year for a Riblet cost scaled to that year's tier. A human
+  player's owned stores persist across sessions (§3.2).
 - Once owned, the player stocks it manually (deposit items from inventory,
   set an asking price per item, within store-level-appropriate bounds to
   prevent trivial arbitrage).
@@ -319,7 +320,6 @@ yours) using NPCs instead of real concurrent users.
 - Ion-cost coefficient tuning: at `0.2/year` a fresh character can't afford
   the first meaningful jump until it has converted some loot — intended, but
   worth revisiting.
-- Persisting player store ownership across sessions (currently session-only).
 - Whether NPC store ownership should be capped (to avoid NPCs monopolizing
   all store slots before the human player can buy in).
 - Save format: single local save vs. multiple character slots.

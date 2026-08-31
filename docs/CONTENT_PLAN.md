@@ -91,8 +91,6 @@ Not new plumbing — tuning and polish:
 - **Ion-cost coefficient** (`IonEconomy.IonsPerYearTravelled = 0.2`): a
   fresh character can't afford the first meaningful jump until it converts
   some loot. Intended friction, but worth revisiting.
-- **Persist player store ownership** across sessions (currently
-  session-only; the save keeps world seed + years + cleared Gatekeepers).
 - **More / finer era bands** for tighter thematic progression.
 - **Config-driven NPC class distribution** instead of uniform-random.
 - **Denser rosters / catalogs** if the game wants more variety per year.

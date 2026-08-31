@@ -1,6 +1,8 @@
 using Mutants.Core.Characters;
 using Mutants.Core.Classes;
+using Mutants.Core.Economy;
 using Mutants.Core.Items;
+using Mutants.Core.Time;
 using Mutants.Engine.Persistence;
 
 namespace Mutants.Engine.Tests.Persistence;
@@ -118,5 +120,78 @@ public class CharacterMapperTests
         var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original, TestSeed));
 
         Assert.Empty(restored.Inventory);
+    }
+
+    [Fact]
+    public void RoundTrip_PreservesAConsumablesEffectFields()
+    {
+        var original = new Mutant("Rook", CharacterClass.Warrior);
+        var potion = Item.Create("Combat Stim", ItemType.Consumable, 3, Rarity.Uncommon,
+            consumableEffect: ConsumableEffectType.BuffAttack, effectMagnitude: 5, effectDurationTicks: 15);
+        original.AddToInventory(potion);
+
+        var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original, TestSeed));
+
+        var restoredPotion = Assert.Single(restored.Inventory);
+        Assert.Equal(ConsumableEffectType.BuffAttack, restoredPotion.ConsumableEffect);
+        Assert.Equal(5, restoredPotion.EffectMagnitude);
+        Assert.Equal(15, restoredPotion.EffectDurationTicks);
+        Assert.True(restoredPotion.IsUsable);
+    }
+
+    [Fact]
+    public void OwnedStores_RoundTripAcrossSave_ThenApplyOwnedStores_RestoresOwnershipCapitalAndListings()
+    {
+        var world = TestTimeWorld.Build(seed: 4242);
+        var year = 2600;
+
+        var player = new Mutant("Rook", CharacterClass.Warrior, startingYear: year);
+        player.AddRiblets(5000);
+        player.PlaceAt(world.GetYear(year).Map.Start);
+
+        var slot = world.GetYear(year).StoreSlots.Single(s => s.IsAvailableForPurchase);
+        var store = slot.Purchase(player, startingCapital: 100);
+        var ribletsAfterPurchase = player.Riblets;
+
+        var listedItem = Item.Create("Layered Plating", ItemType.Armor, 5, Rarity.Rare);
+        player.AddToInventory(listedItem);
+        store.Deposit(player, listedItem, askingPrice: 250);
+
+        var save = CharacterMapper.ToSaveData(player, TestSeed,
+            new Dictionary<int, Store> { [year] = store });
+
+        Assert.Single(save.OwnedStores);
+        Assert.Equal(year, save.OwnedStores[0].Year);
+        Assert.Equal(100, save.OwnedStores[0].Capital);
+        Assert.Single(save.OwnedStores[0].Listings);
+
+        // Fresh session: rebuild the world from the same seed, restore the character, re-attach stores.
+        var reloadedWorld = TestTimeWorld.Build(seed: 4242);
+        var reloaded = CharacterMapper.FromSaveData(save);
+        var ribletsOnReload = reloaded.Riblets;
+        CharacterMapper.ApplyOwnedStores(save, reloaded, reloadedWorld);
+
+        var reloadedSlot = reloadedWorld.GetYear(year).StoreSlots.Single(s => s.Store?.Owner == reloaded);
+        Assert.NotNull(reloadedSlot.Store);
+        Assert.Equal(100, reloadedSlot.Store!.Capital);
+        var reloadedListing = Assert.Single(reloadedSlot.Store.Listings);
+        Assert.Equal("Layered Plating", reloadedListing.Item.Name);
+        Assert.Equal(250, reloadedListing.AskingPrice);
+
+        // Re-attaching does not charge the purchase cost again.
+        Assert.Equal(ribletsOnReload, reloaded.Riblets);
+        Assert.Equal(ribletsAfterPurchase, ribletsOnReload);
+    }
+
+    [Fact]
+    public void ApplyOwnedStores_IsANoOpForASaveWithNoOwnedStores()
+    {
+        var world = TestTimeWorld.Build(seed: 1);
+        var save = CharacterMapper.ToSaveData(new Mutant("Rook", CharacterClass.Warrior), TestSeed);
+        var player = CharacterMapper.FromSaveData(save);
+
+        CharacterMapper.ApplyOwnedStores(save, player, world); // must not throw
+
+        Assert.All(world.GetYear(2000).StoreSlots, s => Assert.NotEqual(player, s.Store?.Owner));
     }
 }

@@ -63,4 +63,23 @@ public sealed class StoreSlot
         Store = new Store($"{buyer.Name}'s Store", HomeLevel, startingCapital, buyer);
         return Store;
     }
+
+    /// <summary>
+    /// Re-attaches a store <paramref name="owner"/> bought in a previous
+    /// session — no Riblet charge, capital restored as-is. Persistence
+    /// only (see Mutants.Engine.Persistence.CharacterMapper); players buy
+    /// in through <see cref="Purchase"/>. The caller re-stocks listings
+    /// via <see cref="Store.Stock"/> afterward. Throws if the slot is
+    /// already occupied.
+    /// </summary>
+    public Store RestoreOwnership(Mutant owner, int capital)
+    {
+        if (Store is not null)
+        {
+            throw new InvalidOperationException($"'{Name}' is already occupied.");
+        }
+
+        Store = new Store($"{owner.Name}'s Store", HomeLevel, Math.Max(0, capital), owner);
+        return Store;
+    }
 }

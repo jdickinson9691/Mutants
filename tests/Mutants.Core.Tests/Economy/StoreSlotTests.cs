@@ -61,4 +61,28 @@ public class StoreSlotTests
 
         Assert.Throws<InvalidOperationException>(() => slot.Purchase(buyer));
     }
+
+    [Fact]
+    public void RestoreOwnership_ReattachesAStoreWithNoRibletChargeAndKeepsTheCapital()
+    {
+        var slot = new StoreSlot("Vacant Storefront", Coordinate.Origin, homeLevel: 2600, purchaseCost: 400);
+        var owner = new Mutant("Rook", CharacterClass.Warrior); // 0 Riblets — Purchase would throw
+
+        var store = slot.RestoreOwnership(owner, capital: 375);
+
+        Assert.Same(store, slot.Store);
+        Assert.Equal(owner, store.Owner);
+        Assert.Equal(375, store.Capital);
+        Assert.Equal(0, owner.Riblets); // never charged
+        Assert.False(slot.IsAvailableForPurchase);
+    }
+
+    [Fact]
+    public void RestoreOwnership_ThrowsIfAlreadyOccupied()
+    {
+        var store = Store.CreateGovernmentStore("Depot", homeLevel: 2600);
+        var slot = new StoreSlot("Depot", Coordinate.Origin, homeLevel: 2600, purchaseCost: 0, store);
+
+        Assert.Throws<InvalidOperationException>(() => slot.RestoreOwnership(new Mutant("Rook", CharacterClass.Warrior), capital: 0));
+    }
 }

@@ -60,5 +60,22 @@ public sealed class CharacterSaveData
     /// <summary>Index into <see cref="Inventory"/> of the equipped armor, or null.</summary>
     public int? EquippedArmorIndex { get; set; }
 
+    /// <summary>The player-owned stores, one per year the player has bought into. Re-attached on load (see CharacterMapper.ApplyOwnedStores). Additive — old blobs deserialize as an empty list.</summary>
+    public List<OwnedStoreSaveData> OwnedStores { get; set; } = [];
+
     public DateTime SavedAtUtc { get; set; }
+}
+
+/// <summary>A player-owned store's persistent state: which year it's in, its accumulated Riblet capital, and its current listings.</summary>
+public sealed class OwnedStoreSaveData
+{
+    public int Year { get; set; }
+    public int Capital { get; set; }
+    public List<StoreListingSaveData> Listings { get; set; } = [];
+}
+
+public sealed class StoreListingSaveData
+{
+    public ItemSaveData Item { get; set; } = new();
+    public int AskingPrice { get; set; }
 }

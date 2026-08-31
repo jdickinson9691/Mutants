@@ -11,4 +11,10 @@ public sealed class ItemSaveData
     public int AttackBonus { get; set; }
     public int DefenseBonus { get; set; }
     public string? RestrictedClass { get; set; }
+
+    /// <summary>One of Mutants.Core.Items.ConsumableEffectType's names; "None" for non-consumables. Additive field — old blobs without it deserialize as "None".</summary>
+    public string ConsumableEffect { get; set; } = "None";
+
+    public double EffectMagnitude { get; set; }
+    public int EffectDurationTicks { get; set; }
 }

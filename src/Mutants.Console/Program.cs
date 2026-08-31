@@ -43,11 +43,9 @@ using Spectre.Console;
 // which also carries the world seed) - NPCs are re-simulated fresh each
 // session, scattered across the whole timeline, and only contribute their
 // personal bests to the leaderboard. The save/leaderboard DB lives at
-// %APPDATA%\Chronomutants\mutants.db.
-//
-// KNOWN LIMITATION (parity with the pre-timeline build): player store
-// ownership is session-only - it is not written to the save. Cleared
-// Gatekeeper years and the world seed do persist.
+// %APPDATA%\Chronomutants\mutants.db, and carries the world seed, the
+// current/furthest year, the cleared Gatekeeper years, and every store
+// the player owns (year + capital + listings, re-attached on load).
 
 AnsiConsole.Write(new FigletText("Chronomutants").Color(Color.Green));
 AnsiConsole.MarkupLine("[grey](pre-release build — the continuous 2000–5000 A.D. timeline)[/]");
@@ -73,7 +71,7 @@ if (start is null)
     return;
 }
 
-var (mutant, worldSeed) = start.Value;
+var (mutant, worldSeed, loadedSave) = start.Value;
 var world = LoadTimeWorld(worldSeed);
 
 // Place / re-place the character now that the world exists.
@@ -81,6 +79,12 @@ var startingRoom = world.GetYear(mutant.CurrentYear).Map;
 if (startingRoom.TryGetRoom(mutant.Position) is null)
 {
     mutant.PlaceAt(startingRoom.Start);
+}
+
+// Re-attach any stores this character owned in a previous session.
+if (loadedSave is not null)
+{
+    CharacterMapper.ApplyOwnedStores(loadedSave, mutant, world);
 }
 
 var npcs = SpawnNpcs(world, random);
@@ -174,7 +178,7 @@ while (running)
             break;
 
         case "save":
-            HandleSave(mutant, repository, worldSeed);
+            HandleSave(mutant, repository, worldSeed, world);
             RecordNpcLeaderboardBests(npcs, repository);
             break;
 
@@ -234,7 +238,7 @@ while (running)
 
 if (!mutant.Health.IsDead)
 {
-    HandleSave(mutant, repository, worldSeed);
+    HandleSave(mutant, repository, worldSeed, world);
 }
 
 RecordNpcLeaderboardBests(npcs, repository);
@@ -244,11 +248,27 @@ AnsiConsole.MarkupLine(mutant.Health.IsDead
     : "[grey]Farewell, Mutant. Progress saved.[/]");
 return;
 
-static void HandleSave(Mutant mutant, GameRepository repository, long worldSeed)
+static void HandleSave(Mutant mutant, GameRepository repository, long worldSeed, TimeWorld world)
 {
-    repository.SaveCharacter(CharacterMapper.ToSaveData(mutant, worldSeed));
+    repository.SaveCharacter(CharacterMapper.ToSaveData(mutant, worldSeed, CollectOwnedStores(mutant, world)));
     repository.RecordPersonalBests(mutant.Name, isPlayer: true, mutant.FurthestYearReached, mutant.Level);
     AnsiConsole.MarkupLine("[green]Game saved.[/]");
+}
+
+/// <summary>The player's stores, keyed by the year each is in — gathered from every year visited this session (see TimeWorld.VisitedYears).</summary>
+static Dictionary<int, Store> CollectOwnedStores(Mutant player, TimeWorld world)
+{
+    var owned = new Dictionary<int, Store>();
+    foreach (var year in world.VisitedYears)
+    {
+        var slot = world.GetYear(year).StoreSlots.FirstOrDefault(s => s.Store?.Owner == player);
+        if (slot is not null)
+        {
+            owned[year] = slot.Store!;
+        }
+    }
+
+    return owned;
 }
 
 /// <summary>NPCs aren't saved as full characters (see file header), but their personal bests still count toward the leaderboard - docs/GDD.md §8's "across player + NPCs."</summary>
@@ -365,8 +385,8 @@ static List<Mutant> SpawnNpcs(TimeWorld world, IRandomSource random)
     return NpcPopulation.Spawn(count, world, random).ToList();
 }
 
-/// <summary>The title-screen "new game or load a save" flow. Returns null only on end-of-input (quit); otherwise the character plus the world seed to build the timeline from.</summary>
-static (Mutant Mutant, long WorldSeed)? HandleStartScreen(GameRepository repository)
+/// <summary>The title-screen "new game or load a save" flow. Returns null only on end-of-input (quit); otherwise the character, the world seed to build the timeline from, and (for a loaded game) the raw save data so owned stores can be re-attached once the world exists.</summary>
+static (Mutant Mutant, long WorldSeed, CharacterSaveData? LoadedSave)? HandleStartScreen(GameRepository repository)
 {
     var savedNames = repository.ListSavedCharacterNames();
     if (savedNames.Count > 0)
@@ -418,7 +438,7 @@ static (Mutant Mutant, long WorldSeed)? HandleStartScreen(GameRepository reposit
             return null;
         }
 
-        return (new Mutant(name, characterClass.Value), System.Random.Shared.NextInt64());
+        return (new Mutant(name, characterClass.Value), System.Random.Shared.NextInt64(), null);
     }
 
     var saveData = repository.LoadCharacter(choice)!;
@@ -433,7 +453,7 @@ static (Mutant Mutant, long WorldSeed)? HandleStartScreen(GameRepository reposit
     }
 
     AnsiConsole.MarkupLine($"[green]Welcome back, {Markup.Escape(loaded.Name)}![/]");
-    return (loaded, seed);
+    return (loaded, seed, saveData);
 }
 
 static void RenderLeaderboards(GameRepository repository, string? highlightName = null)
@@ -689,7 +709,7 @@ static void HandleBuyStore(Mutant mutant, TimeWorld world)
     }
 
     slot.Purchase(mutant);
-    AnsiConsole.MarkupLine($"[green]You now own a store here: {Markup.Escape(slot.Store!.Name)}![/] Use [yellow]deposit[/]/[yellow]withdraw[/]/[yellow]reprice[/]/[yellow]collect[/] to run it. [grey](Store ownership is session-only for now.)[/]");
+    AnsiConsole.MarkupLine($"[green]You now own a store here: {Markup.Escape(slot.Store!.Name)}![/] Use [yellow]deposit[/]/[yellow]withdraw[/]/[yellow]reprice[/]/[yellow]collect[/] to run it. It'll still be yours next session.");
 }
 
 /// <summary>Collects from every store the Mutant owns across every year visited this session — an owner needn't be standing there (docs/GDD.md §6.2's "idle-income loop").</summary>
