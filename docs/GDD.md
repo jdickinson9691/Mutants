@@ -69,7 +69,12 @@ Ions are generated almost entirely by **converting items** — `convert <item>`
 destroys the item and adds Ions based on the item's tier/value `[SOURCE
 mechanic, original value curve]`. This makes every piece of loot a three-way
 choice, mirrored exactly from the source game: **wield it, sell it, or burn
-it** `[SOURCE]`.
+it** `[SOURCE]`. The player's Ion pool has **no ceiling** (original change) —
+converting loot never overflows or gets wasted, so a stockpile for a long
+downstream jump is always worth building. Level-up still raises a *nominal*
+pool size that scales a couple of abilities and the passive-regen cap; it's
+just not a hard limit on how much you can hold. (NPC and monster pools
+stay capped.)
 
 ### 2.1 Ion economy tuning (original)
 - Passive drain: 1 Ion per N game-ticks, scaled slightly up further into
@@ -79,7 +84,9 @@ it** `[SOURCE]`.
   drain in early years and slower in the far future. Net effect: the
   present is survivable (grind → heal → recover), the deep future
   net-drains you. Added after playtesting showed the drain-only model made
-  the early game an unrecoverable attrition spiral.
+  the early game an unrecoverable attrition spiral. Regen alone tops out
+  at the nominal pool size (you can't wait your way to an infinite pool);
+  only converting loot pushes past it.
 - Item→Ion conversion value = `base_item_value * 0.4`, rounded down, with a
   minimum of 1. This keeps converting strictly worse than selling for Credits
   when a store is reachable, but better than nothing when it isn't — replicating
@@ -88,9 +95,10 @@ it** `[SOURCE]`.
 - Time travel cost = `ceil(0.04 * |target_year - current_year|)` Ions,
   minimum 1 for any real jump, symmetric (retreating toward the present
   costs the same as advancing). Original tuning (0.2 → 0.1 → 0.04 across
-  playtests). The Ion **pool cap** still bounds a single jump's distance,
-  but at 0.04 a one-tier early hop (~250 yrs) is affordable from level 1;
-  only a full cross-timeline leap is a late-game commitment.
+  playtests). At 0.04 a one-tier early hop (~250 yrs) is affordable from
+  level 1; a full cross-timeline leap costs ~120. With the pool now
+  uncapped, that leap is a matter of stockpiling conversions rather than
+  something a small pool forbids outright.
 - `heal` restores HP at 3 HP per 1 Ion — no ratio survives in the
   historical record; 3:1 keeps healing a real competitor for the Ion pool
   without making the early game an attrition death (playtested; was 1:1).
@@ -254,10 +262,13 @@ area/group to a capstone — is the standard every class follows.)
   sell/convert fodder** piece (a junk item, drop chance 1.0), a real
   chance at a second (~0.35), then a **piece of gear** (weapon / armour /
   ranged, rarity-weighted) at ~0.35, then a **consumable** at ~0.20. Every
-  kill leaves at least one thing on the body worth taking. If a species'
-  theme pool lacks a category the world generator borrows the cheapest one
-  from the full catalogue, so every monster can also drop something to
-  wear and something to use.
+  kill leaves at least one thing on the body worth taking — and the drop
+  roll has a hard backstop (`LootDropRoller.RollForKill`): if every entry
+  somehow misses it forces the likeliest one, and a monster with no table
+  at all still yields a tier-scaled scrap. If a species' theme pool lacks
+  a category the world generator borrows the cheapest one from the full
+  catalogue, so every monster can also drop something to wear and
+  something to use.
 - **Scaling**: an item's `tier` is derived from the **year** it was
   generated in (`TimeScale.TierForYear`, a continuous 1.0–9.0 across
   2000–5000); tier drives base stats, sell price, and Ion-conversion value
@@ -495,13 +506,14 @@ yours) using NPCs instead of real concurrent users.
 
 - Number and boundaries of the era bands across 2000–5000 (currently ~15;
   more, finer bands would give tighter thematic progression).
-- Travel throughput vs. Ion-pool cap: a jump is paid from the
-  instantaneous Ion pool. Playtest tuning (coefficient 0.2 → 0.04,
-  +1 IonsPerLevel across all classes, and a steeper early tier curve so
-  affordable hops land in a meaningfully harder year) has made mid-range
-  travel practical from low level; a full cross-timeline leap is still a
-  deliberate ~120-Ion end-game commitment. If even that later feels wrong,
-  the remaining lever is a "charge a jump over several ticks" mechanic.
+- Travel throughput: a jump is paid from the instantaneous Ion pool.
+  Playtest tuning (coefficient 0.2 → 0.04, +1 IonsPerLevel across all
+  classes, a steeper early tier curve, and — most recently — **removing
+  the player's Ion pool ceiling** so a big jump is a stockpiling goal
+  rather than a hard block) has made travel practical at every range. A
+  full cross-timeline leap is still a ~120-Ion commitment you build toward
+  by converting loot. If pacing later feels off, the remaining lever is a
+  "charge a jump over several ticks" mechanic.
 - Whether NPC store ownership should be capped (to avoid NPCs monopolizing
   all store slots before the human player can buy in).
 - Save format: single local save vs. multiple character slots.

@@ -95,6 +95,24 @@ public class TravelerTests
     }
 
     [Fact]
+    public void PlayerIonPool_IsUncapped_SoConvertingStockpilesPastTheNominalMax()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        Assert.True(traveler.Ions.Uncapped);
+        var nominalMax = traveler.Ions.Max; // starts full at the nominal max
+
+        for (var i = 0; i < 20; i++)
+        {
+            var item = Item.Create($"Scrap {i}", ItemType.Junk, tier: 3, Rarity.Common);
+            traveler.AddToInventory(item);
+            traveler.Convert(item);
+        }
+
+        Assert.True(traveler.Ions.Current > nominalMax * 2,
+            $"converting a pile of loot should stockpile Ions well past the nominal {nominalMax}");
+    }
+
+    [Fact]
     public void Convert_ThrowsIfItemNotInInventory()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);

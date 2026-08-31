@@ -129,7 +129,10 @@ public sealed class Traveler
         CurrentYear = startingYear;
         FurthestYearReached = startingYear;
         Health = new HealthPool(ClassDefinition.MaxHpAtLevel(Level));
-        Ions = new IonPool(ClassDefinition.MaxIonsAtLevel(Level));
+        // The player's Ion pool has no ceiling (docs/GDD.md §2) — convert
+        // loot to stockpile for a long jump; MaxIonsAtLevel is only a
+        // nominal reference now.
+        Ions = new IonPool(ClassDefinition.MaxIonsAtLevel(Level), uncapped: true);
     }
 
     /// <summary>Reconstructs a Traveler directly from a full state snapshot, bypassing normal gameplay mutation (GainXp/LevelUp/etc.) — for save/load. Inventory (and re-wielding equipped items) is the caller's job afterward via AddToInventory/Wield.</summary>
@@ -146,7 +149,7 @@ public sealed class Traveler
         Xp = xp;
         Stats = stats;
         Health = new HealthPool(maxHp, currentHp);
-        Ions = new IonPool(maxIons, currentIons);
+        Ions = new IonPool(maxIons, currentIons, uncapped: true);
         Credits = credits;
         CurrentYear = Math.Clamp(currentYear, TimeScale.MinYear, TimeScale.MaxYear);
         FurthestYearReached = Math.Clamp(furthestYearReached, TimeScale.MinYear, TimeScale.MaxYear);
@@ -272,7 +275,8 @@ public sealed class Traveler
     /// <see cref="AdvanceIonDrainTick"/> that keeps the early game
     /// recoverable (playtested). Every <paramref name="ticksPerRegen"/>
     /// ticks (see <see cref="Ions.IonEconomy.TicksPerIonRegen"/>), adds
-    /// 1 Ion (clamped to the pool max). Returns true if an Ion was added.
+    /// 1 Ion up to the nominal pool max (converting loot can push past it,
+    /// passive regen can't). Returns true if an Ion was added.
     /// Call it alongside the drain tick; in the present the regen cadence
     /// outpaces the drain so Ions net-recover, and in the far future the
     /// drain wins.
@@ -291,7 +295,7 @@ public sealed class Traveler
         }
 
         _ticksSinceIonRegen = 0;
-        return Ions.Add(1) > 0;
+        return Ions.Add(1, respectSoftCap: true) > 0;
     }
 
     /// <summary>
@@ -357,9 +361,9 @@ public sealed class Traveler
 
     /// <summary>
     /// Destroys an item from inventory for Ions — docs/GDD.md §2/§5.
-    /// Returns the number of Ions actually gained (may be less than the
-    /// item's convert value if it would overflow the Ion pool). Unequips
-    /// the item first if it was wielded.
+    /// Returns the number of Ions gained (the item's full convert value —
+    /// the player's pool is uncapped, so nothing overflows). Unequips the
+    /// item first if it was wielded.
     /// </summary>
     public int Convert(Item item)
     {

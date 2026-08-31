@@ -44,6 +44,26 @@ public class CharacterMapperTests
     }
 
     [Fact]
+    public void RoundTrip_PreservesAStockpiledIonPoolAboveTheNominalMax()
+    {
+        var original = new Traveler("Rook", CharacterClass.Soldier);
+        var nominalMax = original.Ions.Max;
+        for (var i = 0; i < 15; i++)
+        {
+            var scrap = ChronTravelers.Core.Items.Item.Create($"Scrap {i}", ChronTravelers.Core.Items.ItemType.Junk, 3, ChronTravelers.Core.Items.Rarity.Common);
+            original.AddToInventory(scrap);
+            original.Convert(scrap);
+        }
+
+        Assert.True(original.Ions.Current > nominalMax);
+
+        var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original, TestSeed));
+
+        Assert.Equal(original.Ions.Current, restored.Ions.Current); // the stockpile survives the save
+        Assert.True(restored.Ions.Uncapped);
+    }
+
+    [Fact]
     public void FromSaveData_MigratesASchemaOneBlob_ToTheTimeline()
     {
         var legacy = new CharacterSaveData

@@ -88,7 +88,7 @@ public static class CombatResolver
             log.Add($"{traveler.Name} gained {levelsGained} level(s)!");
         }
 
-        var loot = LootDropRoller.Roll(monster.LootTable, random);
+        var loot = LootDropRoller.RollForKill(monster, random);
         foreach (var item in loot)
         {
             traveler.AddToInventory(item);

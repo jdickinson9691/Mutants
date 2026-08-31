@@ -409,7 +409,7 @@ public static class MonsterController
                 population.AddGroundLoot(loser.Position, item);
             }
 
-            foreach (var item in LootDropRoller.Roll(loser.LootTable, random))
+            foreach (var item in LootDropRoller.RollForKill(loser, random))
             {
                 population.AddGroundLoot(loser.Position, item);
             }

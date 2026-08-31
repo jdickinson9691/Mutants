@@ -63,4 +63,42 @@ public class IonPoolTests
         Assert.Equal(30, pool.Max);
         Assert.Equal(5, pool.Current);
     }
+
+    // --- uncapped (player) pools ------------------------------------------
+
+    [Fact]
+    public void Uncapped_AddDoesNotClamp_AndCurrentMayExceedMax()
+    {
+        var pool = new IonPool(max: 20, current: 18, uncapped: true);
+
+        Assert.Equal(50, pool.Add(50));
+        Assert.Equal(68, pool.Current);
+        Assert.Equal(20, pool.Max); // nominal, unchanged
+    }
+
+    [Fact]
+    public void Uncapped_RespectSoftCap_StillClampsAtMax()
+    {
+        var pool = new IonPool(max: 20, current: 19, uncapped: true);
+
+        Assert.Equal(1, pool.Add(10, respectSoftCap: true)); // passive regen
+        Assert.Equal(20, pool.Current);
+        Assert.Equal(0, pool.Add(10, respectSoftCap: true)); // already at the soft cap
+    }
+
+    [Fact]
+    public void Uncapped_ConstructorKeepsACurrentAboveMax()
+    {
+        var pool = new IonPool(max: 20, current: 95, uncapped: true);
+        Assert.Equal(95, pool.Current);
+    }
+
+    [Fact]
+    public void Uncapped_SetMaxNeverDragsCurrentDown()
+    {
+        var pool = new IonPool(max: 20, current: 80, uncapped: true);
+        pool.SetMax(10);
+        Assert.Equal(10, pool.Max);
+        Assert.Equal(80, pool.Current);
+    }
 }

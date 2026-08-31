@@ -48,4 +48,44 @@ public class LootDropRollerTests
         Assert.Single(dropped);
         Assert.Equal("Always", dropped[0].Name);
     }
+
+    // --- RollForKill: a defeated monster ALWAYS drops something ----------
+
+    [Fact]
+    public void RollForKill_ForcesTheLikeliestEntryWhenEveryRollMisses()
+    {
+        var monster = new Monster("Grub", 2, 10, 2, 0, 5, 20, lootTable:
+        [
+            Entry("Long Shot", dropChance: 0.05),
+            Entry("Best Bet", dropChance: 0.60),
+        ]);
+
+        var dropped = LootDropRoller.RollForKill(monster, StubRandomSource.Fixed(0.99)); // all entries miss
+
+        Assert.Single(dropped);
+        Assert.Equal("Best Bet", dropped[0].Name); // the highest-chance entry is forced
+    }
+
+    [Fact]
+    public void RollForKill_SynthesisesATierScaledScrapWhenTheTableIsEmpty()
+    {
+        var monster = new Monster("Blank", 4, 10, 2, 0, 5, 20, lootTable: []);
+
+        var dropped = LootDropRoller.RollForKill(monster, StubRandomSource.Fixed(0.0));
+
+        var scrap = Assert.Single(dropped);
+        Assert.Equal(ItemType.Junk, scrap.Type);
+        Assert.Equal(4, scrap.Tier);
+    }
+
+    [Fact]
+    public void RollForKill_KeepsAGoodRollUntouched()
+    {
+        var monster = new Monster("Grub", 1, 10, 2, 0, 5, 20, lootTable:
+            [Entry("Scrap", dropChance: 1.0), Entry("Bonus", dropChance: 1.0)]);
+
+        var dropped = LootDropRoller.RollForKill(monster, StubRandomSource.Fixed(0.0));
+
+        Assert.Equal(2, dropped.Count);
+    }
 }

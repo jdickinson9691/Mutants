@@ -58,7 +58,7 @@ public static class NpcPopulation
             }
 
             npc.Health.Heal(npc.Health.Max);
-            npc.Ions.Add(npc.Ions.Max);
+            npc.Ions.Add(npc.Ions.Max, respectSoftCap: true); // top off to the nominal pool, not past it
 
             npcs.Add(npc);
         }

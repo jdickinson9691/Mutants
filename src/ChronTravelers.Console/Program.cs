@@ -681,16 +681,14 @@ static bool TryHandleItemCommand(Traveler traveler, string command, string argum
     switch (command)
     {
         case "convert":
-            if (traveler.Ions.Current >= traveler.Ions.Max)
+            if (!traveler.Ions.Uncapped && traveler.Ions.Current >= traveler.Ions.Max)
             {
                 AnsiConsole.MarkupLine($"[grey]Your Ion pool is full — converting {Markup.Escape(item.Name)} now would waste it. Sell it, or spend some Ions first.[/]");
                 break;
             }
 
             var ions = traveler.Convert(item);
-            AnsiConsole.MarkupLine(ions > 0
-                ? $"[blue]Converted {Markup.Escape(item.Name)} for {ions} Ions.[/] ({traveler.Ions.Current}/{traveler.Ions.Max})"
-                : $"[grey]Converted {Markup.Escape(item.Name)}, but your Ion pool had no room for it.[/]");
+            AnsiConsole.MarkupLine($"[blue]Converted {Markup.Escape(item.Name)} for {ions} Ions.[/] ({Markup.Escape(IonText(traveler))})");
             break;
 
         case "wield":
@@ -951,8 +949,13 @@ static void HandleHeal(Traveler traveler)
     }
 
     var healed = traveler.Heal();
-    AnsiConsole.MarkupLine($"[green]You heal for {healed} HP.[/] ({traveler.Health.Current}/{traveler.Health.Max} HP, {traveler.Ions.Current}/{traveler.Ions.Max} Ions left)");
+    AnsiConsole.MarkupLine($"[green]You heal for {healed} HP.[/] ({traveler.Health.Current}/{traveler.Health.Max} HP, {Markup.Escape(IonText(traveler))} left)");
 }
+
+/// <summary>Player Ion readout — just the number when the pool is uncapped (no "/max" ceiling to show), "current/max" otherwise.</summary>
+static string IonText(Traveler traveler) => traveler.Ions.Uncapped
+    ? $"{traveler.Ions.Current} Ions"
+    : $"{traveler.Ions.Current}/{traveler.Ions.Max} Ions";
 
 static void HandleStoreManagement(Traveler traveler, TimeWorld world, string command, string argument)
 {
@@ -1250,7 +1253,7 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
     broadcast.Publish(GameEvent.Slain(target.Name, traveler.Name, traveler.CurrentYear, victimIsCreature: true));
     traveler.GainXp(target.XpReward);
 
-    var drops = LootDropRoller.Roll(target.LootTable, random).Concat(target.Inventory).ToList();
+    var drops = LootDropRoller.RollForKill(target, random).Concat(target.Inventory).ToList();
 
     if (targetIsWarden)
     {
@@ -1925,7 +1928,7 @@ static void RenderStatusBar(Traveler traveler, TimeWorld world)
 {
     var yearContent = world.GetYear(traveler.CurrentYear);
     var status = $"[red]HP {traveler.Health.Current}/{traveler.Health.Max}[/]  " +
-                 $"[blue]Ions {traveler.Ions.Current}/{traveler.Ions.Max}[/]  " +
+                 $"[blue]{Markup.Escape(IonText(traveler))}[/]  " +
                  $"[yellow]Credits {traveler.Credits}[/]  " +
                  $"Char Level {traveler.Level}  " +
                  $"Year {traveler.CurrentYear} A.D.  " +
