@@ -47,6 +47,7 @@ public sealed class Mutant
     public int Riblets { get; private set; }
 
     private int _ticksSinceIonDrain;
+    private int _ticksSinceIonRegen;
 
     /// <summary>Temporary stat buffs from consumed potions — see <see cref="Consume"/> and <see cref="AdvanceEffectTicks"/>.</summary>
     private readonly List<ActiveEffect> _activeEffects = [];
@@ -261,6 +262,33 @@ public sealed class Mutant
 
         Health.Damage(1);
         return true;
+    }
+
+    /// <summary>
+    /// Advances passive Ion regen by one world tick — the counterpart to
+    /// <see cref="AdvanceIonDrainTick"/> that keeps the early game
+    /// recoverable (playtested). Every <paramref name="ticksPerRegen"/>
+    /// ticks (see <see cref="Ions.IonEconomy.TicksPerIonRegen"/>), adds
+    /// 1 Ion (clamped to the pool max). Returns true if an Ion was added.
+    /// Call it alongside the drain tick; in the present the regen cadence
+    /// outpaces the drain so Ions net-recover, and in the far future the
+    /// drain wins.
+    /// </summary>
+    public bool AdvanceIonRegenTick(int ticksPerRegen)
+    {
+        if (ticksPerRegen < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ticksPerRegen), ticksPerRegen, "Ticks per regen must be at least 1.");
+        }
+
+        _ticksSinceIonRegen++;
+        if (_ticksSinceIonRegen < ticksPerRegen)
+        {
+            return false;
+        }
+
+        _ticksSinceIonRegen = 0;
+        return Ions.Add(1) > 0;
     }
 
     /// <summary>

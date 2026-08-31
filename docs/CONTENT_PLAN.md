@@ -88,9 +88,11 @@ validation is surfaced as `ContentException` by the loader.
 
 Not new plumbing — tuning and polish:
 
-- **Ion-cost coefficient** (`IonEconomy.IonsPerYearTravelled = 0.2`): a
-  fresh character can't afford the first meaningful jump until it converts
-  some loot. Intended friction, but worth revisiting.
+- **Travel throughput** (`IonEconomy.IonsPerYearTravelled = 0.1`): tuned
+  after playtesting alongside passive Ion regen + a 3:1 heal ratio +
+  starter rations (the early game was an attrition spiral before). Long
+  `travel <year>` jumps are still gated by the Ion-pool cap into the
+  mid-game — see docs/GDD.md §12.
 - **More / finer era bands** for tighter thematic progression.
 - **Config-driven NPC class distribution** instead of uniform-random.
 - **Denser rosters / catalogs** if the game wants more variety per year.

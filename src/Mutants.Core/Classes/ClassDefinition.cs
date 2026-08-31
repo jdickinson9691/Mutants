@@ -30,14 +30,14 @@ public sealed record ClassDefinition(
                 CharacterClass.Warrior, PrimaryStat.Strength,
                 BaseStats: new StatBlock(Strength: 15, Agility: 10, Faith: 8, Intellect: 8),
                 BaseHp: 30, HpPerLevel: 6,
-                BaseIons: 20, IonsPerLevel: 2,
+                BaseIons: 20, IonsPerLevel: 3,
                 IonDrainMultiplier: 0.8),
 
             [CharacterClass.Thief] = new(
                 CharacterClass.Thief, PrimaryStat.Agility,
                 BaseStats: new StatBlock(Strength: 9, Agility: 15, Faith: 8, Intellect: 10),
                 BaseHp: 24, HpPerLevel: 5,
-                BaseIons: 24, IonsPerLevel: 2,
+                BaseIons: 24, IonsPerLevel: 3,
                 IonDrainMultiplier: 0.9),
 
             [CharacterClass.Priest] = new(

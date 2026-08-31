@@ -202,17 +202,17 @@ public class MutantTests
     }
 
     [Fact]
-    public void Heal_SpendsIonsOneToOneForHp()
+    public void Heal_SpendsIonsAtTheHealRatioAndFullyRecoversWhenAffordable()
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);
-        mutant.Health.Damage(10);
+        mutant.Health.Damage(9); // exactly 3 Ions' worth at 3:1
         var ionsBefore = mutant.Ions.Current;
 
         var healed = mutant.Heal();
 
-        Assert.Equal(10, healed);
+        Assert.Equal(9, healed);
         Assert.Equal(mutant.Health.Max, mutant.Health.Current);
-        Assert.Equal(ionsBefore - 10, mutant.Ions.Current);
+        Assert.Equal(ionsBefore - 3, mutant.Ions.Current);
     }
 
     [Fact]
@@ -220,12 +220,12 @@ public class MutantTests
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);
         mutant.Health.Damage(25);
-        mutant.Ions.Spend(mutant.Ions.Current - 10); // leave exactly 10 Ions
+        mutant.Ions.Spend(mutant.Ions.Current - 2); // leave exactly 2 Ions -> 6 HP at 3:1
 
         var healed = mutant.Heal();
 
-        Assert.Equal(10, healed);
-        Assert.Equal(mutant.Health.Max - 15, mutant.Health.Current); // healed 10 of the 25 missing
+        Assert.Equal(6, healed);
+        Assert.Equal(mutant.Health.Max - 19, mutant.Health.Current); // healed 6 of the 25 missing
         Assert.Equal(0, mutant.Ions.Current);
     }
 
@@ -509,6 +509,38 @@ public class MutantTests
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);
         Assert.Throws<ArgumentOutOfRangeException>(() => mutant.AdvanceIonDrainTick(0));
+    }
+
+    [Fact]
+    public void AdvanceIonRegenTick_AddsOneIonOnceIntervalElapses()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        mutant.Ions.Spend(mutant.Ions.Current); // drain to 0
+
+        Assert.False(mutant.AdvanceIonRegenTick(ticksPerRegen: 3));
+        Assert.False(mutant.AdvanceIonRegenTick(ticksPerRegen: 3));
+        var added = mutant.AdvanceIonRegenTick(ticksPerRegen: 3);
+
+        Assert.True(added);
+        Assert.Equal(1, mutant.Ions.Current);
+    }
+
+    [Fact]
+    public void AdvanceIonRegenTick_ReportsNothingAddedWhenAlreadyAtMax()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior); // starts at full Ions
+
+        var added = mutant.AdvanceIonRegenTick(ticksPerRegen: 1);
+
+        Assert.False(added);
+        Assert.Equal(mutant.Ions.Max, mutant.Ions.Current);
+    }
+
+    [Fact]
+    public void AdvanceIonRegenTick_RejectsNonPositiveInterval()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        Assert.Throws<ArgumentOutOfRangeException>(() => mutant.AdvanceIonRegenTick(0));
     }
 
     [Fact]

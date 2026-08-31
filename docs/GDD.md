@@ -43,19 +43,29 @@ it** `[SOURCE]`.
 - Passive drain: 1 Ion per N game-ticks, scaled slightly up further into
   the future (later years are harsher survival environments) — the scaling
   key is the whole-number difficulty tier for the current year (see §3.2).
+- Passive **regen**: 1 Ion per M game-ticks out of combat, faster than the
+  drain in early years and slower in the far future. Net effect: the
+  present is survivable (grind → heal → recover), the deep future
+  net-drains you. Added after playtesting showed the drain-only model made
+  the early game an unrecoverable attrition spiral.
 - Item→Ion conversion value = `base_item_value * 0.4`, rounded down, with a
   minimum of 1. This keeps converting strictly worse than selling in Riblets
   when a store is reachable, but better than nothing when it isn't — replicating
   the "quasi semi-flawed but usable" economy the original was known for,
   without the parts that made it exploitable.
-- Time travel cost = `ceil(0.2 * |target_year - current_year|)` Ions,
+- Time travel cost = `ceil(0.1 * |target_year - current_year|)` Ions,
   minimum 1 for any real jump, symmetric (retreating toward the present
-  costs the same as advancing). Original tuning.
-- `heal` restores HP at 1 Ion per 1 HP — no specific ratio survives in the
-  historical record, and this one is deliberately steep (not a cheap
-  top-off) so healing genuinely competes with travel/casting/survival for
-  the same Ion pool, matching the "single unified resource" framing above
-  rather than making it a trivial no-cost habit.
+  costs the same as advancing). Original tuning (lowered from 0.2 after
+  playtesting). Note the Ion **pool cap** effectively bounds a single
+  jump's distance — long leaps are a mid/late-game capability, and
+  `travel next`/`prev` (short Gatekeeper-year hops) is the early path
+  across the timeline.
+- `heal` restores HP at 3 HP per 1 Ion — no ratio survives in the
+  historical record; 3:1 keeps healing a real competitor for the Ion pool
+  without making the early game an attrition death (playtested; was 1:1).
+- New characters start with a few `Field Ration` heal items so the first
+  year isn't a pure attrition race before you can loot or buy any HP
+  recovery of your own.
 
 ## 3. Movement & the world map
 
@@ -317,9 +327,12 @@ yours) using NPCs instead of real concurrent users.
 
 - Number and boundaries of the era bands across 2000–5000 (currently ~15;
   more, finer bands would give tighter thematic progression).
-- Ion-cost coefficient tuning: at `0.2/year` a fresh character can't afford
-  the first meaningful jump until it has converted some loot — intended, but
-  worth revisiting.
+- Travel throughput vs. Ion-pool cap: because a jump is paid from the
+  instantaneous Ion pool, and the pool grows only a few points per level,
+  `travel <far year>` stays gated on pool size well into the mid-game —
+  the timeline is really traversed via `travel next` short hops. If that
+  feels too restrictive, the levers are a steeper Ion-pool curve, an even
+  lower cost coefficient, or a "charge a jump over several ticks" mechanic.
 - Whether NPC store ownership should be capped (to avoid NPCs monopolizing
   all store slots before the human player can buy in).
 - Save format: single local save vs. multiple character slots.

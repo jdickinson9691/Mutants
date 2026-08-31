@@ -59,8 +59,9 @@ public sealed class WorldSimulation
             }
 
             var scalingTier = TimelineContentFactory.DisplayTier(mutant.CurrentYear);
-            var ticksPerDrain = IonEconomy.TicksPerIonDrain(scalingTier, mutant.ClassDefinition.IonDrainMultiplier);
-            mutant.AdvanceIonDrainTick(ticksPerDrain);
+            var drainMultiplier = mutant.ClassDefinition.IonDrainMultiplier;
+            mutant.AdvanceIonDrainTick(IonEconomy.TicksPerIonDrain(scalingTier, drainMultiplier));
+            mutant.AdvanceIonRegenTick(IonEconomy.TicksPerIonRegen(scalingTier, drainMultiplier));
             mutant.AdvanceEffectTicks();
         }
 

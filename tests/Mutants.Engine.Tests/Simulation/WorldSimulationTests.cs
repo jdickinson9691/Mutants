@@ -18,23 +18,38 @@ public class WorldSimulationTests
     }
 
     [Fact]
-    public void Tick_DrainsIonsOverEnoughTicks_ForBothPlayerAndNpcs()
+    public void Tick_RegeneratesIonsForADepletedMutantInEarlyYears()
     {
         var world = World();
         var player = NewMutant("Player", world, 2000);
         var npc = NewMutant("Vex", world, 2000);
+        player.Ions.Spend(player.Ions.Current);
+        npc.Ions.Spend(npc.Ions.Current);
         var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.5));
 
-        var startingPlayerIons = player.Ions.Current;
-        var startingNpcIons = npc.Ions.Current;
+        for (var i = 0; i < 15; i++)
+        {
+            simulation.Tick(player);
+        }
+
+        Assert.True(player.Ions.Current > 0, "Player Ions should regen in early years.");
+        Assert.True(npc.Ions.Current > 0, "NPC Ions should regen in early years.");
+    }
+
+    [Fact]
+    public void Tick_StillNetDrainsIonsDeepInTheFuture()
+    {
+        var world = World();
+        var player = NewMutant("Player", world, 4900);
+        var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.5));
+        var startingIons = player.Ions.Current;
 
         for (var i = 0; i < 20; i++)
         {
             simulation.Tick(player);
         }
 
-        Assert.True(player.Ions.Current < startingPlayerIons, "Player Ions should drain over enough ticks.");
-        Assert.True(npc.Ions.Current < startingNpcIons, "NPC Ions should drain over enough ticks.");
+        Assert.True(player.Ions.Current < startingIons, "In the far future the drain should outpace the regen.");
     }
 
     [Fact]

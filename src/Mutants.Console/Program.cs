@@ -86,6 +86,17 @@ if (loadedSave is not null)
 {
     CharacterMapper.ApplyOwnedStores(loadedSave, mutant, world);
 }
+else
+{
+    // Starter kit for a fresh character — a few field rations so the
+    // first year isn't a pure attrition race before you can loot/buy any
+    // HP recovery of your own (playtested).
+    for (var i = 0; i < 3; i++)
+    {
+        mutant.AddToInventory(Item.Create("Field Ration", ItemType.Consumable, 1, Rarity.Common,
+            consumableEffect: ConsumableEffectType.Heal, effectMagnitude: 12));
+    }
+}
 
 var npcs = SpawnNpcs(world, random);
 var simulation = new WorldSimulation(world, npcs, random);

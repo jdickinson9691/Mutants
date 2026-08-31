@@ -26,22 +26,28 @@ public static class IonEconomy
     /// HP restored per Ion spent via the "heal" command — docs/GDD.md §2
     /// [SOURCE] confirms "spend Ions to heal wounds directly," usable at
     /// any time, but no specific ratio survives in the historical record.
-    /// 1:1 is original tuning, deliberately steep (not a cheap top-off) so
-    /// healing genuinely competes with travel/casting/survival for the
-    /// same Ion pool, matching Ions' "single unified resource" design
-    /// intent rather than making it a trivial no-cost habit.
+    /// 3:1 is original tuning: healing still competes with travel/casting
+    /// for the same Ion pool, but not so steeply that the early game
+    /// becomes an unrecoverable attrition spiral (playtested).
     /// </summary>
-    public const int HpPerIonHealed = 1;
+    public const int HpPerIonHealed = 3;
 
-    /// <summary>Ions spent per year of the timeline crossed by a <c>travel</c> — docs/GDD.md §3.2. Original tuning.</summary>
-    public const double IonsPerYearTravelled = 0.2;
+    /// <summary>
+    /// Ions spent per year of the timeline crossed by a <c>travel</c> —
+    /// docs/GDD.md §3.2. Original tuning, lowered from 0.2 after
+    /// playtesting: at 0.1 a small hop (a Gatekeeper year, ~50–100 yrs)
+    /// costs 5–10 Ions, a ~375-year era jump ~38, and a cross-timeline
+    /// leap stays a real end-game Ion commitment.
+    /// </summary>
+    public const double IonsPerYearTravelled = 0.1;
 
     /// <summary>
     /// Ion cost of travelling from <paramref name="fromYear"/> to
-    /// <paramref name="toYear"/> — <c>ceil(0.2 × |Δyear|)</c>, minimum 1
-    /// for any real jump, 0 for staying put. Symmetric: retreating toward
-    /// the present costs the same as advancing (this supersedes the old
-    /// "retreat is free" rule now that travel is otherwise unrestricted).
+    /// <paramref name="toYear"/> — <c>ceil(<see cref="IonsPerYearTravelled"/>
+    /// × |Δyear|)</c>, minimum 1 for any real jump, 0 for staying put.
+    /// Symmetric: retreating toward the present costs the same as advancing
+    /// (this supersedes the old "retreat is free" rule now that travel is
+    /// otherwise unrestricted).
     /// </summary>
     public static int TimeTravelCost(int fromYear, int toYear)
     {
@@ -81,5 +87,33 @@ public static class IonEconomy
         var baseTicks = Math.Max(3, 10 - (scalingTier - 1));
         // A higher class drain multiplier means faster drain -> fewer ticks per Ion.
         return Math.Max(1, (int)Math.Round(baseTicks / classDrainMultiplier));
+    }
+
+    /// <summary>
+    /// Passive Ion <em>regen</em> out of combat — the counterpart to
+    /// <see cref="TicksPerIonDrain"/> that keeps the early game
+    /// recoverable. Adds 1 Ion every N ticks. Fast in the present
+    /// (tier 1 ≈ 4 ticks/Ion) and slower further into the future
+    /// (tier 9 ≈ 12), so early years net-<em>gain</em> Ions while the far
+    /// future still net-drains them — matching docs/GDD.md §2.1's "later
+    /// years are harsher survival environments". A higher class drain
+    /// multiplier (Mage/Wizard) also regens slower.
+    /// </summary>
+    public static int TicksPerIonRegen(int scalingTier, double classDrainMultiplier)
+    {
+        if (scalingTier < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(scalingTier), scalingTier,
+                "Scaling tier must be at least 1.");
+        }
+
+        if (classDrainMultiplier <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(classDrainMultiplier), classDrainMultiplier,
+                "Drain multiplier must be positive.");
+        }
+
+        var baseTicks = 3 + scalingTier;
+        return Math.Max(1, (int)Math.Round(baseTicks * classDrainMultiplier));
     }
 }
