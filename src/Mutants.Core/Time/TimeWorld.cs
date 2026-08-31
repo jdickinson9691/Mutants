@@ -138,8 +138,9 @@ public sealed class TimeWorld
             : null;
 
         var stores = BuildStores(era, year, map);
+        var population = YearPopulation.Seed(WorldSeed, year, map, roster, gatekeeper);
 
-        return new YearContent(year, map, era, roster, stores, gatekeeper, tier);
+        return new YearContent(year, map, era, roster, stores, gatekeeper, tier, population);
     }
 
     private IReadOnlyList<ItemArchetypeDefinition> LootPoolFor(SpeciesDefinition species, EraDefinition era)
