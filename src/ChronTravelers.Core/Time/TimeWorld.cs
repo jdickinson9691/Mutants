@@ -23,7 +23,7 @@ public sealed class TimeWorld
     private readonly Dictionary<string, SpeciesDefinition> _speciesById;
     private readonly IReadOnlyList<ItemArchetypeDefinition> _itemArchetypes;
     private readonly StoreStockTemplate _storeTemplate;
-    private readonly GatekeeperSchedule _gatekeepers;
+    private readonly WardenSchedule _wardens;
     private readonly Dictionary<int, YearContent> _cache = [];
 
     public TimeWorld(
@@ -38,7 +38,7 @@ public sealed class TimeWorld
         _species = species;
         _itemArchetypes = itemArchetypes;
         _storeTemplate = storeTemplate ?? StoreStockTemplate.Default;
-        _gatekeepers = new GatekeeperSchedule(worldSeed);
+        _wardens = new WardenSchedule(worldSeed);
 
         _speciesById = new Dictionary<string, SpeciesDefinition>(StringComparer.OrdinalIgnoreCase);
         foreach (var sp in species)
@@ -92,11 +92,11 @@ public sealed class TimeWorld
         }
     }
 
-    public GatekeeperSchedule Gatekeepers => _gatekeepers;
+    public WardenSchedule Wardens => _wardens;
 
-    public IReadOnlyCollection<int> GatekeeperYears => _gatekeepers.Years;
+    public IReadOnlyCollection<int> WardenYears => _wardens.Years;
 
-    public bool IsGatekeeperYear(int year) => _gatekeepers.IsGatekeeperYear(year);
+    public bool IsWardenYear(int year) => _wardens.IsWardenYear(year);
 
     public EraTable Eras => _eras;
 
@@ -133,14 +133,14 @@ public sealed class TimeWorld
             .Select(sp => TimelineContentFactory.ForSpecies(WorldSeed, sp, year, LootPoolFor(sp, era)))
             .ToList();
 
-        Func<Monster>? gatekeeper = _gatekeepers.IsGatekeeperYear(year)
-            ? () => TimelineContentFactory.Gatekeeper(WorldSeed, year)
+        Func<Monster>? warden = _wardens.IsWardenYear(year)
+            ? () => TimelineContentFactory.Warden(WorldSeed, year)
             : null;
 
         var stores = BuildStores(era, year, map);
-        var population = YearPopulation.Seed(WorldSeed, year, map, roster, gatekeeper);
+        var population = YearPopulation.Seed(WorldSeed, year, map, roster, warden);
 
-        return new YearContent(year, map, era, roster, stores, gatekeeper, tier, population);
+        return new YearContent(year, map, era, roster, stores, warden, tier, population);
     }
 
     private IReadOnlyList<ItemArchetypeDefinition> LootPoolFor(SpeciesDefinition species, EraDefinition era)

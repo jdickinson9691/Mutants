@@ -597,7 +597,7 @@ public class TravelerTests
             "Rook", CharacterClass.Soldier, level: 7, xp: 555, stats,
             currentHp: 40, maxHp: 60, currentIons: 5, maxIons: 30, riblets: 250,
             currentYear: 2900, furthestYearReached: 3200, position: new Coordinate(2, -1),
-            defeatedGatekeeperYears: [2412, 3187]);
+            defeatedWardenYears: [2412, 3187]);
 
         Assert.Equal("Rook", traveler.Name);
         Assert.Equal(CharacterClass.Soldier, traveler.Class);
@@ -612,9 +612,9 @@ public class TravelerTests
         Assert.Equal(3200, traveler.FurthestYearReached);
         Assert.Equal(2900, traveler.CurrentYear);
         Assert.Equal(new Coordinate(2, -1), traveler.Position);
-        Assert.True(traveler.HasDefeatedGatekeeper(2412));
-        Assert.True(traveler.HasDefeatedGatekeeper(3187));
-        Assert.False(traveler.HasDefeatedGatekeeper(4000));
+        Assert.True(traveler.HasDefeatedWarden(2412));
+        Assert.True(traveler.HasDefeatedWarden(3187));
+        Assert.False(traveler.HasDefeatedWarden(4000));
         Assert.Empty(traveler.Inventory);
         Assert.Null(traveler.EquippedWeapon);
     }
@@ -641,14 +641,14 @@ public class TravelerTests
     }
 
     [Fact]
-    public void GatekeeperDefeat_StartsFalseAndCanBeRecorded()
+    public void WardenDefeat_StartsFalseAndCanBeRecorded()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);
-        Assert.False(traveler.HasDefeatedGatekeeper(2));
+        Assert.False(traveler.HasDefeatedWarden(2));
 
-        traveler.RecordGatekeeperDefeat(2);
+        traveler.RecordWardenDefeat(2);
 
-        Assert.True(traveler.HasDefeatedGatekeeper(2));
-        Assert.False(traveler.HasDefeatedGatekeeper(3)); // per-level, not global
+        Assert.True(traveler.HasDefeatedWarden(2));
+        Assert.False(traveler.HasDefeatedWarden(3)); // per-level, not global
     }
 }

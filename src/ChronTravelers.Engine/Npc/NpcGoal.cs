@@ -20,7 +20,7 @@ public enum NpcGoal
     /// <summary>Visited a store this tick — sold excess junk, or bought a needed weapon/armor.</summary>
     Trade,
 
-    /// <summary>Attempted a time-travel jump to the next-deeper level this tick — win or lose (see NpcTickResult.Fight for a gatekeeper attempt).</summary>
+    /// <summary>Attempted a time-travel jump to the next-deeper level this tick — win or lose (see NpcTickResult.Fight for a warden attempt).</summary>
     Travel,
 
     /// <summary>Default goal: wander a step, then fight a monster.</summary>

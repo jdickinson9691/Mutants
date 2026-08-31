@@ -20,11 +20,11 @@ public sealed class YearPopulation
     private readonly List<Monster> _monsters;
     private readonly Dictionary<Coordinate, List<Item>> _groundLoot = [];
 
-    /// <summary>Living and dead — callers should filter on <c>!m.Health.IsDead</c> and remove on kill. Excludes the <see cref="Gatekeeper"/>.</summary>
+    /// <summary>Living and dead — callers should filter on <c>!m.Health.IsDead</c> and remove on kill. Excludes the <see cref="Warden"/>.</summary>
     public IReadOnlyList<Monster> Monsters => _monsters;
 
-    /// <summary>The Gatekeeper standing at the map's start room in a Gatekeeper year (see <see cref="GatekeeperSchedule"/>), or null. Kept out of <see cref="Monsters"/> so it never wanders or infights.</summary>
-    public Monster? Gatekeeper { get; }
+    /// <summary>The Warden standing at the map's start room in a Warden year (see <see cref="WardenSchedule"/>), or null. Kept out of <see cref="Monsters"/> so it never wanders or infights.</summary>
+    public Monster? Warden { get; }
 
     /// <summary>Target population — the respawn trickle tops back up toward this, never past it.</summary>
     public int SoftCap { get; }
@@ -40,10 +40,10 @@ public sealed class YearPopulation
     /// </summary>
     public int TicksSinceAmbush { get; set; } = 2;
 
-    private YearPopulation(List<Monster> monsters, Monster? gatekeeper, int softCap)
+    private YearPopulation(List<Monster> monsters, Monster? warden, int softCap)
     {
         _monsters = monsters;
-        Gatekeeper = gatekeeper;
+        Warden = warden;
         SoftCap = softCap;
     }
 
@@ -51,7 +51,7 @@ public sealed class YearPopulation
     /// Places <c>max(2, roomCount / 3)</c> monsters (roster factories
     /// picked at random) in distinct non-start rooms, deterministically
     /// from <paramref name="worldSeed"/> + <paramref name="year"/>. If
-    /// <paramref name="gatekeeperFactory"/> is non-null its monster is
+    /// <paramref name="wardenFactory"/> is non-null its monster is
     /// built and stationed at the map's start room.
     /// </summary>
     public static YearPopulation Seed(
@@ -59,7 +59,7 @@ public sealed class YearPopulation
         int year,
         LevelMap map,
         IReadOnlyList<Func<Monster>> roster,
-        Func<Monster>? gatekeeperFactory)
+        Func<Monster>? wardenFactory)
     {
         var rng = DeterministicRandom.For(worldSeed, year, "monsters");
 
@@ -87,17 +87,17 @@ public sealed class YearPopulation
             monsters.Add(monster);
         }
 
-        Monster? gatekeeper = null;
-        if (gatekeeperFactory is not null)
+        Monster? warden = null;
+        if (wardenFactory is not null)
         {
-            gatekeeper = gatekeeperFactory();
-            gatekeeper.PlaceAt(map.Start);
+            warden = wardenFactory();
+            warden.PlaceAt(map.Start);
         }
 
-        return new YearPopulation(monsters, gatekeeper, count);
+        return new YearPopulation(monsters, warden, count);
     }
 
-    /// <summary>Living monsters standing at <paramref name="coordinate"/> (never the Gatekeeper).</summary>
+    /// <summary>Living monsters standing at <paramref name="coordinate"/> (never the Warden).</summary>
     public IEnumerable<Monster> MonstersAt(Coordinate coordinate) =>
         _monsters.Where(m => !m.Health.IsDead && m.Position.Equals(coordinate));
 

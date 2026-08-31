@@ -30,26 +30,26 @@ public static class TestMonsters
     ]);
 
     /// <summary>
-    /// A level's "gatekeeper" boss — docs/GDD.md §3.2: unlocking a level
-    /// requires "defeating that level's gatekeeper monster once." A
+    /// A level's "warden" boss — docs/GDD.md §3.2: unlocking a level
+    /// requires "defeating that level's warden monster once." A
     /// "bullet sponge" by design (triple HP, same attack/defense as a
     /// regular same-tier monster) rather than also hitting harder: a
     /// character who can already beat regular monsters at this tier is
-    /// guaranteed to out-damage the gatekeeper too, just over more
+    /// guaranteed to out-damage the warden too, just over more
     /// rounds — stacking a defense/attack multiplier on top of extra HP
     /// compounds fast and risks an unwinnable fight, which a one-time
     /// mandatory gate should never be. Original tuning pending Design
     /// Agent sign-off; guarantees a rare trophy drop.
     /// </summary>
-    public static Monster Gatekeeper(int tier) => new(
-        $"Gatekeeper of Level {tier}",
+    public static Monster Warden(int tier) => new(
+        $"Warden of Level {tier}",
         tier,
         maxHp: MonsterScaling.BaseHp(tier) * 3,
         attackPower: MonsterScaling.BaseAttackPower(tier),
         defense: MonsterScaling.BaseDefense(tier),
         speed: MonsterScaling.BaseSpeed(tier),
         xpReward: MonsterScaling.XpReward(tier) * 5,
-        lootTable: [new LootTableEntry(Item.Create("Gatekeeper's Trophy", ItemType.Weapon, tier, Rarity.Rare), dropChance: 1.0)]);
+        lootTable: [new LootTableEntry(Item.Create("Warden's Trophy", ItemType.Weapon, tier, Rarity.Rare), dropChance: 1.0)]);
 
     /// <summary>Tier-1 roster — the exact set this project has used since milestone 3, unchanged.</summary>
     public static IReadOnlyList<Func<Monster>> All { get; } = [() => Scavenger(), () => JunkGolem(), () => FeralDog()];

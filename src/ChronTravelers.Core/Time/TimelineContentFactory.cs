@@ -7,7 +7,7 @@ namespace ChronTravelers.Core.Time;
 /// Turns the tier-free catalog entries (<see cref="SpeciesDefinition"/>,
 /// <see cref="ItemArchetypeDefinition"/>) into concrete
 /// <see cref="Monster"/>s and <see cref="Item"/>s scaled to a specific
-/// year, plus the year-scaled Gatekeeper and its trophy. All numbers come
+/// year, plus the year-scaled Warden and its trophy. All numbers come
 /// from <see cref="Monsters.MonsterScaling"/> / <see cref="Items.LootScaling"/>
 /// at <see cref="TimeScale.TierForYear"/>; archetypes only shift a
 /// species off that baseline by a fixed amount.
@@ -23,8 +23,8 @@ public static class TimelineContentFactory
     private const double GearDropChance = 0.35;
     private const double ConsumableDropChance = 0.20;
 
-    /// <summary>The <c>powerMultiplier</c> of a Gatekeeper's guaranteed weapon trophy — deep in the Legendary band (see <see cref="Rarity.ForPower"/>).</summary>
-    private const double GatekeeperTrophyPower = 2.8;
+    /// <summary>The <c>powerMultiplier</c> of a Warden's guaranteed weapon trophy — deep in the Legendary band (see <see cref="Rarity.ForPower"/>).</summary>
+    private const double WardenTrophyPower = 2.8;
 
     private static readonly string[] TrophyNouns =
         ["Blade", "Sigil", "Crown", "Gauntlet", "Reliquary", "Warhorn", "Chronometer", "Standard"];
@@ -56,26 +56,26 @@ public static class TimelineContentFactory
     }
 
     /// <summary>
-    /// The Gatekeeper standing watch over a Gatekeeper year (see
-    /// <see cref="GatekeeperSchedule"/>): a "bullet sponge" — ~3× a
+    /// The Warden standing watch over a Warden year (see
+    /// <see cref="WardenSchedule"/>): a "bullet sponge" — ~3× a
     /// regular monster's HP at the year's tier, same attack/defense/speed,
     /// a generous XP payout, and a guaranteed year-scaled Legendary
     /// weapon trophy. It blocks nothing; it just guards good loot until
     /// beaten once.
     /// </summary>
-    public static Monster Gatekeeper(long worldSeed, int year)
+    public static Monster Warden(long worldSeed, int year)
     {
         var tier = TimeScale.TierForYear(year);
-        var rng = DeterministicRandom.For(worldSeed, year, "gatekeeper");
+        var rng = DeterministicRandom.For(worldSeed, year, "warden");
         var noun = TrophyNouns[rng.Next(TrophyNouns.Length)];
 
         var trophy = new Item(
             $"Warden of {year}'s {noun}",
             ItemType.Weapon,
             DisplayTier(year),
-            RarityExtensions.ForPower(GatekeeperTrophyPower),
+            RarityExtensions.ForPower(WardenTrophyPower),
             Value: (int)Math.Round(LootScaling.ValueFor(tier, Rarity.Legendary)),
-            AttackBonus: (int)Math.Round(LootScaling.EquipBonusFor(tier, GatekeeperTrophyPower)));
+            AttackBonus: (int)Math.Round(LootScaling.EquipBonusFor(tier, WardenTrophyPower)));
 
         return new Monster(
             $"The Warden of {year}",

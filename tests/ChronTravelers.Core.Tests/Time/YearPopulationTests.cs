@@ -53,18 +53,18 @@ public class YearPopulationTests
     }
 
     [Fact]
-    public void Seed_StationsTheGatekeeperAtTheStartRoomInAGatekeeperYearOnly()
+    public void Seed_StationsTheWardenAtTheStartRoomInAWardenYearOnly()
     {
         var world = TestTimeWorld.Build(seed: 99);
-        var gkYear = world.GatekeeperYears.First();
+        var gkYear = world.WardenYears.First();
 
         var gkContent = world.GetYear(gkYear);
-        Assert.NotNull(gkContent.Population.Gatekeeper);
-        Assert.Equal(gkContent.Map.Start, gkContent.Population.Gatekeeper!.Position);
-        Assert.DoesNotContain(gkContent.Population.Monsters, m => ReferenceEquals(m, gkContent.Population.Gatekeeper));
+        Assert.NotNull(gkContent.Population.Warden);
+        Assert.Equal(gkContent.Map.Start, gkContent.Population.Warden!.Position);
+        Assert.DoesNotContain(gkContent.Population.Monsters, m => ReferenceEquals(m, gkContent.Population.Warden));
 
-        var plainYear = Enumerable.Range(2001, 200).First(y => !world.IsGatekeeperYear(y));
-        Assert.Null(world.GetYear(plainYear).Population.Gatekeeper);
+        var plainYear = Enumerable.Range(2001, 200).First(y => !world.IsWardenYear(y));
+        Assert.Null(world.GetYear(plainYear).Population.Warden);
     }
 
     [Fact]

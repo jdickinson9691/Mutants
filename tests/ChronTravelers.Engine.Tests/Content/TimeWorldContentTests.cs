@@ -76,30 +76,30 @@ public class TimeWorldContentTests
     }
 
     [Fact]
-    public void GatekeeperYears_AreSpacedFiftyToOneHundredYearsApart()
+    public void WardenYears_AreSpacedFiftyToOneHundredYearsApart()
     {
-        var years = ShippedWorld().GatekeeperYears.ToList();
+        var years = ShippedWorld().WardenYears.ToList();
         Assert.NotEmpty(years);
 
         var previous = TimeScale.MinYear;
         foreach (var year in years)
         {
-            Assert.InRange(year - previous, GatekeeperSchedule.MinGap, GatekeeperSchedule.MaxGap);
+            Assert.InRange(year - previous, WardenSchedule.MinGap, WardenSchedule.MaxGap);
             previous = year;
         }
     }
 
     [Fact]
-    public void EveryGatekeeperYear_YieldsAGatekeeperGuardingALegendaryWeapon()
+    public void EveryWardenYear_YieldsAWardenGuardingALegendaryWeapon()
     {
         var world = ShippedWorld();
 
-        foreach (var year in world.GatekeeperYears)
+        foreach (var year in world.WardenYears)
         {
             var content = world.GetYear(year);
-            Assert.NotNull(content.Gatekeeper);
+            Assert.NotNull(content.Warden);
 
-            var monster = content.Gatekeeper!();
+            var monster = content.Warden!();
             var drop = Assert.Single(monster.LootTable);
             Assert.Equal(ItemType.Weapon, drop.Item.Type);
             Assert.Equal(Rarity.Legendary, drop.Item.Rarity);

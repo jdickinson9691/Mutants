@@ -23,7 +23,7 @@ public static class ContentLoader
     /// content directory expected to contain <c>monster-species.json</c>,
     /// <c>item-archetypes.json</c>, <c>eras.json</c>, and (optionally)
     /// <c>store-templates.json</c>. <paramref name="worldSeed"/> is the
-    /// per-save seed that fixes the Gatekeeper schedule and every year's
+    /// per-save seed that fixes the Warden schedule and every year's
     /// map/store layout. Throws <see cref="ContentException"/> on a
     /// missing/malformed file, an unknown enum value, or a failed
     /// cross-reference (the <see cref="EraTable"/> / <see cref="TimeWorld"/>

@@ -11,7 +11,7 @@ namespace ChronTravelers.Engine.Combat;
 /// to make a normal attack (<see cref="Attack"/>) or cast an ability
 /// (<see cref="Cast"/>), unlike <see cref="CombatResolver.Fight"/>'s
 /// instant, fully-automated resolution (still used as-is for NPC auto-
-/// combat and gatekeeper fights - see ChronTravelers.Console's file header for
+/// combat and warden fights - see ChronTravelers.Console's file header for
 /// what's wired to which). Buffs/debuffs from abilities last for the
 /// rest of the fight rather than a precise round countdown (except
 /// Poison Blade's DamageOverTime, which genuinely needs one) — a
@@ -23,7 +23,7 @@ public sealed class CombatSession
     public Traveler Traveler { get; }
     public Monster Monster { get; }
 
-    /// <summary>False during a gatekeeper fight, where Banish shouldn't be able to trivially skip the level's boss.</summary>
+    /// <summary>False during a warden fight, where Banish shouldn't be able to trivially skip the level's boss.</summary>
     public bool AllowBanish { get; }
 
     public int Rounds { get; private set; }
@@ -113,7 +113,7 @@ public sealed class CombatSession
 
         if (effectType == AbilityEffectType.InstantDefeatNonBoss && !AllowBanish)
         {
-            return new AbilityCastResult(false, $"{ability.Name} has no effect against a gatekeeper. No Ions spent.");
+            return new AbilityCastResult(false, $"{ability.Name} has no effect against a warden. No Ions spent.");
         }
 
         if (!Traveler.Ions.CanAfford(ability.IonCost))

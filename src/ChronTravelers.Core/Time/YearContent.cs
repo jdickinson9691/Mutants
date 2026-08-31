@@ -19,9 +19,9 @@ public sealed record YearContent(
     EraDefinition Era,
     IReadOnlyList<Func<Monster>> MonsterRoster,
     IReadOnlyList<StoreSlot> StoreSlots,
-    Func<Monster>? Gatekeeper,
+    Func<Monster>? Warden,
     double Tier,
     YearPopulation Population)
 {
-    public bool IsGatekeeperYear => Gatekeeper is not null;
+    public bool IsWardenYear => Warden is not null;
 }

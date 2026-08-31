@@ -59,20 +59,20 @@ public class TimeWorldTests
     }
 
     [Fact]
-    public void GetYear_HasAGatekeeperExactlyOnScheduleYears()
+    public void GetYear_HasAWardenExactlyOnScheduleYears()
     {
         var world = World();
-        var scheduleYears = world.GatekeeperYears.ToHashSet();
+        var scheduleYears = world.WardenYears.ToHashSet();
         Assert.NotEmpty(scheduleYears);
 
         foreach (var year in scheduleYears)
         {
             var content = world.GetYear(year);
-            Assert.True(content.IsGatekeeperYear);
-            Assert.NotNull(content.Gatekeeper);
+            Assert.True(content.IsWardenYear);
+            Assert.NotNull(content.Warden);
         }
 
-        // A handful of non-schedule years carry no Gatekeeper.
+        // A handful of non-schedule years carry no Warden.
         var checkedNonGk = 0;
         for (var year = 2001; year <= 5000 && checkedNonGk < 20; year++)
         {
@@ -81,7 +81,7 @@ public class TimeWorldTests
                 continue;
             }
 
-            Assert.Null(world.GetYear(year).Gatekeeper);
+            Assert.Null(world.GetYear(year).Warden);
             checkedNonGk++;
         }
     }
@@ -123,11 +123,11 @@ public class TimeWorldTests
     }
 
     [Fact]
-    public void DifferentSeeds_ProduceDifferentGatekeeperSchedules()
+    public void DifferentSeeds_ProduceDifferentWardenSchedules()
     {
         Assert.NotEqual(
-            World(seed: 100).GatekeeperYears.ToArray(),
-            World(seed: 200).GatekeeperYears.ToArray());
+            World(seed: 100).WardenYears.ToArray(),
+            World(seed: 200).WardenYears.ToArray());
     }
 
     [Fact]

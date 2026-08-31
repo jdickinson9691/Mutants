@@ -3,7 +3,7 @@ namespace ChronTravelers.Core.Time;
 /// <summary>
 /// Builds <see cref="Random"/> instances seeded from a world seed plus a
 /// per-purpose salt, so every deterministic slice of world generation
-/// (a year's map, its stores, a Gatekeeper's name) draws from its own
+/// (a year's map, its stores, a Warden's name) draws from its own
 /// stable stream. Same inputs → same stream, on any machine and across
 /// process restarts — which is why this rolls its own FNV-1a-style mix
 /// instead of <see cref="System.HashCode"/> (whose seed is randomized

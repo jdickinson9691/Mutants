@@ -1,13 +1,16 @@
 [
   {
-    "fromYear": 2000, "name": "Ruined City", "itemThemeTags": ["scrap", "common"],
+    "fromYear": 2000, "name": "The Fallout Belt", "itemThemeTags": ["scrap", "common"],
     "speciesIds": ["scavenger", "rubble-brute", "scrapyard-wraith", "alley-runner"],
     "roomText": [
-      "You are standing at the crossroads of a ruined city block.",
-      "You're in a maintenance shop, shelves stripped bare.",
-      "You see rubble everywhere; the street has collapsed into it.",
-      "A flickering streetlamp buzzes over cracked asphalt.",
-      "Broken glass crunches underfoot outside a gutted storefront."
+      "A ruined city block, downwind of the site. The evac routes were never used.",
+      "You're in a stripped maintenance shop. A faded government notice is taped to the till.",
+      "The street has collapsed into its own rubble. Nothing has been cleared in years.",
+      "A flickering streetlamp buzzes over cracked asphalt and long grass.",
+      "Broken glass crunches underfoot outside a gutted storefront.",
+      "A checkpoint stands abandoned, its barrier arm frozen halfway down.",
+      "Chalk arrows on the walls point the way to a relief centre that isn't there.",
+      "You come around a corner into a plaza where every window faces the same blast direction."
     ]
   },
   {
@@ -15,134 +18,181 @@
     "speciesIds": ["scavenger", "alley-runner", "rubble-brute"],
     "roomText": [
       "Everything here has rusted to the same flaking orange.",
-      "A collapsed overpass makes a low iron ceiling.",
-      "Stripped car husks are stacked three high.",
-      "Something drips, steady and metallic, in the dark."
+      "A collapsed overpass makes a low iron ceiling you have to stoop under.",
+      "Stripped vehicle husks are stacked three high along the kerb.",
+      "Something drips, steady and metallic, somewhere in the dark.",
+      "A row of shipping containers has been welded into a shanty and then abandoned again.",
+      "Rebar juts from every broken slab like reeds from a riverbed.",
+      "A salvage crew's tally is scratched into a girder, the last mark half-finished.",
+      "The wind moves through a hundred empty window frames and makes a low chord."
     ]
   },
   {
     "fromYear": 2400, "name": "The Neon Undercity", "itemThemeTags": ["neon", "common"],
     "speciesIds": ["circuit-wraith", "riot-drone", "wire-skulker"],
     "roomText": [
-      "Flickering neon signage buzzes over a flooded platform.",
-      "Rusted turnstiles block a half-collapsed tunnel.",
-      "A vending machine hums, selling nothing anyone recognizes.",
-      "Graffiti tags cover every surface of this transit hub.",
-      "Dead screens line the wall, all showing the same frozen frame."
+      "Flickering signage buzzes over a flooded transit platform.",
+      "Rusted turnstiles block a half-collapsed tunnel mouth.",
+      "A vending machine hums, still lit, offering nothing anyone recognises.",
+      "Graffiti covers every surface of this junction, layer on layer on layer.",
+      "Dead screens line the wall, all showing the same frozen frame of a news desk.",
+      "An escalator runs backward into standing water, forever.",
+      "Riot shielding is stacked against a doorway from the inside.",
+      "A departures board cycles through destinations that are all just numbers now."
     ]
   },
   {
     "fromYear": 2650, "name": "The Drowned Sprawl", "itemThemeTags": ["drowned", "common"],
     "speciesIds": ["drowned-archivist", "flood-serpent", "bulk-diver"],
     "roomText": [
-      "Black water laps at your knees between the buildings.",
-      "A rooftop garden has become a reeking swamp.",
-      "Drowned traffic lights still cycle under the surface.",
-      "Something large turns over in the water and is gone."
+      "Black water laps at your knees in the gap between two leaning towers.",
+      "A rooftop garden has gone under and become a reeking green swamp.",
+      "Drowned traffic lights still cycle, red to green, below the surface.",
+      "Something large turns over in the water further out, and is gone.",
+      "You wade through what was a shopping arcade; the shopfront glass holds.",
+      "A ferry lies on its side across the road, hull opened like a tin.",
+      "Fishing lines run from a high window down into the murk, taut and old.",
+      "The tidemark on the walls is well above your head and still rising."
     ]
   },
   {
     "fromYear": 2900, "name": "The Ashfall Wastes", "itemThemeTags": ["ash", "common"],
     "speciesIds": ["dune-stalker", "ash-wraith", "ashfall-behemoth"],
     "roomText": [
-      "Ash drifts in slow spirals over a dead highway.",
-      "A skeletal billboard creaks in the wind.",
-      "Sand has swallowed half of what was once a plaza.",
-      "The ground is warm here, and nothing grows.",
-      "Grey dunes roll to the horizon in every direction."
+      "Ash drifts in slow spirals over a dead six-lane highway.",
+      "A skeletal billboard frame creaks in a wind that never fully stops.",
+      "Grey sand has swallowed half of what was once a civic plaza.",
+      "The ground is warm underfoot here, and nothing grows.",
+      "Dunes the colour of cigarette ash roll to the horizon in every direction.",
+      "A convoy sits nose to tail on the shoulder, tyres gone, doors open.",
+      "You pass a relief tent, still pegged out, filled to the roof with drift.",
+      "The sun is a pale coin behind the haze and gives almost no heat."
     ]
   },
   {
-    "fromYear": 3150, "name": "The Undercroft", "itemThemeTags": ["deep", "common"],
+    "fromYear": 3150, "name": "The Deep Archive", "itemThemeTags": ["deep", "common"],
     "speciesIds": ["deep-warden", "bone-choir", "undercroft-eel"],
     "roomText": [
-      "The ceiling is lost somewhere far above in the dark.",
-      "Pale roots hang through cracks in the stone.",
-      "A vast buried hall, its pillars worn smooth by seeping water.",
-      "Your footsteps come back to you a half-second late."
+      "The ceiling is lost somewhere far above you in the dark.",
+      "Pale roots hang through the cracks in the poured-stone walls.",
+      "A vast buried hall, its pillars worn smooth by decades of seeping water.",
+      "Your footsteps come back to you a half-second later than they should.",
+      "Rows of sealed record vaults recede into black, their labels gone.",
+      "A reading room, chairs still pushed in, every book fused into one grey brick.",
+      "Somewhere down a side passage, a machine is still filing, patiently.",
+      "The air is dead and cool and smells faintly of paper and rust."
     ]
   },
   {
     "fromYear": 3400, "name": "The Buried Reaches", "itemThemeTags": ["deep", "drowned"],
     "speciesIds": ["deep-warden", "bone-choir", "drowned-archivist"],
     "roomText": [
-      "Flooded galleries stretch away beneath the world.",
-      "Bioluminescent scum lights the water a faint green.",
-      "An archive of ruined books silts up a side chamber.",
-      "The pressure in your ears never quite equalizes."
+      "Flooded galleries stretch away beneath the weight of the world.",
+      "Bioluminescent scum lights the water a faint, sick green.",
+      "A drift of ruined books has silted up the mouth of a side chamber.",
+      "The pressure in your ears never quite equalises, however you swallow.",
+      "Stairs go down into the water and keep going, past where the light gives out.",
+      "A drowned checkpoint, its logbook still chained to the desk, pages pulped.",
+      "Cave pearls the size of fists line a channel cut by nothing natural.",
+      "You hear a bell, very deep, very slow, and then you don't."
     ]
   },
   {
     "fromYear": 3650, "name": "The Frostbound Vaults", "itemThemeTags": ["frost", "common"],
     "speciesIds": ["rime-stalker", "cryo-revenant", "vault-sentinel"],
     "roomText": [
-      "Frost has grown over every surface in feathered sheets.",
-      "A sealed blast door, rimed shut, stands half open.",
-      "Your breath hangs and does not disperse.",
-      "Ice-locked machinery lines the walls of this vault.",
-      "Something under the ice has the shape of a hand."
+      "Frost has grown over every surface in feathered white sheets.",
+      "A sealed blast door, rimed shut, stands a hand's width open.",
+      "Your breath hangs in front of you and does not disperse.",
+      "Ice-locked machinery lines the walls, dials stopped at the same reading.",
+      "Something under the clear ice of the floor has the shape of a hand.",
+      "Cold-storage racks stretch away, each cradle empty, each tag frosted blank.",
+      "A generator hall, the turbines furred with rime, silent.",
+      "Icicles have grown up from the floor to meet the ones coming down."
     ]
   },
   {
     "fromYear": 3900, "name": "The Glacier Deeps", "itemThemeTags": ["frost", "deep"],
     "speciesIds": ["rime-stalker", "vault-sentinel", "cryo-revenant"],
     "roomText": [
-      "A blue-black crevasse drops away past the reach of light.",
-      "The walls here are old ice, full of trapped bubbles.",
-      "A frozen river hangs mid-fall down the shaft.",
-      "It is so cold the air feels solid."
+      "A blue-black crevasse drops away past the reach of your light.",
+      "The walls here are old ice, packed with trapped bubbles like held breath.",
+      "A frozen river hangs mid-fall down the throat of the shaft.",
+      "It is so cold that the air itself feels solid in your lungs.",
+      "A research hut is entombed in the glacier, lamps still burning inside the ice.",
+      "You cross a bridge of blue ice over nothing you can see the bottom of.",
+      "Meltwater runs somewhere below, the only moving thing for miles.",
+      "The ice pops and cracks around you, settling, always settling."
     ]
   },
   {
     "fromYear": 4100, "name": "The Shattered Orbital", "itemThemeTags": ["orbital", "common"],
     "speciesIds": ["void-drifter", "vacuum-wraith", "hull-breacher"],
     "roomText": [
-      "A ring corridor curves up and away in both directions.",
+      "A ring corridor curves up and away from you in both directions.",
       "Stars wheel slowly past a cracked observation port.",
-      "Loose debris drifts through the failed artificial gravity.",
-      "Warning placards float, unmoored, in the dead air.",
-      "The hull groans as the station's spin decays."
+      "Loose debris drifts through the failed artificial gravity like snow.",
+      "Warning placards float unmoored in the dead, still air.",
+      "The hull groans, low and long, as the station's spin decays.",
+      "An evacuation muster point, harness straps hanging open, pods all gone.",
+      "A hydroponics bay, its racks black and dry, a single light still cycling.",
+      "Earth is a smudge in the port, or it isn't there at all; hard to say."
     ]
   },
   {
     "fromYear": 4350, "name": "The Vacuum Reaches", "itemThemeTags": ["orbital"],
     "speciesIds": ["void-drifter", "vacuum-wraith", "hull-breacher"],
     "roomText": [
-      "Torn hull plating opens onto absolute black.",
-      "Everything not bolted down has long since drifted away.",
-      "Frozen atmosphere coats the walls in white crystal.",
-      "Your own breathing is the only sound there is."
+      "Torn hull plating opens directly onto absolute black.",
+      "Everything not bolted down has long since drifted out and away.",
+      "Frozen atmosphere coats the bulkheads in a fur of white crystal.",
+      "The sound of your own breathing is the only sound there is.",
+      "A blast shutter has half-closed on a body-shaped absence of frost.",
+      "Cabling hangs in slow, frozen arcs across the passage.",
+      "A hatch stands open on a compartment that is simply gone.",
+      "Your suit ticks as it warms the metal you touch, then cools again."
     ]
   },
   {
     "fromYear": 4600, "name": "The Chronofracture", "itemThemeTags": ["paradox", "common"],
     "speciesIds": ["fracture-wisp", "paradox-wraith", "bulwark-construct"],
     "roomText": [
-      "Reality stutters; the same moment happens twice.",
-      "A corridor folds back into itself here.",
-      "Shards of frozen time hang in the air like glass.",
+      "Reality stutters here; the same moment happens twice, then a third time.",
+      "A corridor folds back into itself, and you walk out of the door you walked in.",
+      "Shards of frozen time hang in the air like panes of broken glass.",
       "You see yourself, a room away, not yet arrived.",
-      "The light arrives before whatever cast it."
+      "The light reaches you before whatever cast it does.",
+      "A clock on the wall runs backwards, forwards, and stops, in that order.",
+      "Your footprints are already ahead of you, leading on.",
+      "This is close to the tear the Tunnel opened. The air hums with it."
     ]
   },
   {
     "fromYear": 4800, "name": "The Long Now", "itemThemeTags": ["paradox"],
     "speciesIds": ["paradox-wraith", "bulwark-construct", "void-drifter"],
     "roomText": [
-      "Every clock in the room reads a different century.",
-      "Dust falls upward, slowly, and settles on the ceiling.",
-      "A single instant, stretched thin enough to walk through.",
-      "Nothing here has moved in ten thousand years, including you."
+      "Every clock in the room reads a different century, and all of them are right.",
+      "Dust falls upward, slowly, and settles in a grey coat on the ceiling.",
+      "A single instant, stretched thin enough that you can walk around inside it.",
+      "Nothing here has moved in ten thousand years. Including, until now, you.",
+      "A candle burns with a flame that doesn't flicker and doesn't shorten.",
+      "You pour water from a canteen and it hangs, a rope of it, not falling.",
+      "The far wall is a century away and you will never reach it walking.",
+      "Sound takes so long to arrive that the silence has texture."
     ]
   },
   {
     "fromYear": 4950, "name": "The Final Instant", "itemThemeTags": ["paradox"],
     "speciesIds": ["paradox-wraith", "bulwark-construct", "fracture-wisp"],
     "roomText": [
-      "The end of the timeline is a white, soundless room.",
-      "There is no 'next' here. Only this.",
-      "Everything that will ever happen has already finished.",
-      "The air tastes of the last second before a storm."
+      "The end of the timeline is a white, soundless room with no far side.",
+      "There is no 'next' here. There is only this.",
+      "Everything that will ever happen has already finished happening.",
+      "The air tastes of the last second before a storm that will not break.",
+      "Your shadow has nowhere to fall and so there isn't one.",
+      "You can feel the Tunnel from here, upstream, tiny, still open, still pouring.",
+      "This is as far downstream as the fray goes. After this it just stops.",
+      "Something is standing very still in the white, and has been, forever."
     ]
   }
 ]

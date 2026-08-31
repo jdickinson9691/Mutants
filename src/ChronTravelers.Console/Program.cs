@@ -21,7 +21,7 @@ using Spectre.Console;
 // travel; the only limits are the Ion cost (ceil(0.04 * |Δyear|),
 // symmetric) and how hard the fights get. Every year's map is generated
 // deterministically from a per-save world seed, so revisiting a year is
-// stable. "Gatekeeper" years - a random 50-100 years apart, placed by the
+// stable. "Warden" years - a random 50-100 years apart, placed by the
 // seed - hold a tough guaranteed encounter guarding a year-scaled
 // Legendary trophy, but block nothing.
 //
@@ -73,7 +73,7 @@ using Spectre.Console;
 // session, scattered across the whole timeline, and only contribute their
 // personal bests to the leaderboard. The save/leaderboard DB lives at
 // %APPDATA%\ChronTravelers\chrontravelers.db, and carries the world seed, the
-// current/furthest year, the cleared Gatekeeper years, and every store
+// current/furthest year, the cleared Warden years, and every store
 // the player owns (year + capital + listings, re-attached on load).
 
 AnsiConsole.Write(new FigletText("ChronTravelers").Color(Color.Green));
@@ -416,7 +416,7 @@ static string ContentDirectory() => Path.Combine(AppContext.BaseDirectory, "Cont
 /// ChronTravelers.Core.Time.TestTimeWorld's small sandbox if the content files
 /// are missing or malformed, so a broken deployment degrades to something
 /// playable instead of crashing. <paramref name="worldSeed"/> fixes the
-/// Gatekeeper schedule and every year's map/store layout.
+/// Warden schedule and every year's map/store layout.
 /// </summary>
 static TimeWorld LoadTimeWorld(long worldSeed)
 {
@@ -957,8 +957,8 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
 
 /// <summary>
 /// Resolves one fight against a monster standing in the player's current
-/// room (or that year's Gatekeeper, stationed at the map's start room in
-/// a Gatekeeper year the player hasn't cleared). <paramref name="targetName"/>
+/// room (or that year's Warden, stationed at the map's start room in
+/// a Warden year the player hasn't cleared). <paramref name="targetName"/>
 /// picks one when several share the room; empty takes the first.
 /// Interactive and round-by-round via CombatSession — "attack" or "cast
 /// <ability>" each round. On a win the monster is removed from the year's
@@ -974,15 +974,15 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
     var population = yearContent.Population;
 
     Monster monster;
-    var isGatekeeperFight = false;
+    var isWardenFight = false;
 
-    var gatekeeper = population.Gatekeeper;
-    if (gatekeeper is not null && !gatekeeper.Health.IsDead
-        && !traveler.HasDefeatedGatekeeper(year)
-        && traveler.Position.Equals(gatekeeper.Position))
+    var warden = population.Warden;
+    if (warden is not null && !warden.Health.IsDead
+        && !traveler.HasDefeatedWarden(year)
+        && traveler.Position.Equals(warden.Position))
     {
-        monster = gatekeeper;
-        isGatekeeperFight = true;
+        monster = warden;
+        isWardenFight = true;
     }
     else
     {
@@ -1000,7 +1000,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
 
     var levelBefore = traveler.Level;
 
-    AnsiConsole.MarkupLine(isGatekeeperFight
+    AnsiConsole.MarkupLine(isWardenFight
         ? $"[bold]{Markup.Escape(monster.Name)} rises to meet you![/] (tier {monster.Tier})"
         : $"You close on the [bold]{Markup.Escape(monster.Name)}[/] (tier {monster.Tier})!");
 
@@ -1061,13 +1061,13 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
         AnsiConsole.MarkupLine($"[green]You defeated {Markup.Escape(foe)}! +{session.XpAwarded} XP.[/]");
         broadcast.Publish(GameEvent.Slain(monster.Name, traveler.Name));
 
-        if (isGatekeeperFight)
+        if (isWardenFight)
         {
-            traveler.RecordGatekeeperDefeat(year);
+            traveler.RecordWardenDefeat(year);
             var trophy = session.ItemsDropped.FirstOrDefault();
             AnsiConsole.MarkupLine(trophy is not null
-                ? $"[bold yellow]The Gatekeeper of {year} yields its {Markup.Escape(trophy.Name)}![/]"
-                : $"[bold]The Gatekeeper of {year} is broken. This year is yours.[/]");
+                ? $"[bold yellow]The Warden of {year} yields its {Markup.Escape(trophy.Name)}![/]"
+                : $"[bold]The Warden of {year} is broken. This year is yours.[/]");
         }
         else
         {
@@ -1110,7 +1110,7 @@ static void PrintNewLogLines(CombatSession session, ref int loggedSoFar)
 /// Fires the readied ranged weapon (Traveler.EquippedRanged) one room away
 /// in an exit direction — 'point &lt;dir&gt;' for a Wand, 'shoot &lt;dir&gt;'
 /// for a Bow/Gun — hitting the first living monster there (or that room's
-/// stationed Gatekeeper). A hit spends one round of the weapon's built-in
+/// stationed Warden). A hit spends one round of the weapon's built-in
 /// ammo via ChronTravelers.Engine.Combat.RangedResolver; no target or no exit that
 /// way spends nothing. On a kill, XP and loot are awarded here — the loot
 /// lands on the target room's floor, since the player never walked in.
@@ -1150,15 +1150,15 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
     var population = yearContent.Population;
 
     var target = population.MonstersAt(targetRoom).FirstOrDefault(m => !m.Health.IsDead);
-    var gatekeeper = population.Gatekeeper;
-    var targetIsGatekeeper = false;
+    var warden = population.Warden;
+    var targetIsWarden = false;
     if (target is null
-        && gatekeeper is not null && !gatekeeper.Health.IsDead
-        && !traveler.HasDefeatedGatekeeper(traveler.CurrentYear)
-        && gatekeeper.Position.Equals(targetRoom))
+        && warden is not null && !warden.Health.IsDead
+        && !traveler.HasDefeatedWarden(traveler.CurrentYear)
+        && warden.Position.Equals(targetRoom))
     {
-        target = gatekeeper;
-        targetIsGatekeeper = true;
+        target = warden;
+        targetIsWarden = true;
     }
 
     if (target is null)
@@ -1182,15 +1182,15 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
 
     var drops = LootDropRoller.Roll(target.LootTable, random).Concat(target.Inventory).ToList();
 
-    if (targetIsGatekeeper)
+    if (targetIsWarden)
     {
-        traveler.RecordGatekeeperDefeat(traveler.CurrentYear);
+        traveler.RecordWardenDefeat(traveler.CurrentYear);
         foreach (var drop in drops)
         {
             population.AddGroundLoot(targetRoom, drop);
         }
 
-        AnsiConsole.MarkupLine($"[bold yellow]You drop the Gatekeeper of {traveler.CurrentYear} from a room away — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{target.XpReward} XP.");
+        AnsiConsole.MarkupLine($"[bold yellow]You drop the Warden of {traveler.CurrentYear} from a room away — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{target.XpReward} XP.");
     }
     else
     {
@@ -1251,7 +1251,7 @@ static void RenderAbilities(Traveler traveler, IReadOnlyList<AbilityData> abilit
     AnsiConsole.Write(table);
 }
 
-/// <summary>Handles "travel &lt;year&gt;", "travel +N"/"-N" (relative years), and "travel next"/"prev" (the next/previous Gatekeeper year) — docs/GDD.md §3.2.</summary>
+/// <summary>Handles "travel &lt;year&gt;", "travel +N"/"-N" (relative years), and "travel next"/"prev" (the next/previous Warden year) — docs/GDD.md §3.2.</summary>
 static void HandleTravel(Traveler traveler, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, string argument)
 {
     var arg = argument.Trim();
@@ -1260,15 +1260,15 @@ static void HandleTravel(Traveler traveler, TimeWorld world, IRandomSource rando
     switch (arg.ToLowerInvariant())
     {
         case "":
-            AnsiConsole.MarkupLine("[red]Travel when?[/] Try 'travel 3200', 'travel +150', 'travel -100', or 'travel next'/'prev' (Gatekeeper years).");
+            AnsiConsole.MarkupLine("[red]Travel when?[/] Try 'travel 3200', 'travel +150', 'travel -100', or 'travel next'/'prev' (Warden years).");
             return;
 
         case "next":
         {
-            var next = world.Gatekeepers.NextAfter(traveler.CurrentYear);
+            var next = world.Wardens.NextAfter(traveler.CurrentYear);
             if (next is null)
             {
-                AnsiConsole.MarkupLine("[grey]No Gatekeeper years remain ahead of you.[/]");
+                AnsiConsole.MarkupLine("[grey]No Warden years remain ahead of you.[/]");
                 return;
             }
 
@@ -1278,10 +1278,10 @@ static void HandleTravel(Traveler traveler, TimeWorld world, IRandomSource rando
 
         case "prev" or "previous":
         {
-            var prev = world.Gatekeepers.PreviousBefore(traveler.CurrentYear);
+            var prev = world.Wardens.PreviousBefore(traveler.CurrentYear);
             if (prev is null)
             {
-                AnsiConsole.MarkupLine("[grey]No Gatekeeper years behind you.[/]");
+                AnsiConsole.MarkupLine("[grey]No Warden years behind you.[/]");
                 return;
             }
 
@@ -1405,7 +1405,7 @@ static void RenderMonsters(Traveler traveler, TimeWorld world)
     var population = world.GetYear(traveler.CurrentYear).Population;
     var living = population.Monsters.Where(m => !m.Health.IsDead).ToList();
 
-    if (population.Gatekeeper is { Health.IsDead: false } gk && !traveler.HasDefeatedGatekeeper(traveler.CurrentYear))
+    if (population.Warden is { Health.IsDead: false } gk && !traveler.HasDefeatedWarden(traveler.CurrentYear))
     {
         living.Insert(0, gk);
     }
@@ -1717,14 +1717,14 @@ static void RenderRoom(Traveler traveler, TimeWorld world)
     var population = yearContent.Population;
 
     var here = population.MonstersAt(traveler.Position).Select(m => m.Name).ToList();
-    var gatekeeper = population.Gatekeeper;
-    var gatekeeperHere = gatekeeper is not null && !gatekeeper.Health.IsDead
-        && !traveler.HasDefeatedGatekeeper(traveler.CurrentYear)
-        && gatekeeper.Position.Equals(traveler.Position);
+    var warden = population.Warden;
+    var wardenHere = warden is not null && !warden.Health.IsDead
+        && !traveler.HasDefeatedWarden(traveler.CurrentYear)
+        && warden.Position.Equals(traveler.Position);
 
-    if (gatekeeperHere)
+    if (wardenHere)
     {
-        AnsiConsole.MarkupLine($"[bold red]{Markup.Escape(gatekeeper!.Name)} stands watch here. [yellow]fight[/] when you're ready.[/]");
+        AnsiConsole.MarkupLine($"[bold red]{Markup.Escape(warden!.Name)} stands watch here. [yellow]fight[/] when you're ready.[/]");
     }
 
     if (here.Count > 0)
@@ -1810,7 +1810,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("[yellow]Commands:[/]");
     AnsiConsole.MarkupLine("  [green]n[/]/[green]s[/]/[green]e[/]/[green]w[/] (or north/south/east/west) - move");
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room (monsters here / nearby, ground loot)");
-    AnsiConsole.MarkupLine("  [green]fight[/] (or f) [green]<name>[/] - fight a monster in this room (or the Gatekeeper at the year's start)");
+    AnsiConsole.MarkupLine("  [green]fight[/] (or f) [green]<name>[/] - fight a monster in this room (or the Warden at the year's start)");
     AnsiConsole.MarkupLine("    (each round, type [green]attack[/] or [green]cast <ability>[/])");
     AnsiConsole.MarkupLine("  [green]shoot[/]/[green]point <dir>[/] - fire your readied ranged weapon one room away (finite built-in ammo)");
     AnsiConsole.MarkupLine("  [green]take[/] (or grab) [green]<item>[/] - pick up loot off the ground here ('take all' works)");
@@ -1819,7 +1819,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]abilities[/] (or spells) - list your class's abilities unlocked so far");
     AnsiConsole.MarkupLine("  [green]travel <year>[/]      - jump to a year (2000–5000); costs ceil(0.04·|Δyear|) Ions");
     AnsiConsole.MarkupLine("  [green]travel +N[/]/[green]-N[/]      - jump N years forward/back");
-    AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]   - jump to the next/previous Gatekeeper year");
+    AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]   - jump to the next/previous Warden year");
     AnsiConsole.MarkupLine("  [green]inventory[/] (or i)    - list what you're carrying");
     AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Travelers out in the timeline");
     AnsiConsole.MarkupLine("  [green]news[/] (or broadcast) - show recent kill-feed events");

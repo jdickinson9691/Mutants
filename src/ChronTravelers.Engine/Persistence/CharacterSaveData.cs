@@ -30,7 +30,7 @@ public sealed class CharacterSaveData
     public int MaxIons { get; set; }
     public int Credits { get; set; }
 
-    /// <summary>The per-save world seed — fixes the Gatekeeper schedule and every year's map/store layout (ChronTravelers.Core.Time.TimeWorld). 0 on a legacy (schema 1) blob.</summary>
+    /// <summary>The per-save world seed — fixes the Warden schedule and every year's map/store layout (ChronTravelers.Core.Time.TimeWorld). 0 on a legacy (schema 1) blob.</summary>
     public long WorldSeed { get; set; }
 
     /// <summary>The year the character is standing in (2000–5000).</summary>
@@ -42,8 +42,8 @@ public sealed class CharacterSaveData
     public int PositionEast { get; set; }
     public int PositionNorth { get; set; }
 
-    /// <summary>The Gatekeeper years the character has cleared (schema 2). Legacy blobs carry level numbers here; the migration discards them.</summary>
-    public List<int> DefeatedGatekeepers { get; set; } = [];
+    /// <summary>The Warden years the character has cleared (schema 2). Legacy blobs carry level numbers here; the migration discards them.</summary>
+    public List<int> DefeatedWardens { get; set; } = [];
 
     // --- Legacy (schema 1) fields, read only for migration ---------------
     /// <summary>Legacy: the deepest unlocked discrete level. Migrated to <see cref="FurthestYearReached"/>.</summary>

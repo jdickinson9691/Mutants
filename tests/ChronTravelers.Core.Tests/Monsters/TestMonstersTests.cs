@@ -53,22 +53,22 @@ public class TestMonstersTests
     }
 
     [Fact]
-    public void Gatekeeper_IsABulletSpongeNotAHarderHitter()
+    public void Warden_IsABulletSpongeNotAHarderHitter()
     {
-        // By design (see TestMonsters.Gatekeeper's doc comment): triple
+        // By design (see TestMonsters.Warden's doc comment): triple
         // HP and reward, but the SAME attack/defense as a regular
         // same-tier monster - stacking every stat compounds too fast and
         // risks an unwinnable mandatory gate.
-        var gatekeeper = TestMonsters.Gatekeeper(2);
+        var warden = TestMonsters.Warden(2);
         var regular = TestMonsters.Scavenger(2);
 
-        Assert.Equal(2, gatekeeper.Tier);
-        Assert.True(gatekeeper.Health.Max > regular.Health.Max);
-        Assert.Equal(regular.AttackPower, gatekeeper.AttackPower);
-        Assert.Equal(regular.Defense, gatekeeper.Defense);
-        Assert.True(gatekeeper.XpReward > regular.XpReward);
-        Assert.Single(gatekeeper.LootTable);
-        Assert.Equal(1.0, gatekeeper.LootTable[0].DropChance);
+        Assert.Equal(2, warden.Tier);
+        Assert.True(warden.Health.Max > regular.Health.Max);
+        Assert.Equal(regular.AttackPower, warden.AttackPower);
+        Assert.Equal(regular.Defense, warden.Defense);
+        Assert.True(warden.XpReward > regular.XpReward);
+        Assert.Single(warden.LootTable);
+        Assert.Equal(1.0, warden.LootTable[0].DropChance);
     }
 
     public static IEnumerable<object[]> Factories() =>

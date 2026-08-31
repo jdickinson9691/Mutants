@@ -106,15 +106,15 @@ public class TimelineContentFactoryTests
     }
 
     [Fact]
-    public void Gatekeeper_IsABulletSpongeWithAGuaranteedLegendaryWeaponTrophy()
+    public void Warden_IsABulletSpongeWithAGuaranteedLegendaryWeaponTrophy()
     {
         var year = 3210;
-        var gatekeeper = TimelineContentFactory.Gatekeeper(worldSeed: 9, year);
+        var warden = TimelineContentFactory.Warden(worldSeed: 9, year);
         var regular = TimelineContentFactory.ForSpecies(9, Baseline, year, Pool)();
 
-        Assert.True(gatekeeper.Health.Max > regular.Health.Max * 2);
+        Assert.True(warden.Health.Max > regular.Health.Max * 2);
 
-        var drop = Assert.Single(gatekeeper.LootTable);
+        var drop = Assert.Single(warden.LootTable);
         Assert.Equal(1.0, drop.DropChance);
         Assert.Equal(ItemType.Weapon, drop.Item.Type);
         Assert.Equal(Rarity.Legendary, drop.Item.Rarity);
@@ -122,10 +122,10 @@ public class TimelineContentFactoryTests
     }
 
     [Fact]
-    public void Gatekeeper_IsDeterministicPerSeedAndYear()
+    public void Warden_IsDeterministicPerSeedAndYear()
     {
-        var a = TimelineContentFactory.Gatekeeper(worldSeed: 3, 2600);
-        var b = TimelineContentFactory.Gatekeeper(worldSeed: 3, 2600);
+        var a = TimelineContentFactory.Warden(worldSeed: 3, 2600);
+        var b = TimelineContentFactory.Warden(worldSeed: 3, 2600);
         Assert.Equal(a.LootTable[0].Item.Name, b.LootTable[0].Item.Name);
     }
 
@@ -193,9 +193,9 @@ public class TimelineContentFactoryTests
     }
 
     [Fact]
-    public void Gatekeeper_TrophyIsALegendaryWeaponThatOutclassesAStandardOne()
+    public void Warden_TrophyIsALegendaryWeaponThatOutclassesAStandardOne()
     {
-        var trophy = TimelineContentFactory.Gatekeeper(worldSeed: 7, 3000).LootTable[0].Item;
+        var trophy = TimelineContentFactory.Warden(worldSeed: 7, 3000).LootTable[0].Item;
         var standard = TimelineContentFactory.ForArchetype(
             new("std", "Std", ItemType.Weapon, Rarity.Uncommon, null, ConsumableEffectType.None, 0, 0, ["common"]),
             3000);

@@ -27,7 +27,7 @@ public class MonsterControllerTests
 
     /// <summary>An empty-roster population (no auto-placed monsters) so tests can hand-place exactly what they need.</summary>
     private static YearPopulation EmptyPopulation(LevelMap map) =>
-        YearPopulation.Seed(worldSeed: 1, year: 2000, map, roster: [], gatekeeperFactory: null);
+        YearPopulation.Seed(worldSeed: 1, year: 2000, map, roster: [], wardenFactory: null);
 
     /// <summary>A player parked well off the little test grids, so aggro/ambush never engage unless a test opts in.</summary>
     private static Traveler OffMapPlayer()

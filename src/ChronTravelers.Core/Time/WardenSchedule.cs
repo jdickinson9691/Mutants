@@ -1,30 +1,30 @@
 namespace ChronTravelers.Core.Time;
 
 /// <summary>
-/// Where the Gatekeepers stand on the timeline — docs/GDD.md §3.2. From a
+/// Where the Wardens stand on the timeline — docs/GDD.md §3.2. From a
 /// world seed, walk forward from year 2000 adding a random gap of
 /// <see cref="MinGap"/>–<see cref="MaxGap"/> years each step, placing a
-/// Gatekeeper at every landing year up to 5000. Deterministic per seed
+/// Warden at every landing year up to 5000. Deterministic per seed
 /// (two <see cref="TimeWorld"/>s built from the same save agree), and
 /// different seeds give different schedules. Year 2000 is never a
-/// Gatekeeper year — the "present" needs no boss, matching the old
+/// Warden year — the "present" needs no boss, matching the old
 /// level 1.
 ///
-/// Gatekeepers no longer gate travel: a Gatekeeper year just means a
+/// Wardens no longer gate travel: a Warden year just means a
 /// tough guaranteed encounter guarding a year-scaled Legendary trophy
-/// (see <see cref="TimelineContentFactory.Gatekeeper"/>) until beaten
+/// (see <see cref="TimelineContentFactory.Warden"/>) until beaten
 /// once.
 /// </summary>
-public sealed class GatekeeperSchedule
+public sealed class WardenSchedule
 {
     public const int MinGap = 50;
     public const int MaxGap = 100;
 
     private readonly SortedSet<int> _years = [];
 
-    public GatekeeperSchedule(long worldSeed)
+    public WardenSchedule(long worldSeed)
     {
-        var rng = DeterministicRandom.For(worldSeed, year: 0, purpose: "gatekeeper-schedule");
+        var rng = DeterministicRandom.For(worldSeed, year: 0, purpose: "warden-schedule");
 
         var year = TimeScale.MinYear;
         while (true)
@@ -39,16 +39,16 @@ public sealed class GatekeeperSchedule
         }
     }
 
-    /// <summary>Every Gatekeeper year, ascending.</summary>
+    /// <summary>Every Warden year, ascending.</summary>
     public IReadOnlyCollection<int> Years => _years;
 
-    public bool IsGatekeeperYear(int year) => _years.Contains(year);
+    public bool IsWardenYear(int year) => _years.Contains(year);
 
-    /// <summary>Gatekeeper years within [min(a,b), max(a,b)], ascending.</summary>
+    /// <summary>Warden years within [min(a,b), max(a,b)], ascending.</summary>
     public IEnumerable<int> Between(int a, int b) =>
         _years.GetViewBetween(Math.Min(a, b), Math.Max(a, b));
 
-    /// <summary>The nearest Gatekeeper year strictly after <paramref name="year"/>, or null if none remain.</summary>
+    /// <summary>The nearest Warden year strictly after <paramref name="year"/>, or null if none remain.</summary>
     public int? NextAfter(int year)
     {
         foreach (var candidate in _years)
@@ -62,7 +62,7 @@ public sealed class GatekeeperSchedule
         return null;
     }
 
-    /// <summary>The nearest Gatekeeper year strictly before <paramref name="year"/>, or null if none.</summary>
+    /// <summary>The nearest Warden year strictly before <paramref name="year"/>, or null if none.</summary>
     public int? PreviousBefore(int year)
     {
         int? found = null;

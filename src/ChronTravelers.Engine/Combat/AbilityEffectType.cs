@@ -45,6 +45,6 @@ public enum AbilityEffectType
     /// <summary>Instantly restores a fraction (Magnitude) of the caster's max Ions.</summary>
     RestoreIons,
 
-    /// <summary>Instantly defeats the monster outright — refused against a gatekeeper/boss fight.</summary>
+    /// <summary>Instantly defeats the monster outright — refused against a warden/boss fight.</summary>
     InstantDefeatNonBoss,
 }

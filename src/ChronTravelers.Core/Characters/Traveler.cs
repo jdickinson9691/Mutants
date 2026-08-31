@@ -33,11 +33,11 @@ public sealed class Traveler
     /// <summary>Current grid position on whichever <see cref="LevelMap"/> this Traveler is on — docs/GDD.md §3.1.</summary>
     public Coordinate Position { get; private set; } = Coordinate.Origin;
 
-    /// <summary>The Gatekeeper years this Traveler has already cleared — see <see cref="HasDefeatedGatekeeper"/>.</summary>
-    private readonly HashSet<int> _defeatedGatekeepers = [];
+    /// <summary>The Warden years this Traveler has already cleared — see <see cref="HasDefeatedWarden"/>.</summary>
+    private readonly HashSet<int> _defeatedWardens = [];
 
-    /// <summary>The set of Gatekeeper years this Traveler has cleared. Read-only.</summary>
-    public IReadOnlyCollection<int> DefeatedGatekeeperYears => _defeatedGatekeepers;
+    /// <summary>The set of Warden years this Traveler has cleared. Read-only.</summary>
+    public IReadOnlyCollection<int> DefeatedWardenYears => _defeatedWardens;
 
     /// <summary>
     /// Credits on hand — docs/GDD.md §6's store currency. Full store
@@ -137,7 +137,7 @@ public sealed class Traveler
         string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
         int currentHp, int maxHp, int currentIons, int maxIons, int riblets,
         int currentYear, int furthestYearReached, Coordinate position,
-        IEnumerable<int> defeatedGatekeeperYears)
+        IEnumerable<int> defeatedWardenYears)
     {
         Name = name;
         Class = characterClass;
@@ -151,7 +151,7 @@ public sealed class Traveler
         CurrentYear = Math.Clamp(currentYear, TimeScale.MinYear, TimeScale.MaxYear);
         FurthestYearReached = Math.Clamp(furthestYearReached, TimeScale.MinYear, TimeScale.MaxYear);
         Position = position;
-        _defeatedGatekeepers = new HashSet<int>(defeatedGatekeeperYears);
+        _defeatedWardens = new HashSet<int>(defeatedWardenYears);
     }
 
     /// <summary>See the private snapshot constructor above — this is its public entry point, used by ChronTravelers.Engine.Persistence when loading a save.</summary>
@@ -159,7 +159,7 @@ public sealed class Traveler
         string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
         int currentHp, int maxHp, int currentIons, int maxIons, int riblets,
         int currentYear, int furthestYearReached, Coordinate position,
-        IEnumerable<int> defeatedGatekeeperYears)
+        IEnumerable<int> defeatedWardenYears)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -169,7 +169,7 @@ public sealed class Traveler
         return new Traveler(
             name, characterClass, level, xp, stats,
             currentHp, maxHp, currentIons, maxIons, riblets,
-            currentYear, furthestYearReached, position, defeatedGatekeeperYears);
+            currentYear, furthestYearReached, position, defeatedWardenYears);
     }
 
     /// <summary>
@@ -228,11 +228,11 @@ public sealed class Traveler
         }
     }
 
-    /// <summary>Whether this Traveler has already beaten the Gatekeeper standing watch over <paramref name="year"/> — docs/GDD.md §3.2. Gatekeepers gate nothing; this just stops the trophy fight repeating.</summary>
-    public bool HasDefeatedGatekeeper(int year) => _defeatedGatekeepers.Contains(year);
+    /// <summary>Whether this Traveler has already beaten the Warden standing watch over <paramref name="year"/> — docs/GDD.md §3.2. Wardens gate nothing; this just stops the trophy fight repeating.</summary>
+    public bool HasDefeatedWarden(int year) => _defeatedWardens.Contains(year);
 
-    /// <summary>Records a Gatekeeper-year win, so returning to that year doesn't re-spawn its Gatekeeper.</summary>
-    public void RecordGatekeeperDefeat(int year) => _defeatedGatekeepers.Add(year);
+    /// <summary>Records a Warden-year win, so returning to that year doesn't re-spawn its Warden.</summary>
+    public void RecordWardenDefeat(int year) => _defeatedWardens.Add(year);
 
     /// <summary>
     /// Advances passive Ion drain by one world tick — docs/GDD.md §2:

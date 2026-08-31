@@ -19,7 +19,7 @@ public class CharacterMapperTests
         original.AddCredits(42);
         original.SetCurrentYear(3400);
         original.SetCurrentYear(2600); // current moves back; furthest stays at 3400
-        original.RecordGatekeeperDefeat(3187);
+        original.RecordWardenDefeat(3187);
         original.PlaceAt(new Core.World.Coordinate(3, -2));
 
         var save = CharacterMapper.ToSaveData(original, TestSeed);
@@ -40,7 +40,7 @@ public class CharacterMapperTests
         Assert.Equal(2600, restored.CurrentYear);
         Assert.Equal(3400, restored.FurthestYearReached);
         Assert.Equal(original.Position, restored.Position);
-        Assert.True(restored.HasDefeatedGatekeeper(3187));
+        Assert.True(restored.HasDefeatedWarden(3187));
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public class CharacterMapperTests
             Credits = 700,
             UnlockedTimeLevel = 5,
             CurrentTimeLevel = 4,
-            DefeatedGatekeepers = [2, 3, 4], // old level numbers — discarded by the migration
+            DefeatedWardens = [2, 3, 4], // old level numbers — discarded by the migration
         };
 
         var restored = CharacterMapper.FromSaveData(legacy);
@@ -75,7 +75,7 @@ public class CharacterMapperTests
         // old level 4 -> 2000 + 3*375 = 3125; furthest from old level 5 -> 3500.
         Assert.Equal(3125, restored.CurrentYear);
         Assert.Equal(3500, restored.FurthestYearReached);
-        Assert.Empty(restored.DefeatedGatekeeperYears);
+        Assert.Empty(restored.DefeatedWardenYears);
     }
 
     [Fact]

@@ -97,18 +97,18 @@ public class TimeTravelResolverTests
     }
 
     [Fact]
-    public void Travel_NeverFightsAGatekeeper_EvenIntoAGatekeeperYear()
+    public void Travel_NeverFightsAWarden_EvenIntoAWardenYear()
     {
         var world = World();
-        var gatekeeperYear = world.GatekeeperYears.First();
+        var wardenYear = world.WardenYears.First();
         var traveler = RichTraveler(2000);
         var hpBefore = traveler.Health.Current;
 
-        var result = TimeTravelResolver.Travel(traveler, world, gatekeeperYear, NeutralRandom());
+        var result = TimeTravelResolver.Travel(traveler, world, wardenYear, NeutralRandom());
 
         Assert.True(result.Success);
         Assert.Equal(hpBefore, traveler.Health.Current); // no fight happened
-        Assert.False(traveler.HasDefeatedGatekeeper(gatekeeperYear)); // still there to fight in-year
+        Assert.False(traveler.HasDefeatedWarden(wardenYear)); // still there to fight in-year
     }
 
     [Fact]

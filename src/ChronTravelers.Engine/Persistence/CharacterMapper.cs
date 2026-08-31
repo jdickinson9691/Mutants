@@ -56,7 +56,7 @@ public static class CharacterMapper
             FurthestYearReached = traveler.FurthestYearReached,
             PositionEast = traveler.Position.East,
             PositionNorth = traveler.Position.North,
-            DefeatedGatekeepers = traveler.DefeatedGatekeeperYears.OrderBy(y => y).ToList(),
+            DefeatedWardens = traveler.DefeatedWardenYears.OrderBy(y => y).ToList(),
             Inventory = inventory,
             EquippedWeaponIndex = equippedWeaponIndex >= 0 ? equippedWeaponIndex : null,
             EquippedArmorIndex = equippedArmorIndex >= 0 ? equippedArmorIndex : null,
@@ -115,23 +115,23 @@ public static class CharacterMapper
 
         int currentYear;
         int furthestYear;
-        IEnumerable<int> defeatedGatekeeperYears;
+        IEnumerable<int> defeatedWardenYears;
 
         if (data.SchemaVersion >= 2)
         {
             currentYear = data.CurrentYear;
             furthestYear = Math.Max(data.FurthestYearReached, data.CurrentYear);
-            defeatedGatekeeperYears = data.DefeatedGatekeepers;
+            defeatedWardenYears = data.DefeatedWardens;
         }
         else
         {
             // Schema 1 → 2: map the old discrete level onto the timeline
             // (old level N ≈ year 2000 + (N-1)·375). The character survives;
             // the world reshuffles under a fresh seed (rolled by the caller),
-            // so the old per-level gatekeeper flags no longer mean anything.
+            // so the old per-level warden flags no longer mean anything.
             currentYear = LegacyLevelToYear(data.CurrentTimeLevel);
             furthestYear = LegacyLevelToYear(Math.Max(data.UnlockedTimeLevel, data.CurrentTimeLevel));
-            defeatedGatekeeperYears = [];
+            defeatedWardenYears = [];
         }
 
         var traveler = Traveler.Restore(
@@ -139,7 +139,7 @@ public static class CharacterMapper
             data.CurrentHp, data.MaxHp, data.CurrentIons, data.MaxIons, data.Credits,
             currentYear, furthestYear,
             new Coordinate(data.PositionEast, data.PositionNorth),
-            defeatedGatekeeperYears);
+            defeatedWardenYears);
 
         var items = data.Inventory.Select(FromItemSaveData).ToList();
         foreach (var item in items)

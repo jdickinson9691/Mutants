@@ -112,7 +112,7 @@ public static class NpcController
     /// short hop away (usually forward — see <see cref="ForwardTravelBias"/>),
     /// and calls <see cref="TimeTravelResolver.Travel"/> if the NPC can
     /// afford the Ion cost. Null means nothing happened — the caller falls
-    /// through to trade/grind. There is no Gatekeeper fight during travel
+    /// through to trade/grind. There is no Warden fight during travel
     /// any more, so this never "loses"; a failed result just means the
     /// jump was unaffordable and is reported as such.
     /// </summary>

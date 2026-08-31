@@ -11,7 +11,7 @@ namespace ChronTravelers.Engine.Simulation;
 /// timeline and that the Traveler can pay
 /// <see cref="IonEconomy.TimeTravelCost"/> (symmetric — retreating costs
 /// the same as advancing). No unlock, no minimum character level, no
-/// Gatekeeper gate; Gatekeepers are just tough encounters in their year,
+/// Warden gate; Wardens are just tough encounters in their year,
 /// handled by the fight flow, not here.
 /// </summary>
 public static class TimeTravelResolver
@@ -19,7 +19,7 @@ public static class TimeTravelResolver
     /// <summary>
     /// <paramref name="random"/> is unused now (kept so callers that
     /// thread an <see cref="IRandomSource"/> don't have to change) — there
-    /// is no Gatekeeper fight during travel any more.
+    /// is no Warden fight during travel any more.
     /// </summary>
     public static TimeTravelResult Travel(Traveler traveler, TimeWorld world, int targetYear, IRandomSource random)
     {

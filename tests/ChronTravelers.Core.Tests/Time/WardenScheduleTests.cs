@@ -2,12 +2,12 @@ using ChronTravelers.Core.Time;
 
 namespace ChronTravelers.Core.Tests.Time;
 
-public class GatekeeperScheduleTests
+public class WardenScheduleTests
 {
     [Fact]
-    public void EveryGapBetweenGatekeeperYearsIsBetween50And100()
+    public void EveryGapBetweenWardenYearsIsBetween50And100()
     {
-        var schedule = new GatekeeperSchedule(worldSeed: 12345);
+        var schedule = new WardenSchedule(worldSeed: 12345);
         var years = schedule.Years.ToList();
 
         Assert.NotEmpty(years);
@@ -16,15 +16,15 @@ public class GatekeeperScheduleTests
         foreach (var year in years)
         {
             var gap = year - previous;
-            Assert.InRange(gap, GatekeeperSchedule.MinGap, GatekeeperSchedule.MaxGap);
+            Assert.InRange(gap, WardenSchedule.MinGap, WardenSchedule.MaxGap);
             previous = year;
         }
     }
 
     [Fact]
-    public void AllGatekeeperYearsFallInsideTheTimelineAndExcludeYear2000()
+    public void AllWardenYearsFallInsideTheTimelineAndExcludeYear2000()
     {
-        var schedule = new GatekeeperSchedule(worldSeed: 777);
+        var schedule = new WardenSchedule(worldSeed: 777);
 
         Assert.All(schedule.Years, y => Assert.InRange(y, TimeScale.MinYear + 1, TimeScale.MaxYear));
     }
@@ -32,8 +32,8 @@ public class GatekeeperScheduleTests
     [Fact]
     public void SameSeedProducesTheSameSchedule()
     {
-        var a = new GatekeeperSchedule(worldSeed: 42).Years.ToArray();
-        var b = new GatekeeperSchedule(worldSeed: 42).Years.ToArray();
+        var a = new WardenSchedule(worldSeed: 42).Years.ToArray();
+        var b = new WardenSchedule(worldSeed: 42).Years.ToArray();
 
         Assert.Equal(a, b);
     }
@@ -41,8 +41,8 @@ public class GatekeeperScheduleTests
     [Fact]
     public void DifferentSeedsProduceDifferentSchedules()
     {
-        var a = new GatekeeperSchedule(worldSeed: 1).Years.ToArray();
-        var b = new GatekeeperSchedule(worldSeed: 2).Years.ToArray();
+        var a = new WardenSchedule(worldSeed: 1).Years.ToArray();
+        var b = new WardenSchedule(worldSeed: 2).Years.ToArray();
 
         Assert.NotEqual(a, b);
     }
@@ -50,7 +50,7 @@ public class GatekeeperScheduleTests
     [Fact]
     public void NextAfterAndPreviousBefore_WalkTheSchedule()
     {
-        var schedule = new GatekeeperSchedule(worldSeed: 99);
+        var schedule = new WardenSchedule(worldSeed: 99);
         var years = schedule.Years.ToList();
 
         var first = years[0];
@@ -61,9 +61,9 @@ public class GatekeeperScheduleTests
     }
 
     [Fact]
-    public void Between_ReturnsOnlyGatekeeperYearsInRange()
+    public void Between_ReturnsOnlyWardenYearsInRange()
     {
-        var schedule = new GatekeeperSchedule(worldSeed: 5);
+        var schedule = new WardenSchedule(worldSeed: 5);
         var years = schedule.Years.ToList();
         var lo = years[1];
         var hi = years[^2];
