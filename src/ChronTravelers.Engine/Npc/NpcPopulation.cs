@@ -6,7 +6,7 @@ namespace ChronTravelers.Engine.Npc;
 
 /// <summary>
 /// Spawns the NPC population — docs/GDD.md §7: "A configurable population
-/// of NPC 'Mutants' exists ... each a full character with class, level,
+/// of NPC 'Travelers' exists ... each a full character with class, level,
 /// inventory, and Ion pool — built on the exact same character/inventory/
 /// ability code path as the human player." On the continuous timeline the
 /// population is scattered across the whole of 2000–5000 rather than
@@ -26,7 +26,7 @@ public static class NpcPopulation
     /// <summary>How far below its year's soft cap an NPC can spawn, so a year holds a spread of strengths rather than everyone at the cap.</summary>
     private const int LevelSpreadBelowCap = 12;
 
-    public static IReadOnlyList<Mutant> Spawn(int count, TimeWorld world, IRandomSource random)
+    public static IReadOnlyList<Traveler> Spawn(int count, TimeWorld world, IRandomSource random)
     {
         if (count < 0)
         {
@@ -34,7 +34,7 @@ public static class NpcPopulation
         }
 
         var classes = Enum.GetValues<CharacterClass>();
-        var npcs = new List<Mutant>(count);
+        var npcs = new List<Traveler>(count);
         var yearSpan = TimeScale.MaxYear - TimeScale.MinYear;
 
         for (var i = 0; i < count; i++)
@@ -46,7 +46,7 @@ public static class NpcPopulation
             var startYear = TimeScale.MinYear + (int)(random.NextDouble() * yearSpan);
             startYear = Math.Clamp(startYear, TimeScale.MinYear, TimeScale.MaxYear);
 
-            var npc = new Mutant(name, characterClass, startingYear: startYear);
+            var npc = new Traveler(name, characterClass, startingYear: startYear);
             npc.PlaceAt(world.GetYear(startYear).Map.Start);
 
             var cap = TimeScale.SoftLevelCapForYear(startYear);

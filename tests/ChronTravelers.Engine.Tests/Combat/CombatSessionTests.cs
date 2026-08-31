@@ -11,7 +11,7 @@ public class CombatSessionTests
     // 1.0, so damage is deterministic: raw = attack - defense.
     private static StubRandomSource NeutralRandom() => StubRandomSource.Fixed(0.5);
 
-    private static Mutant Warrior(string name = "Rook") => new(name, CharacterClass.Warrior);
+    private static Traveler Soldier(string name = "Rook") => new(name, CharacterClass.Soldier);
 
     private static Core.Monsters.Monster TankMonster(string name = "Dummy", int hp = 200, int attack = 5, int defense = 2, int speed = 5, IReadOnlyList<string>? tags = null) =>
         new(name, tier: 1, maxHp: hp, attackPower: attack, defense: defense, speed: speed, xpReward: 40, tags: tags);
@@ -36,13 +36,13 @@ public class CombatSessionTests
     [Fact]
     public void Attack_DealsNormalDamage()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
+        var session = new CombatSession(traveler, monster, NeutralRandom());
 
         session.Attack();
 
-        // mutant Strength 15 - monster defense 2 = 13
+        // traveler Strength 15 - monster defense 2 = 13
         Assert.Equal(200 - 13, monster.Health.Current);
         Assert.Equal(1, session.Rounds);
     }
@@ -50,10 +50,10 @@ public class CombatSessionTests
     [Fact]
     public void Attack_WhenAlreadyOver_DoesNothing()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var monster = TankMonster(hp: 1);
         monster.Health.Damage(1); // already dead
-        var session = new CombatSession(mutant, monster, NeutralRandom());
+        var session = new CombatSession(traveler, monster, NeutralRandom());
 
         session.Attack();
 
@@ -63,26 +63,26 @@ public class CombatSessionTests
     [Fact]
     public void Cast_WrongClass_FailsAndSpendsNoIons()
     {
-        var mutant = Warrior();
-        var startingIons = mutant.Ions.Current;
+        var traveler = Soldier();
+        var startingIons = traveler.Ions.Current;
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var mageAbility = MakeAbility("Mage", 5, "Firebolt", "Damage", 1.8, ionCost: 8);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var mageAbility = MakeAbility("Scientist", 5, "Firebolt", "Damage", 1.8, ionCost: 8);
 
         var result = session.Cast(mageAbility);
 
         Assert.False(result.Success);
-        Assert.Equal(startingIons, mutant.Ions.Current);
+        Assert.Equal(startingIons, traveler.Ions.Current);
         Assert.Equal(0, session.Rounds);
     }
 
     [Fact]
     public void Cast_BelowRequiredLevel_Fails()
     {
-        var mutant = Warrior(); // level 1
+        var traveler = Soldier(); // level 1
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var ability = MakeAbility("Warrior", 30, "Executioner", "Damage", 2.0, ionCost: 30);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 30, "Executioner", "Damage", 2.0, ionCost: 30);
 
         var result = session.Cast(ability);
 
@@ -93,28 +93,28 @@ public class CombatSessionTests
     [Fact]
     public void Cast_NoneEffect_RefusedWithNoIonsSpent()
     {
-        var mutant = Warrior();
-        mutant.LevelUp(); mutant.LevelUp(); mutant.LevelUp(); mutant.LevelUp(); // level 5
-        var startingIons = mutant.Ions.Current;
+        var traveler = Soldier();
+        traveler.LevelUp(); traveler.LevelUp(); traveler.LevelUp(); traveler.LevelUp(); // level 5
+        var startingIons = traveler.Ions.Current;
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var ability = MakeAbility("Warrior", 5, "Placeholder", "None", 0, ionCost: 5);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 5, "Placeholder", "None", 0, ionCost: 5);
 
         var result = session.Cast(ability);
 
         Assert.False(result.Success);
-        Assert.Equal(startingIons, mutant.Ions.Current);
+        Assert.Equal(startingIons, traveler.Ions.Current);
         Assert.Equal(0, session.Rounds);
     }
 
     [Fact]
     public void Cast_InsufficientIons_Fails()
     {
-        var mutant = Warrior();
-        mutant.Ions.Spend(mutant.Ions.Current); // 0 Ions
+        var traveler = Soldier();
+        traveler.Ions.Spend(traveler.Ions.Current); // 0 Ions
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var ability = MakeAbility("Warrior", 1, "Cleave", "Damage", 1.5, ionCost: 8);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 1, "Cleave", "Damage", 1.5, ionCost: 8);
 
         var result = session.Cast(ability);
 
@@ -125,25 +125,25 @@ public class CombatSessionTests
     [Fact]
     public void Cast_Damage_DealsMultipliedDamage()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var ability = MakeAbility("Warrior", 1, "Cleave", "Damage", 1.5, ionCost: 8);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 1, "Cleave", "Damage", 1.5, ionCost: 8);
 
         var result = session.Cast(ability);
 
         Assert.True(result.Success);
-        Assert.Equal(8, mutant.Ions.Max - mutant.Ions.Current); // spent
+        Assert.Equal(8, traveler.Ions.Max - traveler.Ions.Current); // spent
         Assert.Equal(200 - (int)Math.Round(13 * 1.5), monster.Health.Current);
     }
 
     [Fact]
     public void Cast_IgnoreDefenseDamage_IgnoresTargetDefense()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var ability = MakeAbility("Warrior", 1, "Guard Break", "IgnoreDefenseDamage", 1.0, ionCost: 16);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 1, "Guard Break", "IgnoreDefenseDamage", 1.0, ionCost: 16);
 
         session.Cast(ability);
 
@@ -153,26 +153,26 @@ public class CombatSessionTests
     [Fact]
     public void Cast_Heal_RestoresFractionOfMaxHp()
     {
-        var mutant = Warrior();
-        mutant.Health.Damage(20); // 10/30
+        var traveler = Soldier();
+        traveler.Health.Damage(20); // 10/30
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var ability = MakeAbility("Warrior", 1, "Second Wind", "Heal", 0.20, ionCost: 0);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 1, "Second Wind", "Heal", 0.20, ionCost: 0);
 
         session.Cast(ability);
 
         // Casting a Heal still uses the round: the monster gets its own
         // counter-attack afterward, at least 1 damage by design.
-        Assert.Equal(10 + (int)Math.Round(30 * 0.20) - 1, mutant.Health.Current);
+        Assert.Equal(10 + (int)Math.Round(30 * 0.20) - 1, traveler.Health.Current);
     }
 
     [Fact]
     public void Cast_BuffSelfAttack_IncreasesFutureDamage()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var buff = MakeAbility("Warrior", 1, "Rally", "BuffSelfAttack", 4, ionCost: 20);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var buff = MakeAbility("Soldier", 1, "Rally", "BuffSelfAttack", 4, ionCost: 20);
 
         session.Cast(buff); // no damage this round - just sets the buff
         var hpAfterBuff = monster.Health.Current;
@@ -185,12 +185,12 @@ public class CombatSessionTests
     [Fact]
     public void Cast_DebuffTargetDefense_IncreasesDamageDealt()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         // Defense 10 (not the default 2) so a -6 debuff doesn't clip
         // against MonsterEffectiveDefense's floor of 0.
         var monster = TankMonster(defense: 10);
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var debuff = MakeAbility("Warrior", 1, "Death Mark", "DebuffTargetDefense", 6, ionCost: 10);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var debuff = MakeAbility("Soldier", 1, "Death Mark", "DebuffTargetDefense", 6, ionCost: 10);
 
         var castResult = session.Cast(debuff);
         Assert.True(castResult.Success);
@@ -204,10 +204,10 @@ public class CombatSessionTests
     [Fact]
     public void Cast_ExtraAttack_HitsTwiceInOneRound()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var ability = MakeAbility("Warrior", 1, "Shadow Step", "ExtraAttack", 1.0, ionCost: 20);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 1, "Shadow Step", "ExtraAttack", 1.0, ionCost: 20);
 
         session.Cast(ability);
 
@@ -218,25 +218,25 @@ public class CombatSessionTests
     [Fact]
     public void Cast_Shield_AbsorbsNextMonsterHit()
     {
-        var mutant = Warrior();
-        var startingHp = mutant.Health.Current;
+        var traveler = Soldier();
+        var startingHp = traveler.Health.Current;
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var ability = MakeAbility("Warrior", 1, "Sanctuary", "Shield", 1, ionCost: 10);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 1, "Sanctuary", "Shield", 1, ionCost: 10);
 
         var castResult = session.Cast(ability); // sets the shield charge (no attack); monster's counter is then absorbed
 
         Assert.True(castResult.Success);
-        Assert.Equal(startingHp, mutant.Health.Current);
+        Assert.Equal(startingHp, traveler.Health.Current);
     }
 
     [Fact]
     public void Cast_DamageOverTime_TicksOnSubsequentRounds()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var ability = MakeAbility("Warrior", 1, "Poison Blade", "DamageOverTime", 6, ionCost: 16, durationRounds: 2);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 1, "Poison Blade", "DamageOverTime", 6, ionCost: 16, durationRounds: 2);
 
         session.Cast(ability); // initial hit (13) + poison starts ticking
         var hpAfterCast = monster.Health.Current;
@@ -253,10 +253,10 @@ public class CombatSessionTests
     [Fact]
     public void Cast_GuaranteedCritNextAttack_BuffsTheFollowingHit()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var vanish = MakeAbility("Warrior", 1, "Vanish", "GuaranteedCritNextAttack", 2.0, ionCost: 12);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var vanish = MakeAbility("Soldier", 1, "Vanish", "GuaranteedCritNextAttack", 2.0, ionCost: 12);
 
         session.Cast(vanish); // sets up the crit, doesn't attack itself
         var hpAfterVanish = monster.Health.Current;
@@ -269,39 +269,39 @@ public class CombatSessionTests
     [Fact]
     public void Cast_RestoreIons_AddsIonsBackWithoutNetLoss()
     {
-        var mutant = Warrior();
-        mutant.Ions.Spend(15); // 5/20 remaining
+        var traveler = Soldier();
+        traveler.Ions.Spend(15); // 5/20 remaining
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var ability = MakeAbility("Warrior", 1, "Mana Well", "RestoreIons", 0.25, ionCost: 0);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 1, "Mana Well", "RestoreIons", 0.25, ionCost: 0);
 
         session.Cast(ability);
 
-        Assert.Equal(5 + (int)Math.Round(20 * 0.25), mutant.Ions.Current);
+        Assert.Equal(5 + (int)Math.Round(20 * 0.25), traveler.Ions.Current);
     }
 
     [Fact]
     public void Cast_InstantDefeatNonBoss_EndsTheFightImmediately()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom(), allowBanish: true);
-        var ability = MakeAbility("Warrior", 1, "Banish", "InstantDefeatNonBoss", 0, ionCost: 10);
+        var session = new CombatSession(traveler, monster, NeutralRandom(), allowBanish: true);
+        var ability = MakeAbility("Soldier", 1, "Banish", "InstantDefeatNonBoss", 0, ionCost: 10);
 
         var result = session.Cast(ability);
 
         Assert.True(result.Success);
         Assert.True(monster.Health.IsDead);
-        Assert.True(session.MutantWon);
+        Assert.True(session.TravelerWon);
     }
 
     [Fact]
     public void Cast_InstantDefeatNonBoss_RefusedWhenBanishNotAllowed()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var monster = TankMonster();
-        var session = new CombatSession(mutant, monster, NeutralRandom(), allowBanish: false);
-        var ability = MakeAbility("Warrior", 1, "Banish", "InstantDefeatNonBoss", 0, ionCost: 10);
+        var session = new CombatSession(traveler, monster, NeutralRandom(), allowBanish: false);
+        var ability = MakeAbility("Soldier", 1, "Banish", "InstantDefeatNonBoss", 0, ionCost: 10);
 
         var result = session.Cast(ability);
 
@@ -312,10 +312,10 @@ public class CombatSessionTests
     [Fact]
     public void ConditionalDamage_AppliesBonusOnlyWhenConditionMet()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var undamagedTarget = TankMonster();
-        var session = new CombatSession(mutant, undamagedTarget, NeutralRandom());
-        var backstab = MakeAbility("Warrior", 1, "Backstab", "Damage", 2.0, ionCost: 8, condition: "TargetUndamaged");
+        var session = new CombatSession(traveler, undamagedTarget, NeutralRandom());
+        var backstab = MakeAbility("Soldier", 1, "Backstab", "Damage", 2.0, ionCost: 8, condition: "TargetUndamaged");
 
         session.Cast(backstab);
 
@@ -325,11 +325,11 @@ public class CombatSessionTests
     [Fact]
     public void ConditionalDamage_FallsBackToNormalHitWhenConditionNotMet()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var damagedTarget = TankMonster();
         damagedTarget.Health.Damage(5); // no longer undamaged
-        var session = new CombatSession(mutant, damagedTarget, NeutralRandom());
-        var backstab = MakeAbility("Warrior", 1, "Backstab", "Damage", 2.0, ionCost: 8, condition: "TargetUndamaged");
+        var session = new CombatSession(traveler, damagedTarget, NeutralRandom());
+        var backstab = MakeAbility("Soldier", 1, "Backstab", "Damage", 2.0, ionCost: 8, condition: "TargetUndamaged");
 
         session.Cast(backstab);
 
@@ -340,8 +340,8 @@ public class CombatSessionTests
     public void ConditionalDamage_TagCondition_OnlyBonusesTaggedMonsters()
     {
         var undead = TankMonster(tags: ["undead"]);
-        var turnUndead = MakeAbility("Priest", 15, "Turn Undead", "Damage", 2.5, ionCost: 16, condition: "TargetTagged", tag: "undead");
-        var priest = new Mutant("Faye", CharacterClass.Priest);
+        var turnUndead = MakeAbility("Doctor", 15, "Turn Undead", "Damage", 2.5, ionCost: 16, condition: "TargetTagged", tag: "undead");
+        var priest = new Traveler("Faye", CharacterClass.Doctor);
         priest.LevelUp(); priest.LevelUp(); priest.LevelUp(); priest.LevelUp();
         priest.LevelUp(); priest.LevelUp(); priest.LevelUp(); priest.LevelUp();
         priest.LevelUp(); priest.LevelUp(); priest.LevelUp(); priest.LevelUp(); priest.LevelUp(); priest.LevelUp(); // level 15
@@ -356,10 +356,10 @@ public class CombatSessionTests
     [Fact]
     public void DebuffTargetSpeed_CanFlipTurnOrderStartingNextRound()
     {
-        var mutant = new Mutant("Zeta", CharacterClass.Wizard); // base Agility 10
-        var monster = TankMonster("Brute", hp: 500, speed: 11); // faster than the Wizard initially
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var slow = MakeAbility("Wizard", 1, "Slow", "DebuffTargetSpeed", 5, ionCost: 8);
+        var traveler = new Traveler("Zeta", CharacterClass.Engineer); // base Agility 10
+        var monster = TankMonster("Brute", hp: 500, speed: 11); // faster than the Engineer initially
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var slow = MakeAbility("Engineer", 1, "Slow", "DebuffTargetSpeed", 5, ionCost: 8);
 
         session.Attack(); // round 1: monster still faster - monster's log line comes first
         Assert.StartsWith("Brute hits", session.Log[0]);
@@ -368,38 +368,38 @@ public class CombatSessionTests
         session.Cast(slow); // round 2: monster still acts first this round (order set before the cast resolves)
         Assert.StartsWith("Brute hits", session.Log[2]);
 
-        session.Attack(); // round 3: monster's effective speed is now 11-5=6 < Wizard's 10 - Wizard acts first
+        session.Attack(); // round 3: monster's effective speed is now 11-5=6 < Engineer's 10 - Engineer acts first
         Assert.StartsWith("Zeta hits", session.Log[^2]);
     }
 
     [Fact]
     public void Cast_VictoryAwardsXpAndLoot()
     {
-        var mutant = Warrior();
+        var traveler = Soldier();
         var monster = TankMonster(hp: 5); // one big hit finishes it
-        var session = new CombatSession(mutant, monster, NeutralRandom());
-        var ability = MakeAbility("Warrior", 1, "Cleave", "Damage", 1.5, ionCost: 8);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 1, "Cleave", "Damage", 1.5, ionCost: 8);
 
         session.Cast(ability);
 
         Assert.True(session.IsOver);
-        Assert.True(session.MutantWon);
+        Assert.True(session.TravelerWon);
         Assert.Equal(monster.XpReward, session.XpAwarded);
-        Assert.True(mutant.Xp >= monster.XpReward);
+        Assert.True(traveler.Xp >= monster.XpReward);
     }
 
     [Fact]
     public void Loss_AwardsNothing()
     {
-        var mutant = Warrior();
-        mutant.Health.Damage(mutant.Health.Max - 1); // 1 HP
-        var monster = TankMonster(attack: 1000, speed: 999); // one-shots the mutant, acts first
-        var session = new CombatSession(mutant, monster, NeutralRandom());
+        var traveler = Soldier();
+        traveler.Health.Damage(traveler.Health.Max - 1); // 1 HP
+        var monster = TankMonster(attack: 1000, speed: 999); // one-shots the traveler, acts first
+        var session = new CombatSession(traveler, monster, NeutralRandom());
 
         session.Attack();
 
         Assert.True(session.IsOver);
-        Assert.False(session.MutantWon);
+        Assert.False(session.TravelerWon);
         Assert.Equal(0, session.XpAwarded);
         Assert.Empty(session.ItemsDropped);
     }

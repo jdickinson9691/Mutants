@@ -91,7 +91,7 @@ public sealed record Item(
         return item;
     }
 
-    /// <summary>True for a Consumable that actually does something when used — see ChronTravelers.Core.Characters.Mutant.Consume. A Consumable with no effect data is flavor-only (still sellable/convertible, but "use" refuses it).</summary>
+    /// <summary>True for a Consumable that actually does something when used — see ChronTravelers.Core.Characters.Traveler.Consume. A Consumable with no effect data is flavor-only (still sellable/convertible, but "use" refuses it).</summary>
     public bool IsUsable => Type == ItemType.Consumable && ConsumableEffect != ConsumableEffectType.None;
 
     /// <summary>A ranged weapon (Wand / Bow / Gun).</summary>

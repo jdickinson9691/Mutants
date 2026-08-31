@@ -1,7 +1,7 @@
 namespace ChronTravelers.Engine.Persistence;
 
 /// <summary>
-/// Plain, LiteDB-friendly save-file shape of a Mutant — docs/AGENTS.md:
+/// Plain, LiteDB-friendly save-file shape of a Traveler — docs/AGENTS.md:
 /// Engine "must not change the public save-file schema without a
 /// migration path." Only the player's own character is saved this way
 /// (NPCs are re-simulated fresh each session — see docs/CONTENT_PLAN.md-
@@ -22,7 +22,7 @@ public sealed class CharacterSaveData
     public int Xp { get; set; }
     public int Strength { get; set; }
     public int Agility { get; set; }
-    public int Faith { get; set; }
+    public int Resolve { get; set; }
     public int Intellect { get; set; }
     public int CurrentHp { get; set; }
     public int MaxHp { get; set; }

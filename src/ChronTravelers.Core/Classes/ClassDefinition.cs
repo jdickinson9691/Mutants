@@ -29,37 +29,37 @@ public sealed record ClassDefinition(
         // drawing on it (paired with the cheaper travel coefficient).
         new Dictionary<CharacterClass, ClassDefinition>
         {
-            [CharacterClass.Warrior] = new(
-                CharacterClass.Warrior, PrimaryStat.Strength,
-                BaseStats: new StatBlock(Strength: 15, Agility: 10, Faith: 8, Intellect: 8),
+            [CharacterClass.Soldier] = new(
+                CharacterClass.Soldier, PrimaryStat.Strength,
+                BaseStats: new StatBlock(Strength: 15, Agility: 10, Resolve: 8, Intellect: 8),
                 BaseHp: 30, HpPerLevel: 6,
                 BaseIons: 20, IonsPerLevel: 4,
                 IonDrainMultiplier: 0.8),
 
-            [CharacterClass.Thief] = new(
-                CharacterClass.Thief, PrimaryStat.Agility,
-                BaseStats: new StatBlock(Strength: 9, Agility: 15, Faith: 8, Intellect: 10),
+            [CharacterClass.Spy] = new(
+                CharacterClass.Spy, PrimaryStat.Agility,
+                BaseStats: new StatBlock(Strength: 9, Agility: 15, Resolve: 8, Intellect: 10),
                 BaseHp: 24, HpPerLevel: 5,
                 BaseIons: 24, IonsPerLevel: 4,
                 IonDrainMultiplier: 0.9),
 
-            [CharacterClass.Priest] = new(
-                CharacterClass.Priest, PrimaryStat.Faith,
-                BaseStats: new StatBlock(Strength: 9, Agility: 8, Faith: 15, Intellect: 10),
+            [CharacterClass.Doctor] = new(
+                CharacterClass.Doctor, PrimaryStat.Resolve,
+                BaseStats: new StatBlock(Strength: 9, Agility: 8, Resolve: 15, Intellect: 10),
                 BaseHp: 22, HpPerLevel: 4,
                 BaseIons: 30, IonsPerLevel: 4,
                 IonDrainMultiplier: 1.0),
 
-            [CharacterClass.Mage] = new(
-                CharacterClass.Mage, PrimaryStat.Intellect,
-                BaseStats: new StatBlock(Strength: 7, Agility: 9, Faith: 8, Intellect: 16),
+            [CharacterClass.Scientist] = new(
+                CharacterClass.Scientist, PrimaryStat.Intellect,
+                BaseStats: new StatBlock(Strength: 7, Agility: 9, Resolve: 8, Intellect: 16),
                 BaseHp: 18, HpPerLevel: 3,
                 BaseIons: 34, IonsPerLevel: 5,
                 IonDrainMultiplier: 1.3),
 
-            [CharacterClass.Wizard] = new(
-                CharacterClass.Wizard, PrimaryStat.Intellect,
-                BaseStats: new StatBlock(Strength: 7, Agility: 10, Faith: 9, Intellect: 15),
+            [CharacterClass.Engineer] = new(
+                CharacterClass.Engineer, PrimaryStat.Intellect,
+                BaseStats: new StatBlock(Strength: 7, Agility: 10, Resolve: 9, Intellect: 15),
                 BaseHp: 18, HpPerLevel: 3,
                 BaseIons: 32, IonsPerLevel: 5,
                 IonDrainMultiplier: 1.2),

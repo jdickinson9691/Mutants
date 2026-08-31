@@ -8,11 +8,11 @@ using ChronTravelers.Core.World;
 namespace ChronTravelers.Core.Characters;
 
 /// <summary>
-/// A Mutant character — human player or NPC, both built on this exact same
+/// A Traveler character — human player or NPC, both built on this exact same
 /// type per docs/GDD.md §7 ("built on the exact same character/inventory/
 /// ability code path" as the requirement that NPCs "play like players").
 /// </summary>
-public sealed class Mutant
+public sealed class Traveler
 {
     public string Name { get; }
     public CharacterClass Class { get; }
@@ -24,19 +24,19 @@ public sealed class Mutant
     public HealthPool Health { get; }
     public IonPool Ions { get; }
 
-    /// <summary>The furthest-future year this Mutant has ever reached — drives the soft level cap (<see cref="TimeScale.SoftLevelCapForYear"/>). Only ever climbs.</summary>
+    /// <summary>The furthest-future year this Traveler has ever reached — drives the soft level cap (<see cref="TimeScale.SoftLevelCapForYear"/>). Only ever climbs.</summary>
     public int FurthestYearReached { get; private set; } = TimeScale.MinYear;
 
-    /// <summary>Which year this Mutant is currently standing in — docs/GDD.md §3.2. Between <see cref="TimeScale.MinYear"/> and <see cref="TimeScale.MaxYear"/>.</summary>
+    /// <summary>Which year this Traveler is currently standing in — docs/GDD.md §3.2. Between <see cref="TimeScale.MinYear"/> and <see cref="TimeScale.MaxYear"/>.</summary>
     public int CurrentYear { get; private set; } = TimeScale.MinYear;
 
-    /// <summary>Current grid position on whichever <see cref="LevelMap"/> this Mutant is on — docs/GDD.md §3.1.</summary>
+    /// <summary>Current grid position on whichever <see cref="LevelMap"/> this Traveler is on — docs/GDD.md §3.1.</summary>
     public Coordinate Position { get; private set; } = Coordinate.Origin;
 
-    /// <summary>The Gatekeeper years this Mutant has already cleared — see <see cref="HasDefeatedGatekeeper"/>.</summary>
+    /// <summary>The Gatekeeper years this Traveler has already cleared — see <see cref="HasDefeatedGatekeeper"/>.</summary>
     private readonly HashSet<int> _defeatedGatekeepers = [];
 
-    /// <summary>The set of Gatekeeper years this Mutant has cleared. Read-only.</summary>
+    /// <summary>The set of Gatekeeper years this Traveler has cleared. Read-only.</summary>
     public IReadOnlyCollection<int> DefeatedGatekeeperYears => _defeatedGatekeepers;
 
     /// <summary>
@@ -108,7 +108,7 @@ public sealed class Mutant
         }
     }
 
-    public Mutant(string name, CharacterClass characterClass, int startingYear = TimeScale.MinYear)
+    public Traveler(string name, CharacterClass characterClass, int startingYear = TimeScale.MinYear)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -132,8 +132,8 @@ public sealed class Mutant
         Ions = new IonPool(ClassDefinition.MaxIonsAtLevel(Level));
     }
 
-    /// <summary>Reconstructs a Mutant directly from a full state snapshot, bypassing normal gameplay mutation (GainXp/LevelUp/etc.) — for save/load. Inventory (and re-wielding equipped items) is the caller's job afterward via AddToInventory/Wield.</summary>
-    private Mutant(
+    /// <summary>Reconstructs a Traveler directly from a full state snapshot, bypassing normal gameplay mutation (GainXp/LevelUp/etc.) — for save/load. Inventory (and re-wielding equipped items) is the caller's job afterward via AddToInventory/Wield.</summary>
+    private Traveler(
         string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
         int currentHp, int maxHp, int currentIons, int maxIons, int riblets,
         int currentYear, int furthestYearReached, Coordinate position,
@@ -155,7 +155,7 @@ public sealed class Mutant
     }
 
     /// <summary>See the private snapshot constructor above — this is its public entry point, used by ChronTravelers.Engine.Persistence when loading a save.</summary>
-    public static Mutant Restore(
+    public static Traveler Restore(
         string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
         int currentHp, int maxHp, int currentIons, int maxIons, int riblets,
         int currentYear, int furthestYearReached, Coordinate position,
@@ -166,7 +166,7 @@ public sealed class Mutant
             throw new ArgumentException("Name cannot be empty.", nameof(name));
         }
 
-        return new Mutant(
+        return new Traveler(
             name, characterClass, level, xp, stats,
             currentHp, maxHp, currentIons, maxIons, riblets,
             currentYear, furthestYearReached, position, defeatedGatekeeperYears);
@@ -212,10 +212,10 @@ public sealed class Mutant
     }
 
     /// <summary>
-    /// Moves this Mutant to a different year — docs/GDD.md §3.2. The Ion
+    /// Moves this Traveler to a different year — docs/GDD.md §3.2. The Ion
     /// charge and range check are
     /// ChronTravelers.Engine.Simulation.TimeTravelResolver's job; this records
-    /// where the Mutant now is and advances
+    /// where the Traveler now is and advances
     /// <see cref="FurthestYearReached"/> if this is new ground. The year
     /// is clamped to the timeline defensively.
     /// </summary>
@@ -228,7 +228,7 @@ public sealed class Mutant
         }
     }
 
-    /// <summary>Whether this Mutant has already beaten the Gatekeeper standing watch over <paramref name="year"/> — docs/GDD.md §3.2. Gatekeepers gate nothing; this just stops the trophy fight repeating.</summary>
+    /// <summary>Whether this Traveler has already beaten the Gatekeeper standing watch over <paramref name="year"/> — docs/GDD.md §3.2. Gatekeepers gate nothing; this just stops the trophy fight repeating.</summary>
     public bool HasDefeatedGatekeeper(int year) => _defeatedGatekeepers.Contains(year);
 
     /// <summary>Records a Gatekeeper-year win, so returning to that year doesn't re-spawn its Gatekeeper.</summary>
@@ -322,10 +322,10 @@ public sealed class Mutant
         }
     }
 
-    /// <summary>Places the Mutant at a specific grid position — e.g. spawning them at a level's start room.</summary>
+    /// <summary>Places the Traveler at a specific grid position — e.g. spawning them at a level's start room.</summary>
     public void PlaceAt(Coordinate coordinate) => Position = coordinate;
 
-    /// <summary>Moves the Mutant to an adjacent coordinate. Legality (is there really an exit there?) is the caller's job — see <see cref="LevelMap.TryMove"/>.</summary>
+    /// <summary>Moves the Traveler to an adjacent coordinate. Legality (is there really an exit there?) is the caller's job — see <see cref="LevelMap.TryMove"/>.</summary>
     public void MoveTo(Coordinate coordinate) => Position = coordinate;
 
     public void AddRiblets(int amount)
@@ -435,7 +435,7 @@ public sealed class Mutant
     /// Sells an item from inventory for Riblets — docs/GDD.md §5/§6.
     /// Unequips the item first if it was wielded. Pass
     /// <paramref name="riblets"/> for a store-negotiated price (see
-    /// ChronTravelers.Core.Economy.Store.BuyFromMutant); omitted, it falls back
+    /// ChronTravelers.Core.Economy.Store.BuyFromTraveler); omitted, it falls back
     /// to <see cref="Item.SellValue"/>'s flat rate.
     /// </summary>
     public int Sell(Item item, int? riblets = null)
@@ -448,7 +448,7 @@ public sealed class Mutant
 
     /// <summary>
     /// Removes an item from inventory with no payout — e.g. depositing it
-    /// into a store the Mutant owns (ChronTravelers.Core.Economy.Store.Deposit).
+    /// into a store the Traveler owns (ChronTravelers.Core.Economy.Store.Deposit).
     /// Unequips the item first if it was wielded.
     /// </summary>
     public void RemoveFromInventory(Item item) => RemoveFromInventoryOrThrow(item);

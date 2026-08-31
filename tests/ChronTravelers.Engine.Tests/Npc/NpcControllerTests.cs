@@ -13,15 +13,15 @@ public class NpcControllerTests
 {
     private static readonly LevelMap TestLevelMap = TestLevel.Build();
 
-    private static Mutant FreshNpc(CharacterClass characterClass = CharacterClass.Warrior, int year = 2000)
+    private static Traveler FreshNpc(CharacterClass characterClass = CharacterClass.Soldier, int year = 2000)
     {
-        var npc = new Mutant("Vex", characterClass, startingYear: year);
+        var npc = new Traveler("Vex", characterClass, startingYear: year);
         npc.PlaceAt(Coordinate.Origin);
         return npc;
     }
 
-    /// <summary>A Warrior levelled far enough (and topped off) that its Ion pool can afford a year-hop.</summary>
-    private static Mutant ReadyToTravelNpc(int year = 2000)
+    /// <summary>A Soldier levelled far enough (and topped off) that its Ion pool can afford a year-hop.</summary>
+    private static Traveler ReadyToTravelNpc(int year = 2000)
     {
         var npc = FreshNpc(year: year);
         for (var i = 1; i < 20; i++)
@@ -185,7 +185,7 @@ public class NpcControllerTests
     [Fact]
     public void Act_TravelRolledButCannotAffordTheIonCost_FallsThroughToGrind()
     {
-        var npc = FreshNpc(); // level 1 Warrior — ~20 max Ions
+        var npc = FreshNpc(); // level 1 Soldier — ~20 max Ions
         npc.Ions.Spend(npc.Ions.Current); // 0 Ions — can't afford any hop
         var world = TestTimeWorld.Build();
 

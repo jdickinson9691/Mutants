@@ -3,7 +3,7 @@ namespace ChronTravelers.Engine.Tests.Content;
 /// <summary>A scratch directory for writing sample content JSON in tests, cleaned up automatically.</summary>
 public sealed class TempContentDirectory : IDisposable
 {
-    public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "mutants-content-tests-" + Guid.NewGuid().ToString("N"));
+    public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "travelers-content-tests-" + Guid.NewGuid().ToString("N"));
 
     public TempContentDirectory()
     {

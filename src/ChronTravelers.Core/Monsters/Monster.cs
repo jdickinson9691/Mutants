@@ -7,7 +7,7 @@ namespace ChronTravelers.Core.Monsters;
 
 /// <summary>
 /// A monster — the loot/XP source docs/GDD.md §5/§7 describes, and (per
-/// §7) mechanically the same kind of opponent a rival Mutant NPC is.
+/// §7) mechanically the same kind of opponent a rival Traveler NPC is.
 /// Monsters are placed spatially in the year the player is standing in
 /// (see <see cref="ChronTravelers.Core.Time.YearPopulation"/>): they carry a
 /// grid <see cref="Position"/>, an <see cref="Ions"/> pool they spend on
@@ -30,7 +30,7 @@ public sealed class Monster
     /// <summary>
     /// Free-form tags (e.g. "undead") — docs/CONTENT_PLAN.md's monster
     /// roster item calls these out explicitly, matched against by tag-
-    /// conditioned abilities like Priest's Turn Undead.
+    /// conditioned abilities like Doctor's Turn Undead.
     /// </summary>
     public IReadOnlyList<string> Tags { get; }
 
@@ -136,7 +136,7 @@ public sealed class Monster
 
     /// <summary>
     /// Heals by spending Ions — the same rules as
-    /// <see cref="ChronTravelers.Core.Characters.Mutant.Heal"/>: HP restored at
+    /// <see cref="ChronTravelers.Core.Characters.Traveler.Heal"/>: HP restored at
     /// <see cref="IonEconomy.HpPerIonHealed"/> per Ion, capped by both
     /// missing HP and available Ions, never overhealing or overspending.
     /// Returns HP restored (0 if full or out of Ions — no Ions spent then).
@@ -160,7 +160,7 @@ public sealed class Monster
         return Health.Heal(ionsToSpend * IonEconomy.HpPerIonHealed);
     }
 
-    /// <summary>Destroys a carried item for Ions — same as <see cref="ChronTravelers.Core.Characters.Mutant.Convert"/>. Returns the Ions actually gained (may be less than the item's convert value if the pool would overflow).</summary>
+    /// <summary>Destroys a carried item for Ions — same as <see cref="ChronTravelers.Core.Characters.Traveler.Convert"/>. Returns the Ions actually gained (may be less than the item's convert value if the pool would overflow).</summary>
     public int Convert(Item item)
     {
         if (!_inventory.Remove(item))

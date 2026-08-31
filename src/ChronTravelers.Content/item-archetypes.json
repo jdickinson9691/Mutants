@@ -14,11 +14,11 @@
   { "id": "junk-sling",       "name": "Junk Sling",       "type": "Ranged", "rangedKind": "Bow",  "ammoCapacity": 6,  "powerMultiplier": 0.5,  "themeTags": ["common"] },
   { "id": "hexbolt-wand",     "name": "Hexbolt Wand",     "type": "Ranged", "rangedKind": "Wand", "ammoCapacity": 5,  "rangedEffect": "Weaken", "effectMagnitude": 2, "powerMultiplier": 0.9, "themeTags": ["common"] },
 
-  { "id": "warrior-maul",     "name": "Breacher's Maul",  "type": "Weapon", "powerMultiplier": 1.2, "restrictedClass": "Warrior", "themeTags": ["common"] },
-  { "id": "thief-fang",       "name": "Backalley Fang",   "type": "Weapon", "powerMultiplier": 1.2, "restrictedClass": "Thief",   "themeTags": ["common"] },
-  { "id": "priest-censer",    "name": "Ashwood Censer",   "type": "Weapon", "powerMultiplier": 1.2, "restrictedClass": "Priest",  "themeTags": ["common"] },
-  { "id": "mage-focus",       "name": "Signal Focus",     "type": "Weapon", "powerMultiplier": 1.2, "restrictedClass": "Mage",    "themeTags": ["common"] },
-  { "id": "wizard-wand",      "name": "Null Wand",        "type": "Weapon", "powerMultiplier": 1.2, "restrictedClass": "Wizard",  "themeTags": ["common"] },
+  { "id": "warrior-maul",     "name": "Breacher's Maul",  "type": "Weapon", "powerMultiplier": 1.2, "restrictedClass": "Soldier", "themeTags": ["common"] },
+  { "id": "thief-fang",       "name": "Backalley Fang",   "type": "Weapon", "powerMultiplier": 1.2, "restrictedClass": "Spy",   "themeTags": ["common"] },
+  { "id": "priest-censer",    "name": "Ashwood Censer",   "type": "Weapon", "powerMultiplier": 1.2, "restrictedClass": "Doctor",  "themeTags": ["common"] },
+  { "id": "mage-focus",       "name": "Signal Focus",     "type": "Weapon", "powerMultiplier": 1.2, "restrictedClass": "Scientist",    "themeTags": ["common"] },
+  { "id": "wizard-wand",      "name": "Null Wand",        "type": "Weapon", "powerMultiplier": 1.2, "restrictedClass": "Engineer",  "themeTags": ["common"] },
 
   { "id": "rebar-club",       "name": "Rebar Club",       "type": "Weapon", "powerMultiplier": 0.55, "themeTags": ["scrap"] },
   { "id": "scrap-cleaver",    "name": "Scrap Cleaver",    "type": "Weapon", "powerMultiplier": 1.1,  "themeTags": ["scrap"] },

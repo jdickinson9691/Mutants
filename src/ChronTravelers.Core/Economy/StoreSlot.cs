@@ -52,7 +52,7 @@ public sealed class StoreSlot
     /// depositing more Riblets into an existing store isn't modeled yet).
     /// Throws if the slot is already occupied.
     /// </summary>
-    public Store Purchase(Mutant buyer, int startingCapital = 100)
+    public Store Purchase(Traveler buyer, int startingCapital = 100)
     {
         if (Store is not null)
         {
@@ -72,7 +72,7 @@ public sealed class StoreSlot
     /// via <see cref="Store.Stock"/> afterward. Throws if the slot is
     /// already occupied.
     /// </summary>
-    public Store RestoreOwnership(Mutant owner, int capital)
+    public Store RestoreOwnership(Traveler owner, int capital)
     {
         if (Store is not null)
         {

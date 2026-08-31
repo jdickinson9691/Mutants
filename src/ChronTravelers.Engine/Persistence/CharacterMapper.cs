@@ -8,7 +8,7 @@ using ChronTravelers.Core.World;
 
 namespace ChronTravelers.Engine.Persistence;
 
-/// <summary>Converts between the live <see cref="Mutant"/> domain object and its <see cref="CharacterSaveData"/> save-file shape.</summary>
+/// <summary>Converts between the live <see cref="Traveler"/> domain object and its <see cref="CharacterSaveData"/> save-file shape.</summary>
 public static class CharacterMapper
 {
     /// <summary>
@@ -18,45 +18,45 @@ public static class CharacterMapper
     /// (used by tests that don't exercise stores).
     /// </summary>
     public static CharacterSaveData ToSaveData(
-        Mutant mutant,
+        Traveler traveler,
         long worldSeed,
         IReadOnlyDictionary<int, Store>? ownedStoresByYear = null)
     {
-        var inventory = mutant.Inventory.Select(ToItemSaveData).ToList();
+        var inventory = traveler.Inventory.Select(ToItemSaveData).ToList();
 
         // Item has no unique instance id (records compare by value), so if
         // two structurally identical wieldable items are both carried,
         // this can pick either one as "the" equipped index - functionally
         // harmless (they're identical), just not necessarily the exact
         // reference that was equipped.
-        var inventoryList = mutant.Inventory.ToList();
-        var equippedWeaponIndex = mutant.EquippedWeapon is null ? null : (int?)inventoryList.IndexOf(mutant.EquippedWeapon);
-        var equippedArmorIndex = mutant.EquippedArmor is null ? null : (int?)inventoryList.IndexOf(mutant.EquippedArmor);
+        var inventoryList = traveler.Inventory.ToList();
+        var equippedWeaponIndex = traveler.EquippedWeapon is null ? null : (int?)inventoryList.IndexOf(traveler.EquippedWeapon);
+        var equippedArmorIndex = traveler.EquippedArmor is null ? null : (int?)inventoryList.IndexOf(traveler.EquippedArmor);
         // A ranged weapon carries a unique InstanceId, so IndexOf pins the exact instance (unlike weapon/armor above).
-        var equippedRangedIndex = mutant.EquippedRanged is null ? null : (int?)inventoryList.IndexOf(mutant.EquippedRanged);
+        var equippedRangedIndex = traveler.EquippedRanged is null ? null : (int?)inventoryList.IndexOf(traveler.EquippedRanged);
 
         return new CharacterSaveData
         {
             SchemaVersion = CharacterSaveData.CurrentSchemaVersion,
-            Name = mutant.Name,
-            Class = mutant.Class.ToString(),
-            Level = mutant.Level,
-            Xp = mutant.Xp,
-            Strength = mutant.Stats.Strength,
-            Agility = mutant.Stats.Agility,
-            Faith = mutant.Stats.Faith,
-            Intellect = mutant.Stats.Intellect,
-            CurrentHp = mutant.Health.Current,
-            MaxHp = mutant.Health.Max,
-            CurrentIons = mutant.Ions.Current,
-            MaxIons = mutant.Ions.Max,
-            Riblets = mutant.Riblets,
+            Name = traveler.Name,
+            Class = traveler.Class.ToString(),
+            Level = traveler.Level,
+            Xp = traveler.Xp,
+            Strength = traveler.Stats.Strength,
+            Agility = traveler.Stats.Agility,
+            Resolve = traveler.Stats.Resolve,
+            Intellect = traveler.Stats.Intellect,
+            CurrentHp = traveler.Health.Current,
+            MaxHp = traveler.Health.Max,
+            CurrentIons = traveler.Ions.Current,
+            MaxIons = traveler.Ions.Max,
+            Riblets = traveler.Riblets,
             WorldSeed = worldSeed,
-            CurrentYear = mutant.CurrentYear,
-            FurthestYearReached = mutant.FurthestYearReached,
-            PositionEast = mutant.Position.East,
-            PositionNorth = mutant.Position.North,
-            DefeatedGatekeepers = mutant.DefeatedGatekeeperYears.OrderBy(y => y).ToList(),
+            CurrentYear = traveler.CurrentYear,
+            FurthestYearReached = traveler.FurthestYearReached,
+            PositionEast = traveler.Position.East,
+            PositionNorth = traveler.Position.North,
+            DefeatedGatekeepers = traveler.DefeatedGatekeeperYears.OrderBy(y => y).ToList(),
             Inventory = inventory,
             EquippedWeaponIndex = equippedWeaponIndex >= 0 ? equippedWeaponIndex : null,
             EquippedArmorIndex = equippedArmorIndex >= 0 ? equippedArmorIndex : null,
@@ -85,7 +85,7 @@ public static class CharacterMapper
     /// exist) is skipped. Schema-1 blobs carry no <c>OwnedStores</c>, so
     /// this is a no-op for them.
     /// </summary>
-    public static void ApplyOwnedStores(CharacterSaveData data, Mutant player, TimeWorld world)
+    public static void ApplyOwnedStores(CharacterSaveData data, Traveler player, TimeWorld world)
     {
         foreach (var saved in data.OwnedStores)
         {
@@ -108,10 +108,10 @@ public static class CharacterMapper
         }
     }
 
-    public static Mutant FromSaveData(CharacterSaveData data)
+    public static Traveler FromSaveData(CharacterSaveData data)
     {
         var characterClass = Enum.Parse<CharacterClass>(data.Class);
-        var stats = new StatBlock(data.Strength, data.Agility, data.Faith, data.Intellect);
+        var stats = new StatBlock(data.Strength, data.Agility, data.Resolve, data.Intellect);
 
         int currentYear;
         int furthestYear;
@@ -134,7 +134,7 @@ public static class CharacterMapper
             defeatedGatekeeperYears = [];
         }
 
-        var mutant = Mutant.Restore(
+        var traveler = Traveler.Restore(
             data.Name, characterClass, data.Level, data.Xp, stats,
             data.CurrentHp, data.MaxHp, data.CurrentIons, data.MaxIons, data.Riblets,
             currentYear, furthestYear,
@@ -144,25 +144,25 @@ public static class CharacterMapper
         var items = data.Inventory.Select(FromItemSaveData).ToList();
         foreach (var item in items)
         {
-            mutant.AddToInventory(item);
+            traveler.AddToInventory(item);
         }
 
         if (data.EquippedWeaponIndex is { } weaponIndex && weaponIndex >= 0 && weaponIndex < items.Count)
         {
-            mutant.Wield(items[weaponIndex]);
+            traveler.Wield(items[weaponIndex]);
         }
 
         if (data.EquippedArmorIndex is { } armorIndex && armorIndex >= 0 && armorIndex < items.Count)
         {
-            mutant.Wield(items[armorIndex]);
+            traveler.Wield(items[armorIndex]);
         }
 
         if (data.EquippedRangedIndex is { } rangedIndex && rangedIndex >= 0 && rangedIndex < items.Count)
         {
-            mutant.Wield(items[rangedIndex]);
+            traveler.Wield(items[rangedIndex]);
         }
 
-        return mutant;
+        return traveler;
     }
 
     /// <summary>Old discrete level N → the year that level occupied on the new timeline, clamped to 2000–5000.</summary>

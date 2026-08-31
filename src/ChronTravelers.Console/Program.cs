@@ -72,20 +72,20 @@ using Spectre.Console;
 // which also carries the world seed) - NPCs are re-simulated fresh each
 // session, scattered across the whole timeline, and only contribute their
 // personal bests to the leaderboard. The save/leaderboard DB lives at
-// %APPDATA%\Chronomutants\mutants.db, and carries the world seed, the
+// %APPDATA%\Chronotravelers\travelers.db, and carries the world seed, the
 // current/furthest year, the cleared Gatekeeper years, and every store
 // the player owns (year + capital + listings, re-attached on load).
 
-AnsiConsole.Write(new FigletText("Chronomutants").Color(Color.Green));
+AnsiConsole.Write(new FigletText("Chronotravelers").Color(Color.Green));
 AnsiConsole.MarkupLine("[grey](pre-release build — the continuous 2000–5000 A.D. timeline)[/]");
 AnsiConsole.WriteLine();
 
 var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 var savesDirectory = string.IsNullOrEmpty(appDataFolder)
     ? "saves"
-    : Path.Combine(appDataFolder, "Chronomutants");
+    : Path.Combine(appDataFolder, "Chronotravelers");
 Directory.CreateDirectory(savesDirectory);
-var savePath = Path.Combine(savesDirectory, "mutants.db");
+var savePath = Path.Combine(savesDirectory, "travelers.db");
 using var repository = new GameRepository(savePath);
 
 RenderLeaderboards(repository);
@@ -100,20 +100,20 @@ if (start is null)
     return;
 }
 
-var (mutant, worldSeed, loadedSave) = start.Value;
+var (traveler, worldSeed, loadedSave) = start.Value;
 var world = LoadTimeWorld(worldSeed);
 
 // Place / re-place the character now that the world exists.
-var startingRoom = world.GetYear(mutant.CurrentYear).Map;
-if (startingRoom.TryGetRoom(mutant.Position) is null)
+var startingRoom = world.GetYear(traveler.CurrentYear).Map;
+if (startingRoom.TryGetRoom(traveler.Position) is null)
 {
-    mutant.PlaceAt(startingRoom.Start);
+    traveler.PlaceAt(startingRoom.Start);
 }
 
 // Re-attach any stores this character owned in a previous session.
 if (loadedSave is not null)
 {
-    CharacterMapper.ApplyOwnedStores(loadedSave, mutant, world);
+    CharacterMapper.ApplyOwnedStores(loadedSave, traveler, world);
 }
 else
 {
@@ -122,7 +122,7 @@ else
     // HP recovery of your own (playtested).
     for (var i = 0; i < 3; i++)
     {
-        mutant.AddToInventory(Item.Create("Field Ration", ItemType.Consumable, 1, Rarity.Common,
+        traveler.AddToInventory(Item.Create("Field Ration", ItemType.Consumable, 1, Rarity.Common,
             consumableEffect: ConsumableEffectType.Heal, effectMagnitude: 12));
     }
 }
@@ -132,11 +132,11 @@ var simulation = new WorldSimulation(world, npcs, random);
 var shownBroadcastCount = 0;
 
 AnsiConsole.WriteLine();
-AnsiConsole.MarkupLine($"Welcome, [bold]{Markup.Escape(mutant.Name)}[/] the [bold]{mutant.Class}[/]. Type [yellow]help[/] for commands.");
-AnsiConsole.MarkupLine($"[grey]{npcs.Count} other Mutants are scattered across the centuries, fending for themselves.[/]");
+AnsiConsole.MarkupLine($"Welcome, [bold]{Markup.Escape(traveler.Name)}[/] the [bold]{traveler.Class}[/]. Type [yellow]help[/] for commands.");
+AnsiConsole.MarkupLine($"[grey]{npcs.Count} other Travelers are scattered across the centuries, fending for themselves.[/]");
 AnsiConsole.WriteLine();
 
-RenderRoom(mutant, world);
+RenderRoom(traveler, world);
 
 var running = true;
 while (running)
@@ -165,11 +165,11 @@ while (running)
             break;
 
         case "look" or "l":
-            RenderRoom(mutant, world);
+            RenderRoom(traveler, world);
             break;
 
         case "status" or "stat":
-            RenderStatusBar(mutant, world);
+            RenderStatusBar(traveler, world);
             break;
 
         case "wait" or "z":
@@ -177,15 +177,15 @@ while (running)
             break;
 
         case "heal":
-            HandleHeal(mutant);
+            HandleHeal(traveler);
             break;
 
         case "abilities" or "spells":
-            RenderAbilities(mutant, abilities);
+            RenderAbilities(traveler, abilities);
             break;
 
         case "inventory" or "i":
-            RenderInventory(mutant);
+            RenderInventory(traveler);
             break;
 
         case "npcs" or "who":
@@ -193,7 +193,7 @@ while (running)
             break;
 
         case "monsters" or "mobs":
-            RenderMonsters(mutant, world);
+            RenderMonsters(traveler, world);
             break;
 
         case "news" or "broadcast":
@@ -202,28 +202,28 @@ while (running)
             break;
 
         case "stores":
-            RenderStores(world.GetYear(mutant.CurrentYear).StoreSlots);
+            RenderStores(world.GetYear(traveler.CurrentYear).StoreSlots);
             break;
 
         case "shop":
-            HandleShop(mutant, world);
+            HandleShop(traveler, world);
             break;
 
         case "buy-store":
-            HandleBuyStore(mutant, world);
+            HandleBuyStore(traveler, world);
             break;
 
         case "collect":
-            HandleCollect(mutant, world);
+            HandleCollect(traveler, world);
             break;
 
         case "save":
-            HandleSave(mutant, repository, worldSeed, world);
+            HandleSave(traveler, repository, worldSeed, world);
             RecordNpcLeaderboardBests(npcs, repository);
             break;
 
         case "leaderboard" or "board":
-            RenderLeaderboards(repository, mutant.Name);
+            RenderLeaderboards(repository, traveler.Name);
             break;
 
         default:
@@ -231,7 +231,7 @@ while (running)
 
             if (command is "fight" or "f")
             {
-                if (!HandleFight(mutant, world, random, simulation.Broadcast, abilities, argument))
+                if (!HandleFight(traveler, world, random, simulation.Broadcast, abilities, argument))
                 {
                     running = false;
                 }
@@ -241,41 +241,41 @@ while (running)
 
             if (command is "take" or "grab" or "pickup" or "get")
             {
-                HandleTake(mutant, world, argument);
+                HandleTake(traveler, world, argument);
                 break;
             }
 
             if (command is "shoot" or "point" or "fire")
             {
-                HandleShoot(mutant, world, random, simulation.Broadcast, command, argument);
+                HandleShoot(traveler, world, random, simulation.Broadcast, command, argument);
                 break;
             }
 
             if (command is "travel")
             {
-                HandleTravel(mutant, world, random, simulation.Broadcast, argument);
+                HandleTravel(traveler, world, random, simulation.Broadcast, argument);
                 break;
             }
 
             if (command is "sell")
             {
-                HandleSellToStore(mutant, world, argument);
+                HandleSellToStore(traveler, world, argument);
                 break;
             }
 
             if (command is "buy")
             {
-                HandleBuyFromStore(mutant, world, argument);
+                HandleBuyFromStore(traveler, world, argument);
                 break;
             }
 
             if (command is "deposit" or "withdraw" or "reprice")
             {
-                HandleStoreManagement(mutant, world, command, argument);
+                HandleStoreManagement(traveler, world, command, argument);
                 break;
             }
 
-            if (TryHandleItemCommand(mutant, command, argument))
+            if (TryHandleItemCommand(traveler, command, argument))
             {
                 break;
             }
@@ -287,13 +287,13 @@ while (running)
                 break;
             }
 
-            HandleMove(mutant, world, direction.Value);
+            HandleMove(traveler, world, direction.Value);
             break;
     }
 
-    if (running && !mutant.Health.IsDead)
+    if (running && !traveler.Health.IsDead)
     {
-        simulation.Tick(mutant, playerActedIdly: IsIdleCommand(input));
+        simulation.Tick(traveler, playerActedIdly: IsIdleCommand(input));
 
         foreach (var line in simulation.LastTickNarration)
         {
@@ -302,7 +302,7 @@ while (running)
 
         shownBroadcastCount = RenderNewBroadcastEvents(simulation.Broadcast, shownBroadcastCount);
 
-        if (mutant.Health.IsDead)
+        if (traveler.Health.IsDead)
         {
             // A monster sharing the room struck the killing blow this tick (see MonsterController's ambush).
             AnsiConsole.MarkupLine("[red]You're struck down where you stand.[/]");
@@ -311,27 +311,27 @@ while (running)
     }
 }
 
-if (!mutant.Health.IsDead)
+if (!traveler.Health.IsDead)
 {
-    HandleSave(mutant, repository, worldSeed, world);
+    HandleSave(traveler, repository, worldSeed, world);
 }
 
 RecordNpcLeaderboardBests(npcs, repository);
 
-AnsiConsole.MarkupLine(mutant.Health.IsDead
+AnsiConsole.MarkupLine(traveler.Health.IsDead
     ? "[grey]Game over.[/]"
-    : "[grey]Farewell, Mutant. Progress saved.[/]");
+    : "[grey]Farewell, Traveler. Progress saved.[/]");
 return;
 
-static void HandleSave(Mutant mutant, GameRepository repository, long worldSeed, TimeWorld world)
+static void HandleSave(Traveler traveler, GameRepository repository, long worldSeed, TimeWorld world)
 {
-    repository.SaveCharacter(CharacterMapper.ToSaveData(mutant, worldSeed, CollectOwnedStores(mutant, world)));
-    repository.RecordPersonalBests(mutant.Name, isPlayer: true, mutant.FurthestYearReached, mutant.Level);
+    repository.SaveCharacter(CharacterMapper.ToSaveData(traveler, worldSeed, CollectOwnedStores(traveler, world)));
+    repository.RecordPersonalBests(traveler.Name, isPlayer: true, traveler.FurthestYearReached, traveler.Level);
     AnsiConsole.MarkupLine("[green]Game saved.[/]");
 }
 
 /// <summary>The player's stores, keyed by the year each is in — gathered from every year visited this session (see TimeWorld.VisitedYears).</summary>
-static Dictionary<int, Store> CollectOwnedStores(Mutant player, TimeWorld world)
+static Dictionary<int, Store> CollectOwnedStores(Traveler player, TimeWorld world)
 {
     var owned = new Dictionary<int, Store>();
     foreach (var year in world.VisitedYears)
@@ -347,7 +347,7 @@ static Dictionary<int, Store> CollectOwnedStores(Mutant player, TimeWorld world)
 }
 
 /// <summary>NPCs aren't saved as full characters (see file header), but their personal bests still count toward the leaderboard - docs/GDD.md §8's "across player + NPCs."</summary>
-static void RecordNpcLeaderboardBests(IReadOnlyList<Mutant> npcs, GameRepository repository)
+static void RecordNpcLeaderboardBests(IReadOnlyList<Traveler> npcs, GameRepository repository)
 {
     foreach (var npc in npcs)
     {
@@ -445,7 +445,7 @@ static IReadOnlyList<AbilityData> LoadAbilities()
 }
 
 /// <summary>Spawns the whole NPC population (npc-population.json's totalCount), scattered across the timeline. Falls back to 12 if the config is missing/malformed.</summary>
-static List<Mutant> SpawnNpcs(TimeWorld world, IRandomSource random)
+static List<Traveler> SpawnNpcs(TimeWorld world, IRandomSource random)
 {
     int count;
     try
@@ -461,17 +461,17 @@ static List<Mutant> SpawnNpcs(TimeWorld world, IRandomSource random)
 }
 
 /// <summary>The title-screen "new game or load a save" flow. Returns null only on end-of-input (quit); otherwise the character, the world seed to build the timeline from, and (for a loaded game) the raw save data so owned stores can be re-attached once the world exists.</summary>
-static (Mutant Mutant, long WorldSeed, CharacterSaveData? LoadedSave)? HandleStartScreen(GameRepository repository)
+static (Traveler Traveler, long WorldSeed, CharacterSaveData? LoadedSave)? HandleStartScreen(GameRepository repository)
 {
     var savedNames = repository.ListSavedCharacterNames();
     if (savedNames.Count > 0)
     {
         AnsiConsole.MarkupLine($"[yellow]Saved characters:[/] {string.Join(", ", savedNames.Select(Markup.Escape))}");
-        AnsiConsole.MarkupLine("Type [green]new[/] to create a Mutant, or a saved name to continue them.");
+        AnsiConsole.MarkupLine("Type [green]new[/] to create a Traveler, or a saved name to continue them.");
     }
     else
     {
-        AnsiConsole.MarkupLine("No saved characters yet. Type [green]new[/] to create a Mutant.");
+        AnsiConsole.MarkupLine("No saved characters yet. Type [green]new[/] to create a Traveler.");
     }
 
     string choice;
@@ -501,7 +501,7 @@ static (Mutant Mutant, long WorldSeed, CharacterSaveData? LoadedSave)? HandleSta
 
     if (choice == "new")
     {
-        var name = ReadNonEmptyLine("What is your name, Mutant? ");
+        var name = ReadNonEmptyLine("What is your name, Traveler? ");
         if (name is null)
         {
             return null;
@@ -513,7 +513,7 @@ static (Mutant Mutant, long WorldSeed, CharacterSaveData? LoadedSave)? HandleSta
             return null;
         }
 
-        return (new Mutant(name, characterClass.Value), System.Random.Shared.NextInt64(), null);
+        return (new Traveler(name, characterClass.Value), System.Random.Shared.NextInt64(), null);
     }
 
     var saveData = repository.LoadCharacter(choice)!;
@@ -598,14 +598,14 @@ static bool IsIdleCommand(string input) => SplitCommand(input).Command is
     or "leaderboard" or "board";
 
 /// <summary>Handles "convert/wield/use/eat/drink &lt;item&gt;" commands. Returns false if <paramref name="command"/> isn't one of those verbs.</summary>
-static bool TryHandleItemCommand(Mutant mutant, string command, string argument)
+static bool TryHandleItemCommand(Traveler traveler, string command, string argument)
 {
     if (command is not ("convert" or "wield" or "use" or "eat" or "drink"))
     {
         return false;
     }
 
-    var item = FindInventoryItem(mutant, argument);
+    var item = FindInventoryItem(traveler, argument);
     if (item is null)
     {
         AnsiConsole.MarkupLine(argument.Length == 0
@@ -617,15 +617,15 @@ static bool TryHandleItemCommand(Mutant mutant, string command, string argument)
     switch (command)
     {
         case "convert":
-            if (mutant.Ions.Current >= mutant.Ions.Max)
+            if (traveler.Ions.Current >= traveler.Ions.Max)
             {
                 AnsiConsole.MarkupLine($"[grey]Your Ion pool is full — converting {Markup.Escape(item.Name)} now would waste it. Sell it, or spend some Ions first.[/]");
                 break;
             }
 
-            var ions = mutant.Convert(item);
+            var ions = traveler.Convert(item);
             AnsiConsole.MarkupLine(ions > 0
-                ? $"[blue]Converted {Markup.Escape(item.Name)} for {ions} Ions.[/] ({mutant.Ions.Current}/{mutant.Ions.Max})"
+                ? $"[blue]Converted {Markup.Escape(item.Name)} for {ions} Ions.[/] ({traveler.Ions.Current}/{traveler.Ions.Max})"
                 : $"[grey]Converted {Markup.Escape(item.Name)}, but your Ion pool had no room for it.[/]");
             break;
 
@@ -636,8 +636,8 @@ static bool TryHandleItemCommand(Mutant mutant, string command, string argument)
                 break;
             }
 
-            mutant.Wield(item);
-            var penalty = item.IsClassCompatible(mutant.Class) ? "" : " [red](off-class - reduced effectiveness)[/]";
+            traveler.Wield(item);
+            var penalty = item.IsClassCompatible(traveler.Class) ? "" : " [red](off-class - reduced effectiveness)[/]";
             AnsiConsole.MarkupLine($"[green]Wielded {Markup.Escape(item.Name)}.[/]{penalty}");
             break;
 
@@ -649,11 +649,11 @@ static bool TryHandleItemCommand(Mutant mutant, string command, string argument)
             }
 
             var effect = item.ConsumableEffect;
-            var healed = mutant.Consume(item);
+            var healed = traveler.Consume(item);
             AnsiConsole.MarkupLine(effect switch
             {
                 ConsumableEffectType.Heal =>
-                    $"[green]You use {Markup.Escape(item.Name)} and heal for {healed} HP.[/] ({mutant.Health.Current}/{mutant.Health.Max} HP)",
+                    $"[green]You use {Markup.Escape(item.Name)} and heal for {healed} HP.[/] ({traveler.Health.Current}/{traveler.Health.Max} HP)",
                 ConsumableEffectType.BuffAttack =>
                     $"[green]You use {Markup.Escape(item.Name)}. Your attack is bolstered for {item.EffectDurationTicks} ticks.[/]",
                 ConsumableEffectType.BuffDefense =>
@@ -666,19 +666,19 @@ static bool TryHandleItemCommand(Mutant mutant, string command, string argument)
     return true;
 }
 
-static Item? FindInventoryItem(Mutant mutant, string argument)
+static Item? FindInventoryItem(Traveler traveler, string argument)
 {
     if (argument.Length == 0)
     {
         return null;
     }
 
-    if (int.TryParse(argument, out var index) && index >= 1 && index <= mutant.Inventory.Count)
+    if (int.TryParse(argument, out var index) && index >= 1 && index <= traveler.Inventory.Count)
     {
-        return mutant.Inventory[index - 1];
+        return traveler.Inventory[index - 1];
     }
 
-    return mutant.Inventory.FirstOrDefault(i => string.Equals(i.Name, argument, StringComparison.OrdinalIgnoreCase));
+    return traveler.Inventory.FirstOrDefault(i => string.Equals(i.Name, argument, StringComparison.OrdinalIgnoreCase));
 }
 
 static StoreListing? FindListing(Store store, string argument)
@@ -711,10 +711,10 @@ static (string ItemArg, int Price)? SplitItemAndPrice(string argument)
     return (string.Join(' ', tokens[..^1]), price);
 }
 
-static void HandleShop(Mutant mutant, TimeWorld world)
+static void HandleShop(Traveler traveler, TimeWorld world)
 {
-    var storeSlots = world.GetYear(mutant.CurrentYear).StoreSlots;
-    var slot = FindStoreSlotAt(storeSlots, mutant.Position);
+    var storeSlots = world.GetYear(traveler.CurrentYear).StoreSlots;
+    var slot = FindStoreSlotAt(storeSlots, traveler.Position);
     if (slot?.Store is not { } store)
     {
         AnsiConsole.MarkupLine("[red]There's no store here.[/]");
@@ -724,10 +724,10 @@ static void HandleShop(Mutant mutant, TimeWorld world)
     RenderShop(store);
 }
 
-static void HandleBuyFromStore(Mutant mutant, TimeWorld world, string argument)
+static void HandleBuyFromStore(Traveler traveler, TimeWorld world, string argument)
 {
-    var storeSlots = world.GetYear(mutant.CurrentYear).StoreSlots;
-    var slot = FindStoreSlotAt(storeSlots, mutant.Position);
+    var storeSlots = world.GetYear(traveler.CurrentYear).StoreSlots;
+    var slot = FindStoreSlotAt(storeSlots, traveler.Position);
     if (slot?.Store is not { } store)
     {
         AnsiConsole.MarkupLine("[red]There's no store here to buy from.[/]");
@@ -743,20 +743,20 @@ static void HandleBuyFromStore(Mutant mutant, TimeWorld world, string argument)
         return;
     }
 
-    if (mutant.Riblets < listing.AskingPrice)
+    if (traveler.Riblets < listing.AskingPrice)
     {
-        AnsiConsole.MarkupLine($"[red]You can't afford {Markup.Escape(listing.Item.Name)} ({listing.AskingPrice} Riblets; you have {mutant.Riblets}).[/]");
+        AnsiConsole.MarkupLine($"[red]You can't afford {Markup.Escape(listing.Item.Name)} ({listing.AskingPrice} Riblets; you have {traveler.Riblets}).[/]");
         return;
     }
 
-    store.SellToMutant(mutant, listing);
+    store.SellToTraveler(traveler, listing);
     AnsiConsole.MarkupLine($"[green]Bought {Markup.Escape(listing.Item.Name)} for {listing.AskingPrice} Riblets.[/]");
 }
 
-static void HandleSellToStore(Mutant mutant, TimeWorld world, string argument)
+static void HandleSellToStore(Traveler traveler, TimeWorld world, string argument)
 {
-    var storeSlots = world.GetYear(mutant.CurrentYear).StoreSlots;
-    var slot = FindStoreSlotAt(storeSlots, mutant.Position);
+    var storeSlots = world.GetYear(traveler.CurrentYear).StoreSlots;
+    var slot = FindStoreSlotAt(storeSlots, traveler.Position);
     if (slot?.Store is not { } store)
     {
         AnsiConsole.MarkupLine("[red]You need to be at a store to sell.[/] Try [yellow]convert[/] to destroy an item for Ions instead, or [yellow]stores[/] to find one.");
@@ -767,7 +767,7 @@ static void HandleSellToStore(Mutant mutant, TimeWorld world, string argument)
     // gear and consumables you keep unless you name them).
     if (argument.Trim() is "all" or "junk" or "*")
     {
-        var junk = mutant.Inventory.Where(i => i.Type == ItemType.Junk).ToList();
+        var junk = traveler.Inventory.Where(i => i.Type == ItemType.Junk).ToList();
         if (junk.Count == 0)
         {
             AnsiConsole.MarkupLine("[grey]No junk to sell.[/] Name an item to sell that instead.");
@@ -778,7 +778,7 @@ static void HandleSellToStore(Mutant mutant, TimeWorld world, string argument)
         var count = 0;
         foreach (var j in junk)
         {
-            var got = store.BuyFromMutant(mutant, j);
+            var got = store.BuyFromTraveler(traveler, j);
             if (got is null)
             {
                 break;
@@ -792,7 +792,7 @@ static void HandleSellToStore(Mutant mutant, TimeWorld world, string argument)
         return;
     }
 
-    var item = FindInventoryItem(mutant, argument);
+    var item = FindInventoryItem(traveler, argument);
     if (item is null)
     {
         AnsiConsole.MarkupLine(argument.Length == 0
@@ -801,7 +801,7 @@ static void HandleSellToStore(Mutant mutant, TimeWorld world, string argument)
         return;
     }
 
-    var price = store.BuyFromMutant(mutant, item);
+    var price = store.BuyFromTraveler(traveler, item);
     if (price is null)
     {
         AnsiConsole.MarkupLine($"[red]{Markup.Escape(store.Name)} can't afford to buy that right now.[/]");
@@ -811,10 +811,10 @@ static void HandleSellToStore(Mutant mutant, TimeWorld world, string argument)
     AnsiConsole.MarkupLine($"[yellow]Sold {Markup.Escape(item.Name)} to {Markup.Escape(store.Name)} for {price} Riblets.[/]");
 }
 
-static void HandleBuyStore(Mutant mutant, TimeWorld world)
+static void HandleBuyStore(Traveler traveler, TimeWorld world)
 {
-    var storeSlots = world.GetYear(mutant.CurrentYear).StoreSlots;
-    var slot = FindStoreSlotAt(storeSlots, mutant.Position);
+    var storeSlots = world.GetYear(traveler.CurrentYear).StoreSlots;
+    var slot = FindStoreSlotAt(storeSlots, traveler.Position);
     if (slot is null)
     {
         AnsiConsole.MarkupLine("[red]There's no store slot here.[/]");
@@ -827,22 +827,22 @@ static void HandleBuyStore(Mutant mutant, TimeWorld world)
         return;
     }
 
-    if (mutant.Riblets < slot.PurchaseCost)
+    if (traveler.Riblets < slot.PurchaseCost)
     {
-        AnsiConsole.MarkupLine($"[red]You need {slot.PurchaseCost} Riblets to buy this slot; you have {mutant.Riblets}.[/]");
+        AnsiConsole.MarkupLine($"[red]You need {slot.PurchaseCost} Riblets to buy this slot; you have {traveler.Riblets}.[/]");
         return;
     }
 
-    slot.Purchase(mutant);
+    slot.Purchase(traveler);
     AnsiConsole.MarkupLine($"[green]You now own a store here: {Markup.Escape(slot.Store!.Name)}![/] Use [yellow]deposit[/]/[yellow]withdraw[/]/[yellow]reprice[/]/[yellow]collect[/] to run it. It'll still be yours next session.");
 }
 
-/// <summary>Collects from every store the Mutant owns across every year visited this session — an owner needn't be standing there (docs/GDD.md §6.2's "idle-income loop").</summary>
-static void HandleCollect(Mutant mutant, TimeWorld world)
+/// <summary>Collects from every store the Traveler owns across every year visited this session — an owner needn't be standing there (docs/GDD.md §6.2's "idle-income loop").</summary>
+static void HandleCollect(Traveler traveler, TimeWorld world)
 {
     var owned = world.VisitedYears
         .SelectMany(y => world.GetYear(y).StoreSlots)
-        .Where(s => s.Store?.Owner == mutant)
+        .Where(s => s.Store?.Owner == traveler)
         .ToList();
 
     if (owned.Count == 0)
@@ -857,7 +857,7 @@ static void HandleCollect(Mutant mutant, TimeWorld world)
         var capital = slot.Store!.Capital;
         if (capital > 0)
         {
-            totalCollected += slot.Store.CollectCapital(mutant, capital);
+            totalCollected += slot.Store.CollectCapital(traveler, capital);
         }
     }
 
@@ -867,29 +867,29 @@ static void HandleCollect(Mutant mutant, TimeWorld world)
 }
 
 /// <summary>docs/GDD.md §2 [SOURCE]: "spend Ions to heal wounds directly," usable at any time.</summary>
-static void HandleHeal(Mutant mutant)
+static void HandleHeal(Traveler traveler)
 {
-    if (mutant.Health.Current >= mutant.Health.Max)
+    if (traveler.Health.Current >= traveler.Health.Max)
     {
         AnsiConsole.MarkupLine("[grey]You're already at full health.[/]");
         return;
     }
 
-    if (mutant.Ions.Current <= 0)
+    if (traveler.Ions.Current <= 0)
     {
         AnsiConsole.MarkupLine("[red]Not enough Ions to heal.[/]");
         return;
     }
 
-    var healed = mutant.Heal();
-    AnsiConsole.MarkupLine($"[green]You heal for {healed} HP.[/] ({mutant.Health.Current}/{mutant.Health.Max} HP, {mutant.Ions.Current}/{mutant.Ions.Max} Ions left)");
+    var healed = traveler.Heal();
+    AnsiConsole.MarkupLine($"[green]You heal for {healed} HP.[/] ({traveler.Health.Current}/{traveler.Health.Max} HP, {traveler.Ions.Current}/{traveler.Ions.Max} Ions left)");
 }
 
-static void HandleStoreManagement(Mutant mutant, TimeWorld world, string command, string argument)
+static void HandleStoreManagement(Traveler traveler, TimeWorld world, string command, string argument)
 {
-    var storeSlots = world.GetYear(mutant.CurrentYear).StoreSlots;
-    var slot = FindStoreSlotAt(storeSlots, mutant.Position);
-    if (slot?.Store is not { } store || store.Owner != mutant)
+    var storeSlots = world.GetYear(traveler.CurrentYear).StoreSlots;
+    var slot = FindStoreSlotAt(storeSlots, traveler.Position);
+    if (slot?.Store is not { } store || store.Owner != traveler)
     {
         AnsiConsole.MarkupLine("[red]You need to be at a store you own to do that.[/]");
         return;
@@ -905,7 +905,7 @@ static void HandleStoreManagement(Mutant mutant, TimeWorld world, string command
                 return;
             }
 
-            store.Withdraw(mutant, listing);
+            store.Withdraw(traveler, listing);
             AnsiConsole.MarkupLine($"[green]Withdrew {Markup.Escape(listing.Item.Name)} back into your inventory.[/]");
             break;
 
@@ -919,14 +919,14 @@ static void HandleStoreManagement(Mutant mutant, TimeWorld world, string command
             }
 
             var (itemArg, price) = split.Value;
-            var item = FindInventoryItem(mutant, itemArg);
+            var item = FindInventoryItem(traveler, itemArg);
             if (item is null)
             {
                 AnsiConsole.MarkupLine($"[red]No item matching '{Markup.Escape(itemArg)}' in your inventory.[/]");
                 return;
             }
 
-            store.Deposit(mutant, item, price);
+            store.Deposit(traveler, item, price);
             AnsiConsole.MarkupLine($"[green]Listed {Markup.Escape(item.Name)} at {Markup.Escape(store.Name)} for {price} Riblets.[/]");
             break;
         }
@@ -948,7 +948,7 @@ static void HandleStoreManagement(Mutant mutant, TimeWorld world, string command
                 return;
             }
 
-            store.AdjustPrice(mutant, listingToReprice, price);
+            store.AdjustPrice(traveler, listingToReprice, price);
             AnsiConsole.MarkupLine($"[green]{Markup.Escape(listingToReprice.Item.Name)} is now {price} Riblets.[/]");
             break;
         }
@@ -963,13 +963,13 @@ static void HandleStoreManagement(Mutant mutant, TimeWorld world, string command
 /// Interactive and round-by-round via CombatSession — "attack" or "cast
 /// <ability>" each round. On a win the monster is removed from the year's
 /// live population and its loot (table roll + anything it had scavenged)
-/// goes to the player. Returns false if the Mutant was defeated (caller
+/// goes to the player. Returns false if the Traveler was defeated (caller
 /// ends the session). End-of-input mid-fight auto-attacks each remaining
 /// round.
 /// </summary>
-static bool HandleFight(Mutant mutant, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, IReadOnlyList<AbilityData> abilities, string targetName)
+static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, IReadOnlyList<AbilityData> abilities, string targetName)
 {
-    var year = mutant.CurrentYear;
+    var year = traveler.CurrentYear;
     var yearContent = world.GetYear(year);
     var population = yearContent.Population;
 
@@ -978,15 +978,15 @@ static bool HandleFight(Mutant mutant, TimeWorld world, IRandomSource random, Br
 
     var gatekeeper = population.Gatekeeper;
     if (gatekeeper is not null && !gatekeeper.Health.IsDead
-        && !mutant.HasDefeatedGatekeeper(year)
-        && mutant.Position.Equals(gatekeeper.Position))
+        && !traveler.HasDefeatedGatekeeper(year)
+        && traveler.Position.Equals(gatekeeper.Position))
     {
         monster = gatekeeper;
         isGatekeeperFight = true;
     }
     else
     {
-        var here = population.MonstersAt(mutant.Position).ToList();
+        var here = population.MonstersAt(traveler.Position).ToList();
         if (here.Count == 0)
         {
             AnsiConsole.MarkupLine("[grey]Nothing here to fight.[/] Monsters roam the rooms — go find one.");
@@ -998,17 +998,17 @@ static bool HandleFight(Mutant mutant, TimeWorld world, IRandomSource random, Br
             : here[0];
     }
 
-    var levelBefore = mutant.Level;
+    var levelBefore = traveler.Level;
 
     AnsiConsole.MarkupLine(isGatekeeperFight
         ? $"[bold]{Markup.Escape(monster.Name)} rises to meet you![/] (tier {monster.Tier})"
         : $"You close on the [bold]{Markup.Escape(monster.Name)}[/] (tier {monster.Tier})!");
 
     var usableAbilities = abilities
-        .Where(a => string.Equals(a.Class, mutant.Class.ToString(), StringComparison.OrdinalIgnoreCase) && a.Level <= mutant.Level)
+        .Where(a => string.Equals(a.Class, traveler.Class.ToString(), StringComparison.OrdinalIgnoreCase) && a.Level <= traveler.Level)
         .ToList();
 
-    var session = new CombatSession(mutant, monster, random);
+    var session = new CombatSession(traveler, monster, random);
     var loggedSoFar = 0;
 
     while (!session.IsOver)
@@ -1056,14 +1056,14 @@ static bool HandleFight(Mutant mutant, TimeWorld world, IRandomSource random, Br
         ? monster.Name
         : $"the {monster.Name}";
 
-    if (session.MutantWon)
+    if (session.TravelerWon)
     {
         AnsiConsole.MarkupLine($"[green]You defeated {Markup.Escape(foe)}! +{session.XpAwarded} XP.[/]");
-        broadcast.Publish(GameEvent.Slain(monster.Name, mutant.Name));
+        broadcast.Publish(GameEvent.Slain(monster.Name, traveler.Name));
 
         if (isGatekeeperFight)
         {
-            mutant.RecordGatekeeperDefeat(year);
+            traveler.RecordGatekeeperDefeat(year);
             var trophy = session.ItemsDropped.FirstOrDefault();
             AnsiConsole.MarkupLine(trophy is not null
                 ? $"[bold yellow]The Gatekeeper of {year} yields its {Markup.Escape(trophy.Name)}![/]"
@@ -1076,23 +1076,23 @@ static bool HandleFight(Mutant mutant, TimeWorld world, IRandomSource random, Br
             // Anything the monster had scavenged off the ground comes with the kill.
             foreach (var scavenged in monster.Inventory.ToList())
             {
-                mutant.AddToInventory(scavenged);
+                traveler.AddToInventory(scavenged);
                 AnsiConsole.MarkupLine($"[green]You take the {Markup.Escape(scavenged.Name)} it was carrying.[/]");
             }
         }
 
-        if (mutant.Level > levelBefore)
+        if (traveler.Level > levelBefore)
         {
-            broadcast.Publish(GameEvent.LevelReached(mutant.Name, mutant.Level));
+            broadcast.Publish(GameEvent.LevelReached(traveler.Name, traveler.Level));
         }
 
-        RenderStatusBar(mutant, world);
+        RenderStatusBar(traveler, world);
         return true;
     }
 
     // docs/GDD.md §3.3 (death & recall) is not implemented yet; a defeat here just ends the session.
     AnsiConsole.MarkupLine($"[red]You were defeated by {Markup.Escape(foe)}...[/]");
-    broadcast.Publish(GameEvent.Slain(mutant.Name, monster.Name));
+    broadcast.Publish(GameEvent.Slain(traveler.Name, monster.Name));
     return false;
 }
 
@@ -1107,7 +1107,7 @@ static void PrintNewLogLines(CombatSession session, ref int loggedSoFar)
 }
 
 /// <summary>
-/// Fires the readied ranged weapon (Mutant.EquippedRanged) one room away
+/// Fires the readied ranged weapon (Traveler.EquippedRanged) one room away
 /// in an exit direction — 'point &lt;dir&gt;' for a Wand, 'shoot &lt;dir&gt;'
 /// for a Bow/Gun — hitting the first living monster there (or that room's
 /// stationed Gatekeeper). A hit spends one round of the weapon's built-in
@@ -1117,9 +1117,9 @@ static void PrintNewLogLines(CombatSession session, ref int loggedSoFar)
 /// Softening a monster with a Weaken wand carries into the next 'fight'
 /// (CombatSession consumes Monster.PendingDefensePenalty once).
 /// </summary>
-static void HandleShoot(Mutant mutant, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, string verb, string argument)
+static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, string verb, string argument)
 {
-    var weapon = mutant.EquippedRanged;
+    var weapon = traveler.EquippedRanged;
     if (weapon is null)
     {
         AnsiConsole.MarkupLine("[red]You have no ranged weapon readied.[/] [yellow]wield[/] a wand, bow, or gun first.");
@@ -1139,14 +1139,14 @@ static void HandleShoot(Mutant mutant, TimeWorld world, IRandomSource random, Br
         return;
     }
 
-    var yearContent = world.GetYear(mutant.CurrentYear);
-    if (!yearContent.Map.GetRoom(mutant.Position).ExitDescriptions.ContainsKey(direction.Value))
+    var yearContent = world.GetYear(traveler.CurrentYear);
+    if (!yearContent.Map.GetRoom(traveler.Position).ExitDescriptions.ContainsKey(direction.Value))
     {
         AnsiConsole.MarkupLine("[red]You can't shoot through a wall.[/] There's no exit that way.");
         return;
     }
 
-    var targetRoom = mutant.Position.Move(direction.Value);
+    var targetRoom = traveler.Position.Move(direction.Value);
     var population = yearContent.Population;
 
     var target = population.MonstersAt(targetRoom).FirstOrDefault(m => !m.Health.IsDead);
@@ -1154,7 +1154,7 @@ static void HandleShoot(Mutant mutant, TimeWorld world, IRandomSource random, Br
     var targetIsGatekeeper = false;
     if (target is null
         && gatekeeper is not null && !gatekeeper.Health.IsDead
-        && !mutant.HasDefeatedGatekeeper(mutant.CurrentYear)
+        && !traveler.HasDefeatedGatekeeper(traveler.CurrentYear)
         && gatekeeper.Position.Equals(targetRoom))
     {
         target = gatekeeper;
@@ -1167,8 +1167,8 @@ static void HandleShoot(Mutant mutant, TimeWorld world, IRandomSource random, Br
         return;
     }
 
-    var levelBefore = mutant.Level;
-    var result = RangedResolver.Fire(mutant, target, weapon, random);
+    var levelBefore = traveler.Level;
+    var result = RangedResolver.Fire(traveler, target, weapon, random);
     AnsiConsole.MarkupLine($"[blue]{Markup.Escape(result.Message)}[/]");
     AnsiConsole.MarkupLine($"[grey]{Markup.Escape(weapon.Name)}: {weapon.AmmoRemaining}/{weapon.AmmoCapacity} shots left.[/]");
 
@@ -1177,20 +1177,20 @@ static void HandleShoot(Mutant mutant, TimeWorld world, IRandomSource random, Br
         return;
     }
 
-    broadcast.Publish(GameEvent.Slain(target.Name, mutant.Name));
-    mutant.GainXp(target.XpReward);
+    broadcast.Publish(GameEvent.Slain(target.Name, traveler.Name));
+    traveler.GainXp(target.XpReward);
 
     var drops = LootDropRoller.Roll(target.LootTable, random).Concat(target.Inventory).ToList();
 
     if (targetIsGatekeeper)
     {
-        mutant.RecordGatekeeperDefeat(mutant.CurrentYear);
+        traveler.RecordGatekeeperDefeat(traveler.CurrentYear);
         foreach (var drop in drops)
         {
             population.AddGroundLoot(targetRoom, drop);
         }
 
-        AnsiConsole.MarkupLine($"[bold yellow]You drop the Gatekeeper of {mutant.CurrentYear} from a room away — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{target.XpReward} XP.");
+        AnsiConsole.MarkupLine($"[bold yellow]You drop the Gatekeeper of {traveler.CurrentYear} from a room away — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{target.XpReward} XP.");
     }
     else
     {
@@ -1205,17 +1205,17 @@ static void HandleShoot(Mutant mutant, TimeWorld world, IRandomSource random, Br
             : $"[green]The {Markup.Escape(target.Name)} drops. +{target.XpReward} XP.[/]");
     }
 
-    if (mutant.Level > levelBefore)
+    if (traveler.Level > levelBefore)
     {
-        broadcast.Publish(GameEvent.LevelReached(mutant.Name, mutant.Level));
+        broadcast.Publish(GameEvent.LevelReached(traveler.Name, traveler.Level));
     }
 }
 
 /// <summary>Lists the player's class's abilities - locked ones greyed, the handful with no combat effect flagged.</summary>
-static void RenderAbilities(Mutant mutant, IReadOnlyList<AbilityData> abilities)
+static void RenderAbilities(Traveler traveler, IReadOnlyList<AbilityData> abilities)
 {
     var classAbilities = abilities
-        .Where(a => string.Equals(a.Class, mutant.Class.ToString(), StringComparison.OrdinalIgnoreCase))
+        .Where(a => string.Equals(a.Class, traveler.Class.ToString(), StringComparison.OrdinalIgnoreCase))
         .OrderBy(a => a.Tier)
         .ToList();
 
@@ -1234,7 +1234,7 @@ static void RenderAbilities(Mutant mutant, IReadOnlyList<AbilityData> abilities)
 
     foreach (var ability in classAbilities)
     {
-        var unlocked = mutant.Level >= ability.Level;
+        var unlocked = traveler.Level >= ability.Level;
         var hasCombatEffect = !string.Equals(ability.Effect, "None", StringComparison.OrdinalIgnoreCase);
         var status = !unlocked
             ? "[grey]locked[/]"
@@ -1252,7 +1252,7 @@ static void RenderAbilities(Mutant mutant, IReadOnlyList<AbilityData> abilities)
 }
 
 /// <summary>Handles "travel &lt;year&gt;", "travel +N"/"-N" (relative years), and "travel next"/"prev" (the next/previous Gatekeeper year) — docs/GDD.md §3.2.</summary>
-static void HandleTravel(Mutant mutant, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, string argument)
+static void HandleTravel(Traveler traveler, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, string argument)
 {
     var arg = argument.Trim();
     int targetYear;
@@ -1265,7 +1265,7 @@ static void HandleTravel(Mutant mutant, TimeWorld world, IRandomSource random, B
 
         case "next":
         {
-            var next = world.Gatekeepers.NextAfter(mutant.CurrentYear);
+            var next = world.Gatekeepers.NextAfter(traveler.CurrentYear);
             if (next is null)
             {
                 AnsiConsole.MarkupLine("[grey]No Gatekeeper years remain ahead of you.[/]");
@@ -1278,7 +1278,7 @@ static void HandleTravel(Mutant mutant, TimeWorld world, IRandomSource random, B
 
         case "prev" or "previous":
         {
-            var prev = world.Gatekeepers.PreviousBefore(mutant.CurrentYear);
+            var prev = world.Gatekeepers.PreviousBefore(traveler.CurrentYear);
             if (prev is null)
             {
                 AnsiConsole.MarkupLine("[grey]No Gatekeeper years behind you.[/]");
@@ -1292,7 +1292,7 @@ static void HandleTravel(Mutant mutant, TimeWorld world, IRandomSource random, B
         default:
             if ((arg.StartsWith('+') || arg.StartsWith('-')) && int.TryParse(arg, out var delta))
             {
-                targetYear = mutant.CurrentYear + delta;
+                targetYear = traveler.CurrentYear + delta;
             }
             else if (int.TryParse(arg, out var absolute))
             {
@@ -1307,7 +1307,7 @@ static void HandleTravel(Mutant mutant, TimeWorld world, IRandomSource random, B
             break;
     }
 
-    if (targetYear == mutant.CurrentYear)
+    if (targetYear == traveler.CurrentYear)
     {
         AnsiConsole.MarkupLine("[grey]You're already there.[/]");
         return;
@@ -1319,12 +1319,12 @@ static void HandleTravel(Mutant mutant, TimeWorld world, IRandomSource random, B
         return;
     }
 
-    var cost = IonEconomy.TimeTravelCost(mutant.CurrentYear, targetYear);
-    var yearGap = Math.Abs(targetYear - mutant.CurrentYear);
+    var cost = IonEconomy.TimeTravelCost(traveler.CurrentYear, targetYear);
+    var yearGap = Math.Abs(targetYear - traveler.CurrentYear);
     var targetTier = TimelineContentFactory.DisplayTier(targetYear);
     // Well above your level band — allowed (that's how you go loot-hunting
     // in the deep future), but you should know what you're walking into.
-    var overreaching = mutant.Level < 10 * (targetTier - 2);
+    var overreaching = traveler.Level < 10 * (targetTier - 2);
 
     if (yearGap > 500 || overreaching)
     {
@@ -1332,11 +1332,11 @@ static void HandleTravel(Mutant mutant, TimeWorld world, IRandomSource random, B
         {
             AnsiConsole.MarkupLine(
                 $"[yellow]Heads up:[/] {targetYear} A.D. is around tier {targetTier} — its monsters and loot " +
-                $"scale to roughly level {10 * targetTier}, and you're level {mutant.Level}. " +
+                $"scale to roughly level {10 * targetTier}, and you're level {traveler.Level}. " +
                 "Better gear if you can grab it and run; a quick death if you can't.");
         }
 
-        AnsiConsole.Markup($"[yellow]That's a {yearGap}-year jump — {cost} Ions (you have {mutant.Ions.Current}). Proceed? (y/n)[/] ");
+        AnsiConsole.Markup($"[yellow]That's a {yearGap}-year jump — {cost} Ions (you have {traveler.Ions.Current}). Proceed? (y/n)[/] ");
         var confirm = Console.ReadLine();
         if (confirm is null || !confirm.Trim().StartsWith("y", StringComparison.OrdinalIgnoreCase))
         {
@@ -1345,8 +1345,8 @@ static void HandleTravel(Mutant mutant, TimeWorld world, IRandomSource random, B
         }
     }
 
-    var levelBefore = mutant.Level;
-    var result = TimeTravelResolver.Travel(mutant, world, targetYear, random);
+    var levelBefore = traveler.Level;
+    var result = TimeTravelResolver.Travel(traveler, world, targetYear, random);
 
     if (!result.Success)
     {
@@ -1354,24 +1354,24 @@ static void HandleTravel(Mutant mutant, TimeWorld world, IRandomSource random, B
         {
             TimeTravelFailureReason.YearOutOfRange => $"[red]{targetYear} is off the timeline (2000–5000).[/]",
             TimeTravelFailureReason.InsufficientIons =>
-                $"[red]Not enough Ions ({cost} needed; you have {mutant.Ions.Current}).[/]",
+                $"[red]Not enough Ions ({cost} needed; you have {traveler.Ions.Current}).[/]",
             _ => "[red]Travel failed.[/]",
         });
         return;
     }
 
-    if (mutant.Level > levelBefore)
+    if (traveler.Level > levelBefore)
     {
-        broadcast.Publish(GameEvent.LevelReached(mutant.Name, mutant.Level));
+        broadcast.Publish(GameEvent.LevelReached(traveler.Name, traveler.Level));
     }
 
     var arrival = world.GetYear(targetYear);
     AnsiConsole.MarkupLine($"[bold]You travel to {targetYear} A.D. — {Markup.Escape(arrival.Era.Name)}.[/] [grey]({result.IonsSpent} Ions)[/]");
-    broadcast.Publish(GameEvent.TimeTraveled(mutant.Name, targetYear));
-    RenderRoom(mutant, world);
+    broadcast.Publish(GameEvent.TimeTraveled(traveler.Name, targetYear));
+    RenderRoom(traveler, world);
 }
 
-static void RenderNpcs(IReadOnlyList<Mutant> npcs)
+static void RenderNpcs(IReadOnlyList<Traveler> npcs)
 {
     var table = new Table().Expand();
     table.AddColumn("Name");
@@ -1400,12 +1400,12 @@ static void RenderNpcs(IReadOnlyList<Mutant> npcs)
 }
 
 /// <summary>Lists the monsters roaming the player's current year (see YearPopulation), the one the player is standing with marked.</summary>
-static void RenderMonsters(Mutant mutant, TimeWorld world)
+static void RenderMonsters(Traveler traveler, TimeWorld world)
 {
-    var population = world.GetYear(mutant.CurrentYear).Population;
+    var population = world.GetYear(traveler.CurrentYear).Population;
     var living = population.Monsters.Where(m => !m.Health.IsDead).ToList();
 
-    if (population.Gatekeeper is { Health.IsDead: false } gk && !mutant.HasDefeatedGatekeeper(mutant.CurrentYear))
+    if (population.Gatekeeper is { Health.IsDead: false } gk && !traveler.HasDefeatedGatekeeper(traveler.CurrentYear))
     {
         living.Insert(0, gk);
     }
@@ -1416,7 +1416,7 @@ static void RenderMonsters(Mutant mutant, TimeWorld world)
         return;
     }
 
-    var here = living.Count(m => m.Position.Equals(mutant.Position));
+    var here = living.Count(m => m.Position.Equals(traveler.Position));
     AnsiConsole.MarkupLine(here > 0
         ? $"[grey]{living.Count} monster(s) roaming — [red]{here} in your room[/].[/]"
         : $"[grey]{living.Count} monster(s) roaming this year.[/]");
@@ -1429,10 +1429,10 @@ static void RenderMonsters(Mutant mutant, TimeWorld world)
     table.AddColumn("Mood");
     table.AddColumn("Location");
 
-    foreach (var m in living.OrderBy(m => m.Position.Equals(mutant.Position) ? 0 : 1).ThenBy(m => m.Position.North).ThenBy(m => m.Position.East))
+    foreach (var m in living.OrderBy(m => m.Position.Equals(traveler.Position) ? 0 : 1).ThenBy(m => m.Position.North).ThenBy(m => m.Position.East))
     {
         var loc = Markup.Escape(m.Position.ToString())
-            + (m.Position.Equals(mutant.Position) ? " [green](here)[/]"
+            + (m.Position.Equals(traveler.Position) ? " [green](here)[/]"
                : m.Heading is { } hd ? $" [grey]heading {hd.Name()}[/]"
                : "");
         var mood = AggroModel.MoodFor(m.Aggro) switch
@@ -1448,10 +1448,10 @@ static void RenderMonsters(Mutant mutant, TimeWorld world)
 }
 
 /// <summary>Picks up ground loot at the player's coordinate — 'take &lt;item&gt;' (name or number) or 'take all'.</summary>
-static void HandleTake(Mutant mutant, TimeWorld world, string argument)
+static void HandleTake(Traveler traveler, TimeWorld world, string argument)
 {
-    var population = world.GetYear(mutant.CurrentYear).Population;
-    var pile = population.LootAt(mutant.Position);
+    var population = world.GetYear(traveler.CurrentYear).Population;
+    var pile = population.LootAt(traveler.Position);
     if (pile.Count == 0)
     {
         AnsiConsole.MarkupLine("[grey]Nothing on the ground here.[/]");
@@ -1462,9 +1462,9 @@ static void HandleTake(Mutant mutant, TimeWorld world, string argument)
     if (arg.Length == 0 || string.Equals(arg, "all", StringComparison.OrdinalIgnoreCase))
     {
         Item? item;
-        while ((item = population.TakeGroundLoot(mutant.Position, _ => true)) is not null)
+        while ((item = population.TakeGroundLoot(traveler.Position, _ => true)) is not null)
         {
-            mutant.AddToInventory(item);
+            traveler.AddToInventory(item);
             AnsiConsole.MarkupLine($"[green]You pick up the {Markup.Escape(item.Name)}.[/]");
         }
 
@@ -1487,10 +1487,10 @@ static void HandleTake(Mutant mutant, TimeWorld world, string argument)
         return;
     }
 
-    var picked = population.TakeGroundLoot(mutant.Position, i => ReferenceEquals(i, match));
+    var picked = population.TakeGroundLoot(traveler.Position, i => ReferenceEquals(i, match));
     if (picked is not null)
     {
-        mutant.AddToInventory(picked);
+        traveler.AddToInventory(picked);
         AnsiConsole.MarkupLine($"[green]You pick up the {Markup.Escape(picked.Name)}.[/]");
     }
 }
@@ -1629,9 +1629,9 @@ static void RenderShop(Store store)
     AnsiConsole.Write(table);
 }
 
-static void RenderInventory(Mutant mutant)
+static void RenderInventory(Traveler traveler)
 {
-    if (mutant.Inventory.Count == 0)
+    if (traveler.Inventory.Count == 0)
     {
         AnsiConsole.MarkupLine("[grey]Your inventory is empty.[/]");
         return;
@@ -1647,10 +1647,10 @@ static void RenderInventory(Mutant mutant)
     table.AddColumn("Effect");
     table.AddColumn("Equipped");
 
-    for (var i = 0; i < mutant.Inventory.Count; i++)
+    for (var i = 0; i < traveler.Inventory.Count; i++)
     {
-        var item = mutant.Inventory[i];
-        var equipped = item == mutant.EquippedWeapon || item == mutant.EquippedArmor || ReferenceEquals(item, mutant.EquippedRanged) ? "yes" : "";
+        var item = traveler.Inventory[i];
+        var equipped = item == traveler.EquippedWeapon || item == traveler.EquippedArmor || ReferenceEquals(item, traveler.EquippedRanged) ? "yes" : "";
         var effect = item.ConsumableEffect switch
         {
             ConsumableEffectType.Heal => $"heals {item.EffectMagnitude:0} HP",
@@ -1676,26 +1676,26 @@ static void RenderInventory(Mutant mutant)
     AnsiConsole.Write(table);
 }
 
-static void HandleMove(Mutant mutant, TimeWorld world, Direction direction)
+static void HandleMove(Traveler traveler, TimeWorld world, Direction direction)
 {
-    var map = world.GetYear(mutant.CurrentYear).Map;
-    var result = map.TryMove(mutant.Position, direction);
+    var map = world.GetYear(traveler.CurrentYear).Map;
+    var result = map.TryMove(traveler.Position, direction);
     if (!result.Success)
     {
         AnsiConsole.MarkupLine("[red]You can't go that way.[/]");
         return;
     }
 
-    mutant.MoveTo(result.Destination!.Value);
-    RenderRoom(mutant, world);
+    traveler.MoveTo(result.Destination!.Value);
+    RenderRoom(traveler, world);
 }
 
-static void RenderRoom(Mutant mutant, TimeWorld world)
+static void RenderRoom(Traveler traveler, TimeWorld world)
 {
-    var yearContent = world.GetYear(mutant.CurrentYear);
-    var room = yearContent.Map.GetRoom(mutant.Position);
+    var yearContent = world.GetYear(traveler.CurrentYear);
+    var room = yearContent.Map.GetRoom(traveler.Position);
 
-    RenderStatusBar(mutant, world);
+    RenderStatusBar(traveler, world);
     AnsiConsole.WriteLine();
     AnsiConsole.MarkupLine(Markup.Escape(room.Description));
 
@@ -1716,11 +1716,11 @@ static void RenderRoom(Mutant mutant, TimeWorld world)
 
     var population = yearContent.Population;
 
-    var here = population.MonstersAt(mutant.Position).Select(m => m.Name).ToList();
+    var here = population.MonstersAt(traveler.Position).Select(m => m.Name).ToList();
     var gatekeeper = population.Gatekeeper;
     var gatekeeperHere = gatekeeper is not null && !gatekeeper.Health.IsDead
-        && !mutant.HasDefeatedGatekeeper(mutant.CurrentYear)
-        && gatekeeper.Position.Equals(mutant.Position);
+        && !traveler.HasDefeatedGatekeeper(traveler.CurrentYear)
+        && gatekeeper.Position.Equals(traveler.Position);
 
     if (gatekeeperHere)
     {
@@ -1734,7 +1734,7 @@ static void RenderRoom(Mutant mutant, TimeWorld world)
 
     foreach (var direction in exitDirections)
     {
-        var adjacent = mutant.Position.Move(direction);
+        var adjacent = traveler.Position.Move(direction);
         if (!population.HasLivingMonsterAt(adjacent))
         {
             continue;
@@ -1751,13 +1751,13 @@ static void RenderRoom(Mutant mutant, TimeWorld world)
         AnsiConsole.MarkupLine($"[grey]{flavour}[/]");
     }
 
-    var ground = population.LootAt(mutant.Position);
+    var ground = population.LootAt(traveler.Position);
     if (ground.Count > 0)
     {
         AnsiConsole.MarkupLine($"[yellow]On the ground:[/] {Markup.Escape(NameList(ground.Select(i => i.Name).ToList()))}. [grey](take <item>)[/]");
     }
 
-    var slot = FindStoreSlotAt(yearContent.StoreSlots, mutant.Position);
+    var slot = FindStoreSlotAt(yearContent.StoreSlots, traveler.Position);
     if (slot is not null)
     {
         AnsiConsole.MarkupLine(slot.Store switch
@@ -1771,27 +1771,27 @@ static void RenderRoom(Mutant mutant, TimeWorld world)
     AnsiConsole.WriteLine();
 }
 
-static void RenderStatusBar(Mutant mutant, TimeWorld world)
+static void RenderStatusBar(Traveler traveler, TimeWorld world)
 {
-    var yearContent = world.GetYear(mutant.CurrentYear);
-    var status = $"[red]HP {mutant.Health.Current}/{mutant.Health.Max}[/]  " +
-                 $"[blue]Ions {mutant.Ions.Current}/{mutant.Ions.Max}[/]  " +
-                 $"[yellow]Riblets {mutant.Riblets}[/]  " +
-                 $"Char Level {mutant.Level}  " +
-                 $"Year {mutant.CurrentYear} A.D.  " +
-                 $"Furthest {mutant.FurthestYearReached}  " +
-                 $"Location {Markup.Escape(mutant.Position.ToString())}";
+    var yearContent = world.GetYear(traveler.CurrentYear);
+    var status = $"[red]HP {traveler.Health.Current}/{traveler.Health.Max}[/]  " +
+                 $"[blue]Ions {traveler.Ions.Current}/{traveler.Ions.Max}[/]  " +
+                 $"[yellow]Riblets {traveler.Riblets}[/]  " +
+                 $"Char Level {traveler.Level}  " +
+                 $"Year {traveler.CurrentYear} A.D.  " +
+                 $"Furthest {traveler.FurthestYearReached}  " +
+                 $"Location {Markup.Escape(traveler.Position.ToString())}";
 
-    if (mutant.EquippedRanged is { } ranged)
+    if (traveler.EquippedRanged is { } ranged)
     {
         status += ranged.IsDepleted
             ? $"\n[grey]Ranged: {Markup.Escape(ranged.Name)} (spent)[/]"
             : $"\n[blue]Ranged: {Markup.Escape(ranged.Name)} — {ranged.AmmoRemaining}/{ranged.AmmoCapacity} shots[/]";
     }
 
-    if (mutant.ActiveEffects.Count > 0)
+    if (traveler.ActiveEffects.Count > 0)
     {
-        var effects = mutant.ActiveEffects.Select(e => e.Type switch
+        var effects = traveler.ActiveEffects.Select(e => e.Type switch
         {
             ConsumableEffectType.BuffAttack => $"+{e.Magnitude:0} attack ({e.TicksRemaining} ticks left)",
             ConsumableEffectType.BuffDefense => $"+{e.Magnitude:0} defense ({e.TicksRemaining} ticks left)",
@@ -1801,7 +1801,7 @@ static void RenderStatusBar(Mutant mutant, TimeWorld world)
     }
 
     AnsiConsole.Write(new Panel(status)
-        .Header($"[bold]{Markup.Escape(mutant.Name)}[/] — {Markup.Escape(yearContent.Era.Name)}, {mutant.CurrentYear} A.D.")
+        .Header($"[bold]{Markup.Escape(traveler.Name)}[/] — {Markup.Escape(yearContent.Era.Name)}, {traveler.CurrentYear} A.D.")
         .Expand());
 }
 
@@ -1821,7 +1821,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]travel +N[/]/[green]-N[/]      - jump N years forward/back");
     AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]   - jump to the next/previous Gatekeeper year");
     AnsiConsole.MarkupLine("  [green]inventory[/] (or i)    - list what you're carrying");
-    AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Mutants out in the timeline");
+    AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Travelers out in the timeline");
     AnsiConsole.MarkupLine("  [green]news[/] (or broadcast) - show recent kill-feed events");
     AnsiConsole.MarkupLine("  [green]convert <item>[/]     - destroy an item for Ions (a spent ranged weapon is worth a fraction)");
     AnsiConsole.MarkupLine("  [green]wield <item>[/]       - equip a weapon, armor, or ranged (wand/bow/gun) item");

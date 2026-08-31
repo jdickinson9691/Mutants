@@ -10,27 +10,27 @@ public class WorldSimulationTests
 {
     private static TimeWorld World() => TestTimeWorld.Build(seed: 909);
 
-    private static Mutant NewMutant(string name, TimeWorld world, int year)
+    private static Traveler NewTraveler(string name, TimeWorld world, int year)
     {
-        var mutant = new Mutant(name, CharacterClass.Warrior, startingYear: year);
-        mutant.PlaceAt(world.GetYear(year).Map.Start);
-        return mutant;
+        var traveler = new Traveler(name, CharacterClass.Soldier, startingYear: year);
+        traveler.PlaceAt(world.GetYear(year).Map.Start);
+        return traveler;
     }
 
     /// <summary>Parks the player on a coordinate no room occupies, so the spatial monster sim (aggro/ambush) stays out of these bookkeeping-focused tests.</summary>
-    private static Mutant OffGridPlayer(string name, TimeWorld world, int year)
+    private static Traveler OffGridPlayer(string name, TimeWorld world, int year)
     {
-        var mutant = NewMutant(name, world, year);
-        mutant.PlaceAt(new Core.World.Coordinate(999, 999));
-        return mutant;
+        var traveler = NewTraveler(name, world, year);
+        traveler.PlaceAt(new Core.World.Coordinate(999, 999));
+        return traveler;
     }
 
     [Fact]
-    public void Tick_RegeneratesIonsForADepletedMutantInEarlyYears()
+    public void Tick_RegeneratesIonsForADepletedTravelerInEarlyYears()
     {
         var world = World();
-        var player = NewMutant("Player", world, 2000);
-        var npc = NewMutant("Vex", world, 2000);
+        var player = NewTraveler("Player", world, 2000);
+        var npc = NewTraveler("Vex", world, 2000);
         player.Ions.Spend(player.Ions.Current);
         npc.Ions.Spend(npc.Ions.Current);
         var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.5));
@@ -65,7 +65,7 @@ public class WorldSimulationTests
     {
         var world = World();
         var player = OffGridPlayer("Player", world, 2000);
-        var npc = NewMutant("Vex", world, 2000);
+        var npc = NewTraveler("Vex", world, 2000);
         npc.Health.Damage(npc.Health.Max);
         var startingPosition = npc.Position;
         var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.5));
@@ -80,8 +80,8 @@ public class WorldSimulationTests
     public void Tick_PublishesSlainEventWhenAnNpcDefeatsAMonster()
     {
         var world = World();
-        var player = NewMutant("Player", world, 2000);
-        var npc = NewMutant("Vex", world, 2000);
+        var player = NewTraveler("Player", world, 2000);
+        var npc = NewTraveler("Vex", world, 2000);
         var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.5));
 
         simulation.Tick(player);
@@ -93,8 +93,8 @@ public class WorldSimulationTests
     public void Tick_PublishesLevelReachedEventWhenAnNpcLevelsUp()
     {
         var world = World();
-        var player = NewMutant("Player", world, 2000);
-        var npc = NewMutant("Vex", world, 2000);
+        var player = NewTraveler("Player", world, 2000);
+        var npc = NewTraveler("Vex", world, 2000);
         // A tier-1 kill awards 40 XP; level 2 needs 100 cumulative.
         npc.GainXp(80);
         var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.5));
@@ -109,8 +109,8 @@ public class WorldSimulationTests
     public void Tick_PassesTheYearsGovernmentStoreThroughToNpcTrading()
     {
         var world = World();
-        var player = NewMutant("Player", world, 2200);
-        var npc = NewMutant("Vex", world, 2200);
+        var player = NewTraveler("Player", world, 2200);
+        var npc = NewTraveler("Vex", world, 2200);
         for (var tier = 1; tier <= 4; tier++)
         {
             npc.AddToInventory(Item.Create($"Junk Tier {tier}", ItemType.Junk, tier, Rarity.Common));
@@ -142,7 +142,7 @@ public class WorldSimulationTests
     {
         var world = World();
         var year = 2000;
-        var player = NewMutant("Player", world, year);
+        var player = NewTraveler("Player", world, year);
 
         // Stand the player on a hostile monster's tile that isn't a store haven.
         var content = world.GetYear(year);
@@ -167,9 +167,9 @@ public class WorldSimulationTests
     public void Tick_ResolvesEachNpcAgainstItsOwnYear_NotOneSharedYear()
     {
         var world = World();
-        var player = NewMutant("Player", world, 2000);
-        var npcEarly = NewMutant("Vex", world, 2100);
-        var npcLate = NewMutant("Corrode", world, 4500);
+        var player = NewTraveler("Player", world, 2000);
+        var npcEarly = NewTraveler("Vex", world, 2100);
+        var npcLate = NewTraveler("Corrode", world, 4500);
 
         var simulation = new WorldSimulation(world, [npcEarly, npcLate], StubRandomSource.Fixed(0.5));
 
@@ -183,7 +183,7 @@ public class WorldSimulationTests
     public void Tick_RunsTheCurrentYearsMonsterPopulation_InfightKillBroadcasts()
     {
         var world = World();
-        var player = NewMutant("Player", world, 2000);
+        var player = NewTraveler("Player", world, 2000);
         var pop = world.GetYear(player.CurrentYear).Population;
 
         // Force two of the year's monsters into the same room so an infight is possible.

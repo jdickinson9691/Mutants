@@ -30,16 +30,16 @@ public class MonsterControllerTests
         YearPopulation.Seed(worldSeed: 1, year: 2000, map, roster: [], gatekeeperFactory: null);
 
     /// <summary>A player parked well off the little test grids, so aggro/ambush never engage unless a test opts in.</summary>
-    private static Mutant OffMapPlayer()
+    private static Traveler OffMapPlayer()
     {
-        var player = new Mutant("Bystander", CharacterClass.Warrior);
+        var player = new Traveler("Bystander", CharacterClass.Soldier);
         player.PlaceAt(new Coordinate(9, 9));
         return player;
     }
 
     /// <summary>Thin wrapper over MonsterController.Tick with test-friendly defaults (prev position = "didn't move", not lingering, no havens).</summary>
     private static void Tick(
-        YearPopulation pop, LevelMap map, Mutant player, IRandomSource random,
+        YearPopulation pop, LevelMap map, Traveler player, IRandomSource random,
         Coordinate? previousPlayerPosition = null,
         bool playerLingered = false,
         BroadcastChannel? broadcast = null,
@@ -138,7 +138,7 @@ public class MonsterControllerTests
     {
         var map = CorridorMap(4);
         var pop = EmptyPopulation(map);
-        var player = new Mutant("Prey", CharacterClass.Warrior);
+        var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(Coordinate.Origin);
 
         var m = Monster.Create("Beast", tier: 1);
@@ -158,7 +158,7 @@ public class MonsterControllerTests
     {
         var map = CorridorMap(4);
         var pop = EmptyPopulation(map);
-        var player = new Mutant("Prey", CharacterClass.Warrior);
+        var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(Coordinate.Origin);
 
         var m = Monster.Create("Beast", tier: 1);
@@ -178,7 +178,7 @@ public class MonsterControllerTests
     {
         var map = CorridorMap(5);
         var pop = EmptyPopulation(map);
-        var player = new Mutant("Prey", CharacterClass.Warrior);
+        var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(Coordinate.Origin);
 
         var m = Monster.Create("Beast", tier: 1);
@@ -256,7 +256,7 @@ public class MonsterControllerTests
         var map = CorridorMap(6);
         var pop = EmptyPopulation(map);
 
-        var player = new Mutant("Prey", CharacterClass.Warrior);
+        var player = new Traveler("Prey", CharacterClass.Soldier);
         var monster = Monster.Create("Idler", tier: 1);
         monster.PlaceAt(new Coordinate(2, 0));
         pop.AddMonster(monster);
@@ -284,7 +284,7 @@ public class MonsterControllerTests
         var tile = Coordinate.Origin;
         var next = new Coordinate(1, 0);
 
-        var player = new Mutant("Pest", CharacterClass.Warrior);
+        var player = new Traveler("Pest", CharacterClass.Soldier);
         var monster = Monster.Create("Guard", tier: 1);
         monster.PlaceAt(tile);
         pop.AddMonster(monster);
@@ -310,7 +310,7 @@ public class MonsterControllerTests
         var map = FourRoomMap();
         var pop = EmptyPopulation(map);
 
-        var player = new Mutant("Prey", CharacterClass.Warrior);
+        var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(new Coordinate(1, 0));
         var fullHp = player.Health.Current;
 
@@ -331,7 +331,7 @@ public class MonsterControllerTests
         var map = FourRoomMap();
         var pop = EmptyPopulation(map);
 
-        var player = new Mutant("Prey", CharacterClass.Warrior);
+        var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(Coordinate.Origin);
         var fullHp = player.Health.Current;
 
@@ -353,7 +353,7 @@ public class MonsterControllerTests
         var map = FourRoomMap();
         var pop = EmptyPopulation(map);
 
-        var player = new Mutant("Prey", CharacterClass.Warrior);
+        var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(Coordinate.Origin);
         var fullHp = player.Health.Current;
 
@@ -372,7 +372,7 @@ public class MonsterControllerTests
         var map = FourRoomMap();
         var pop = EmptyPopulation(map);
 
-        var player = new Mutant("Prey", CharacterClass.Warrior);
+        var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(Coordinate.Origin);
         var fullHp = player.Health.Current;
 
@@ -391,7 +391,7 @@ public class MonsterControllerTests
         var map = FourRoomMap();
         var pop = EmptyPopulation(map);
 
-        var player = new Mutant("Prey", CharacterClass.Warrior);
+        var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(Coordinate.Origin);
 
         var lurker = Lurker(Coordinate.Origin);
@@ -416,7 +416,7 @@ public class MonsterControllerTests
         var map = CorridorMap(8);
         var pop = EmptyPopulation(map);
 
-        var player = new Mutant("Prey", CharacterClass.Warrior);
+        var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(new Coordinate(1, 0));
 
         var stalker = Monster.Create("Stalker", tier: 1);
@@ -447,7 +447,7 @@ public class MonsterControllerTests
         var pop = EmptyPopulation(map);
         var haven = Coordinate.Origin;
 
-        var player = new Mutant("Prey", CharacterClass.Warrior);
+        var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(haven);
         var fullHp = player.Health.Current;
 
@@ -476,7 +476,7 @@ public class MonsterControllerTests
         var cap = pop.SoftCap;
         Assert.True(cap > 0);
 
-        var player = new Mutant("Bystander", CharacterClass.Warrior);
+        var player = new Traveler("Bystander", CharacterClass.Soldier);
         player.SetCurrentYear(2400);
         player.PlaceAt(new Coordinate(99, 99));
 

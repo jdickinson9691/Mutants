@@ -10,7 +10,7 @@ public class ContentLoaderTests
     {
         using var dir = new TempContentDirectory();
         var path = dir.WriteFile("abilities.json", """
-            [{ "class": "Warrior", "tier": 1, "level": 5, "name": "Cleave", "description": "Hit up to 2 additional adjacent enemies." }]
+            [{ "class": "Soldier", "tier": 1, "level": 5, "name": "Cleave", "description": "Hit up to 2 additional adjacent enemies." }]
             """);
 
         var abilities = ContentLoader.LoadAbilities(path);

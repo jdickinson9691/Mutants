@@ -12,35 +12,35 @@ public class TimeTravelResolverTests
 
     private static TimeWorld World() => TestTimeWorld.Build(seed: 4242);
 
-    private static Mutant RichMutant(int startingYear = 2000)
+    private static Traveler RichTraveler(int startingYear = 2000)
     {
-        var mutant = new Mutant("Rook", CharacterClass.Warrior, startingYear);
-        mutant.Ions.SetMax(2000);
-        mutant.Ions.Add(2000);
-        return mutant;
+        var traveler = new Traveler("Rook", CharacterClass.Soldier, startingYear);
+        traveler.Ions.SetMax(2000);
+        traveler.Ions.Add(2000);
+        return traveler;
     }
 
     [Fact]
     public void Travel_ToAYearOffTheTimeline_Fails()
     {
-        var mutant = RichMutant();
-        var result = TimeTravelResolver.Travel(mutant, World(), targetYear: 9999, NeutralRandom());
+        var traveler = RichTraveler();
+        var result = TimeTravelResolver.Travel(traveler, World(), targetYear: 9999, NeutralRandom());
 
         Assert.False(result.Success);
         Assert.Equal(TimeTravelFailureReason.YearOutOfRange, result.FailureReason);
-        Assert.Equal(2000, mutant.CurrentYear);
+        Assert.Equal(2000, traveler.CurrentYear);
     }
 
     [Fact]
     public void Travel_ChargesCeilOfTheCoefficientTimesTheDistance_Symmetrically()
     {
-        var mutant = RichMutant(2000);
+        var traveler = RichTraveler(2000);
 
-        var forward = TimeTravelResolver.Travel(mutant, World(), targetYear: 2500, NeutralRandom());
+        var forward = TimeTravelResolver.Travel(traveler, World(), targetYear: 2500, NeutralRandom());
         Assert.True(forward.Success);
         Assert.Equal(20, forward.IonsSpent); // ceil(0.04 * 500)
 
-        var back = TimeTravelResolver.Travel(mutant, World(), targetYear: 2000, NeutralRandom());
+        var back = TimeTravelResolver.Travel(traveler, World(), targetYear: 2000, NeutralRandom());
         Assert.True(back.Success);
         Assert.Equal(20, back.IonsSpent); // retreat costs the same
     }
@@ -48,52 +48,52 @@ public class TimeTravelResolverTests
     [Fact]
     public void Travel_WithoutEnoughIons_FailsAndChangesNothing()
     {
-        var mutant = new Mutant("Rook", CharacterClass.Warrior);
-        mutant.Ions.Spend(mutant.Ions.Current); // 0 Ions
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        traveler.Ions.Spend(traveler.Ions.Current); // 0 Ions
 
-        var result = TimeTravelResolver.Travel(mutant, World(), targetYear: 3000, NeutralRandom());
+        var result = TimeTravelResolver.Travel(traveler, World(), targetYear: 3000, NeutralRandom());
 
         Assert.False(result.Success);
         Assert.Equal(TimeTravelFailureReason.InsufficientIons, result.FailureReason);
-        Assert.Equal(2000, mutant.CurrentYear);
+        Assert.Equal(2000, traveler.CurrentYear);
     }
 
     [Fact]
     public void Travel_Success_MovesTheYear_SpendsIons_AndAdvancesFurthestYearReached()
     {
-        var mutant = RichMutant(2000);
-        var before = mutant.Ions.Current;
+        var traveler = RichTraveler(2000);
+        var before = traveler.Ions.Current;
 
-        var result = TimeTravelResolver.Travel(mutant, World(), targetYear: 4200, NeutralRandom());
+        var result = TimeTravelResolver.Travel(traveler, World(), targetYear: 4200, NeutralRandom());
 
         Assert.True(result.Success);
         Assert.Equal(4200, result.NewYear);
-        Assert.Equal(4200, mutant.CurrentYear);
-        Assert.Equal(4200, mutant.FurthestYearReached);
-        Assert.Equal(before - result.IonsSpent, mutant.Ions.Current);
+        Assert.Equal(4200, traveler.CurrentYear);
+        Assert.Equal(4200, traveler.FurthestYearReached);
+        Assert.Equal(before - result.IonsSpent, traveler.Ions.Current);
     }
 
     [Fact]
     public void Travel_Retreat_MovesCurrentYearButNotFurthestYearReached()
     {
-        var mutant = RichMutant(2000);
-        TimeTravelResolver.Travel(mutant, World(), targetYear: 4000, NeutralRandom());
+        var traveler = RichTraveler(2000);
+        TimeTravelResolver.Travel(traveler, World(), targetYear: 4000, NeutralRandom());
 
-        TimeTravelResolver.Travel(mutant, World(), targetYear: 2300, NeutralRandom());
+        TimeTravelResolver.Travel(traveler, World(), targetYear: 2300, NeutralRandom());
 
-        Assert.Equal(2300, mutant.CurrentYear);
-        Assert.Equal(4000, mutant.FurthestYearReached);
+        Assert.Equal(2300, traveler.CurrentYear);
+        Assert.Equal(4000, traveler.FurthestYearReached);
     }
 
     [Fact]
-    public void Travel_PlacesTheMutantAtTheDestinationYearsStartRoom()
+    public void Travel_PlacesTheTravelerAtTheDestinationYearsStartRoom()
     {
-        var mutant = RichMutant(2000);
+        var traveler = RichTraveler(2000);
         var world = World();
 
-        TimeTravelResolver.Travel(mutant, world, targetYear: 3300, NeutralRandom());
+        TimeTravelResolver.Travel(traveler, world, targetYear: 3300, NeutralRandom());
 
-        Assert.Equal(world.GetYear(3300).Map.Start, mutant.Position);
+        Assert.Equal(world.GetYear(3300).Map.Start, traveler.Position);
     }
 
     [Fact]
@@ -101,27 +101,27 @@ public class TimeTravelResolverTests
     {
         var world = World();
         var gatekeeperYear = world.GatekeeperYears.First();
-        var mutant = RichMutant(2000);
-        var hpBefore = mutant.Health.Current;
+        var traveler = RichTraveler(2000);
+        var hpBefore = traveler.Health.Current;
 
-        var result = TimeTravelResolver.Travel(mutant, world, gatekeeperYear, NeutralRandom());
+        var result = TimeTravelResolver.Travel(traveler, world, gatekeeperYear, NeutralRandom());
 
         Assert.True(result.Success);
-        Assert.Equal(hpBefore, mutant.Health.Current); // no fight happened
-        Assert.False(mutant.HasDefeatedGatekeeper(gatekeeperYear)); // still there to fight in-year
+        Assert.Equal(hpBefore, traveler.Health.Current); // no fight happened
+        Assert.False(traveler.HasDefeatedGatekeeper(gatekeeperYear)); // still there to fight in-year
     }
 
     [Fact]
     public void Travel_ToTheSameYear_IsAFreeNoOp()
     {
-        var mutant = RichMutant(2500);
-        var before = mutant.Ions.Current;
+        var traveler = RichTraveler(2500);
+        var before = traveler.Ions.Current;
 
-        var result = TimeTravelResolver.Travel(mutant, World(), targetYear: 2500, NeutralRandom());
+        var result = TimeTravelResolver.Travel(traveler, World(), targetYear: 2500, NeutralRandom());
 
         Assert.True(result.Success);
         Assert.Equal(0, result.IonsSpent);
-        Assert.Equal(before, mutant.Ions.Current);
+        Assert.Equal(before, traveler.Ions.Current);
     }
 
     [Fact]

@@ -8,6 +8,6 @@ public enum PrimaryStat
 {
     Strength,
     Agility,
-    Faith,
+    Resolve,
     Intellect,
 }

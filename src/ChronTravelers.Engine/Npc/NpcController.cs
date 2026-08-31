@@ -51,7 +51,7 @@ public static class NpcController
     /// omit it (or leave null) to skip that behavior entirely.
     /// </summary>
     public static NpcTickResult Act(
-        Mutant npc,
+        Traveler npc,
         LevelMap level,
         IRandomSource random,
         IReadOnlyList<Store>? stores = null,
@@ -118,7 +118,7 @@ public static class NpcController
     /// </summary>
     private const double ForwardTravelBias = 0.8;
 
-    private static NpcTickResult? TryTravel(Mutant npc, TimeWorld world, IRandomSource random)
+    private static NpcTickResult? TryTravel(Traveler npc, TimeWorld world, IRandomSource random)
     {
         if (random.NextDouble() > TravelAttemptChance)
         {
@@ -155,7 +155,7 @@ public static class NpcController
     /// if unarmed — at most one action, at a randomly picked store. Null
     /// if there was nothing worth doing (falls through to grinding).
     /// </summary>
-    private static NpcTickResult? TryTrade(Mutant npc, IReadOnlyList<Store> stores, IRandomSource random)
+    private static NpcTickResult? TryTrade(Traveler npc, IReadOnlyList<Store> stores, IRandomSource random)
     {
         var junkCount = npc.Inventory.Count(i => i.Type == ItemType.Junk);
         var wantsToSell = junkCount > ExcessJunkThreshold;
@@ -171,7 +171,7 @@ public static class NpcController
         if (wantsToSell)
         {
             var junk = npc.Inventory.First(i => i.Type == ItemType.Junk);
-            var price = store.BuyFromMutant(npc, junk);
+            var price = store.BuyFromTraveler(npc, junk);
             if (price is not null)
             {
                 return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"sold {junk.Name} to {store.Name} for {price} Riblets");
@@ -187,7 +187,7 @@ public static class NpcController
 
             if (affordable is not null)
             {
-                store.SellToMutant(npc, affordable);
+                store.SellToTraveler(npc, affordable);
                 npc.Wield(affordable.Item);
                 return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"bought and wielded {affordable.Item.Name} from {store.Name}");
             }
@@ -196,7 +196,7 @@ public static class NpcController
         return null; // wanted to trade but nothing worked out this tick
     }
 
-    private static void Wander(Mutant npc, LevelMap level, IRandomSource random)
+    private static void Wander(Traveler npc, LevelMap level, IRandomSource random)
     {
         var room = level.GetRoom(npc.Position);
         var exits = room.ExitDescriptions.Keys.ToList();

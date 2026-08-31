@@ -10,7 +10,7 @@ public class RangedResolverTests
 {
     private static StubRandomSource Neutral() => StubRandomSource.Fixed(0.5); // damage variance factor = 1.0
 
-    private static Mutant Shooter() => new("Rook", CharacterClass.Warrior);
+    private static Traveler Shooter() => new("Rook", CharacterClass.Soldier);
 
     private static Monster Target(int hp = 200, int defense = 8) =>
         new("Straw Dummy", tier: 2, maxHp: hp, attackPower: 5, defense: defense, speed: 8, xpReward: 80);

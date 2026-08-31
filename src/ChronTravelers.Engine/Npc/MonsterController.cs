@@ -84,7 +84,7 @@ public static class MonsterController
         YearPopulation population,
         LevelMap map,
         IReadOnlyList<Func<Monster>> roster,
-        Mutant player,
+        Traveler player,
         Coordinate previousPlayerPosition,
         bool playerLingered,
         IRandomSource random,
@@ -411,7 +411,7 @@ public static class MonsterController
     /// leaving, or just never having provoked it.
     /// </summary>
     /// <returns>True if a monster actually landed a hit (drives the cooldown reset).</returns>
-    private static bool ResolveAmbush(YearPopulation population, Mutant player, IRandomSource random, BroadcastChannel broadcast)
+    private static bool ResolveAmbush(YearPopulation population, Traveler player, IRandomSource random, BroadcastChannel broadcast)
     {
         if (player.Health.IsDead)
         {

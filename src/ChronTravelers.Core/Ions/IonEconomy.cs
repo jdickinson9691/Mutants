@@ -98,7 +98,7 @@ public static class IonEconomy
     /// (tier 9 ≈ 12), so early years net-<em>gain</em> Ions while the far
     /// future still net-drains them — matching docs/GDD.md §2.1's "later
     /// years are harsher survival environments". A higher class drain
-    /// multiplier (Mage/Wizard) also regens slower.
+    /// multiplier (Scientist/Engineer) also regens slower.
     /// </summary>
     public static int TicksPerIonRegen(int scalingTier, double classDrainMultiplier)
     {

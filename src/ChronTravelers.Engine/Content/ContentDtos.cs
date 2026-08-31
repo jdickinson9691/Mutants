@@ -13,7 +13,7 @@ namespace ChronTravelers.Engine.Content;
 /// docs/AGENTS.md's "data over code" rule. Several abilities were written
 /// for group combat (docs/GDD.md's "hit up to 2 additional adjacent
 /// enemies," "heal ... adjacent party/NPC allies") that this engine
-/// doesn't have yet (fights are strictly one Mutant vs. one Monster) —
+/// doesn't have yet (fights are strictly one Traveler vs. one Monster) —
 /// those are deliberately adapted to a single-target equivalent rather
 /// than left unimplemented; a genuine multi-combatant fight is future
 /// work. A few (Fence's Favor, Mana Well, Blink, Resurrect Lite) have no

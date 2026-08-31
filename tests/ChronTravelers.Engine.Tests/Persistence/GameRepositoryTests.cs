@@ -7,12 +7,12 @@ public class GameRepositoryTests
     private static CharacterSaveData SampleCharacter(string name = "Rook") => new()
     {
         Name = name,
-        Class = "Warrior",
+        Class = "Soldier",
         Level = 3,
         Xp = 250,
         Strength = 17,
         Agility = 10,
-        Faith = 8,
+        Resolve = 8,
         Intellect = 8,
         CurrentHp = 30,
         MaxHp = 42,

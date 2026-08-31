@@ -15,7 +15,7 @@ namespace ChronTravelers.Engine.Combat;
 /// </summary>
 public static class RangedResolver
 {
-    public static RangedResult Fire(Mutant shooter, Monster target, Item weapon, IRandomSource random)
+    public static RangedResult Fire(Traveler shooter, Monster target, Item weapon, IRandomSource random)
     {
         if (!weapon.IsRanged)
         {

@@ -16,7 +16,7 @@ public sealed class Store
 {
     public string Name { get; }
     public int HomeLevel { get; }
-    public Mutant? Owner { get; }
+    public Traveler? Owner { get; }
     public int Capital { get; private set; }
 
     public bool IsGovernmentRun => Owner is null;
@@ -24,7 +24,7 @@ public sealed class Store
     private readonly List<StoreListing> _listings = [];
     public IReadOnlyList<StoreListing> Listings => _listings;
 
-    public Store(string name, int homeLevel, int startingCapital, Mutant? owner = null)
+    public Store(string name, int homeLevel, int startingCapital, Traveler? owner = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -66,7 +66,7 @@ public sealed class Store
     /// price — the §6.3 Riblet-sink safeguard in action; government
     /// stores' huge Capital means this practically never happens to them.
     /// </summary>
-    public int? BuyFromMutant(Mutant seller, Item item)
+    public int? BuyFromTraveler(Traveler seller, Item item)
     {
         var price = EconomyPricing.BuyPrice(item);
         if (Capital < price)
@@ -80,8 +80,8 @@ public sealed class Store
         return price;
     }
 
-    /// <summary>A mutant buys a listed item from the store for Riblets.</summary>
-    public void SellToMutant(Mutant buyer, StoreListing listing)
+    /// <summary>A traveler buys a listed item from the store for Riblets.</summary>
+    public void SellToTraveler(Traveler buyer, StoreListing listing)
     {
         if (!_listings.Remove(listing))
         {
@@ -94,7 +94,7 @@ public sealed class Store
     }
 
     /// <summary>Owner deposits an item from their own inventory for sale — docs/GDD.md §6.2. Owner-only.</summary>
-    public void Deposit(Mutant owner, Item item, int askingPrice)
+    public void Deposit(Traveler owner, Item item, int askingPrice)
     {
         RequireOwner(owner);
         owner.RemoveFromInventory(item);
@@ -102,7 +102,7 @@ public sealed class Store
     }
 
     /// <summary>Owner pulls a listed item back into their own inventory, unlisting it. Owner-only.</summary>
-    public void Withdraw(Mutant owner, StoreListing listing)
+    public void Withdraw(Traveler owner, StoreListing listing)
     {
         RequireOwner(owner);
         if (!_listings.Remove(listing))
@@ -114,7 +114,7 @@ public sealed class Store
     }
 
     /// <summary>Owner changes a listing's asking price. Owner-only.</summary>
-    public void AdjustPrice(Mutant owner, StoreListing listing, int newPrice)
+    public void AdjustPrice(Traveler owner, StoreListing listing, int newPrice)
     {
         RequireOwner(owner);
         var index = _listings.IndexOf(listing);
@@ -131,7 +131,7 @@ public sealed class Store
     /// into their personal Riblets — the "idle-income loop" of
     /// docs/GDD.md §6.2. Owner-only.
     /// </summary>
-    public int CollectCapital(Mutant owner, int amount)
+    public int CollectCapital(Traveler owner, int amount)
     {
         RequireOwner(owner);
         if (amount < 0 || amount > Capital)
@@ -144,11 +144,11 @@ public sealed class Store
         return amount;
     }
 
-    private void RequireOwner(Mutant mutant)
+    private void RequireOwner(Traveler traveler)
     {
-        if (Owner != mutant)
+        if (Owner != traveler)
         {
-            throw new InvalidOperationException($"{mutant.Name} does not own {Name}.");
+            throw new InvalidOperationException($"{traveler.Name} does not own {Name}.");
         }
     }
 }

@@ -14,7 +14,7 @@ public class CharacterMapperTests
     [Fact]
     public void RoundTrip_PreservesCoreStatsAndTimelinePosition()
     {
-        var original = new Mutant("Rook", CharacterClass.Warrior);
+        var original = new Traveler("Rook", CharacterClass.Soldier);
         original.GainXp(150);
         original.AddRiblets(42);
         original.SetCurrentYear(3400);
@@ -50,12 +50,12 @@ public class CharacterMapperTests
         {
             SchemaVersion = 1,
             Name = "Legacy",
-            Class = nameof(CharacterClass.Thief),
+            Class = nameof(CharacterClass.Spy),
             Level = 22,
             Xp = 5000,
             Strength = 12,
             Agility = 30,
-            Faith = 10,
+            Resolve = 10,
             Intellect = 14,
             CurrentHp = 40,
             MaxHp = 80,
@@ -81,8 +81,8 @@ public class CharacterMapperTests
     [Fact]
     public void RoundTrip_PreservesInventoryAndEquippedItems()
     {
-        var original = new Mutant("Rook", CharacterClass.Warrior);
-        var weapon = Item.Create("Axe", ItemType.Weapon, 2, Rarity.Rare, CharacterClass.Warrior);
+        var original = new Traveler("Rook", CharacterClass.Soldier);
+        var weapon = Item.Create("Axe", ItemType.Weapon, 2, Rarity.Rare, CharacterClass.Soldier);
         var armor = Item.Create("Plate", ItemType.Armor, 2, Rarity.Uncommon);
         var junk = Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common);
         original.AddToInventory(weapon);
@@ -104,7 +104,7 @@ public class CharacterMapperTests
     [Fact]
     public void RoundTrip_HandlesNoEquippedItems()
     {
-        var original = new Mutant("Rook", CharacterClass.Warrior);
+        var original = new Traveler("Rook", CharacterClass.Soldier);
         original.AddToInventory(Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common));
 
         var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original, TestSeed));
@@ -116,7 +116,7 @@ public class CharacterMapperTests
     [Fact]
     public void RoundTrip_HandlesEmptyInventory()
     {
-        var original = new Mutant("Rook", CharacterClass.Warrior);
+        var original = new Traveler("Rook", CharacterClass.Soldier);
         var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original, TestSeed));
 
         Assert.Empty(restored.Inventory);
@@ -125,7 +125,7 @@ public class CharacterMapperTests
     [Fact]
     public void RoundTrip_PreservesAConsumablesEffectFields()
     {
-        var original = new Mutant("Rook", CharacterClass.Warrior);
+        var original = new Traveler("Rook", CharacterClass.Soldier);
         var potion = Item.Create("Combat Stim", ItemType.Consumable, 3, Rarity.Uncommon,
             consumableEffect: ConsumableEffectType.BuffAttack, effectMagnitude: 5, effectDurationTicks: 15);
         original.AddToInventory(potion);
@@ -142,7 +142,7 @@ public class CharacterMapperTests
     [Fact]
     public void RoundTrip_PreservesAHalfSpentEquippedRangedWeapon_AndReEquipsIt()
     {
-        var original = new Mutant("Rook", CharacterClass.Warrior);
+        var original = new Traveler("Rook", CharacterClass.Soldier);
         var wand = Item.CreateRanged("Hexbolt Wand", 3, Rarity.Rare, RangedKind.Wand, ammoCapacity: 5,
             rangedEffect: RangedEffectType.Weaken, magnitude: 2);
         wand.AmmoRemaining = 2; // fired three of five
@@ -169,8 +169,8 @@ public class CharacterMapperTests
         {
             SchemaVersion = 2,
             Name = "Rook",
-            Class = nameof(CharacterClass.Warrior),
-            Strength = 10, Agility = 10, Faith = 10, Intellect = 10,
+            Class = nameof(CharacterClass.Soldier),
+            Strength = 10, Agility = 10, Resolve = 10, Intellect = 10,
             CurrentHp = 30, MaxHp = 30, CurrentIons = 10, MaxIons = 10,
             CurrentYear = 2000, FurthestYearReached = 2000,
         });
@@ -184,7 +184,7 @@ public class CharacterMapperTests
         var world = TestTimeWorld.Build(seed: 4242);
         var year = 2600;
 
-        var player = new Mutant("Rook", CharacterClass.Warrior, startingYear: year);
+        var player = new Traveler("Rook", CharacterClass.Soldier, startingYear: year);
         player.AddRiblets(5000);
         player.PlaceAt(world.GetYear(year).Map.Start);
 
@@ -226,7 +226,7 @@ public class CharacterMapperTests
     public void ApplyOwnedStores_IsANoOpForASaveWithNoOwnedStores()
     {
         var world = TestTimeWorld.Build(seed: 1);
-        var save = CharacterMapper.ToSaveData(new Mutant("Rook", CharacterClass.Warrior), TestSeed);
+        var save = CharacterMapper.ToSaveData(new Traveler("Rook", CharacterClass.Soldier), TestSeed);
         var player = CharacterMapper.FromSaveData(save);
 
         CharacterMapper.ApplyOwnedStores(save, player, world); // must not throw

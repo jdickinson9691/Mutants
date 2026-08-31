@@ -20,7 +20,7 @@ namespace ChronTravelers.Engine.Combat;
 /// </summary>
 public sealed class CombatSession
 {
-    public Mutant Mutant { get; }
+    public Traveler Traveler { get; }
     public Monster Monster { get; }
 
     /// <summary>False during a gatekeeper fight, where Banish shouldn't be able to trivially skip the level's boss.</summary>
@@ -28,8 +28,8 @@ public sealed class CombatSession
 
     public int Rounds { get; private set; }
     public IReadOnlyList<string> Log => _log;
-    public bool IsOver => Mutant.Health.IsDead || Monster.Health.IsDead;
-    public bool MutantWon => Monster.Health.IsDead && !Mutant.Health.IsDead;
+    public bool IsOver => Traveler.Health.IsDead || Monster.Health.IsDead;
+    public bool TravelerWon => Monster.Health.IsDead && !Traveler.Health.IsDead;
     public int XpAwarded { get; private set; }
     public IReadOnlyList<Item> ItemsDropped { get; private set; } = [];
 
@@ -39,8 +39,8 @@ public sealed class CombatSession
 
     // Ability-driven combat-duration state - see the class doc comment
     // for why these last "the rest of the fight" rather than N rounds.
-    private int _mutantAttackBonus;
-    private int _mutantDefenseBonus;
+    private int _travelerAttackBonus;
+    private int _travelerDefenseBonus;
     private int _monsterAttackPenalty;
     private int _monsterDefensePenalty;
     private int _monsterSpeedPenalty;
@@ -50,9 +50,9 @@ public sealed class CombatSession
     private int _dotDamagePerRound;
     private int _dotRoundsRemaining;
 
-    public CombatSession(Mutant mutant, Monster monster, IRandomSource random, bool allowBanish = true)
+    public CombatSession(Traveler traveler, Monster monster, IRandomSource random, bool allowBanish = true)
     {
-        Mutant = mutant;
+        Traveler = traveler;
         Monster = monster;
         _random = random;
         AllowBanish = allowBanish;
@@ -91,14 +91,14 @@ public sealed class CombatSession
             return new AbilityCastResult(false, "The fight is already over.");
         }
 
-        if (!Enum.TryParse<CharacterClass>(ability.Class, ignoreCase: true, out var abilityClass) || abilityClass != Mutant.Class)
+        if (!Enum.TryParse<CharacterClass>(ability.Class, ignoreCase: true, out var abilityClass) || abilityClass != Traveler.Class)
         {
-            return new AbilityCastResult(false, $"{Mutant.Name} can't use {ability.Name} — that's a {ability.Class} ability.");
+            return new AbilityCastResult(false, $"{Traveler.Name} can't use {ability.Name} — that's a {ability.Class} ability.");
         }
 
-        if (Mutant.Level < ability.Level)
+        if (Traveler.Level < ability.Level)
         {
-            return new AbilityCastResult(false, $"{ability.Name} unlocks at level {ability.Level} (you're level {Mutant.Level}).");
+            return new AbilityCastResult(false, $"{ability.Name} unlocks at level {ability.Level} (you're level {Traveler.Level}).");
         }
 
         if (!Enum.TryParse<AbilityEffectType>(ability.Effect, ignoreCase: true, out var effectType))
@@ -116,25 +116,25 @@ public sealed class CombatSession
             return new AbilityCastResult(false, $"{ability.Name} has no effect against a gatekeeper. No Ions spent.");
         }
 
-        if (!Mutant.Ions.CanAfford(ability.IonCost))
+        if (!Traveler.Ions.CanAfford(ability.IonCost))
         {
-            return new AbilityCastResult(false, $"Not enough Ions ({ability.IonCost} needed; you have {Mutant.Ions.Current}).");
+            return new AbilityCastResult(false, $"Not enough Ions ({ability.IonCost} needed; you have {Traveler.Ions.Current}).");
         }
 
-        Mutant.Ions.Spend(ability.IonCost);
+        Traveler.Ions.Spend(ability.IonCost);
         ResolveRound(ability, effectType);
-        return new AbilityCastResult(true, $"{Mutant.Name} casts {ability.Name}!");
+        return new AbilityCastResult(true, $"{Traveler.Name} casts {ability.Name}!");
     }
 
     private void ResolveRound(AbilityData? ability, AbilityEffectType effectType)
     {
         Rounds++;
 
-        var mutantActsFirst = Mutant.Speed >= MonsterEffectiveSpeed();
+        var travelerActsFirst = Traveler.Speed >= MonsterEffectiveSpeed();
 
-        if (mutantActsFirst)
+        if (travelerActsFirst)
         {
-            MutantTurn(ability, effectType);
+            TravelerTurn(ability, effectType);
             if (!Monster.Health.IsDead)
             {
                 MonsterTurn();
@@ -143,9 +143,9 @@ public sealed class CombatSession
         else
         {
             MonsterTurn();
-            if (!Mutant.Health.IsDead)
+            if (!Traveler.Health.IsDead)
             {
-                MutantTurn(ability, effectType);
+                TravelerTurn(ability, effectType);
             }
         }
 
@@ -160,45 +160,45 @@ public sealed class CombatSession
             }
         }
 
-        if (IsOver && MutantWon && !_rewardsGranted)
+        if (IsOver && TravelerWon && !_rewardsGranted)
         {
             _rewardsGranted = true;
             XpAwarded = Monster.XpReward;
-            ItemsDropped = CombatResolver.AwardVictory(Mutant, Monster, _random, _log);
+            ItemsDropped = CombatResolver.AwardVictory(Traveler, Monster, _random, _log);
         }
     }
 
-    private void MutantTurn(AbilityData? ability, AbilityEffectType effectType)
+    private void TravelerTurn(AbilityData? ability, AbilityEffectType effectType)
     {
         if (ability is null)
         {
-            PerformMutantAttack();
+            PerformTravelerAttack();
             return;
         }
 
         switch (effectType)
         {
             case AbilityEffectType.Damage:
-                PerformMutantAttack(ability.Magnitude, condition: ability.Condition, tag: ability.Tag);
+                PerformTravelerAttack(ability.Magnitude, condition: ability.Condition, tag: ability.Tag);
                 break;
 
             case AbilityEffectType.IgnoreDefenseDamage:
-                PerformMutantAttack(ability.Magnitude, ignoreDefense: true);
+                PerformTravelerAttack(ability.Magnitude, ignoreDefense: true);
                 break;
 
             case AbilityEffectType.Heal:
-                var healed = Mutant.Health.Heal((int)Math.Round(Mutant.Health.Max * ability.Magnitude));
-                _log.Add($"{Mutant.Name} heals for {healed} HP.");
+                var healed = Traveler.Health.Heal((int)Math.Round(Traveler.Health.Max * ability.Magnitude));
+                _log.Add($"{Traveler.Name} heals for {healed} HP.");
                 break;
 
             case AbilityEffectType.BuffSelfAttack:
-                _mutantAttackBonus += (int)ability.Magnitude;
-                _log.Add($"{Mutant.Name}'s attack is bolstered.");
+                _travelerAttackBonus += (int)ability.Magnitude;
+                _log.Add($"{Traveler.Name}'s attack is bolstered.");
                 break;
 
             case AbilityEffectType.BuffSelfDefense:
-                _mutantDefenseBonus += (int)ability.Magnitude;
-                _log.Add($"{Mutant.Name}'s defense is bolstered.");
+                _travelerDefenseBonus += (int)ability.Magnitude;
+                _log.Add($"{Traveler.Name}'s defense is bolstered.");
                 break;
 
             case AbilityEffectType.DebuffTargetAttack:
@@ -219,33 +219,33 @@ public sealed class CombatSession
             case AbilityEffectType.GuaranteedCritNextAttack:
                 _critCharge = true;
                 _critMultiplier = ability.Magnitude;
-                _log.Add($"{Mutant.Name} vanishes into the shadows...");
+                _log.Add($"{Traveler.Name} vanishes into the shadows...");
                 break;
 
             case AbilityEffectType.ExtraAttack:
-                PerformMutantAttack();
+                PerformTravelerAttack();
                 if (!Monster.Health.IsDead)
                 {
-                    PerformMutantAttack();
+                    PerformTravelerAttack();
                 }
 
                 break;
 
             case AbilityEffectType.Shield:
                 _shieldCharge = true;
-                _log.Add($"{Mutant.Name} is shielded.");
+                _log.Add($"{Traveler.Name} is shielded.");
                 break;
 
             case AbilityEffectType.DamageOverTime:
-                PerformMutantAttack();
+                PerformTravelerAttack();
                 _dotDamagePerRound = (int)ability.Magnitude;
                 _dotRoundsRemaining = ability.DurationRounds;
                 _log.Add($"{Monster.Name} is poisoned.");
                 break;
 
             case AbilityEffectType.RestoreIons:
-                var restored = Mutant.Ions.Add((int)Math.Round(Mutant.Ions.Max * ability.Magnitude));
-                _log.Add($"{Mutant.Name} restores {restored} Ions.");
+                var restored = Traveler.Ions.Add((int)Math.Round(Traveler.Ions.Max * ability.Magnitude));
+                _log.Add($"{Traveler.Name} restores {restored} Ions.");
                 break;
 
             case AbilityEffectType.InstantDefeatNonBoss:
@@ -262,7 +262,7 @@ public sealed class CombatSession
     /// already spent by the time this runs, so a total whiff would be
     /// needlessly punishing.
     /// </summary>
-    private void PerformMutantAttack(double damageMultiplier = 1.0, bool ignoreDefense = false, string? condition = null, string? tag = null)
+    private void PerformTravelerAttack(double damageMultiplier = 1.0, bool ignoreDefense = false, string? condition = null, string? tag = null)
     {
         if (!string.IsNullOrEmpty(condition))
         {
@@ -284,19 +284,19 @@ public sealed class CombatSession
         {
             damageMultiplier *= _critMultiplier;
             _critCharge = false;
-            _log.Add($"{Mutant.Name} strikes from the shadows!");
+            _log.Add($"{Traveler.Name} strikes from the shadows!");
         }
 
         var defense = ignoreDefense ? 0 : MonsterEffectiveDefense();
-        var baseDamage = CombatResolver.RollDamage(MutantEffectiveAttack(), defense, _random);
+        var baseDamage = CombatResolver.RollDamage(TravelerEffectiveAttack(), defense, _random);
         var damage = Math.Max(1, (int)Math.Round(baseDamage * damageMultiplier));
         var actualDamage = Monster.Health.Damage(damage);
-        _log.Add($"{Mutant.Name} hits {Monster.Name} for {actualDamage} damage.");
+        _log.Add($"{Traveler.Name} hits {Monster.Name} for {actualDamage} damage.");
     }
 
     private void MonsterTurn()
     {
-        var incoming = CombatResolver.RollDamage(MonsterEffectiveAttack(), MutantEffectiveDefense(), _random);
+        var incoming = CombatResolver.RollDamage(MonsterEffectiveAttack(), TravelerEffectiveDefense(), _random);
 
         if (_shieldCharge)
         {
@@ -305,13 +305,13 @@ public sealed class CombatSession
             return;
         }
 
-        var actualDamage = Mutant.Health.Damage(incoming);
-        _log.Add($"{Monster.Name} hits {Mutant.Name} for {actualDamage} damage.");
+        var actualDamage = Traveler.Health.Damage(incoming);
+        _log.Add($"{Monster.Name} hits {Traveler.Name} for {actualDamage} damage.");
     }
 
-    private int MutantEffectiveAttack() => Mutant.EffectiveAttackPower + _mutantAttackBonus;
+    private int TravelerEffectiveAttack() => Traveler.EffectiveAttackPower + _travelerAttackBonus;
 
-    private int MutantEffectiveDefense() => Mutant.EffectiveDefense + _mutantDefenseBonus;
+    private int TravelerEffectiveDefense() => Traveler.EffectiveDefense + _travelerDefenseBonus;
 
     private int MonsterEffectiveAttack() => Math.Max(0, Monster.AttackPower - _monsterAttackPenalty);
 

@@ -71,7 +71,7 @@ public static class TestTimeWorld
     private static IReadOnlyList<ItemArchetypeDefinition> BuildItemArchetypes() =>
     [
         Weapon("blade", "Salvaged Blade", Rarity.Common, ["scrap", "ash", "paradox", "common"]),
-        Weapon("warrior-arm", "Bruiser's Maul", Rarity.Uncommon, ["scrap", "ash", "paradox"], CharacterClassRestriction: Classes.CharacterClass.Warrior),
+        Weapon("warrior-arm", "Bruiser's Maul", Rarity.Uncommon, ["scrap", "ash", "paradox"], CharacterClassRestriction: Classes.CharacterClass.Soldier),
         Armor("plate", "Layered Plating", Rarity.Common, ["scrap", "ash", "paradox", "common"]),
         Junk("shard", "Salvage Shard", Rarity.Common, ["scrap", "ash", "paradox", "common"]),
         Food("ration", "Ration Pack", magnitude: 12, ["scrap", "ash", "paradox", "common"]),

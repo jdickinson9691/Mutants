@@ -7,13 +7,13 @@ namespace ChronTravelers.Core.Stats;
 /// produces a new StatBlock rather than mutating one in place, so stat
 /// history/replay stays simple.
 /// </summary>
-public readonly record struct StatBlock(int Strength, int Agility, int Faith, int Intellect)
+public readonly record struct StatBlock(int Strength, int Agility, int Resolve, int Intellect)
 {
     public int Get(PrimaryStat stat) => stat switch
     {
         PrimaryStat.Strength => Strength,
         PrimaryStat.Agility => Agility,
-        PrimaryStat.Faith => Faith,
+        PrimaryStat.Resolve => Resolve,
         PrimaryStat.Intellect => Intellect,
         _ => throw new ArgumentOutOfRangeException(nameof(stat), stat, null),
     };
@@ -23,7 +23,7 @@ public readonly record struct StatBlock(int Strength, int Agility, int Faith, in
     {
         PrimaryStat.Strength => this with { Strength = Strength + amount },
         PrimaryStat.Agility => this with { Agility = Agility + amount },
-        PrimaryStat.Faith => this with { Faith = Faith + amount },
+        PrimaryStat.Resolve => this with { Resolve = Resolve + amount },
         PrimaryStat.Intellect => this with { Intellect = Intellect + amount },
         _ => throw new ArgumentOutOfRangeException(nameof(stat), stat, null),
     };

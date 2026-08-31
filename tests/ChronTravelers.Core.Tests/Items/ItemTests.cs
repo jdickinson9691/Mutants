@@ -49,20 +49,20 @@ public class ItemTests
     public void IsClassCompatible_TrueWhenUnrestrictedOrMatching()
     {
         var unrestricted = Item.Create("Generic Dagger", ItemType.Weapon, 1, Rarity.Common);
-        var warriorOnly = Item.Create("Great Axe", ItemType.Weapon, 1, Rarity.Common, CharacterClass.Warrior);
+        var warriorOnly = Item.Create("Great Axe", ItemType.Weapon, 1, Rarity.Common, CharacterClass.Soldier);
 
-        Assert.True(unrestricted.IsClassCompatible(CharacterClass.Mage));
-        Assert.True(warriorOnly.IsClassCompatible(CharacterClass.Warrior));
-        Assert.False(warriorOnly.IsClassCompatible(CharacterClass.Mage));
+        Assert.True(unrestricted.IsClassCompatible(CharacterClass.Scientist));
+        Assert.True(warriorOnly.IsClassCompatible(CharacterClass.Soldier));
+        Assert.False(warriorOnly.IsClassCompatible(CharacterClass.Scientist));
     }
 
     [Fact]
     public void WieldEffectiveness_FullForCompatible_PenalizedForIncompatible()
     {
-        var warriorOnly = Item.Create("Great Axe", ItemType.Weapon, 1, Rarity.Common, CharacterClass.Warrior);
+        var warriorOnly = Item.Create("Great Axe", ItemType.Weapon, 1, Rarity.Common, CharacterClass.Soldier);
 
-        Assert.Equal(1.0, warriorOnly.WieldEffectiveness(CharacterClass.Warrior));
-        Assert.True(warriorOnly.WieldEffectiveness(CharacterClass.Mage) < 1.0);
+        Assert.Equal(1.0, warriorOnly.WieldEffectiveness(CharacterClass.Soldier));
+        Assert.True(warriorOnly.WieldEffectiveness(CharacterClass.Scientist) < 1.0);
     }
 
     [Fact]

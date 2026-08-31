@@ -4,7 +4,7 @@ using ChronTravelers.Core.Monsters;
 namespace ChronTravelers.Engine.Combat;
 
 /// <summary>
-/// Resolves a fight between a Mutant and a Monster — docs/AGENTS.md
+/// Resolves a fight between a Traveler and a Monster — docs/AGENTS.md
 /// assigns "combat resolution" to the Systems/Engine Agent, kept separate
 /// from the Core domain model. docs/GDD.md confirms "every class shares
 /// ... a primary attack" but specifies no combat formula; the turn order,
@@ -29,70 +29,70 @@ public static class CombatResolver
     private const double DamageVariance = 0.15;
 
     /// <summary>
-    /// Fights <paramref name="mutant"/> against <paramref name="monster"/>
-    /// to a decisive result (or the round cap). On a Mutant win, awards XP
+    /// Fights <paramref name="traveler"/> against <paramref name="monster"/>
+    /// to a decisive result (or the round cap). On a Traveler win, awards XP
     /// and rolls/adds loot per docs/GDD.md §5. On a loss (or the round
     /// cap, treated as a loss), no rewards are granted and combat/death
     /// handling beyond that — docs/GDD.md §3.3's death & recall — is out
     /// of scope here; the caller decides what a defeat means.
     /// </summary>
-    public static FightResult Fight(Mutant mutant, Monster monster, IRandomSource random)
+    public static FightResult Fight(Traveler traveler, Monster monster, IRandomSource random)
     {
         var log = new List<string>();
-        var mutantActsFirst = mutant.Speed >= monster.Speed;
+        var travelerActsFirst = traveler.Speed >= monster.Speed;
         var rounds = 0;
 
-        while (!mutant.Health.IsDead && !monster.Health.IsDead && rounds < MaxRounds)
+        while (!traveler.Health.IsDead && !monster.Health.IsDead && rounds < MaxRounds)
         {
             rounds++;
 
-            if (mutantActsFirst)
+            if (travelerActsFirst)
             {
-                ResolveAttack(mutant.Name, mutant.EffectiveAttackPower, monster.Name, monster.Defense, monster.Health, random, log);
+                ResolveAttack(traveler.Name, traveler.EffectiveAttackPower, monster.Name, monster.Defense, monster.Health, random, log);
                 if (monster.Health.IsDead)
                 {
                     break;
                 }
 
-                ResolveAttack(monster.Name, monster.AttackPower, mutant.Name, mutant.EffectiveDefense, mutant.Health, random, log);
+                ResolveAttack(monster.Name, monster.AttackPower, traveler.Name, traveler.EffectiveDefense, traveler.Health, random, log);
             }
             else
             {
-                ResolveAttack(monster.Name, monster.AttackPower, mutant.Name, mutant.EffectiveDefense, mutant.Health, random, log);
-                if (mutant.Health.IsDead)
+                ResolveAttack(monster.Name, monster.AttackPower, traveler.Name, traveler.EffectiveDefense, traveler.Health, random, log);
+                if (traveler.Health.IsDead)
                 {
                     break;
                 }
 
-                ResolveAttack(mutant.Name, mutant.EffectiveAttackPower, monster.Name, monster.Defense, monster.Health, random, log);
+                ResolveAttack(traveler.Name, traveler.EffectiveAttackPower, monster.Name, monster.Defense, monster.Health, random, log);
             }
         }
 
-        var mutantWon = monster.Health.IsDead && !mutant.Health.IsDead;
+        var travelerWon = monster.Health.IsDead && !traveler.Health.IsDead;
 
-        if (!mutantWon)
+        if (!travelerWon)
         {
-            return new FightResult(MutantWon: false, rounds, XpAwarded: 0, ItemsDropped: [], log);
+            return new FightResult(TravelerWon: false, rounds, XpAwarded: 0, ItemsDropped: [], log);
         }
 
-        var loot = AwardVictory(mutant, monster, random, log);
-        return new FightResult(MutantWon: true, rounds, XpAwarded: monster.XpReward, ItemsDropped: loot, log);
+        var loot = AwardVictory(traveler, monster, random, log);
+        return new FightResult(TravelerWon: true, rounds, XpAwarded: monster.XpReward, ItemsDropped: loot, log);
     }
 
     /// <summary>Grants XP and rolls/adds loot for defeating <paramref name="monster"/> — shared with CombatSession's interactive fights.</summary>
-    internal static IReadOnlyList<Core.Items.Item> AwardVictory(Mutant mutant, Monster monster, IRandomSource random, List<string> log)
+    internal static IReadOnlyList<Core.Items.Item> AwardVictory(Traveler traveler, Monster monster, IRandomSource random, List<string> log)
     {
-        var levelsGained = mutant.GainXp(monster.XpReward);
+        var levelsGained = traveler.GainXp(monster.XpReward);
         if (levelsGained > 0)
         {
-            log.Add($"{mutant.Name} gained {levelsGained} level(s)!");
+            log.Add($"{traveler.Name} gained {levelsGained} level(s)!");
         }
 
         var loot = LootDropRoller.Roll(monster.LootTable, random);
         foreach (var item in loot)
         {
-            mutant.AddToInventory(item);
-            log.Add($"{mutant.Name} looted {item.Name}.");
+            traveler.AddToInventory(item);
+            log.Add($"{traveler.Name} looted {item.Name}.");
         }
 
         return loot;

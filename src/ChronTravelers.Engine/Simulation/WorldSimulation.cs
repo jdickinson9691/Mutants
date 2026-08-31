@@ -15,7 +15,7 @@ namespace ChronTravelers.Engine.Simulation;
 /// hosts this — ChronTravelers.Console currently advances one tick per player
 /// command instead, as a synchronous v1 approximation.
 ///
-/// Each NPC acts against its OWN <see cref="Mutant.CurrentTimeLevel"/> —
+/// Each NPC acts against its OWN <see cref="Traveler.CurrentTimeLevel"/> —
 /// the map, monster roster, and store list are all resolved per-NPC from
 /// <see cref="World"/> every tick, rather than one shared level for
 /// everyone, since NPCs are free to time-travel independently of the
@@ -25,7 +25,7 @@ public sealed class WorldSimulation
 {
     public TimeWorld World { get; }
     public BroadcastChannel Broadcast { get; }
-    public IReadOnlyList<Mutant> Npcs { get; }
+    public IReadOnlyList<Traveler> Npcs { get; }
 
     /// <summary>
     /// Player-local ambient narration from the most recent <see cref="Tick"/>
@@ -44,7 +44,7 @@ public sealed class WorldSimulation
 
     public WorldSimulation(
         TimeWorld world,
-        IReadOnlyList<Mutant> npcs,
+        IReadOnlyList<Traveler> npcs,
         IRandomSource random,
         BroadcastChannel? broadcast = null)
     {
@@ -56,7 +56,7 @@ public sealed class WorldSimulation
 
     /// <summary>
     /// Advances the world by one tick: passive Ion drain and potion-buff
-    /// expiry for every living mutant (all NPCs plus
+    /// expiry for every living traveler (all NPCs plus
     /// <paramref name="player"/>), then one AI action per living NPC on
     /// its own current level (which may trade, travel, or fight — see
     /// <see cref="Npc.NpcController"/>), publishing kill/level-up/
@@ -68,22 +68,22 @@ public sealed class WorldSimulation
     /// — and only if they also held position — can a co-located monster
     /// ambush them. Defaults to false so non-console callers never ambush.
     /// </param>
-    public void Tick(Mutant player, bool playerActedIdly = false)
+    public void Tick(Traveler player, bool playerActedIdly = false)
     {
         _narration.Clear();
 
-        foreach (var mutant in Npcs.Append(player))
+        foreach (var traveler in Npcs.Append(player))
         {
-            if (mutant.Health.IsDead)
+            if (traveler.Health.IsDead)
             {
                 continue;
             }
 
-            var scalingTier = TimelineContentFactory.DisplayTier(mutant.CurrentYear);
-            var drainMultiplier = mutant.ClassDefinition.IonDrainMultiplier;
-            mutant.AdvanceIonDrainTick(IonEconomy.TicksPerIonDrain(scalingTier, drainMultiplier));
-            mutant.AdvanceIonRegenTick(IonEconomy.TicksPerIonRegen(scalingTier, drainMultiplier));
-            mutant.AdvanceEffectTicks();
+            var scalingTier = TimelineContentFactory.DisplayTier(traveler.CurrentYear);
+            var drainMultiplier = traveler.ClassDefinition.IonDrainMultiplier;
+            traveler.AdvanceIonDrainTick(IonEconomy.TicksPerIonDrain(scalingTier, drainMultiplier));
+            traveler.AdvanceIonRegenTick(IonEconomy.TicksPerIonRegen(scalingTier, drainMultiplier));
+            traveler.AdvanceEffectTicks();
         }
 
         foreach (var npc in Npcs)
@@ -111,7 +111,7 @@ public sealed class WorldSimulation
 
             if (result.Fight is { } fight)
             {
-                Broadcast.Publish(fight.MutantWon
+                Broadcast.Publish(fight.TravelerWon
                     ? GameEvent.Slain(result.MonsterName!, npc.Name)
                     : GameEvent.Slain(npc.Name, result.MonsterName!));
             }

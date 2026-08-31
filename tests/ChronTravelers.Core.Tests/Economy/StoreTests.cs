@@ -7,7 +7,7 @@ namespace ChronTravelers.Core.Tests.Economy;
 
 public class StoreTests
 {
-    private static Mutant NewMutant(string name = "Rook") => new(name, CharacterClass.Warrior);
+    private static Traveler NewTraveler(string name = "Rook") => new(name, CharacterClass.Soldier);
 
     [Fact]
     public void CreateGovernmentStore_HasNoOwnerAndHugeCapital()
@@ -20,7 +20,7 @@ public class StoreTests
     }
 
     [Fact]
-    public void Stock_AddsListingWithoutTouchingAnyMutant()
+    public void Stock_AddsListingWithoutTouchingAnyTraveler()
     {
         var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
         var item = Item.Create("Patch Kit", ItemType.Consumable, 1, Rarity.Common);
@@ -32,14 +32,14 @@ public class StoreTests
     }
 
     [Fact]
-    public void BuyFromMutant_PaysSellerAndRelistsTheItem()
+    public void BuyFromTraveler_PaysSellerAndRelistsTheItem()
     {
         var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
-        var seller = NewMutant();
+        var seller = NewTraveler();
         var item = Item.Create("Scrap", ItemType.Junk, tier: 2, Rarity.Common); // value 20
         seller.AddToInventory(item);
 
-        var price = store.BuyFromMutant(seller, item);
+        var price = store.BuyFromTraveler(seller, item);
 
         Assert.NotNull(price);
         Assert.Equal(price, seller.Riblets);
@@ -48,14 +48,14 @@ public class StoreTests
     }
 
     [Fact]
-    public void BuyFromMutant_ReturnsNullAndDoesNothingWhenStoreCantAfford()
+    public void BuyFromTraveler_ReturnsNullAndDoesNothingWhenStoreCantAfford()
     {
         var store = new Store("Corner Shop", homeLevel: 1, startingCapital: 0);
-        var seller = NewMutant();
+        var seller = NewTraveler();
         var item = Item.Create("Scrap", ItemType.Junk, 2, Rarity.Common);
         seller.AddToInventory(item);
 
-        var price = store.BuyFromMutant(seller, item);
+        var price = store.BuyFromTraveler(seller, item);
 
         Assert.Null(price);
         Assert.Equal(0, seller.Riblets);
@@ -64,16 +64,16 @@ public class StoreTests
     }
 
     [Fact]
-    public void SellToMutant_TransfersItemAndChargesRiblets()
+    public void SellToTraveler_TransfersItemAndChargesRiblets()
     {
         var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
         var item = Item.Create("Patch Kit", ItemType.Consumable, 1, Rarity.Common);
         store.Stock(item, askingPrice: 15);
-        var buyer = NewMutant();
+        var buyer = NewTraveler();
         buyer.AddRiblets(20);
         var capitalBefore = store.Capital;
 
-        store.SellToMutant(buyer, store.Listings[0]);
+        store.SellToTraveler(buyer, store.Listings[0]);
 
         Assert.Equal(5, buyer.Riblets);
         Assert.Contains(item, buyer.Inventory);
@@ -82,21 +82,21 @@ public class StoreTests
     }
 
     [Fact]
-    public void SellToMutant_ThrowsForAListingNotAtThisStore()
+    public void SellToTraveler_ThrowsForAListingNotAtThisStore()
     {
         var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
         var phantomListing = new StoreListing(Item.Create("Ghost", ItemType.Junk, 1, Rarity.Common), 5);
-        var buyer = NewMutant();
+        var buyer = NewTraveler();
         buyer.AddRiblets(10);
 
-        Assert.Throws<InvalidOperationException>(() => store.SellToMutant(buyer, phantomListing));
+        Assert.Throws<InvalidOperationException>(() => store.SellToTraveler(buyer, phantomListing));
     }
 
     [Fact]
     public void Deposit_RequiresOwnership()
     {
-        var owner = NewMutant("Owner");
-        var stranger = NewMutant("Stranger");
+        var owner = NewTraveler("Owner");
+        var stranger = NewTraveler("Stranger");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
         var item = Item.Create("Widget", ItemType.Junk, 1, Rarity.Common);
         stranger.AddToInventory(item);
@@ -107,7 +107,7 @@ public class StoreTests
     [Fact]
     public void Deposit_MovesItemFromOwnerInventoryIntoAListing()
     {
-        var owner = NewMutant("Owner");
+        var owner = NewTraveler("Owner");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
         var item = Item.Create("Widget", ItemType.Junk, 1, Rarity.Common);
         owner.AddToInventory(item);
@@ -121,8 +121,8 @@ public class StoreTests
     [Fact]
     public void Withdraw_RequiresOwnership()
     {
-        var owner = NewMutant("Owner");
-        var stranger = NewMutant("Stranger");
+        var owner = NewTraveler("Owner");
+        var stranger = NewTraveler("Stranger");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
         var item = Item.Create("Widget", ItemType.Junk, 1, Rarity.Common);
         store.Stock(item, 10);
@@ -133,7 +133,7 @@ public class StoreTests
     [Fact]
     public void Withdraw_ReturnsItemToOwnerInventoryAndUnlists()
     {
-        var owner = NewMutant("Owner");
+        var owner = NewTraveler("Owner");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
         var item = Item.Create("Widget", ItemType.Junk, 1, Rarity.Common);
         store.Stock(item, 10);
@@ -147,8 +147,8 @@ public class StoreTests
     [Fact]
     public void AdjustPrice_RequiresOwnership()
     {
-        var owner = NewMutant("Owner");
-        var stranger = NewMutant("Stranger");
+        var owner = NewTraveler("Owner");
+        var stranger = NewTraveler("Stranger");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
         store.Stock(Item.Create("Widget", ItemType.Junk, 1, Rarity.Common), 10);
 
@@ -158,7 +158,7 @@ public class StoreTests
     [Fact]
     public void AdjustPrice_ChangesTheAskingPrice()
     {
-        var owner = NewMutant("Owner");
+        var owner = NewTraveler("Owner");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
         store.Stock(Item.Create("Widget", ItemType.Junk, 1, Rarity.Common), 10);
 
@@ -170,8 +170,8 @@ public class StoreTests
     [Fact]
     public void CollectCapital_RequiresOwnership()
     {
-        var owner = NewMutant("Owner");
-        var stranger = NewMutant("Stranger");
+        var owner = NewTraveler("Owner");
+        var stranger = NewTraveler("Stranger");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
 
         Assert.Throws<InvalidOperationException>(() => store.CollectCapital(stranger, 10));
@@ -180,7 +180,7 @@ public class StoreTests
     [Fact]
     public void CollectCapital_MovesStoreCapitalToOwnerRiblets()
     {
-        var owner = NewMutant("Owner");
+        var owner = NewTraveler("Owner");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
 
         var collected = store.CollectCapital(owner, 40);
@@ -193,7 +193,7 @@ public class StoreTests
     [Fact]
     public void CollectCapital_RejectsAmountBeyondAvailableCapital()
     {
-        var owner = NewMutant("Owner");
+        var owner = NewTraveler("Owner");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => store.CollectCapital(owner, 101));
@@ -202,7 +202,7 @@ public class StoreTests
     [Fact]
     public void GovernmentStore_CanNeverBeOwnedOrCollectedFrom()
     {
-        var owner = NewMutant("Owner");
+        var owner = NewTraveler("Owner");
         var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
 
         Assert.Throws<InvalidOperationException>(() => store.CollectCapital(owner, 1));

@@ -87,8 +87,8 @@ public class IonEconomyTests
     [Fact]
     public void TicksPerIonDrain_HigherClassMultiplierDrainsFaster()
     {
-        var slowClass = IonEconomy.TicksPerIonDrain(scalingTier: 1, classDrainMultiplier: 0.8); // e.g. Warrior
-        var fastClass = IonEconomy.TicksPerIonDrain(scalingTier: 1, classDrainMultiplier: 1.3); // e.g. Mage
+        var slowClass = IonEconomy.TicksPerIonDrain(scalingTier: 1, classDrainMultiplier: 0.8); // e.g. Soldier
+        var fastClass = IonEconomy.TicksPerIonDrain(scalingTier: 1, classDrainMultiplier: 1.3); // e.g. Scientist
 
         Assert.True(fastClass <= slowClass, "A higher drain multiplier should mean fewer ticks per Ion (faster drain).");
     }
