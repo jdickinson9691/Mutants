@@ -56,6 +56,15 @@ public sealed class CombatSession
         Monster = monster;
         _random = random;
         AllowBanish = allowBanish;
+
+        // A ranged Weaken shot landed before this fight — apply it once,
+        // then spend it (see Mutants.Engine.Combat.RangedResolver).
+        if (monster.PendingDefensePenalty > 0)
+        {
+            _monsterDefensePenalty += monster.PendingDefensePenalty;
+            monster.PendingDefensePenalty = 0;
+            _log.Add($"{monster.Name} is still reeling from the shot — its guard is down.");
+        }
     }
 
     /// <summary>Makes a normal attack this round.</summary>
