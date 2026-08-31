@@ -34,6 +34,42 @@ public class MonsterTests
     }
 
     [Fact]
+    public void EquipWeapon_AddsItsAttackBonusToEffectiveAttackPower_AndDropsWithInventory()
+    {
+        var monster = new Monster("Brute", 1, 30, 10, 2, 8, 40);
+        Assert.Null(monster.EquippedWeapon);
+        Assert.Equal(10, monster.EffectiveAttackPower);
+
+        var blade = Item.Create("Scav Blade", ItemType.Weapon, 4, Rarity.Rare);
+        monster.EquipWeapon(blade);
+
+        Assert.Same(blade, monster.EquippedWeapon);
+        Assert.Equal(10 + blade.AttackBonus, monster.EffectiveAttackPower);
+        Assert.Contains(blade, monster.Inventory); // so it drops with everything else on death
+    }
+
+    [Fact]
+    public void EquipWeapon_RejectsANonWeapon()
+    {
+        var monster = new Monster("Brute", 1, 30, 10, 2, 8, 40);
+        Assert.Throws<ArgumentException>(() => monster.EquipWeapon(Item.Create("Ration", ItemType.Consumable, 1, Rarity.Common)));
+    }
+
+    [Fact]
+    public void ConvertingTheEquippedWeapon_ClearsTheEquipSlot()
+    {
+        var monster = new Monster("Brute", 1, 30, 10, 2, 8, 40, maxIons: 50);
+        monster.Ions.Spend(monster.Ions.Current);
+        var blade = Item.Create("Scav Blade", ItemType.Weapon, 4, Rarity.Rare);
+        monster.EquipWeapon(blade);
+
+        monster.Convert(blade);
+
+        Assert.Null(monster.EquippedWeapon);
+        Assert.Equal(10, monster.EffectiveAttackPower);
+    }
+
+    [Fact]
     public void IsApex_DefaultsFalse_AndCanBeSet()
     {
         Assert.False(Monster.Create("Beast", 1).IsApex);

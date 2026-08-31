@@ -109,6 +109,62 @@ public class MonsterControllerTests
     }
 
     [Fact]
+    public void Tick_ACalmHealthyMonsterOnAPileOfLootLeavesItAlone()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var monster = Monster.Create("Rover", tier: 1); // full HP, full Ions
+        monster.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(monster);
+        pop.AddGroundLoot(Coordinate.Origin, Item.Create("Junk", ItemType.Junk, 1, Rarity.Common));
+        pop.AddGroundLoot(Coordinate.Origin, Item.Create("Tonic", ItemType.Consumable, 1, Rarity.Common));
+
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99)); // 0.99 -> doesn't wander
+
+        Assert.Empty(monster.Inventory);
+        Assert.Equal(2, pop.LootAt(Coordinate.Origin).Count);
+    }
+
+    [Fact]
+    public void Tick_ALowIonMonsterScavengesOneNonWeaponFromThePileToBurn()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var monster = new Monster("Scrounger", 2, 40, 8, 3, 10, 80, maxIons: 30);
+        monster.Ions.Spend(monster.Ions.Current); // bone dry -> below the scavenge threshold
+        monster.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(monster);
+        pop.AddGroundLoot(Coordinate.Origin, Item.Create("Prime Blade", ItemType.Weapon, 5, Rarity.Epic));
+        pop.AddGroundLoot(Coordinate.Origin, Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common));
+
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99));
+
+        // Took exactly one item, and left the good weapon for the player.
+        Assert.Single(monster.Inventory.Where(i => i.Name == "Scrap"));
+        Assert.Contains(pop.LootAt(Coordinate.Origin), i => i.Name == "Prime Blade");
+        Assert.DoesNotContain(pop.LootAt(Coordinate.Origin), i => i.Name == "Scrap");
+    }
+
+    [Fact]
+    public void Tick_AMonsterUpgradesToABetterGroundWeaponAndHitsHarderForIt()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var monster = Monster.Create("Brute", tier: 1); // full Ions -> only the weapon rule applies
+        var baseAttack = monster.EffectiveAttackPower;
+        monster.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(monster);
+        var goodWeapon = Item.Create("Prime Blade", ItemType.Weapon, 5, Rarity.Epic); // large AttackBonus
+        pop.AddGroundLoot(Coordinate.Origin, goodWeapon);
+
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99));
+
+        Assert.Same(goodWeapon, monster.EquippedWeapon);
+        Assert.True(monster.EffectiveAttackPower > baseAttack);
+        Assert.Empty(pop.LootAt(Coordinate.Origin));
+    }
+
+    [Fact]
     public void Tick_ARoamingMonsterPausesBrieflyAfterMoving()
     {
         var map = FourRoomMap();

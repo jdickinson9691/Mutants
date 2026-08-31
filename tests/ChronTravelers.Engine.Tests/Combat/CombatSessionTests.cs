@@ -389,6 +389,21 @@ public class CombatSessionTests
     }
 
     [Fact]
+    public void Victory_DoesNotPutLootInThePlayersPack_ItsForTheCallerToGround()
+    {
+        var traveler = Soldier();
+        var inventoryBefore = traveler.Inventory.Count;
+        var monster = TankMonster(hp: 5);
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+
+        session.Attack();
+
+        Assert.True(session.TravelerWon);
+        Assert.NotEmpty(session.ItemsDropped); // RollForKill always yields something
+        Assert.Equal(inventoryBefore, traveler.Inventory.Count); // ...but none of it auto-acquired
+    }
+
+    [Fact]
     public void Loss_AwardsNothing()
     {
         var traveler = Soldier();

@@ -85,6 +85,29 @@ public sealed class Monster
     /// <summary>Items this monster is carrying — picked up off the ground, spent via <see cref="Convert"/>, and dropped where it dies.</summary>
     public IReadOnlyList<Item> Inventory => _inventory;
 
+    private Item? _equippedWeapon;
+
+    /// <summary>A weapon this monster scavenged off the ground because it beat what it was wielding — adds its <see cref="Item.AttackBonus"/> to <see cref="EffectiveAttackPower"/>, and drops with the rest of its inventory on death. Session state.</summary>
+    public Item? EquippedWeapon => _equippedWeapon;
+
+    /// <summary>Base <see cref="AttackPower"/> plus any scavenged <see cref="EquippedWeapon"/>'s bonus — what its hits actually land for.</summary>
+    public int EffectiveAttackPower => AttackPower + (_equippedWeapon?.AttackBonus ?? 0);
+
+    /// <summary>Wields <paramref name="weapon"/> (adding it to inventory if it isn't already there). Caller checks it's actually an upgrade.</summary>
+    public void EquipWeapon(Item weapon)
+    {
+        if (weapon.Type != ItemType.Weapon)
+        {
+            throw new ArgumentException("Only a Weapon can be equipped.", nameof(weapon));
+        }
+
+        _equippedWeapon = weapon;
+        if (!_inventory.Contains(weapon))
+        {
+            _inventory.Add(weapon);
+        }
+    }
+
     private int _ticksSinceIonRegen;
 
     public Monster(
@@ -145,7 +168,15 @@ public sealed class Monster
 
     public void AddToInventory(Item item) => _inventory.Add(item);
 
-    public bool RemoveFromInventory(Item item) => _inventory.Remove(item);
+    public bool RemoveFromInventory(Item item)
+    {
+        if (ReferenceEquals(item, _equippedWeapon))
+        {
+            _equippedWeapon = null;
+        }
+
+        return _inventory.Remove(item);
+    }
 
     /// <summary>
     /// Heals by spending Ions — the same rules as
@@ -179,6 +210,11 @@ public sealed class Monster
         if (!_inventory.Remove(item))
         {
             throw new InvalidOperationException($"'{item.Name}' is not in {Name}'s inventory.");
+        }
+
+        if (ReferenceEquals(item, _equippedWeapon))
+        {
+            _equippedWeapon = null;
         }
 
         return Ions.Add(item.ConvertValue());

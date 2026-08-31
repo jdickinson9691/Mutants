@@ -1,6 +1,7 @@
 using ChronTravelers.Core.Characters;
 using ChronTravelers.Core.Events;
 using ChronTravelers.Core.Ions;
+using ChronTravelers.Core.Items;
 using ChronTravelers.Core.Monsters;
 using ChronTravelers.Core.Time;
 using ChronTravelers.Core.World;
@@ -209,7 +210,7 @@ public static class MonsterController
             previousPlayerPosition: default, playerLingered: false,
             random, broadcast, safeRooms, narration: null);
 
-    /// <summary>Hurt monster → heal (converting a carried item first if out of Ions). True if it acted.</summary>
+    /// <summary>Hurt monster → heal (converting carried fodder first if out of Ions). True if it acted.</summary>
     private static bool TryHeal(Monster monster)
     {
         if (monster.Health.Current > monster.Health.Max * HealHpThreshold)
@@ -219,22 +220,63 @@ public static class MonsterController
 
         if (monster.Ions.Current == 0 && monster.Inventory.Count > 0)
         {
-            monster.Convert(monster.Inventory[0]);
+            // Burn scavenged fodder, not the weapon it's wielding — unless
+            // that's all it's carrying.
+            var fuel = monster.Inventory.FirstOrDefault(i => !ReferenceEquals(i, monster.EquippedWeapon))
+                ?? monster.Inventory[0];
+            monster.Convert(fuel);
         }
 
         return monster.Heal() > 0;
     }
 
+    /// <summary>Fraction of its Ion pool below which a monster will scavenge a ground item to burn for fuel.</summary>
+    private const double ScavengeForIonsBelow = 0.5;
+
+    /// <summary>
+    /// A monster only takes loot off the floor for a reason (docs/GDD.md
+    /// §7.1): one item to burn for Ions when it's running low, or a single
+    /// weapon that beats what it's wielding. Otherwise it steps over the
+    /// pile. Returns true if it took something.
+    /// </summary>
     private static bool TryGrabLoot(YearPopulation population, Monster monster)
     {
-        var item = population.TakeGroundLoot(monster.Position, _ => true);
-        if (item is null)
+        if (population.LootAt(monster.Position).Count == 0)
         {
             return false;
         }
 
-        monster.AddToInventory(item);
-        return true;
+        // (a) Low on Ions → grab one thing to convert. Prefer junk/consumables
+        // so a good weapon on the ground survives for the player.
+        if (monster.Ions.Current < monster.Ions.Max * ScavengeForIonsBelow)
+        {
+            var fuel = population.TakeGroundLoot(monster.Position, i => i.Type is not (ItemType.Weapon or ItemType.Armor))
+                       ?? population.TakeGroundLoot(monster.Position, _ => true);
+            if (fuel is not null)
+            {
+                monster.AddToInventory(fuel);
+                return true;
+            }
+        }
+
+        // (b) A ground weapon better than what it's wielding → upgrade,
+        // dropping the old one back for someone else.
+        var currentBonus = monster.EquippedWeapon?.AttackBonus ?? 0;
+        var upgrade = population.TakeGroundLoot(monster.Position,
+            i => i.Type == ItemType.Weapon && i.AttackBonus > currentBonus);
+        if (upgrade is not null)
+        {
+            if (monster.EquippedWeapon is { } old)
+            {
+                monster.RemoveFromInventory(old);
+                population.AddGroundLoot(monster.Position, old);
+            }
+
+            monster.EquipWeapon(upgrade);
+            return true;
+        }
+
+        return false;
     }
 
     private static bool IsBlocked(IReadOnlySet<Coordinate>? safeRooms, Coordinate room) =>
@@ -427,13 +469,13 @@ public static class MonsterController
 
         while (!first.Health.IsDead && !second.Health.IsDead && guard++ < DuelRoundCap)
         {
-            second.Health.Damage(CombatResolver.RollDamage(first.AttackPower, second.Defense, random));
+            second.Health.Damage(CombatResolver.RollDamage(first.EffectiveAttackPower, second.Defense, random));
             if (second.Health.IsDead)
             {
                 break;
             }
 
-            first.Health.Damage(CombatResolver.RollDamage(second.AttackPower, first.Defense, random));
+            first.Health.Damage(CombatResolver.RollDamage(second.EffectiveAttackPower, first.Defense, random));
         }
 
         return first.Health.IsDead ? second : first;
@@ -458,7 +500,7 @@ public static class MonsterController
             .Where(m => !m.Health.IsDead
                 && m.Position.Equals(player.Position)
                 && AggroModel.MoodFor(m.Aggro) == AggroMood.Hostile)
-            .OrderByDescending(m => m.AttackPower)
+            .OrderByDescending(m => m.EffectiveAttackPower)
             .FirstOrDefault();
 
         if (attacker is null)
@@ -468,7 +510,7 @@ public static class MonsterController
 
         // An ambush catches you unbraced — only half your defense applies, so
         // a lingering low-tier monster still stings rather than pinging for 1.
-        var dealt = player.Health.Damage(CombatResolver.RollDamage(attacker.AttackPower, player.EffectiveDefense / 2, random));
+        var dealt = player.Health.Damage(CombatResolver.RollDamage(attacker.EffectiveAttackPower, player.EffectiveDefense / 2, random));
         broadcast.Publish(GameEvent.Ambushed(attacker.Name, player.Name, dealt, year));
         return true;
     }

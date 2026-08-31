@@ -164,7 +164,9 @@ public sealed class CombatSession
         {
             _rewardsGranted = true;
             XpAwarded = Monster.XpReward;
-            ItemsDropped = CombatResolver.AwardVictory(Traveler, Monster, _random, _log);
+            // The player's kills drop to the ground (the console grounds
+            // ItemsDropped at the player's tile); nothing auto-enters the pack.
+            ItemsDropped = CombatResolver.AwardVictory(Traveler, Monster, _random, _log, addToInventory: false);
         }
     }
 
@@ -313,7 +315,7 @@ public sealed class CombatSession
 
     private int TravelerEffectiveDefense() => Traveler.EffectiveDefense + _travelerDefenseBonus;
 
-    private int MonsterEffectiveAttack() => Math.Max(0, Monster.AttackPower - _monsterAttackPenalty);
+    private int MonsterEffectiveAttack() => Math.Max(0, Monster.EffectiveAttackPower - _monsterAttackPenalty);
 
     private int MonsterEffectiveDefense() => Math.Max(0, Monster.Defense - _monsterDefensePenalty);
 

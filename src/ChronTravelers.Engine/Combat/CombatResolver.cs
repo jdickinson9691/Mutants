@@ -54,11 +54,11 @@ public static class CombatResolver
                     break;
                 }
 
-                ResolveAttack(monster.Name, monster.AttackPower, traveler.Name, traveler.EffectiveDefense, traveler.Health, random, log);
+                ResolveAttack(monster.Name, monster.EffectiveAttackPower, traveler.Name, traveler.EffectiveDefense, traveler.Health, random, log);
             }
             else
             {
-                ResolveAttack(monster.Name, monster.AttackPower, traveler.Name, traveler.EffectiveDefense, traveler.Health, random, log);
+                ResolveAttack(monster.Name, monster.EffectiveAttackPower, traveler.Name, traveler.EffectiveDefense, traveler.Health, random, log);
                 if (traveler.Health.IsDead)
                 {
                     break;
@@ -79,8 +79,16 @@ public static class CombatResolver
         return new FightResult(TravelerWon: true, rounds, XpAwarded: monster.XpReward, ItemsDropped: loot, log);
     }
 
-    /// <summary>Grants XP and rolls/adds loot for defeating <paramref name="monster"/> — shared with CombatSession's interactive fights.</summary>
-    internal static IReadOnlyList<Core.Items.Item> AwardVictory(Traveler traveler, Monster monster, IRandomSource random, List<string> log)
+    /// <summary>
+    /// Grants XP and rolls loot for defeating <paramref name="monster"/> —
+    /// shared with CombatSession's interactive fights. When
+    /// <paramref name="addToInventory"/> is true (the abstract NPC path) the
+    /// loot goes straight into the winner's pack; when false (the player's
+    /// interactive fight) it's just returned, and the caller drops it on the
+    /// ground for the player to <c>take</c>.
+    /// </summary>
+    internal static IReadOnlyList<Core.Items.Item> AwardVictory(
+        Traveler traveler, Monster monster, IRandomSource random, List<string> log, bool addToInventory = true)
     {
         var levelsGained = traveler.GainXp(monster.XpReward);
         if (levelsGained > 0)
@@ -89,10 +97,13 @@ public static class CombatResolver
         }
 
         var loot = LootDropRoller.RollForKill(monster, random);
-        foreach (var item in loot)
+        if (addToInventory)
         {
-            traveler.AddToInventory(item);
-            log.Add($"{traveler.Name} looted {item.Name}.");
+            foreach (var item in loot)
+            {
+                traveler.AddToInventory(item);
+                log.Add($"{traveler.Name} looted {item.Name}.");
+            }
         }
 
         return loot;

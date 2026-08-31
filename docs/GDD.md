@@ -256,7 +256,11 @@ area/group to a capstone — is the standard every class follows.)
   fought in) and **random location spawns** (a periodic chance per room,
   per tick, for an item to appear on the ground — matches the brief "random
   chance of spawning in a location" requirement; original spawn-rate
-  tuning).
+  tuning). Defeated-monster loot — the rolled drops plus anything the
+  monster had scavenged — **falls to the floor where it died**; nothing
+  auto-enters the player's pack. `look` lists it and `take <item>` /
+  `take all` picks it up. (NPC grinding is abstract and off-grid, so an
+  NPC's kills still go straight into its inventory.)
 - **Drop composition**: a regular monster's table is built by category so
   a kill always pays and occasionally supplies you — a **guaranteed
   sell/convert fodder** piece (a junk item, drop chance 1.0), a real
@@ -403,9 +407,16 @@ The year the player is standing in also runs a live monster population
 world seed on first entry, kept alive in the session's year memo — not
 saved):
 - Monsters occupy specific rooms and, each tick, **drift** through exits,
-  **grab loot** off their room's floor, or — if hurt — **heal** from their
-  own Ion pool, first **converting** a scavenged item if they're out of
-  Ions (the same `heal` / `convert` the player uses). Drift is deliberately
+  **scavenge** off their room's floor, or — if hurt — **heal** from their
+  own Ion pool, first **converting** a carried item if they're out of Ions
+  (the same `heal` / `convert` the player uses). A monster only takes loot
+  for a reason: **one item to burn for Ions** when it's low (it prefers
+  junk/consumables, leaving a good weapon for you), or **a single weapon
+  that beats what it's wielding** — a scavenged weapon adds its bonus to
+  the monster's hits (`Monster.EffectiveAttackPower`) and drops with it on
+  death, and the weapon it replaced falls back to the floor. A calm,
+  full-Ion monster with a decent weapon walks straight over a pile. Drift
+  is deliberately
   **slow and random** — a low per-tick move chance, no fixed heading,
   frequent multi-tick pauses — so a monster you spotted on the `monsters`
   list is still near where it was when you get there, rather than a

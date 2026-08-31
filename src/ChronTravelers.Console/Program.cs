@@ -40,9 +40,12 @@ using Spectre.Console;
 // entry): they occupy grid rooms, drift slowly and randomly between them
 // (low per-tick move chance, no fixed heading, frequent pauses - so a
 // player heading for one on the `monsters` list actually finds it near
-// where it was), fight each other (the loser's loot drops on the floor -
-// `take` it), heal from their own Ion pool, and slowly respawn toward a
-// soft cap. `fight` engages a monster in the current room. Every year
+// where it was), fight each other, scavenge from the floor only when they
+// need Ion fuel or a weapon upgrade (otherwise they step over a pile),
+// heal from their own Ion pool, and slowly respawn toward a soft cap.
+// `fight` engages a monster in the current room; its loot (rolled drops +
+// anything it scavenged) falls where it dies - nothing auto-enters your
+// pack, `take` it off the floor. Every year
 // that's been instantiated this session keeps simulating each tick
 // (ChronTravelers.Engine.Npc.MonsterController via WorldSimulation.Tick) -
 // the player's year with full aggro/ambush/narration, every other one
@@ -1134,23 +1137,29 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
         AnsiConsole.MarkupLine($"[green]You defeated {Markup.Escape(foe)}! +{session.XpAwarded} XP.[/]");
         broadcast.Publish(GameEvent.Slain(monster.Name, traveler.Name, year, victimIsCreature: true));
 
+        // Loot never auto-enters the pack — it falls where the fight was
+        // (the rolled drops plus anything the monster had scavenged). Walk
+        // it off the floor with `take`.
+        var dropped = session.ItemsDropped.Concat(monster.Inventory).ToList();
+        foreach (var item in dropped)
+        {
+            population.AddGroundLoot(traveler.Position, item);
+        }
+
         if (isWardenFight)
         {
             traveler.RecordWardenDefeat(year);
             var trophy = session.ItemsDropped.FirstOrDefault();
             AnsiConsole.MarkupLine(trophy is not null
-                ? $"[bold yellow]The Warden of {year} yields its {Markup.Escape(trophy.Name)}![/]"
+                ? $"[bold yellow]The Warden of {year} falls. Its {Markup.Escape(trophy.Name)} lies at your feet — [yellow]take[/] it.[/]"
                 : $"[bold]The Warden of {year} is broken. This year is yours.[/]");
         }
         else
         {
             population.RemoveMonster(monster);
-
-            // Anything the monster had scavenged off the ground comes with the kill.
-            foreach (var scavenged in monster.Inventory.ToList())
+            if (dropped.Count > 0)
             {
-                traveler.AddToInventory(scavenged);
-                AnsiConsole.MarkupLine($"[green]You take the {Markup.Escape(scavenged.Name)} it was carrying.[/]");
+                AnsiConsole.MarkupLine($"[green]It drops {Markup.Escape(NameList(dropped.Select(i => i.Name).ToList()))} on the ground.[/] [grey](take <item>)[/]");
             }
         }
 
