@@ -757,11 +757,40 @@ static void HandleSellToStore(Mutant mutant, TimeWorld world, string argument)
         return;
     }
 
+    // 'sell all' / 'sell junk' — clears the vendor trash (Junk items only;
+    // gear and consumables you keep unless you name them).
+    if (argument.Trim() is "all" or "junk" or "*")
+    {
+        var junk = mutant.Inventory.Where(i => i.Type == ItemType.Junk).ToList();
+        if (junk.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[grey]No junk to sell.[/] Name an item to sell that instead.");
+            return;
+        }
+
+        var total = 0;
+        var count = 0;
+        foreach (var j in junk)
+        {
+            var got = store.BuyFromMutant(mutant, j);
+            if (got is null)
+            {
+                break;
+            }
+
+            total += got.Value;
+            count++;
+        }
+
+        AnsiConsole.MarkupLine($"[yellow]Sold {count} junk item(s) to {Markup.Escape(store.Name)} for {total} Riblets.[/]");
+        return;
+    }
+
     var item = FindInventoryItem(mutant, argument);
     if (item is null)
     {
         AnsiConsole.MarkupLine(argument.Length == 0
-            ? "[red]Sell what?[/] Type [yellow]inventory[/] to see what you're carrying."
+            ? "[red]Sell what?[/] Type [yellow]inventory[/] to see what you're carrying, or [yellow]sell all[/] to dump junk."
             : $"[red]No item matching '{Markup.Escape(argument)}' in your inventory.[/]");
         return;
     }
@@ -1781,7 +1810,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]stores[/]              - list every store this year");
     AnsiConsole.MarkupLine("  [green]shop[/]                - browse the store in your current room");
     AnsiConsole.MarkupLine("  [green]buy <item>[/]         - buy a listed item (must be at a store)");
-    AnsiConsole.MarkupLine("  [green]sell <item>[/]        - sell an item to the store here (must be at a store)");
+    AnsiConsole.MarkupLine("  [green]sell <item>[/] / [green]sell all[/] - sell one item, or dump all junk, to the store here");
     AnsiConsole.MarkupLine("  [green]buy-store[/]           - purchase an empty store slot you're standing in");
     AnsiConsole.MarkupLine("  [green]deposit <item> <price>[/] - list your own item for sale at your store");
     AnsiConsole.MarkupLine("  [green]withdraw <item>[/]    - pull a listing back into your inventory");
