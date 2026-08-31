@@ -28,6 +28,16 @@ public sealed class Monster
     public IReadOnlyList<LootTableEntry> LootTable { get; }
 
     /// <summary>
+    /// An "apex" — a rare, much tougher monster seeded a few to a year
+    /// (see <see cref="ChronTravelers.Core.Time.YearPopulation"/>). It hits
+    /// harder and soaks far more, drops better loot, and — crucially —
+    /// accrues aggro at a fraction of the normal rate
+    /// (<see cref="AggroModel.ApexAggroMultiplier"/>), so it essentially
+    /// ignores a passer-by: the player picks the fight, or leaves it be.
+    /// </summary>
+    public bool IsApex { get; }
+
+    /// <summary>
     /// Free-form tags (e.g. "echo") — docs/CONTENT_PLAN.md's monster
     /// roster item calls these out explicitly, matched against by tag-
     /// conditioned abilities like Doctor's Turn Undead.
@@ -87,7 +97,8 @@ public sealed class Monster
         int xpReward,
         IReadOnlyList<LootTableEntry>? lootTable = null,
         IReadOnlyList<string>? tags = null,
-        int? maxIons = null)
+        int? maxIons = null,
+        bool isApex = false)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -109,12 +120,13 @@ public sealed class Monster
         XpReward = xpReward;
         LootTable = lootTable ?? [];
         Tags = tags ?? [];
+        IsApex = isApex;
     }
 
     public bool HasTag(string tag) => Tags.Contains(tag, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Builds a monster from <see cref="MonsterScaling"/>'s tier baselines instead of specifying stats directly.</summary>
-    public static Monster Create(string name, int tier, IReadOnlyList<LootTableEntry>? lootTable = null, IReadOnlyList<string>? tags = null) =>
+    public static Monster Create(string name, int tier, IReadOnlyList<LootTableEntry>? lootTable = null, IReadOnlyList<string>? tags = null, bool isApex = false) =>
         new(name, tier,
             maxHp: MonsterScaling.BaseHp(tier),
             attackPower: MonsterScaling.BaseAttackPower(tier),
@@ -122,7 +134,8 @@ public sealed class Monster
             speed: MonsterScaling.BaseSpeed(tier),
             xpReward: MonsterScaling.XpReward(tier),
             lootTable: lootTable,
-            tags: tags);
+            tags: tags,
+            isApex: isApex);
 
     /// <summary>Places the monster at a grid position — e.g. when its year's population is seeded.</summary>
     public void PlaceAt(Coordinate coordinate) => Position = coordinate;

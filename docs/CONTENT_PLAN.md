@@ -26,9 +26,12 @@ file I/O.
       species' `lootThemeTags` (or the era's), scaled to the year.
       **Placed spatially** (GDD §7.1): `YearPopulation.Seed` drops
       `max(2, roomCount/3)` of the year's roster into its rooms on first
-      entry, and `MonsterController` roams / infights / heals them each
-      tick. No per-year placement content — it's all derived from the
-      species roster + the world seed.
+      entry — plus, in ~half of years, one or two **apex** monsters
+      (`TimelineContentFactory.ApexForSpecies`, `Monster.IsApex`, "Frayed
+      &lt;species&gt;": ~2.4× HP, ~3.5× XP, gear-heavy loot, near-zero
+      aggro) — and `MonsterController` drifts (slow + random) / infights /
+      heals them each tick. No per-year placement content — it's all
+      derived from the species roster + the world seed.
 
 - [x] **Item archetypes** — `item-archetypes.json`. ~55 archetypes: `{ id,
       name, type, powerMultiplier? | rarity, restrictedClass?, effect?,

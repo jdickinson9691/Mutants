@@ -128,9 +128,14 @@ public sealed class TimeWorld
         var map = YearMapFactory.Build(WorldSeed, era, year);
         var tier = TimeScale.TierForYear(year);
 
-        var roster = era.SpeciesIds
-            .Select(id => _speciesById[id])
+        var eraSpecies = era.SpeciesIds.Select(id => _speciesById[id]).ToList();
+
+        var roster = eraSpecies
             .Select(sp => TimelineContentFactory.ForSpecies(WorldSeed, sp, year, LootPoolFor(sp, era)))
+            .ToList();
+
+        var apexRoster = eraSpecies
+            .Select(sp => TimelineContentFactory.ApexForSpecies(WorldSeed, sp, year, LootPoolFor(sp, era)))
             .ToList();
 
         Func<Monster>? warden = _wardens.IsWardenYear(year)
@@ -138,7 +143,7 @@ public sealed class TimeWorld
             : null;
 
         var stores = BuildStores(era, year, map);
-        var population = YearPopulation.Seed(WorldSeed, year, map, roster, warden);
+        var population = YearPopulation.Seed(WorldSeed, year, map, roster, warden, apexRoster);
 
         return new YearContent(year, map, era, roster, stores, warden, tier, population);
     }

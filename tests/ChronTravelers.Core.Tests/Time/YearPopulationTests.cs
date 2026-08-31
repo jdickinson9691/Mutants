@@ -17,7 +17,9 @@ public class YearPopulationTests
         var pop = content.Population;
         var expected = System.Math.Max(2, content.Map.RoomCount / 3);
 
-        Assert.Equal(expected, pop.Monsters.Count);
+        // The regular roster is the soft cap; a year may also seed an apex
+        // or two on top (Monster.IsApex), placed in further distinct rooms.
+        Assert.Equal(expected, pop.Monsters.Count(m => !m.IsApex));
         Assert.Equal(expected, pop.SoftCap);
         Assert.All(pop.Monsters, m => Assert.True(content.Map.Rooms.ContainsKey(m.Position)));
         Assert.DoesNotContain(pop.Monsters, m => m.Position.Equals(content.Map.Start));
@@ -65,6 +67,38 @@ public class YearPopulationTests
 
         var plainYear = Enumerable.Range(2001, 200).First(y => !world.IsWardenYear(y));
         Assert.Null(world.GetYear(plainYear).Population.Warden);
+    }
+
+    [Fact]
+    public void Seed_PlacesApexMonstersFromTheApexRoster_InTheirOwnRooms()
+    {
+        // Scan a run of years; across them, the real world seeds some apexes.
+        var world = TestTimeWorld.Build(seed: 424242);
+        var apexes = Enumerable.Range(2000, 400)
+            .SelectMany(y => world.GetYear(y).Population.Monsters)
+            .Where(m => m.IsApex)
+            .ToList();
+
+        Assert.NotEmpty(apexes);
+        Assert.All(apexes, a => Assert.StartsWith("Frayed ", a.Name));
+
+        // In any single year, the apex (if present) sits in a distinct room.
+        foreach (var y in Enumerable.Range(2000, 400))
+        {
+            var pop = world.GetYear(y).Population;
+            Assert.Equal(pop.Monsters.Count, pop.Monsters.Select(m => m.Position).Distinct().Count());
+        }
+    }
+
+    [Fact]
+    public void Seed_WithNoApexRoster_PlacesNoApexes()
+    {
+        var map = TestTimeWorld.Build(1).GetYear(2000).Map;
+        var roster = new List<Func<Monster>> { () => Monster.Create("Grunt", 1) };
+
+        var pop = YearPopulation.Seed(worldSeed: 5, year: 2000, map, roster, wardenFactory: null, apexRoster: null);
+
+        Assert.DoesNotContain(pop.Monsters, m => m.IsApex);
     }
 
     [Fact]

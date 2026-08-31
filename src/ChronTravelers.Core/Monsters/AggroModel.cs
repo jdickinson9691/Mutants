@@ -45,6 +45,14 @@ public static class AggroModel
     /// <summary>Aggro is clamped to this ceiling.</summary>
     public const double Cap = 12.0;
 
+    /// <summary>
+    /// Every aggro <em>gain</em> an apex monster (<see cref="Monster.IsApex"/>)
+    /// would take is scaled by this — so incidental proximity never wakes
+    /// one and you'd have to camp on its tile for a long time to provoke it.
+    /// The player is meant to choose the fight, not stumble into it.
+    /// </summary>
+    public const double ApexAggroMultiplier = 0.15;
+
     /// <summary>At/above this the monster shadows the player.</summary>
     public const double AlertThreshold = 3.0;
 

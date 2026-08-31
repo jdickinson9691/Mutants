@@ -34,6 +34,14 @@ public class MonsterTests
     }
 
     [Fact]
+    public void IsApex_DefaultsFalse_AndCanBeSet()
+    {
+        Assert.False(Monster.Create("Beast", 1).IsApex);
+        Assert.True(Monster.Create("Frayed Beast", 1, isApex: true).IsApex);
+        Assert.True(new Monster("Frayed Beast", 1, 80, 10, 4, 9, 200, isApex: true).IsApex);
+    }
+
+    [Fact]
     public void Aggro_DefaultsToZero_RaisesClampedToCap_AndDecaysNeverBelowZero()
     {
         var m = Monster.Create("Beast", 1);

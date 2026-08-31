@@ -26,6 +26,16 @@ public static class TimelineContentFactory
     /// <summary>The <c>powerMultiplier</c> of a Warden's guaranteed weapon trophy — deep in the Legendary band (see <see cref="Rarity.ForPower"/>).</summary>
     private const double WardenTrophyPower = 2.8;
 
+    // How much tougher an apex (Monster.IsApex, seeded a few to a year by
+    // YearPopulation) is than the same species at the same year — a serious
+    // optional fight, not a boss. Speed is untouched so the player can
+    // still disengage and walk away.
+    private const double ApexHpMultiplier = 2.4;
+    private const double ApexAttackMultiplier = 1.35;
+    private const double ApexDefenseMultiplier = 1.4;
+    private const double ApexXpMultiplier = 3.5;
+    private const double ApexIonMultiplier = 2.0;
+
     private static readonly string[] TrophyNouns =
         ["Blade", "Sigil", "Crown", "Gauntlet", "Reliquary", "Warhorn", "Chronometer", "Standard"];
 
@@ -53,6 +63,36 @@ public static class TimelineContentFactory
         var loot = BuildLootTable(worldSeed, year, species.Id, lootPool);
 
         return () => new Monster(name, displayTier, hp, attack, defense, speed, xp, loot, tags, maxIons: ions);
+    }
+
+    /// <summary>
+    /// A factory for an <b>apex</b> version of <paramref name="species"/> in
+    /// <paramref name="year"/> (see <see cref="Monster.IsApex"/>): the same
+    /// species, much tougher, with a loot table that reliably yields real
+    /// gear. <see cref="YearPopulation.Seed"/> drops a few of these into a
+    /// year alongside the regular roster.
+    /// </summary>
+    public static Func<Monster> ApexForSpecies(
+        long worldSeed,
+        SpeciesDefinition species,
+        int year,
+        IReadOnlyList<ItemArchetypeDefinition> lootPool)
+    {
+        var tier = TimeScale.TierForYear(year);
+        var (hp, attack, defense, speed) = StatsFor(species.Archetype, tier);
+
+        var apexHp = Math.Max(1, (int)Math.Round(hp * ApexHpMultiplier));
+        var apexAttack = Math.Max(1, (int)Math.Round(attack * ApexAttackMultiplier));
+        var apexDefense = Math.Max(0, (int)Math.Round(defense * ApexDefenseMultiplier));
+        var apexXp = (int)Math.Round(MonsterScaling.XpReward(tier) * ApexXpMultiplier);
+        var apexIons = (int)Math.Round(MonsterScaling.BaseIons(tier) * ApexIonMultiplier);
+        var displayTier = DisplayTier(year);
+        var tags = species.Tags;
+        var name = $"Frayed {species.Name}";
+
+        var loot = BuildApexLootTable(worldSeed, year, species.Id, lootPool);
+
+        return () => new Monster(name, displayTier, apexHp, apexAttack, apexDefense, speed, apexXp, loot, tags, maxIons: apexIons, isApex: true);
     }
 
     /// <summary>
@@ -172,6 +212,65 @@ public static class TimelineContentFactory
             // Pool had none of the three categories (shouldn't happen —
             // TimeWorld.LootPoolFor backfills) — still give the kill a payout.
             AddFrom(lootPool, SellFodderDropChance);
+        }
+
+        return entries;
+    }
+
+    /// <summary>
+    /// An apex monster's drop (see <see cref="ApexForSpecies"/>): a
+    /// guaranteed piece of gear biased toward the <em>strong</em> end of
+    /// the pool, plus guaranteed sell fodder and good odds on a second
+    /// piece of gear and a consumable — the payoff for taking an optional
+    /// hard fight.
+    /// </summary>
+    private static IReadOnlyList<LootTableEntry> BuildApexLootTable(
+        long worldSeed,
+        int year,
+        string speciesId,
+        IReadOnlyList<ItemArchetypeDefinition> lootPool)
+    {
+        if (lootPool.Count == 0)
+        {
+            return [];
+        }
+
+        var rng = DeterministicRandom.For(worldSeed, year, $"apexloot:{speciesId}");
+        var entries = new List<LootTableEntry>();
+
+        void AddGear(double dropChance)
+        {
+            var pool = lootPool.Where(a => a.IsEquippable).ToList();
+            if (pool.Count == 0)
+            {
+                return;
+            }
+
+            // Bias hard toward high power — the whole point of the fight.
+            var pick = WeightedPick(pool, a => Math.Pow(Math.Max(0.3, a.PowerMultiplier), 2), rng);
+            entries.Add(new LootTableEntry(ForArchetype(pick, year), dropChance));
+        }
+
+        void AddFrom(IEnumerable<ItemArchetypeDefinition> candidates, double dropChance)
+        {
+            var pool = candidates.ToList();
+            if (pool.Count == 0)
+            {
+                return;
+            }
+
+            var pick = WeightedPick(pool, a => a.Rarity.DropWeight(), rng);
+            entries.Add(new LootTableEntry(ForArchetype(pick, year), dropChance));
+        }
+
+        AddFrom(lootPool.Where(a => a.Type == ItemType.Junk), 1.0);
+        AddGear(1.0);
+        AddGear(0.4);
+        AddFrom(lootPool.Where(a => a.Type == ItemType.Consumable), 0.6);
+
+        if (entries.Count == 0)
+        {
+            AddFrom(lootPool, 1.0);
         }
 
         return entries;

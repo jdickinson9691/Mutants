@@ -112,8 +112,8 @@ public sealed class WorldSimulation
             if (result.Fight is { } fight)
             {
                 Broadcast.Publish(fight.TravelerWon
-                    ? GameEvent.Slain(result.MonsterName!, npc.Name)
-                    : GameEvent.Slain(npc.Name, result.MonsterName!));
+                    ? GameEvent.Slain(result.MonsterName!, npc.Name, yearBefore)
+                    : GameEvent.Slain(npc.Name, result.MonsterName!, yearBefore));
             }
 
             if (npc.CurrentYear != yearBefore)
@@ -123,7 +123,7 @@ public sealed class WorldSimulation
 
             if (npc.Level > levelBefore)
             {
-                Broadcast.Publish(GameEvent.LevelReached(npc.Name, npc.Level));
+                Broadcast.Publish(GameEvent.LevelReached(npc.Name, npc.Level, npc.CurrentYear));
             }
         }
 

@@ -136,18 +136,18 @@ public class MonsterControllerTests
     [Fact]
     public void Tick_NarratesAMonsterEnteringThePlayersRoomWithTheDirectionItCameFrom()
     {
-        var map = CorridorMap(4);
+        // Two-room corridor so the monster's only open exit is toward the player.
+        var map = CorridorMap(2);
         var pop = EmptyPopulation(map);
         var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(Coordinate.Origin);
 
         var m = Monster.Create("Beast", tier: 1);
         m.PlaceAt(new Coordinate(1, 0)); // one room east
-        m.Heading = Direction.West;      // heading toward the player
         pop.AddMonster(m);
 
         var log = new List<string>();
-        Tick(pop, map, player, StubRandomSource.Fixed(0.5), narration: log);
+        Tick(pop, map, player, StubRandomSource.Fixed(0.0), narration: log);
 
         Assert.Equal(Coordinate.Origin, m.Position);
         Assert.Contains(log, l => l.Contains("Beast") && l.Contains("east"));
@@ -156,18 +156,18 @@ public class MonsterControllerTests
     [Fact]
     public void Tick_NarratesAMonsterLeavingThePlayersRoomWithTheDirectionItWent()
     {
-        var map = CorridorMap(4);
+        // Two-room corridor: from the player's room the only open exit is east.
+        var map = CorridorMap(2);
         var pop = EmptyPopulation(map);
         var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(Coordinate.Origin);
 
         var m = Monster.Create("Beast", tier: 1);
         m.PlaceAt(Coordinate.Origin); // sharing the player's room
-        m.Heading = Direction.East;
         pop.AddMonster(m);
 
         var log = new List<string>();
-        Tick(pop, map, player, StubRandomSource.Fixed(0.5), narration: log);
+        Tick(pop, map, player, StubRandomSource.Fixed(0.0), narration: log);
 
         Assert.Equal(new Coordinate(1, 0), m.Position);
         Assert.Contains(log, l => l.Contains("Beast") && l.Contains("east"));
@@ -176,48 +176,59 @@ public class MonsterControllerTests
     [Fact]
     public void Tick_NarratesAMonsterFirstComingWithinOneRoom()
     {
-        var map = CorridorMap(5);
+        // Three-room corridor: from the far room the only open exit is west,
+        // toward the player.
+        var map = CorridorMap(3);
         var pop = EmptyPopulation(map);
         var player = new Traveler("Prey", CharacterClass.Soldier);
         player.PlaceAt(Coordinate.Origin);
 
         var m = Monster.Create("Beast", tier: 1);
         m.PlaceAt(new Coordinate(2, 0)); // two rooms east
-        m.Heading = Direction.West;
         pop.AddMonster(m);
 
         var log = new List<string>();
-        Tick(pop, map, player, StubRandomSource.Fixed(0.5), narration: log);
+        Tick(pop, map, player, StubRandomSource.Fixed(0.0), narration: log);
 
         Assert.Equal(new Coordinate(1, 0), m.Position);
         Assert.Contains(log, l => l.Contains("hear") || l.Contains("stir") || l.Contains("movement") || l.Contains("shuffle") || l.Contains("shift"));
     }
 
     [Fact]
-    public void Tick_ARoamingMonsterKeepsHeadingTheSameWaySoItsPathIsReadable()
+    public void Tick_ARoamingMonsterMovesSlowly_HoldingStillWhenTheWanderRollFails()
     {
-        // Long corridor so a monster can hold a heading for a while.
+        // A roll at/above WanderChance means "don't step this tick" — the
+        // monster stays put so a player heading for it can actually arrive.
         var map = CorridorMap(8);
         var pop = EmptyPopulation(map);
-        var monster = Monster.Create("Patroller", tier: 1);
-        monster.PlaceAt(new Coordinate(1, 0));
+        var monster = Monster.Create("Drifter", tier: 1);
+        monster.PlaceAt(new Coordinate(3, 0));
         pop.AddMonster(monster);
         var player = OffMapPlayer();
 
-        // 0.1 -> always wanders, never turns (KeepHeadingChance), never pauses.
-        var seen = new List<Coordinate>();
-        for (var i = 0; i < 5; i++)
+        for (var i = 0; i < 8; i++)
         {
-            Tick(pop, map, player, StubRandomSource.Fixed(0.1));
-            seen.Add(monster.Position);
+            Tick(pop, map, player, StubRandomSource.Fixed(0.5));
         }
 
-        // Every actual step went the same direction (pauses aside).
-        Assert.NotNull(monster.Heading);
-        var eastings = seen.Select(c => c.East).ToList();
-        var steps = eastings.Zip(eastings.Skip(1), (a, b) => b - a).Where(d => d != 0).ToList();
-        Assert.NotEmpty(steps);
-        Assert.True(steps.All(d => d == steps[0]), $"path {string.Join(",", seen)} should be a straight patrol");
+        Assert.Equal(new Coordinate(3, 0), monster.Position);
+    }
+
+    [Fact]
+    public void Tick_ARoamingMonsterDoesStepOnALowWanderRoll()
+    {
+        var map = CorridorMap(8);
+        var pop = EmptyPopulation(map);
+        var monster = Monster.Create("Drifter", tier: 1);
+        var start = new Coordinate(3, 0);
+        monster.PlaceAt(start);
+        pop.AddMonster(monster);
+
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.0));
+
+        Assert.NotEqual(start, monster.Position);
+        Assert.True(map.Rooms.ContainsKey(monster.Position));
+        Assert.Equal(1, Math.Abs(monster.Position.East - start.East) + Math.Abs(monster.Position.North - start.North));
     }
 
     [Fact]
@@ -302,6 +313,40 @@ public class MonsterControllerTests
         }
 
         Assert.Equal(AggroMood.Hostile, AggroModel.MoodFor(monster.Aggro));
+    }
+
+    [Fact]
+    public void Tick_AnApexBarelyAccruesAggro_SoTheSameHarassmentThatEnragesARegularLeavesItCalm()
+    {
+        var map = FourRoomMap();
+        var tile = Coordinate.Origin;
+        var next = new Coordinate(1, 0);
+
+        void Pace(YearPopulation pop, Traveler player)
+        {
+            for (var i = 0; i < 6; i++)
+            {
+                player.PlaceAt(tile);
+                Tick(pop, map, player, StubRandomSource.Fixed(0.99), previousPlayerPosition: next);
+                player.PlaceAt(next);
+                Tick(pop, map, player, StubRandomSource.Fixed(0.99), previousPlayerPosition: tile);
+            }
+        }
+
+        var regularPop = EmptyPopulation(map);
+        var regular = Monster.Create("Guard", tier: 1);
+        regular.PlaceAt(tile);
+        regularPop.AddMonster(regular);
+        Pace(regularPop, new Traveler("Pest", CharacterClass.Soldier));
+
+        var apexPop = EmptyPopulation(map);
+        var apex = Monster.Create("Frayed Guard", tier: 1, isApex: true);
+        apex.PlaceAt(tile);
+        apexPop.AddMonster(apex);
+        Pace(apexPop, new Traveler("Pest", CharacterClass.Soldier));
+
+        Assert.Equal(AggroMood.Hostile, AggroModel.MoodFor(regular.Aggro));
+        Assert.Equal(AggroMood.Calm, AggroModel.MoodFor(apex.Aggro));
     }
 
     [Fact]

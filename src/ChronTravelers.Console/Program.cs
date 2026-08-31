@@ -37,13 +37,16 @@ using Spectre.Console;
 //
 // Monsters are placed spatially in the year the player is standing in
 // (ChronTravelers.Core.Time.YearPopulation, seeded deterministically on first
-// entry): they occupy grid rooms, wander between them, fight each other
-// (the loser's loot drops on the floor - `take` it), heal from their own
-// Ion pool, and slowly respawn toward a soft cap. `fight` engages a
-// monster in the current room; only the player's current year is
-// simulated live (ChronTravelers.Engine.Npc.MonsterController via
-// WorldSimulation.Tick), other years hold frozen monsters until visited,
-// and none of this is written to the save (a fresh session re-seeds).
+// entry): they occupy grid rooms, drift slowly and randomly between them
+// (low per-tick move chance, no fixed heading, frequent pauses - so a
+// player heading for one on the `monsters` list actually finds it near
+// where it was), fight each other (the loser's loot drops on the floor -
+// `take` it), heal from their own Ion pool, and slowly respawn toward a
+// soft cap. `fight` engages a monster in the current room; only the
+// player's current year is simulated live
+// (ChronTravelers.Engine.Npc.MonsterController via WorldSimulation.Tick),
+// other years hold frozen monsters until visited, and none of this is
+// written to the save (a fresh session re-seeds).
 // Monsters ignore passers-by: each carries an earned aggro meter
 // (ChronTravelers.Core.Monsters.AggroModel) raised by stepping onto its tile
 // repeatedly / lingering on it / being shot, and decaying when you leave.
@@ -51,8 +54,13 @@ using Spectre.Console;
 // Hostile -> also lands one ambush hit, but only on an idle turn (look /
 // status / wait / ...), never while you're acting (move / fight / heal /
 // shop / wield) and never into a store room (a haven). `monsters` shows
-// each one's mood. The inline kill-feed after each command is capped and
-// drops NPC time-hops - `news` still shows the lot.
+// each one's mood. A few years also seed one or two `IsApex` monsters
+// ("Frayed <species>") - much tougher, better loot, and accruing aggro at
+// a fraction of the normal rate so they essentially never provoke: the
+// player chooses to take one on or walk past. The inline kill-feed after
+// each command shows only events in the player's own year (plus any
+// ambush on the player); everything elsewhere in the timeline is a count,
+// with `news` still showing the lot.
 //
 // Ranged weapons (ChronTravelers.Core.Items.Item / RangedKind - wands, bows,
 // later guns) reach one room away: `wield` one into its own slot, then
@@ -315,7 +323,7 @@ while (running)
             AnsiConsole.MarkupLine($"[grey italic]{Markup.Escape(line)}[/]");
         }
 
-        shownBroadcastCount = RenderNewBroadcastEvents(simulation.Broadcast, shownBroadcastCount);
+        shownBroadcastCount = RenderNewBroadcastEvents(simulation.Broadcast, shownBroadcastCount, traveler.CurrentYear);
 
         if (traveler.Health.IsDead)
         {
@@ -1026,7 +1034,8 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
 
         monster = targetName.Length > 0
             ? here.FirstOrDefault(m => m.Name.Contains(targetName, StringComparison.OrdinalIgnoreCase)) ?? here[0]
-            : here[0];
+            // A bare 'fight' never picks the apex by accident — name it to take it on.
+            : here.FirstOrDefault(m => !m.IsApex) ?? here[0];
     }
 
     var levelBefore = traveler.Level;
@@ -1090,7 +1099,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
     if (session.TravelerWon)
     {
         AnsiConsole.MarkupLine($"[green]You defeated {Markup.Escape(foe)}! +{session.XpAwarded} XP.[/]");
-        broadcast.Publish(GameEvent.Slain(monster.Name, traveler.Name));
+        broadcast.Publish(GameEvent.Slain(monster.Name, traveler.Name, year));
 
         if (isWardenFight)
         {
@@ -1114,7 +1123,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
 
         if (traveler.Level > levelBefore)
         {
-            broadcast.Publish(GameEvent.LevelReached(traveler.Name, traveler.Level));
+            broadcast.Publish(GameEvent.LevelReached(traveler.Name, traveler.Level, year));
         }
 
         RenderStatusBar(traveler, world);
@@ -1123,7 +1132,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
 
     // docs/GDD.md §3.3 (death & recall) is not implemented yet; a defeat here just ends the session.
     AnsiConsole.MarkupLine($"[red]You were defeated by {Markup.Escape(foe)}...[/]");
-    broadcast.Publish(GameEvent.Slain(traveler.Name, monster.Name));
+    broadcast.Publish(GameEvent.Slain(traveler.Name, monster.Name, year));
     return false;
 }
 
@@ -1208,7 +1217,7 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
         return;
     }
 
-    broadcast.Publish(GameEvent.Slain(target.Name, traveler.Name));
+    broadcast.Publish(GameEvent.Slain(target.Name, traveler.Name, traveler.CurrentYear));
     traveler.GainXp(target.XpReward);
 
     var drops = LootDropRoller.Roll(target.LootTable, random).Concat(target.Inventory).ToList();
@@ -1238,7 +1247,7 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
 
     if (traveler.Level > levelBefore)
     {
-        broadcast.Publish(GameEvent.LevelReached(traveler.Name, traveler.Level));
+        broadcast.Publish(GameEvent.LevelReached(traveler.Name, traveler.Level, traveler.CurrentYear));
     }
 }
 
@@ -1393,7 +1402,7 @@ static void HandleTravel(Traveler traveler, TimeWorld world, IRandomSource rando
 
     if (traveler.Level > levelBefore)
     {
-        broadcast.Publish(GameEvent.LevelReached(traveler.Name, traveler.Level));
+        broadcast.Publish(GameEvent.LevelReached(traveler.Name, traveler.Level, targetYear));
     }
 
     var arrival = world.GetYear(targetYear);
@@ -1464,7 +1473,7 @@ static void RenderMonsters(Traveler traveler, TimeWorld world)
     {
         var loc = Markup.Escape(m.Position.ToString())
             + (m.Position.Equals(traveler.Position) ? " [green](here)[/]"
-               : m.Heading is { } hd ? $" [grey]heading {hd.Name()}[/]"
+               : m.Heading is { } hd ? $" [grey]drifting {hd.Name()}[/]"
                : "");
         var mood = AggroModel.MoodFor(m.Aggro) switch
         {
@@ -1472,7 +1481,8 @@ static void RenderMonsters(Traveler traveler, TimeWorld world)
             AggroMood.Alert => "[yellow]alert[/]",
             _ => "[grey]calm[/]",
         };
-        table.AddRow(Markup.Escape(m.Name), m.Tier.ToString(), $"{m.Health.Current}/{m.Health.Max}", $"{m.Ions.Current}/{m.Ions.Max}", mood, loc);
+        var name = m.IsApex ? $"[bold red]{Markup.Escape(m.Name)}[/] [red](apex)[/]" : Markup.Escape(m.Name);
+        table.AddRow(name, m.Tier.ToString(), $"{m.Health.Current}/{m.Health.Max}", $"{m.Ions.Current}/{m.Ions.Max}", mood, loc);
     }
 
     AnsiConsole.Write(table);
@@ -1553,27 +1563,41 @@ static void RenderBroadcast(BroadcastChannel broadcast, int count)
 
 /// <summary>
 /// Prints broadcast events published since <paramref name="alreadyShownCount"/>,
-/// as an inline feed after a command. NPC time-hops are the bulk of the
-/// channel and are noise here — they're skipped inline but still kept for
-/// the full <c>news</c> view. Returns the new total (all events count as
-/// "seen" so they don't resurface later).
+/// as an inline feed after a command. Only events in the player's own year
+/// (<paramref name="playerYear"/>) — plus any not tied to a year, and any
+/// ambush on the player — show inline; everything happening elsewhere in
+/// the timeline is the bulk of the channel and is noise here, summarised
+/// as a count and left for the full <c>news</c> view. Returns the new
+/// total (all events count as "seen" so they don't resurface later).
 /// </summary>
-static int RenderNewBroadcastEvents(BroadcastChannel broadcast, int alreadyShownCount)
+static int RenderNewBroadcastEvents(BroadcastChannel broadcast, int alreadyShownCount, int playerYear)
 {
     const int InlineFeedCap = 6;
 
     var events = broadcast.Events;
     var fresh = new List<GameEvent>();
+    var elsewhere = 0;
     for (var i = alreadyShownCount; i < events.Count; i++)
     {
-        if (events[i].Kind != GameEventKind.TimeTraveled)
+        var evt = events[i];
+        if (evt.Kind == GameEventKind.TimeTraveled)
         {
-            fresh.Add(events[i]);
+            continue; // NPC time-hops: always news-only
+        }
+
+        var local = evt.Year is null || evt.Year == playerYear || evt.Kind == GameEventKind.Ambushed;
+        if (local)
+        {
+            fresh.Add(evt);
+        }
+        else
+        {
+            elsewhere++;
         }
     }
 
-    // Keep the tail and summarise the rest so a busy NPC tick doesn't bury
-    // the room — but an ambush on the player is never dropped.
+    // Keep the tail and summarise the rest so a busy tick doesn't bury the
+    // room — but an ambush on the player is never dropped.
     var shown = fresh.Count <= InlineFeedCap
         ? fresh
         : fresh.Where(e => e.Kind == GameEventKind.Ambushed)
@@ -1586,10 +1610,10 @@ static int RenderNewBroadcastEvents(BroadcastChannel broadcast, int alreadyShown
         AnsiConsole.MarkupLine($"[{colour}]* {Markup.Escape(evt.Message)}[/]");
     }
 
-    var hidden = fresh.Count - shown.Count;
+    var hidden = (fresh.Count - shown.Count) + elsewhere;
     if (hidden > 0)
     {
-        AnsiConsole.MarkupLine($"[grey]  …and {hidden} more elsewhere in the timeline (see [yellow]news[/]).[/]");
+        AnsiConsole.MarkupLine($"[grey]  …and {hidden} more across the timeline (see [yellow]news[/]).[/]");
     }
 
     return events.Count;
@@ -1747,7 +1771,9 @@ static void RenderRoom(Traveler traveler, TimeWorld world)
 
     var population = yearContent.Population;
 
-    var here = population.MonstersAt(traveler.Position).Select(m => m.Name).ToList();
+    var monstersHere = population.MonstersAt(traveler.Position).ToList();
+    var apexHere = monstersHere.Where(m => m.IsApex).ToList();
+    var here = monstersHere.Where(m => !m.IsApex).Select(m => m.Name).ToList();
     var warden = population.Warden;
     var wardenHere = warden is not null && !warden.Health.IsDead
         && !traveler.HasDefeatedWarden(traveler.CurrentYear)
@@ -1756,6 +1782,11 @@ static void RenderRoom(Traveler traveler, TimeWorld world)
     if (wardenHere)
     {
         AnsiConsole.MarkupLine($"[bold red]{Markup.Escape(warden!.Name)} stands watch here. [yellow]fight[/] when you're ready.[/]");
+    }
+
+    foreach (var apex in apexHere)
+    {
+        AnsiConsole.MarkupLine($"[bold red]A {Markup.Escape(apex.Name)} is here — far bigger and harder than the rest, and it hasn't reacted to you.[/] [grey](fight {Markup.Escape(apex.Name.Split(' ')[^1])} — or leave it be)[/]");
     }
 
     if (here.Count > 0)
@@ -1879,5 +1910,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("[grey]  (look/status/wait/…). Acting is safe, a store room is a haven, and moving a[/]");
     AnsiConsole.MarkupLine("[grey]  couple of rooms away calms a monster back down.[/]");
     AnsiConsole.MarkupLine("[grey]  Movement near you is called out — something coming into earshot, entering, or[/]");
-    AnsiConsole.MarkupLine("[grey]  leaving your room, with its direction; [yellow]monsters[/] shows each one's heading.[/]");
+    AnsiConsole.MarkupLine("[grey]  leaving your room, with its direction; [yellow]monsters[/] shows each one's position.[/]");
+    AnsiConsole.MarkupLine("[grey]  A few years hold an [red](apex)[/] — much tougher, barely provokable, better loot.[/]");
+    AnsiConsole.MarkupLine("[grey]  It leaves you alone; [yellow]fight <name>[/] it only if you want what it's carrying.[/]");
 }

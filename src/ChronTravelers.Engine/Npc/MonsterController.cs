@@ -31,8 +31,13 @@ namespace ChronTravelers.Engine.Npc;
 /// </summary>
 public static class MonsterController
 {
-    /// <summary>Per-tick chance a roaming monster takes a step — high enough that it covers ground so the <c>monsters</c> list stays live.</summary>
-    private const double WanderChance = 0.6;
+    /// <summary>
+    /// Per-tick chance a roaming monster takes a step. Deliberately low —
+    /// a calm monster drifts slowly and randomly, so a player heading for
+    /// one they saw on the <c>monsters</c> list actually finds it near
+    /// where it was rather than chasing a same-speed target forever.
+    /// </summary>
+    private const double WanderChance = 0.28;
 
     private const double InfightChance = 0.20;
     private const double HealHpThreshold = 0.40;
@@ -40,14 +45,11 @@ public static class MonsterController
     private const double RespawnChance = 0.25;
     private const int DuelRoundCap = 200;
 
-    /// <summary>Chance a roaming monster keeps its current heading rather than turning — makes its path readable so you can intercept it.</summary>
-    private const double KeepHeadingChance = 0.8;
+    /// <summary>After a step, the chance a roaming monster settles for a stretch (so it isn't drifting every eligible tick).</summary>
+    private const double RestAfterWanderChance = 0.5;
 
-    /// <summary>After a step, the chance a roaming monster pauses briefly (a look-around, not a long freeze).</summary>
-    private const double RestAfterWanderChance = 0.3;
-
-    private const int RestTicksMin = 2;
-    private const int RestTicksMax = 4;
+    private const int RestTicksMin = 3;
+    private const int RestTicksMax = 7;
 
     /// <summary>Minimum ticks between ambush hits on the player, so a quick <c>status</c> + <c>monsters</c> check near a hostile monster costs one hit, not three.</summary>
     private const int AmbushCooldownTicks = 2;
@@ -101,21 +103,25 @@ public static class MonsterController
             var distance = playerHere ? ManhattanDistance(monster.Position, player.Position) : int.MaxValue;
 
             // --- aggro accrual / decay -------------------------------------
+            // An apex barely registers a passer-by (it picks its fights),
+            // so every gain it would take is heavily scaled down.
+            var aggroScale = monster.IsApex ? AggroModel.ApexAggroMultiplier : 1.0;
+
             if (!playerHere || playerSafe || distance > AggroRange)
             {
                 monster.DecayAggro(AggroModel.DecayPerTick);
             }
             else if (player.Position.Equals(monster.Position) && !previousPlayerPosition.Equals(monster.Position))
             {
-                monster.RaiseAggro(AggroModel.EnterTileAggro); // stepped onto me
+                monster.RaiseAggro(AggroModel.EnterTileAggro * aggroScale); // stepped onto me
             }
             else if (distance == 0)
             {
-                monster.RaiseAggro(AggroModel.CoLocatedPerTick); // parked on me
+                monster.RaiseAggro(AggroModel.CoLocatedPerTick * aggroScale); // parked on me
             }
             else
             {
-                monster.RaiseAggro(AggroModel.AdjacentPerTick); // loitering next door
+                monster.RaiseAggro(AggroModel.AdjacentPerTick * aggroScale); // loitering next door
             }
 
             var mood = AggroModel.MoodFor(monster.Aggro);
@@ -137,8 +143,10 @@ public static class MonsterController
                 {
                     monster.RestTicks--; // settled in place for a stretch
                 }
-                else if (random.NextDouble() < WanderChance)
+                else if (random.NextDouble() < (monster.IsApex ? WanderChance * 0.5 : WanderChance))
                 {
+                    // An apex lurks — it drifts half as often, so it stays a
+                    // findable landmark you can walk up to and take on.
                     Wander(map, monster, random, safeRooms);
                     if (random.NextDouble() < RestAfterWanderChance)
                     {
@@ -155,11 +163,15 @@ public static class MonsterController
             monster.AdvanceIonRegenTick(IonEconomy.TicksPerIonRegen(monster.Tier, classDrainMultiplier: 1.0));
         }
 
-        ResolveInfighting(population, random, broadcast);
+        // Every event here happens in the year the player is standing in —
+        // MonsterController only ever runs for that one year.
+        var year = player.CurrentYear;
+
+        ResolveInfighting(population, random, broadcast, year);
         MaybeRespawn(population, map, roster, random);
 
         if (playerHere && playerLingered && !playerSafe && population.TicksSinceAmbush >= AmbushCooldownTicks
-            && ResolveAmbush(population, player, random, broadcast))
+            && ResolveAmbush(population, player, random, broadcast, year))
         {
             population.TicksSinceAmbush = 0;
         }
@@ -199,9 +211,11 @@ public static class MonsterController
         safeRooms is not null && safeRooms.Contains(room);
 
     /// <summary>
-    /// Patrol movement: a roaming monster keeps heading the same way most
-    /// turns (so its path is legible on the <c>monsters</c> list and you
-    /// can intercept it), turning only when blocked or on a random whim.
+    /// Drift movement: a roaming monster picks a random open exit (never
+    /// into a haven) and takes it. No fixed patrol heading — combined with
+    /// the low <see cref="WanderChance"/> it moves slowly and
+    /// unpredictably. <see cref="Monster.Heading"/> is left pointing the
+    /// way it last stepped, purely so movement narration reads right.
     /// </summary>
     private static void Wander(LevelMap map, Monster monster, IRandomSource random, IReadOnlySet<Coordinate>? safeRooms)
     {
@@ -222,23 +236,15 @@ public static class MonsterController
             return step.Success && !IsBlocked(safeRooms, step.Destination!.Value);
         }
 
-        Direction? heading = monster.Heading is { } h && Usable(h) && random.NextDouble() < KeepHeadingChance
-            ? h
-            : null;
-
-        if (heading is null)
+        var options = exits.Where(Usable).ToList();
+        if (options.Count == 0)
         {
-            var options = exits.Where(Usable).ToList();
-            if (options.Count == 0)
-            {
-                return;
-            }
-
-            heading = options[(int)(random.NextDouble() * options.Count)];
+            return;
         }
 
+        var heading = options[(int)(random.NextDouble() * options.Count)];
         monster.Heading = heading;
-        var move = map.TryMove(monster.Position, heading.Value);
+        var move = map.TryMove(monster.Position, heading);
         if (move.Success)
         {
             monster.MoveTo(move.Destination!.Value);
@@ -349,7 +355,7 @@ public static class MonsterController
         }
     }
 
-    private static void ResolveInfighting(YearPopulation population, IRandomSource random, BroadcastChannel broadcast)
+    private static void ResolveInfighting(YearPopulation population, IRandomSource random, BroadcastChannel broadcast, int year)
     {
         var crowdedRooms = population.Monsters
             .Where(m => !m.Health.IsDead)
@@ -379,7 +385,7 @@ public static class MonsterController
             }
 
             population.RemoveMonster(loser);
-            broadcast.Publish(GameEvent.Slain(loser.Name, winner.Name));
+            broadcast.Publish(GameEvent.Slain(loser.Name, winner.Name, year));
         }
     }
 
@@ -411,7 +417,7 @@ public static class MonsterController
     /// leaving, or just never having provoked it.
     /// </summary>
     /// <returns>True if a monster actually landed a hit (drives the cooldown reset).</returns>
-    private static bool ResolveAmbush(YearPopulation population, Traveler player, IRandomSource random, BroadcastChannel broadcast)
+    private static bool ResolveAmbush(YearPopulation population, Traveler player, IRandomSource random, BroadcastChannel broadcast, int year)
     {
         if (player.Health.IsDead)
         {
@@ -433,7 +439,7 @@ public static class MonsterController
         // An ambush catches you unbraced — only half your defense applies, so
         // a lingering low-tier monster still stings rather than pinging for 1.
         var dealt = player.Health.Damage(CombatResolver.RollDamage(attacker.AttackPower, player.EffectiveDefense / 2, random));
-        broadcast.Publish(GameEvent.Ambushed(attacker.Name, player.Name, dealt));
+        broadcast.Publish(GameEvent.Ambushed(attacker.Name, player.Name, dealt, year));
         return true;
     }
 
@@ -451,8 +457,10 @@ public static class MonsterController
 
         population.TicksSinceRespawn = 0;
 
+        // SoftCap counts the regular roster only — a seeded apex shouldn't
+        // starve the ordinary respawn trickle.
         if (roster.Count == 0
-            || population.Monsters.Count(m => !m.Health.IsDead) >= population.SoftCap
+            || population.Monsters.Count(m => !m.Health.IsDead && !m.IsApex) >= population.SoftCap
             || random.NextDouble() >= RespawnChance)
         {
             return;

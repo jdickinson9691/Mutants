@@ -106,6 +106,48 @@ public class TimelineContentFactoryTests
     }
 
     [Fact]
+    public void ApexForSpecies_IsMuchTougherThanTheRegularSpeciesButNotFaster()
+    {
+        var year = 2800;
+        var regular = TimelineContentFactory.ForSpecies(11, Baseline, year, Pool)();
+        var apex = TimelineContentFactory.ApexForSpecies(11, Baseline, year, Pool)();
+
+        Assert.True(apex.IsApex);
+        Assert.False(regular.IsApex);
+        Assert.StartsWith("Frayed ", apex.Name);
+        Assert.True(apex.Health.Max > regular.Health.Max * 2);
+        Assert.True(apex.AttackPower > regular.AttackPower);
+        Assert.True(apex.XpReward > regular.XpReward * 3);
+        Assert.Equal(regular.Speed, apex.Speed); // you can still walk away
+    }
+
+    [Fact]
+    public void ApexForSpecies_LootTable_GuaranteesGearBiasedTowardHighPower()
+    {
+        IReadOnlyList<ItemArchetypeDefinition> pool =
+        [
+            new("j", "Bits", ItemType.Junk, Rarity.Common, null, ConsumableEffectType.None, 0, 0, ["common"]),
+            new("crude", "Shiv", ItemType.Weapon, RarityExtensions.ForPower(0.5), null, ConsumableEffectType.None, 0, 0, ["common"], PowerMultiplier: 0.5),
+            new("relic", "Paradox Edge", ItemType.Weapon, RarityExtensions.ForPower(2.9), null, ConsumableEffectType.None, 0, 0, ["common"], PowerMultiplier: 2.9),
+        ];
+
+        var strong = 0;
+        for (var year = 2000; year < 2600; year++)
+        {
+            var table = TimelineContentFactory.ApexForSpecies(3, Baseline, year, pool)().LootTable;
+
+            var gear = table.Where(e => e.Item.Type == ItemType.Weapon).ToList();
+            Assert.Contains(gear, e => e.DropChance == 1.0); // a guaranteed piece
+            if (gear.Any(e => e.Item.Name == "Paradox Edge"))
+            {
+                strong++;
+            }
+        }
+
+        Assert.True(strong > 300, "apex gear should lean hard toward the strong end of the pool");
+    }
+
+    [Fact]
     public void Warden_IsABulletSpongeWithAGuaranteedLegendaryWeaponTrophy()
     {
         var year = 3210;

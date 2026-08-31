@@ -47,19 +47,25 @@ public sealed class YearPopulation
         SoftCap = softCap;
     }
 
+    /// <summary>~55% of years seed a single apex; a rare few seed two.</summary>
+    private const double SecondApexChance = 0.20;
+
     /// <summary>
     /// Places <c>max(2, roomCount / 3)</c> monsters (roster factories
     /// picked at random) in distinct non-start rooms, deterministically
     /// from <paramref name="worldSeed"/> + <paramref name="year"/>. If
-    /// <paramref name="wardenFactory"/> is non-null its monster is
-    /// built and stationed at the map's start room.
+    /// <paramref name="apexRoster"/> is non-empty, 0–2 apex monsters
+    /// (<see cref="Monster.IsApex"/>) are placed in further rooms alongside
+    /// the regular population. If <paramref name="wardenFactory"/> is
+    /// non-null its monster is built and stationed at the map's start room.
     /// </summary>
     public static YearPopulation Seed(
         long worldSeed,
         int year,
         LevelMap map,
         IReadOnlyList<Func<Monster>> roster,
-        Func<Monster>? wardenFactory)
+        Func<Monster>? wardenFactory,
+        IReadOnlyList<Func<Monster>>? apexRoster = null)
     {
         var rng = DeterministicRandom.For(worldSeed, year, "monsters");
 
@@ -85,6 +91,25 @@ public sealed class YearPopulation
             var monster = roster[rng.Next(roster.Count)]();
             monster.PlaceAt(rooms[i]);
             monsters.Add(monster);
+        }
+
+        // Apex monsters take the next free shuffled rooms — a rare, tougher
+        // presence the player can choose to take on. Roll happens even when
+        // there's no roster so the deterministic stream doesn't shift.
+        var apexCount = 0;
+        if (rng.NextDouble() < 0.55)
+        {
+            apexCount = rng.NextDouble() < SecondApexChance ? 2 : 1;
+        }
+
+        if (apexRoster is { Count: > 0 })
+        {
+            for (var i = 0; i < apexCount && count + i < rooms.Count; i++)
+            {
+                var apex = apexRoster[rng.Next(apexRoster.Count)]();
+                apex.PlaceAt(rooms[count + i]);
+                monsters.Add(apex);
+            }
         }
 
         Monster? warden = null;

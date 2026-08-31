@@ -371,6 +371,11 @@ Since v1 has no network multiplayer, the world needs to feel alive:
   leaderboard and the "who's doing what" feel of the original survives
   without a live human population. (The rupture leaks a low signal every
   Traveler's rig can pick up; that's the in-fiction reason you hear it.)
+  Every broadcast is tagged with the **year** it happened in. The console
+  shows only events in the player's *own* year inline after a command
+  (plus any ambush on the player); everything happening elsewhere on the
+  timeline is collapsed to a "…and N more" count, with the full feed on
+  `news`. Keeps the moment-to-moment log about the room you're in.
 - NPC decision-making is intentionally simple and rule-based for v1 (finite
   state machine, not full pathfinding AI/ML) to keep it debuggable and cheap
   to simulate at scale; an upgrade path to smarter behavior is a documented
@@ -381,14 +386,22 @@ The year the player is standing in also runs a live monster population
 (`ChronTravelers.Core.Time.YearPopulation`, seeded deterministically from the
 world seed on first entry, kept alive in the session's year memo — not
 saved):
-- Monsters occupy specific rooms and, each tick, **patrol** through exits,
+- Monsters occupy specific rooms and, each tick, **drift** through exits,
   **grab loot** off their room's floor, or — if hurt — **heal** from their
   own Ion pool, first **converting** a scavenged item if they're out of
-  Ions (the same `heal` / `convert` the player uses). A roaming monster
-  keeps **heading the same direction** most turns rather than random-
-  walking (with the odd short pause), so it covers ground and its path is
-  legible: the `monsters` list shows each one's heading, and you can read
-  where it's going and cut it off.
+  Ions (the same `heal` / `convert` the player uses). Drift is deliberately
+  **slow and random** — a low per-tick move chance, no fixed heading,
+  frequent multi-tick pauses — so a monster you spotted on the `monsters`
+  list is still near where it was when you get there, rather than a
+  same-speed target you can never catch. The `monsters` list shows each
+  one's exact room (and the way it last stepped).
+- A few years also seed one or two **apex** monsters (`Monster.IsApex`,
+  named "Frayed &lt;species&gt;"): much tougher (~2.4× HP, harder hits,
+  ~3.5× XP, a loot table that reliably yields real gear biased to the
+  strong end of the pool), but they accrue aggro at ~15% of the normal
+  rate and drift half as often — so they essentially never provoke and sit
+  as a findable landmark. The player chooses to take one on for the loot,
+  or walks past. A bare `fight` never targets the apex; you name it.
 - **Movement is narrated** relative to you, in the source game's style —
   a monster **first coming within one room** ("you hear something to the
   north," with varied phrasing), **entering** your room ("a Rubble Hulk
