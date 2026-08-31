@@ -13,6 +13,11 @@
 ;   iscc installer\ChronTravelers.iss
 ; The finished installer lands in installer\Output\.
 ;
+; "iscc" here means ISCC.exe. A winget install (JRSoftware.InnoSetup)
+; puts it under %LOCALAPPDATA%\Programs\Inno Setup 6\ (per-user, not on
+; PATH by default); the choco install the CI uses puts it under
+; "C:\Program Files (x86)\Inno Setup 6\" (see .github/workflows/release.yml).
+;
 ; MyAppVersion can be overridden from the command line (the release CI
 ; workflow does this from the pushed git tag):
 ;   iscc /DMyAppVersion=1.2.3 installer\ChronTravelers.iss
