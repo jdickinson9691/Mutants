@@ -34,6 +34,12 @@ public sealed class LevelMap
         _rooms = new Dictionary<Coordinate, Room>(rooms);
     }
 
+    /// <summary>Every room on the grid, keyed by coordinate. Read-only.</summary>
+    public IReadOnlyDictionary<Coordinate, Room> Rooms => _rooms;
+
+    /// <summary>Number of rooms on the grid.</summary>
+    public int RoomCount => _rooms.Count;
+
     public Room? TryGetRoom(Coordinate coordinate) => _rooms.GetValueOrDefault(coordinate);
 
     public Room GetRoom(Coordinate coordinate) =>
