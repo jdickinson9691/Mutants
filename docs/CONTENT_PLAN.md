@@ -18,11 +18,17 @@ file I/O.
       name, tags, archetype, lootThemeTags }`, no numbers. `archetype` is
       one of `Baseline | Caster | Bruiser | Skirmisher`
       (`Mutants.Core.Time.MonsterArchetype`); `TimelineContentFactory`
-      turns it into concrete stats at the encounter year, as a fixed
-      offset from `MonsterScaling`'s baseline for that year. `"undead"`
-      tags carry through to combat (Priest "Turn Undead", GDD §4.2).
-      Loot is rolled from item archetypes whose `themeTags` intersect the
+      turns it into concrete stats (incl. an Ion pool from
+      `MonsterScaling.BaseIons`) at the encounter year, as a fixed offset
+      from `MonsterScaling`'s baseline for that year. `"undead"` tags
+      carry through to combat (Priest "Turn Undead", GDD §4.2). Loot is
+      rolled from item archetypes whose `themeTags` intersect the
       species' `lootThemeTags` (or the era's), scaled to the year.
+      **Placed spatially** (GDD §7.1): `YearPopulation.Seed` drops
+      `max(2, roomCount/3)` of the year's roster into its rooms on first
+      entry, and `MonsterController` roams / infights / heals them each
+      tick. No per-year placement content — it's all derived from the
+      species roster + the world seed.
 
 - [x] **Item archetypes** — `item-archetypes.json`. ~32 archetypes: `{ id,
       name, type, rarity, restrictedClass?, effect?, effectMagnitude?,

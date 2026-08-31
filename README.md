@@ -18,7 +18,9 @@ distance, and monsters, loot, maps, and stores all scale smoothly by
 year. Each year's map is generated deterministically from a per-save
 world seed. "Gatekeeper" years — placed by the seed every random 50–100
 years — hold a tough optional boss guarding a Legendary trophy, but gate
-nothing. Content is a set of tier-free catalogs in
+nothing. In the year you're standing in, monsters occupy rooms, roam
+between them, fight each other (loot drops on the floor — `take` it), and
+heal from their own Ion pool. Content is a set of tier-free catalogs in
 `src/Mutants.Content/*.json` (`monster-species`, `item-archetypes`,
 `eras`, `store-templates`), loaded by
 `Mutants.Engine.Content.ContentLoader.LoadTimeWorld` into a

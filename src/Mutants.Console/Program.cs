@@ -4,6 +4,7 @@ using Mutants.Core.Economy;
 using Mutants.Core.Events;
 using Mutants.Core.Ions;
 using Mutants.Core.Items;
+using Mutants.Core.Monsters;
 using Mutants.Core.Time;
 using Mutants.Core.World;
 using Mutants.Engine;
@@ -17,12 +18,22 @@ using Spectre.Console;
 // The world is a continuous timeline (docs/GDD.md §3.2): the player starts
 // in the year 2000 A.D. and `travel`s - spending Ions - to any year up to
 // 5000, with monsters and loot scaling smoothly by year. Nothing gates
-// travel; the only limits are the Ion cost (ceil(0.2 * |Δyear|),
+// travel; the only limits are the Ion cost (ceil(0.1 * |Δyear|),
 // symmetric) and how hard the fights get. Every year's map is generated
 // deterministically from a per-save world seed, so revisiting a year is
 // stable. "Gatekeeper" years - a random 50-100 years apart, placed by the
 // seed - hold a tough guaranteed encounter guarding a year-scaled
 // Legendary trophy, but block nothing.
+//
+// Monsters are placed spatially in the year the player is standing in
+// (Mutants.Core.Time.YearPopulation, seeded deterministically on first
+// entry): they occupy grid rooms, wander between them, fight each other
+// (the loser's loot drops on the floor - `take` it), heal from their own
+// Ion pool, and slowly respawn toward a soft cap. `fight` engages a
+// monster in the current room; only the player's current year is
+// simulated live (Mutants.Engine.Npc.MonsterController via
+// WorldSimulation.Tick), other years hold frozen monsters until visited,
+// and none of this is written to the save (a fresh session re-seeds).
 //
 // Content is data-driven (Mutants.Content/*.json - monster-species,
 // item-archetypes, eras, store-templates - loaded by
@@ -147,14 +158,6 @@ while (running)
             HandleHeal(mutant);
             break;
 
-        case "fight" or "f":
-            if (!HandleFight(mutant, world, random, simulation.Broadcast, abilities))
-            {
-                running = false;
-            }
-
-            break;
-
         case "abilities" or "spells":
             RenderAbilities(mutant, abilities);
             break;
@@ -165,6 +168,10 @@ while (running)
 
         case "npcs" or "who":
             RenderNpcs(npcs);
+            break;
+
+        case "monsters" or "mobs":
+            RenderMonsters(mutant, world);
             break;
 
         case "news" or "broadcast":
@@ -199,6 +206,22 @@ while (running)
 
         default:
             var (command, argument) = SplitCommand(input);
+
+            if (command is "fight" or "f")
+            {
+                if (!HandleFight(mutant, world, random, simulation.Broadcast, abilities, argument))
+                {
+                    running = false;
+                }
+
+                break;
+            }
+
+            if (command is "take" or "grab" or "pickup" or "get")
+            {
+                HandleTake(mutant, world, argument);
+                break;
+            }
 
             if (command is "travel")
             {
@@ -842,29 +865,53 @@ static void HandleStoreManagement(Mutant mutant, TimeWorld world, string command
 }
 
 /// <summary>
-/// Resolves one fight. In a Gatekeeper year the player hasn't cleared, the
-/// opponent is that year's Gatekeeper (a bullet sponge guarding a
-/// Legendary trophy, which drops through the normal loot path on a win);
-/// otherwise it's a random monster from the year's roster. The fight
-/// itself is interactive and round-by-round via CombatSession - "attack"
-/// or "cast <ability>" each round. Returns false if the Mutant was
-/// defeated (caller ends the session). End-of-input mid-fight auto-attacks
-/// each remaining round.
+/// Resolves one fight against a monster standing in the player's current
+/// room (or that year's Gatekeeper, stationed at the map's start room in
+/// a Gatekeeper year the player hasn't cleared). <paramref name="targetName"/>
+/// picks one when several share the room; empty takes the first.
+/// Interactive and round-by-round via CombatSession — "attack" or "cast
+/// <ability>" each round. On a win the monster is removed from the year's
+/// live population and its loot (table roll + anything it had scavenged)
+/// goes to the player. Returns false if the Mutant was defeated (caller
+/// ends the session). End-of-input mid-fight auto-attacks each remaining
+/// round.
 /// </summary>
-static bool HandleFight(Mutant mutant, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, IReadOnlyList<AbilityData> abilities)
+static bool HandleFight(Mutant mutant, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, IReadOnlyList<AbilityData> abilities, string targetName)
 {
     var year = mutant.CurrentYear;
     var yearContent = world.GetYear(year);
+    var population = yearContent.Population;
 
-    var isGatekeeperFight = yearContent.Gatekeeper is not null && !mutant.HasDefeatedGatekeeper(year);
-    var monster = isGatekeeperFight
-        ? yearContent.Gatekeeper!()
-        : yearContent.MonsterRoster[System.Random.Shared.Next(yearContent.MonsterRoster.Count)]();
+    Monster monster;
+    var isGatekeeperFight = false;
+
+    var gatekeeper = population.Gatekeeper;
+    if (gatekeeper is not null && !gatekeeper.Health.IsDead
+        && !mutant.HasDefeatedGatekeeper(year)
+        && mutant.Position.Equals(gatekeeper.Position))
+    {
+        monster = gatekeeper;
+        isGatekeeperFight = true;
+    }
+    else
+    {
+        var here = population.MonstersAt(mutant.Position).ToList();
+        if (here.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[grey]Nothing here to fight.[/] Monsters roam the rooms — go find one.");
+            return true;
+        }
+
+        monster = targetName.Length > 0
+            ? here.FirstOrDefault(m => m.Name.Contains(targetName, StringComparison.OrdinalIgnoreCase)) ?? here[0]
+            : here[0];
+    }
+
     var levelBefore = mutant.Level;
 
     AnsiConsole.MarkupLine(isGatekeeperFight
         ? $"[bold]{Markup.Escape(monster.Name)} rises to meet you![/] (tier {monster.Tier})"
-        : $"A [bold]{Markup.Escape(monster.Name)}[/] (tier {monster.Tier}) attacks!");
+        : $"You close on the [bold]{Markup.Escape(monster.Name)}[/] (tier {monster.Tier})!");
 
     var usableAbilities = abilities
         .Where(a => string.Equals(a.Class, mutant.Class.ToString(), StringComparison.OrdinalIgnoreCase) && a.Level <= mutant.Level)
@@ -930,6 +977,17 @@ static bool HandleFight(Mutant mutant, TimeWorld world, IRandomSource random, Br
             AnsiConsole.MarkupLine(trophy is not null
                 ? $"[bold yellow]The Gatekeeper of {year} yields its {Markup.Escape(trophy.Name)}![/]"
                 : $"[bold]The Gatekeeper of {year} is broken. This year is yours.[/]");
+        }
+        else
+        {
+            population.RemoveMonster(monster);
+
+            // Anything the monster had scavenged off the ground comes with the kill.
+            foreach (var scavenged in monster.Inventory.ToList())
+            {
+                mutant.AddToInventory(scavenged);
+                AnsiConsole.MarkupLine($"[green]You take the {Markup.Escape(scavenged.Name)} it was carrying.[/]");
+            }
         }
 
         if (mutant.Level > levelBefore)
@@ -1131,6 +1189,96 @@ static void RenderNpcs(IReadOnlyList<Mutant> npcs)
     AnsiConsole.Write(table);
 }
 
+/// <summary>Lists the monsters roaming the player's current year (see YearPopulation), the one the player is standing with marked.</summary>
+static void RenderMonsters(Mutant mutant, TimeWorld world)
+{
+    var population = world.GetYear(mutant.CurrentYear).Population;
+    var living = population.Monsters.Where(m => !m.Health.IsDead).ToList();
+
+    if (population.Gatekeeper is { Health.IsDead: false } gk && !mutant.HasDefeatedGatekeeper(mutant.CurrentYear))
+    {
+        living.Insert(0, gk);
+    }
+
+    if (living.Count == 0)
+    {
+        AnsiConsole.MarkupLine("[grey]No monsters roaming this year right now — they'll trickle back.[/]");
+        return;
+    }
+
+    var table = new Table().Expand();
+    table.AddColumn("Name");
+    table.AddColumn("Tier");
+    table.AddColumn("HP");
+    table.AddColumn("Ions");
+    table.AddColumn("Location");
+
+    foreach (var m in living.OrderBy(m => m.Position.North).ThenBy(m => m.Position.East))
+    {
+        var loc = Markup.Escape(m.Position.ToString()) + (m.Position.Equals(mutant.Position) ? " [green](here)[/]" : "");
+        table.AddRow(Markup.Escape(m.Name), m.Tier.ToString(), $"{m.Health.Current}/{m.Health.Max}", $"{m.Ions.Current}/{m.Ions.Max}", loc);
+    }
+
+    AnsiConsole.Write(table);
+}
+
+/// <summary>Picks up ground loot at the player's coordinate — 'take &lt;item&gt;' (name or number) or 'take all'.</summary>
+static void HandleTake(Mutant mutant, TimeWorld world, string argument)
+{
+    var population = world.GetYear(mutant.CurrentYear).Population;
+    var pile = population.LootAt(mutant.Position);
+    if (pile.Count == 0)
+    {
+        AnsiConsole.MarkupLine("[grey]Nothing on the ground here.[/]");
+        return;
+    }
+
+    var arg = argument.Trim();
+    if (arg.Length == 0 || string.Equals(arg, "all", StringComparison.OrdinalIgnoreCase))
+    {
+        Item? item;
+        while ((item = population.TakeGroundLoot(mutant.Position, _ => true)) is not null)
+        {
+            mutant.AddToInventory(item);
+            AnsiConsole.MarkupLine($"[green]You pick up the {Markup.Escape(item.Name)}.[/]");
+        }
+
+        return;
+    }
+
+    Item? match = null;
+    if (int.TryParse(arg, out var index) && index >= 1 && index <= pile.Count)
+    {
+        match = pile[index - 1];
+    }
+    else
+    {
+        match = pile.FirstOrDefault(i => i.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
+    }
+
+    if (match is null)
+    {
+        AnsiConsole.MarkupLine($"[red]No '{Markup.Escape(arg)}' on the ground here.[/] It holds: {Markup.Escape(NameList(pile.Select(i => i.Name).ToList()))}.");
+        return;
+    }
+
+    var picked = population.TakeGroundLoot(mutant.Position, i => ReferenceEquals(i, match));
+    if (picked is not null)
+    {
+        mutant.AddToInventory(picked);
+        AnsiConsole.MarkupLine($"[green]You pick up the {Markup.Escape(picked.Name)}.[/]");
+    }
+}
+
+/// <summary>"A, B and C" — a readable comma list.</summary>
+static string NameList(IReadOnlyList<string> names) => names.Count switch
+{
+    0 => "nothing",
+    1 => names[0],
+    2 => $"{names[0]} and {names[1]}",
+    _ => $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}",
+};
+
 static void RenderBroadcast(BroadcastChannel broadcast, int count)
 {
     var recent = broadcast.Recent(count);
@@ -1305,9 +1453,36 @@ static void RenderRoom(Mutant mutant, TimeWorld world)
         AnsiConsole.MarkupLine("[green]There are no exits. You are stuck.[/]");
     }
 
-    if (yearContent.Gatekeeper is not null && !mutant.HasDefeatedGatekeeper(mutant.CurrentYear))
+    var population = yearContent.Population;
+
+    var here = population.MonstersAt(mutant.Position).Select(m => m.Name).ToList();
+    var gatekeeper = population.Gatekeeper;
+    var gatekeeperHere = gatekeeper is not null && !gatekeeper.Health.IsDead
+        && !mutant.HasDefeatedGatekeeper(mutant.CurrentYear)
+        && gatekeeper.Position.Equals(mutant.Position);
+
+    if (gatekeeperHere)
     {
-        AnsiConsole.MarkupLine("[bold red]A Gatekeeper holds this year. It will not let you leave unnoticed — [yellow]fight[/] when you're ready.[/]");
+        AnsiConsole.MarkupLine($"[bold red]{Markup.Escape(gatekeeper!.Name)} stands watch here. [yellow]fight[/] when you're ready.[/]");
+    }
+
+    if (here.Count > 0)
+    {
+        AnsiConsole.MarkupLine($"[red]{Markup.Escape(NameList(here))} {(here.Count == 1 ? "is" : "are")} here.[/] [grey](fight{(here.Count > 1 ? " <name>" : "")})[/]");
+    }
+
+    foreach (var direction in exitDirections)
+    {
+        if (population.HasLivingMonsterAt(mutant.Position.Move(direction)))
+        {
+            AnsiConsole.MarkupLine($"[grey]Something stirs to the {direction.Name()}.[/]");
+        }
+    }
+
+    var ground = population.LootAt(mutant.Position);
+    if (ground.Count > 0)
+    {
+        AnsiConsole.MarkupLine($"[yellow]On the ground:[/] {Markup.Escape(NameList(ground.Select(i => i.Name).ToList()))}. [grey](take <item>)[/]");
     }
 
     var slot = FindStoreSlotAt(yearContent.StoreSlots, mutant.Position);
@@ -1355,12 +1530,14 @@ static void RenderHelp()
 {
     AnsiConsole.MarkupLine("[yellow]Commands:[/]");
     AnsiConsole.MarkupLine("  [green]n[/]/[green]s[/]/[green]e[/]/[green]w[/] (or north/south/east/west) - move");
-    AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room");
-    AnsiConsole.MarkupLine("  [green]fight[/] (or f)        - fight a monster from this year's roster (or its Gatekeeper)");
+    AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room (monsters here / nearby, ground loot)");
+    AnsiConsole.MarkupLine("  [green]fight[/] (or f) [green]<name>[/] - fight a monster in this room (or the Gatekeeper at the year's start)");
     AnsiConsole.MarkupLine("    (each round, type [green]attack[/] or [green]cast <ability>[/])");
+    AnsiConsole.MarkupLine("  [green]take[/] (or grab) [green]<item>[/] - pick up loot off the ground here ('take all' works)");
+    AnsiConsole.MarkupLine("  [green]monsters[/] (or mobs)  - list the monsters roaming this year");
     AnsiConsole.MarkupLine("  [green]heal[/]                - spend Ions to recover HP (usable any time)");
     AnsiConsole.MarkupLine("  [green]abilities[/] (or spells) - list your class's abilities unlocked so far");
-    AnsiConsole.MarkupLine("  [green]travel <year>[/]      - jump to a year (2000–5000); costs ceil(0.2·|Δyear|) Ions");
+    AnsiConsole.MarkupLine("  [green]travel <year>[/]      - jump to a year (2000–5000); costs ceil(0.1·|Δyear|) Ions");
     AnsiConsole.MarkupLine("  [green]travel +N[/]/[green]-N[/]      - jump N years forward/back");
     AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]   - jump to the next/previous Gatekeeper year");
     AnsiConsole.MarkupLine("  [green]inventory[/] (or i)    - list what you're carrying");

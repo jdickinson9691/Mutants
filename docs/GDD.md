@@ -80,9 +80,14 @@ stretch goal, not in the original).
   maintenance shop.`, `You see rubble everywhere.`, `You feel a cold
   breeze.`) `[SOURCE style]`.
 - Adjacent-room hints are surfaced before you move into them (`You see
-  shadows to the east, west.`) `[SOURCE style]`.
+  shadows to the east, west.`; `Something stirs to the north.` when a
+  monster is next door) `[SOURCE style]`.
 - Available exits are always listed explicitly, e.g. `north - area
   continues.` `[SOURCE style]`.
+- **Monsters occupy rooms** (§7): the year you're in has monsters standing
+  in specific rooms; `look` names the ones sharing yours and hints at
+  neighbours; `fight [name]` engages one where you stand; loot left on a
+  room's floor is listed and picked up with `take`.
 
 ### 3.2 The timeline & time travel `[SOURCE: confirmed mechanic + Ion cost]`
 - The world is a **continuous timeline** from year **2000 A.D.** (the
@@ -281,6 +286,25 @@ Since v1 has no network multiplayer, the world needs to feel alive:
   state machine, not full pathfinding AI/ML) to keep it debuggable and cheap
   to simulate at scale; an upgrade path to smarter behavior is a documented
   v2 idea, not a v1 requirement.
+
+### 7.1 Spatial monsters
+The year the player is standing in also runs a live monster population
+(`Mutants.Core.Time.YearPopulation`, seeded deterministically from the
+world seed on first entry, kept alive in the session's year memo — not
+saved):
+- Monsters occupy specific rooms and, each tick, **wander** through exits,
+  **grab loot** off their room's floor, or — if hurt — **heal** from their
+  own Ion pool, first **converting** a scavenged item if they're out of
+  Ions (the same `heal` / `convert` the player uses).
+- Two monsters sharing a room may **fight each other**; the loser dies and
+  its carried items plus a loot-table roll drop on that room's floor,
+  exactly as when a player kills it, and it posts to the same kill-feed.
+- A slow **respawn trickle** keeps an emptied year refilling toward a soft
+  cap (~a third of its rooms) without ever overflowing.
+- Only the player's current year is simulated; every other year holds its
+  monsters frozen where they were placed until visited. NPC-Mutants still
+  grind abstractly against their year's roster (spatial NPC↔monster
+  interaction is a follow-up).
 
 ## 8. Leaderboards `[SOURCE: MutantLink cross-board high scores]`
 
