@@ -25,4 +25,33 @@ public class MonsterScalingTests
         Assert.Throws<ArgumentOutOfRangeException>(() => MonsterScaling.BaseSpeed(tier));
         Assert.Throws<ArgumentOutOfRangeException>(() => MonsterScaling.XpReward(tier));
     }
+
+    [Fact]
+    public void IntOverload_MatchesDoubleOverloadRoundedAtWholeTiers()
+    {
+        for (var tier = 1; tier <= 9; tier++)
+        {
+            Assert.Equal(MonsterScaling.BaseHp(tier), (int)System.Math.Round(MonsterScaling.BaseHp((double)tier)));
+            Assert.Equal(MonsterScaling.BaseAttackPower(tier), (int)System.Math.Round(MonsterScaling.BaseAttackPower((double)tier)));
+            Assert.Equal(MonsterScaling.XpReward(tier), (int)System.Math.Round(MonsterScaling.XpReward((double)tier)));
+        }
+    }
+
+    [Fact]
+    public void DoubleOverload_IsContinuousBetweenWholeTiers()
+    {
+        var atTwo = MonsterScaling.BaseHp(2.0);
+        var atHalf = MonsterScaling.BaseHp(2.5);
+        var atThree = MonsterScaling.BaseHp(3.0);
+
+        Assert.True(atHalf > atTwo && atHalf < atThree);
+        Assert.Equal((atTwo + atThree) / 2, atHalf, precision: 6);
+    }
+
+    [Fact]
+    public void DoubleOverload_RejectsTierBelowOne()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => MonsterScaling.BaseHp(0.9));
+        Assert.Throws<ArgumentOutOfRangeException>(() => MonsterScaling.XpReward(0.0));
+    }
 }
