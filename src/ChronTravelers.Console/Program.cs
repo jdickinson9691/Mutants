@@ -99,14 +99,7 @@ using Spectre.Console;
 // current/furthest year, the cleared Warden years, and every store
 // the player owns (year + capital + listings, re-attached on load).
 
-AnsiConsole.Write(new FigletText("ChronTravelers").Color(Color.Green));
-AnsiConsole.MarkupLine("[grey](pre-release build — the continuous 2000–5000 A.D. timeline)[/]");
-AnsiConsole.WriteLine();
-AnsiConsole.MarkupLine("[grey]Project Meridian's tunnel opened for eight seconds and never fully closed.[/]");
-AnsiConsole.MarkupLine("[grey]It frayed the future. The gantry crew fell downstream with it — you among them,[/]");
-AnsiConsole.MarkupLine("[grey]surfacing somewhere between 2000 and 5000 A.D. with no way to steer and no way home.[/]");
-AnsiConsole.MarkupLine("[grey]Ride the Ion surges. Go as far downstream as you can. The surface team is still looking.[/]");
-AnsiConsole.WriteLine();
+RenderTitle();
 
 var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 var savesDirectory = string.IsNullOrEmpty(appDataFolder)
@@ -115,9 +108,6 @@ var savesDirectory = string.IsNullOrEmpty(appDataFolder)
 Directory.CreateDirectory(savesDirectory);
 var savePath = Path.Combine(savesDirectory, "chrontravelers.db");
 using var repository = new GameRepository(savePath);
-
-RenderLeaderboards(repository);
-AnsiConsole.WriteLine();
 
 var abilities = LoadAbilities();
 var random = new SystemRandomSource();
@@ -425,12 +415,10 @@ static string? ReadNonEmptyLine(string prompt)
     }
 }
 
-static CharacterClass? ReadClassChoice()
+static CharacterClass? ReadClassChoice(IReadOnlyList<CharacterClass> classes)
 {
-    var classes = Enum.GetValues<CharacterClass>();
-
     AnsiConsole.MarkupLine("Choose your [green]role[/] on the Meridian crew:");
-    for (var i = 0; i < classes.Length; i++)
+    for (var i = 0; i < classes.Count; i++)
     {
         AnsiConsole.MarkupLine($"  [green]{i + 1}[/]. [bold]{classes[i]}[/] [grey]- {ClassBlurb(classes[i])}[/]");
     }
@@ -446,12 +434,12 @@ static CharacterClass? ReadClassChoice()
 
         var trimmed = line.Trim();
 
-        if (int.TryParse(trimmed, out var choice) && choice >= 1 && choice <= classes.Length)
+        if (int.TryParse(trimmed, out var choice) && choice >= 1 && choice <= classes.Count)
         {
             return classes[choice - 1];
         }
 
-        if (Enum.TryParse<CharacterClass>(trimmed, ignoreCase: true, out var byName) && Enum.IsDefined(byName))
+        if (Enum.TryParse<CharacterClass>(trimmed, ignoreCase: true, out var byName) && classes.Contains(byName))
         {
             return byName;
         }
@@ -522,68 +510,172 @@ static List<Traveler> SpawnNpcs(TimeWorld world, IRandomSource random)
     return NpcPopulation.Spawn(count, world, random).ToList();
 }
 
-/// <summary>The title-screen "new game or load a save" flow. Returns null only on end-of-input (quit); otherwise the character, the world seed to build the timeline from, and (for a loaded game) the raw save data so owned stores can be re-attached once the world exists.</summary>
-static (Traveler Traveler, long WorldSeed, CharacterSaveData? LoadedSave)? HandleStartScreen(GameRepository repository)
+/// <summary>The custom ChronTravelers wordmark shown once at launch (a hand-set banner, not Spectre's Figlet), with a timeline motif and the intro flavour.</summary>
+static void RenderTitle()
 {
-    var savedNames = repository.ListSavedCharacterNames();
-    if (savedNames.Count > 0)
+    string[] banner =
+    [
+        @" ██████╗██╗  ██╗██████╗  ██████╗ ███╗   ██╗",
+        @"██╔════╝██║  ██║██╔══██╗██╔═══██╗████╗  ██║",
+        @"██║     ███████║██████╔╝██║   ██║██╔██╗ ██║",
+        @"██║     ██╔══██║██╔══██╗██║   ██║██║╚██╗██║",
+        @"╚██████╗██║  ██║██║  ██║╚██████╔╝██║ ╚████║",
+        @" ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝",
+        @"████████╗██████╗  █████╗ ██╗   ██╗███████╗██╗     ███████╗██████╗ ███████╗",
+        @"╚══██╔══╝██╔══██╗██╔══██╗██║   ██║██╔════╝██║     ██╔════╝██╔══██╗██╔════╝",
+        @"   ██║   ██████╔╝███████║██║   ██║█████╗  ██║     █████╗  ██████╔╝███████╗",
+        @"   ██║   ██╔══██╗██╔══██║╚██╗ ██╔╝██╔══╝  ██║     ██╔══╝  ██╔══██╗╚════██║",
+        @"   ██║   ██║  ██║██║  ██║ ╚████╔╝ ███████╗███████╗███████╗██║  ██║███████║",
+        @"   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝",
+    ];
+
+    AnsiConsole.WriteLine();
+    foreach (var line in banner)
     {
-        AnsiConsole.MarkupLine($"[yellow]Saved characters:[/] {string.Join(", ", savedNames.Select(Markup.Escape))}");
-        AnsiConsole.MarkupLine("Type [green]new[/] to create a Traveler, or a saved name to continue them.");
-    }
-    else
-    {
-        AnsiConsole.MarkupLine("No saved characters yet. Type [green]new[/] to create a Traveler.");
+        AnsiConsole.MarkupLine($"[green]{line}[/]");
     }
 
-    string choice;
+    AnsiConsole.WriteLine();
+    AnsiConsole.MarkupLine("[grey]  2000 A.D. »»——————————  the tunnel is still open  ——————————»» 5000 A.D.[/]");
+    AnsiConsole.MarkupLine("[grey]  a Lüdinn Entertainment production · pre-release build[/]");
+    AnsiConsole.WriteLine();
+    AnsiConsole.MarkupLine("[grey]Project Meridian's tunnel opened for eight seconds and never fully closed.[/]");
+    AnsiConsole.MarkupLine("[grey]It frayed the future. The gantry crew fell downstream with it — you among them,[/]");
+    AnsiConsole.MarkupLine("[grey]surfacing somewhere between 2000 and 5000 A.D. with no way to steer and no way home.[/]");
+    AnsiConsole.MarkupLine("[grey]Ride the Ion surges. Go as far downstream as you can. The surface team is still looking.[/]");
+}
+
+/// <summary>
+/// The start-screen menu loop. Options 2–4 (leaderboards / how to play /
+/// help) print and return here; only "Play" (picking or making a Traveler)
+/// or quit ends the loop — returning the chosen character + world seed +
+/// (for a continued game) its raw save data, or null on quit / end-of-input.
+/// </summary>
+static (Traveler Traveler, long WorldSeed, CharacterSaveData? LoadedSave)? HandleStartScreen(GameRepository repository)
+{
     while (true)
     {
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[yellow]═══ ChronTravelers ═══[/]");
+        AnsiConsole.MarkupLine("  [green]1[/]. Play ChronTravelers");
+        AnsiConsole.MarkupLine("  [green]2[/]. Leaderboards");
+        AnsiConsole.MarkupLine("  [green]3[/]. How to play");
+        AnsiConsole.MarkupLine("  [green]4[/]. Help");
+        AnsiConsole.MarkupLine("  [green]5[/]. Quit");
+
         var input = ReadNonEmptyLine("> ");
         if (input is null)
         {
             return null;
         }
 
-        if (string.Equals(input, "new", StringComparison.OrdinalIgnoreCase))
+        switch (input.ToLowerInvariant())
         {
-            choice = "new";
-            break;
-        }
+            case "1" or "play" or "play chrontravelers":
+                var picked = HandleCharacterSelect(repository);
+                if (picked is not null)
+                {
+                    return picked;
+                }
 
-        var matchedName = savedNames.FirstOrDefault(n => string.Equals(n, input, StringComparison.OrdinalIgnoreCase));
-        if (matchedName is not null)
-        {
-            choice = matchedName;
-            break;
-        }
+                break;
 
-        AnsiConsole.MarkupLine("[red]Type 'new', or the exact name of a saved character.[/]");
+            case "2" or "leaderboards" or "leaderboard" or "board":
+                AnsiConsole.WriteLine();
+                RenderLeaderboards(repository);
+                break;
+
+            case "3" or "how to play" or "howtoplay" or "how":
+                AnsiConsole.WriteLine();
+                RenderHowToPlay();
+                break;
+
+            case "4" or "help" or "?":
+                AnsiConsole.WriteLine();
+                RenderHelp();
+                break;
+
+            case "5" or "quit" or "exit":
+                return null;
+
+            default:
+                AnsiConsole.MarkupLine("[red]Pick 1–5.[/]");
+                break;
+        }
     }
+}
 
-    if (choice == "new")
+/// <summary>Option 1 — pick a saved Traveler to continue, or make a new one. Returns null (back to the menu) on a blank line or end-of-input.</summary>
+static (Traveler Traveler, long WorldSeed, CharacterSaveData? LoadedSave)? HandleCharacterSelect(GameRepository repository)
+{
+    var saved = repository.ListSavedCharacters();
+
+    AnsiConsole.WriteLine();
+    if (saved.Count > 0)
     {
-        var name = ReadNonEmptyLine("What is your name, Traveler? ");
-        if (name is null)
+        AnsiConsole.MarkupLine("[yellow]Your Travelers:[/]");
+        for (var i = 0; i < saved.Count; i++)
         {
-            return null;
+            var c = saved[i];
+            AnsiConsole.MarkupLine($"  [green]{i + 1}[/]. [bold]{Markup.Escape(c.Name)}[/] the {Markup.Escape(c.Class)} — level {c.Level}, furthest {c.FurthestYearReached} A.D.");
         }
-
-        var characterClass = ReadClassChoice();
-        if (characterClass is null)
-        {
-            return null;
-        }
-
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[grey]You were on the gantry when the tunnel lit. The next thing you knew, the lab was gone[/]");
-        AnsiConsole.MarkupLine($"[grey]and the sky was the wrong colour. Wherever — whenever — this is, you're the {characterClass} now, and[/]");
-        AnsiConsole.MarkupLine($"[grey]you're on your own. Downstream is the only direction that means anything.[/]");
-
-        return (new Traveler(name, characterClass.Value), System.Random.Shared.NextInt64(), null);
+    }
+    else
+    {
+        AnsiConsole.MarkupLine("[grey]No Travelers yet.[/]");
     }
 
-    var saveData = repository.LoadCharacter(choice)!;
+    var newOption = saved.Count + 1;
+    AnsiConsole.MarkupLine($"  [green]{newOption}[/]. [bold]New Traveler[/] [grey]— a role you haven't played[/]");
+    AnsiConsole.MarkupLine("  [grey](blank to go back)[/]");
+
+    while (true)
+    {
+        AnsiConsole.Markup("[green]>[/] ");
+        var line = Console.ReadLine();
+        if (line is null)
+        {
+            return null;
+        }
+
+        var t = line.Trim();
+        if (t.Length == 0)
+        {
+            return null;
+        }
+
+        if (int.TryParse(t, out var n))
+        {
+            if (n >= 1 && n <= saved.Count)
+            {
+                return ContinueSaved(repository, saved[n - 1].Name);
+            }
+
+            if (n == newOption)
+            {
+                return CreateNewTraveler(repository, saved);
+            }
+        }
+
+        if (string.Equals(t, "new", StringComparison.OrdinalIgnoreCase))
+        {
+            return CreateNewTraveler(repository, saved);
+        }
+
+        var byName = saved.FirstOrDefault(c => string.Equals(c.Name, t, StringComparison.OrdinalIgnoreCase));
+        if (byName is not null)
+        {
+            return ContinueSaved(repository, byName.Name);
+        }
+
+        AnsiConsole.MarkupLine($"[red]Pick 1–{newOption}, a name, or blank to go back.[/]");
+    }
+}
+
+/// <summary>Loads a saved Traveler and the world seed to rebuild its timeline from.</summary>
+static (Traveler Traveler, long WorldSeed, CharacterSaveData? LoadedSave)? ContinueSaved(GameRepository repository, string name)
+{
+    var saveData = repository.LoadCharacter(name)!;
     var loaded = CharacterMapper.FromSaveData(saveData);
     var seed = saveData is { SchemaVersion: >= 2, WorldSeed: not 0 }
         ? saveData.WorldSeed
@@ -596,6 +688,71 @@ static (Traveler Traveler, long WorldSeed, CharacterSaveData? LoadedSave)? Handl
 
     AnsiConsole.MarkupLine($"[green]Welcome back, {Markup.Escape(loaded.Name)}![/]");
     return (loaded, seed, saveData);
+}
+
+/// <summary>Makes a fresh Traveler. Only the roles the player hasn't played yet are offered (all five if they've played the lot).</summary>
+static (Traveler Traveler, long WorldSeed, CharacterSaveData? LoadedSave)? CreateNewTraveler(GameRepository repository, IReadOnlyList<CharacterSaveData> saved)
+{
+    string name;
+    while (true)
+    {
+        var entered = ReadNonEmptyLine("What is your name, Traveler? ");
+        if (entered is null)
+        {
+            return null;
+        }
+
+        if (saved.Any(c => string.Equals(c.Name, entered, StringComparison.OrdinalIgnoreCase)))
+        {
+            AnsiConsole.MarkupLine("[red]You already have a Traveler by that name — pick another.[/]");
+            continue;
+        }
+
+        name = entered;
+        break;
+    }
+
+    var played = saved
+        .Select(c => Enum.TryParse<CharacterClass>(c.Class, ignoreCase: true, out var cc) ? cc : (CharacterClass?)null)
+        .Where(c => c is not null)
+        .Select(c => c!.Value)
+        .ToHashSet();
+
+    var offered = Enum.GetValues<CharacterClass>().Where(c => !played.Contains(c)).ToList();
+    if (offered.Count == 0)
+    {
+        AnsiConsole.MarkupLine("[grey]You've played every role — pick any.[/]");
+        offered = Enum.GetValues<CharacterClass>().ToList();
+    }
+
+    var characterClass = ReadClassChoice(offered);
+    if (characterClass is null)
+    {
+        return null;
+    }
+
+    AnsiConsole.WriteLine();
+    AnsiConsole.MarkupLine("[grey]You were on the gantry when the tunnel lit. The next thing you knew, the lab was gone[/]");
+    AnsiConsole.MarkupLine($"[grey]and the sky was the wrong colour. Wherever — whenever — this is, you're the {characterClass} now, and[/]");
+    AnsiConsole.MarkupLine("[grey]you're on your own. Downstream is the only direction that means anything.[/]");
+
+    return (new Traveler(name, characterClass.Value), System.Random.Shared.NextInt64(), null);
+}
+
+/// <summary>Prints the embedded HowToPlay.txt (start-menu option 3).</summary>
+static void RenderHowToPlay()
+{
+    var asm = System.Reflection.Assembly.GetExecutingAssembly();
+    var resource = asm.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("HowToPlay.txt", StringComparison.OrdinalIgnoreCase));
+    if (resource is null)
+    {
+        AnsiConsole.MarkupLine("[red]The how-to-play text is missing from this build.[/] Type [yellow]4[/] for the command list.");
+        return;
+    }
+
+    using var stream = asm.GetManifestResourceStream(resource)!;
+    using var reader = new StreamReader(stream);
+    AnsiConsole.WriteLine(reader.ReadToEnd());
 }
 
 static void RenderLeaderboards(GameRepository repository, string? highlightName = null)

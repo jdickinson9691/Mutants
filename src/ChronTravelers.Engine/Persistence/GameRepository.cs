@@ -55,6 +55,13 @@ public sealed class GameRepository : IDisposable
             .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+    /// <summary>Every saved character, name-ordered — for the start-screen roster (name / class / level / furthest year).</summary>
+    public IReadOnlyList<CharacterSaveData> ListSavedCharacters() =>
+        _db.GetCollection<CharacterSaveData>(CharactersCollection)
+            .FindAll()
+            .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
     /// <summary>
     /// Records a character's current stats as personal bests if they beat
     /// what's on file — docs/GDD.md §8: the two leaderboards only ever

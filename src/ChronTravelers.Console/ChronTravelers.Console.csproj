@@ -33,6 +33,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The "How to play" text shown from the start menu — embedded so it
+         can't go missing next to a single-file exe. -->
+    <EmbeddedResource Include="HowToPlay.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ChronTravelers.Core\ChronTravelers.Core.csproj" />
     <ProjectReference Include="..\ChronTravelers.Engine\ChronTravelers.Engine.csproj" />
     <ProjectReference Include="..\ChronTravelers.Content\ChronTravelers.Content.csproj" />
