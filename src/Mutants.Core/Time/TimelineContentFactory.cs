@@ -14,10 +14,12 @@ namespace Mutants.Core.Time;
 /// </summary>
 public static class TimelineContentFactory
 {
-    // A regular monster's drop is weighted toward sell/convert fodder, with
-    // a lesser chance of a piece of gear and a smaller one of a consumable —
-    // so a kill reliably pays out and now and then arms or supplies you.
-    private const double SellFodderDropChance = 0.75;
+    // A regular monster's drop is weighted toward sell/convert fodder —
+    // a near-certain junk piece plus a real chance at a second — with a
+    // lesser chance of gear and a smaller one of a consumable. So a couple
+    // of kills reliably funds a purchase, and now and then you get armed.
+    private const double SellFodderDropChance = 0.9;
+    private const double SecondSellFodderDropChance = 0.35;
     private const double GearDropChance = 0.35;
     private const double ConsumableDropChance = 0.20;
 
@@ -161,6 +163,7 @@ public static class TimelineContentFactory
         }
 
         AddFrom(lootPool.Where(a => a.Type == ItemType.Junk), SellFodderDropChance);
+        AddFrom(lootPool.Where(a => a.Type == ItemType.Junk), SecondSellFodderDropChance);
         AddFrom(lootPool.Where(a => a.IsEquippable), GearDropChance);
         AddFrom(lootPool.Where(a => a.Type == ItemType.Consumable), ConsumableDropChance);
 

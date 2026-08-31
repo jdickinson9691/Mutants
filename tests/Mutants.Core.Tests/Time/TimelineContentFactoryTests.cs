@@ -81,13 +81,15 @@ public class TimelineContentFactoryTests
 
         var table = TimelineContentFactory.ForSpecies(7, Baseline, 2600, pool)().LootTable;
 
-        var junk = table.Single(e => e.Item.Type == ItemType.Junk);
+        var junkChances = table.Where(e => e.Item.Type == ItemType.Junk).Select(e => e.DropChance).ToList();
         var gear = table.Single(e => e.Item.Type == ItemType.Weapon);
         var use = table.Single(e => e.Item.Type == ItemType.Consumable);
 
-        Assert.True(junk.DropChance > gear.DropChance, "sell fodder is the most common drop");
+        Assert.True(junkChances.Count >= 2, "there's a near-certain junk drop plus a chance at a second");
+        Assert.True(junkChances.Max() > gear.DropChance, "sell fodder is the most common drop");
         Assert.True(gear.DropChance > use.DropChance);
-        Assert.True(junk.DropChance >= 0.6, "a kill reliably yields something to sell/convert");
+        Assert.True(junkChances.Max() >= 0.8, "a kill reliably yields something to sell/convert");
+        Assert.True(junkChances.Sum() > 1.0, "expected junk per kill is above one");
     }
 
     [Fact]
