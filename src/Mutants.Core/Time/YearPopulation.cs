@@ -32,6 +32,14 @@ public sealed class YearPopulation
     /// <summary>Bookkeeping for the respawn trickle in MonsterController.</summary>
     public int TicksSinceRespawn { get; set; }
 
+    /// <summary>
+    /// Bookkeeping for the ambush cooldown in MonsterController — so
+    /// info-checking near a monster isn't death by a thousand cuts. Starts
+    /// primed (a lingering player is ambushable on their first eligible
+    /// tick; the grace period already covered the turn they arrived).
+    /// </summary>
+    public int TicksSinceAmbush { get; set; } = 2;
+
     private YearPopulation(List<Monster> monsters, Monster? gatekeeper, int softCap)
     {
         _monsters = monsters;

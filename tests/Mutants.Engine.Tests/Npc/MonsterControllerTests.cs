@@ -193,6 +193,31 @@ public class MonsterControllerTests
     }
 
     [Fact]
+    public void Tick_AmbushHasACooldown_SoLingeringHitsEveryOtherTurnNotEveryTurn()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+
+        var player = new Mutant("Prey", CharacterClass.Warrior);
+        player.PlaceAt(Coordinate.Origin);
+
+        var lurker = new Monster("Lurker", 1, maxHp: 30, attackPower: 12, defense: 2, speed: 8, xpReward: 40);
+        lurker.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(lurker);
+
+        int HpAfterATick()
+        {
+            var before = player.Health.Current;
+            MonsterController.Tick(pop, map, [], player, playerLingered: true, StubRandomSource.Fixed(0.0), new BroadcastChannel());
+            return before - player.Health.Current;
+        }
+
+        Assert.True(HpAfterATick() > 0, "first lingering turn: ambushed");
+        Assert.Equal(0, HpAfterATick());          // cooldown turn: spared
+        Assert.True(HpAfterATick() > 0, "cooldown elapsed: ambushed again");
+    }
+
+    [Fact]
     public void Tick_RespawnTrickleRefillsTowardSoftCapButNeverPastIt()
     {
         var world = TestTimeWorld.Build(seed: 314);

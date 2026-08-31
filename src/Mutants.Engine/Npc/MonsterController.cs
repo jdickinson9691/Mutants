@@ -31,6 +31,9 @@ public static class MonsterController
     private const double RespawnChance = 0.25;
     private const int DuelRoundCap = 200;
 
+    /// <summary>Minimum ticks between ambush hits on the player, so a quick <c>status</c> + <c>monsters</c> check near a monster costs one hit, not three.</summary>
+    private const int AmbushCooldownTicks = 2;
+
     /// <summary>
     /// A monster this many rooms (Manhattan) from the player or nearer
     /// stops wandering and moves to close the distance; one that's already
@@ -82,10 +85,13 @@ public static class MonsterController
         ResolveInfighting(population, random, broadcast);
         MaybeRespawn(population, map, roster, random);
 
-        if (playerHere && playerLingered)
+        if (playerHere && playerLingered && population.TicksSinceAmbush >= AmbushCooldownTicks
+            && ResolveAmbush(population, player, random, broadcast))
         {
-            ResolveAmbush(population, player, random, broadcast);
+            population.TicksSinceAmbush = 0;
         }
+
+        population.TicksSinceAmbush++;
     }
 
     /// <summary>Hurt monster → heal (converting a carried item first if out of Ions). True if it acted.</summary>
@@ -226,11 +232,12 @@ public static class MonsterController
     /// crowded room is dangerous but not instantly lethal. The player
     /// avoids it by <c>fight</c>ing (resolved before the tick) or leaving.
     /// </summary>
-    private static void ResolveAmbush(YearPopulation population, Mutant player, IRandomSource random, BroadcastChannel broadcast)
+    /// <returns>True if a monster actually landed a hit (drives the cooldown reset).</returns>
+    private static bool ResolveAmbush(YearPopulation population, Mutant player, IRandomSource random, BroadcastChannel broadcast)
     {
         if (player.Health.IsDead)
         {
-            return;
+            return false;
         }
 
         var attacker = population.Monsters
@@ -240,13 +247,14 @@ public static class MonsterController
 
         if (attacker is null)
         {
-            return;
+            return false;
         }
 
         // An ambush catches you unbraced — only half your defense applies, so
         // a lingering low-tier monster still stings rather than pinging for 1.
         var dealt = player.Health.Damage(CombatResolver.RollDamage(attacker.AttackPower, player.EffectiveDefense / 2, random));
         broadcast.Publish(GameEvent.Ambushed(attacker.Name, player.Name, dealt));
+        return true;
     }
 
     private static void MaybeRespawn(
