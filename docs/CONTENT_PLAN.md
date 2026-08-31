@@ -30,17 +30,21 @@ file I/O.
       tick. No per-year placement content — it's all derived from the
       species roster + the world seed.
 
-- [x] **Item archetypes** — `item-archetypes.json`. ~35 archetypes: `{ id,
-      name, type, rarity, restrictedClass?, effect?, effectMagnitude?,
-      effectDurationTicks?, rangedKind?, ammoCapacity?, rangedEffect?,
-      themeTags }`, no tier. `TimelineContentFactory.
+- [x] **Item archetypes** — `item-archetypes.json`. ~55 archetypes: `{ id,
+      name, type, powerMultiplier? | rarity, restrictedClass?, effect?,
+      effectMagnitude?, effectDurationTicks?, rangedKind?, ammoCapacity?,
+      rangedEffect?, themeTags }`, no tier. `TimelineContentFactory.
       ForArchetype(archetype, year)` produces a concrete `Item` whose
       Value / AttackBonus / DefenseBonus come from `LootScaling` at that
-      year. Includes a generic staple set (weapon / armour / junk / a
-      Heal food / a BuffAttack potion / a BuffDefense potion / a ranged
-      weapon), one class-restricted weapon per class, and per-theme flavour
-      armour and junk for eight themes (scrap, neon, ash, drowned, deep,
-      frost, orbital, paradox).
+      year.
+  - **Equippables (weapon / armour / ranged) author `powerMultiplier`,
+    not `rarity`** — ~0.5 crude → 1.0 standard → ~1.8 fine → ~2.9 relic.
+    `LootScaling.EquipBonusFor(tier, mult)` scales the per-tier baseline
+    (`4.4·tier + 1`) by it; `Rarity.ForPower` derives the rarity band;
+    `Rarity.DropWeight` makes rare bands scarce on loot tables. Each era
+    theme carries a crude → standard → fine ladder plus an occasional
+    master/relic; plus one class-restricted weapon per class (Uncommon).
+    Consumables/junk still author `rarity`.
   - **Ranged weapons** (`type: "Ranged"`, GDD §5): a `rangedKind` of
     `Wand`/`Bow`/`Gun` plus an `ammoCapacity` (the built-in shot count —
     no separate ammo item) and an optional `rangedEffect` (`Weaken`).

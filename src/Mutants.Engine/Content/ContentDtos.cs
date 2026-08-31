@@ -87,7 +87,18 @@ public sealed class ItemArchetypeData
     public string Id { get; set; } = "";
     public string Name { get; set; } = "";
     public string Type { get; set; } = "";
+
+    /// <summary>Authored rarity — used for Consumable/Junk only. For an equippable (Weapon/Armor/Ranged) rarity is derived from <see cref="PowerMultiplier"/> and this is ignored.</summary>
     public string Rarity { get; set; } = "";
+
+    /// <summary>
+    /// Equippables only (Weapon/Armor/Ranged): scales the tier baseline
+    /// for the AttackBonus/DefenseBonus and, via Rarity.ForPower, fixes the
+    /// item's rarity. ~0.5 = crude, 1.0 = standard, ~1.75 = fine, ~2.8 =
+    /// relic. Defaults to 1.0 (Standard/Uncommon) when omitted.
+    /// </summary>
+    public double PowerMultiplier { get; set; } = 1.0;
+
     public string? RestrictedClass { get; set; }
 
     /// <summary>One of Mutants.Core.Items.ConsumableEffectType's names; defaults to "None".</summary>

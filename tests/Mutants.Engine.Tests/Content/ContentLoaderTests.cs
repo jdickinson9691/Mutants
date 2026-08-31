@@ -189,6 +189,44 @@ public class ContentLoaderTests
     }
 
     [Fact]
+    public void LoadTimeWorld_DerivesEquippableRarityFromPowerMultiplier_IgnoringAnyAuthoredRarity()
+    {
+        using var dir = new TempContentDirectory();
+        // The weapon claims "Common" but its power puts it in the Legendary band.
+        var archetypes = """
+            [
+              { "id": "w", "name": "Relic Blade", "type": "Weapon", "rarity": "Common", "powerMultiplier": 2.9, "themeTags": ["common"] },
+              { "id": "a", "name": "Plate", "type": "Armor", "powerMultiplier": 1.0, "themeTags": ["common"] },
+              { "id": "h", "name": "Ration", "type": "Consumable", "rarity": "Common", "effect": "Heal", "effectMagnitude": 10, "themeTags": ["common"] },
+              { "id": "ba", "name": "Stim", "type": "Consumable", "rarity": "Common", "effect": "BuffAttack", "effectMagnitude": 3, "effectDurationTicks": 15, "themeTags": ["common"] },
+              { "id": "bd", "name": "Ward", "type": "Consumable", "rarity": "Common", "effect": "BuffDefense", "effectMagnitude": 3, "effectDurationTicks": 15, "themeTags": ["common"] }
+            ]
+            """;
+
+        var world = ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir, archetypes: archetypes), worldSeed: 1);
+        var government = world.GetYear(2400).StoreSlots.Select(s => s.Store).Single(s => s is { IsGovernmentRun: true })!;
+        var blade = government.Listings.Select(l => l.Item).Single(i => i.Type == ItemType.Weapon);
+
+        Assert.Equal(Rarity.Legendary, blade.Rarity);
+        Assert.True(blade.AttackBonus > 0);
+    }
+
+    [Fact]
+    public void LoadTimeWorld_ThrowsWhenAnEquippablePowerMultiplierIsOutOfRange()
+    {
+        using var dir = new TempContentDirectory();
+        var archetypes = MinimalArchetypesJson.TrimEnd().TrimEnd(']')
+            + """
+            ,
+              { "id": "broken", "name": "Broken Blade", "type": "Weapon", "powerMultiplier": 9.0, "themeTags": ["common"] }
+            ]
+            """;
+
+        Assert.Throws<ContentException>(() =>
+            ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir, archetypes: archetypes), worldSeed: 1));
+    }
+
+    [Fact]
     public void LoadTimeWorld_ThrowsForInvalidJson()
     {
         using var dir = new TempContentDirectory();

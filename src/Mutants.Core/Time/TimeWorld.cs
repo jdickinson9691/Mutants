@@ -197,14 +197,22 @@ public sealed class TimeWorld
         ItemArchetypeDefinition? Pick(Func<ItemArchetypeDefinition, bool> predicate) =>
             pool.FirstOrDefault(predicate) ?? _itemArchetypes.FirstOrDefault(predicate);
 
+        // A government depot stocks a dependable mid-grade piece, not the
+        // crude bottom of the catalogue — the exotic stuff is a loot find.
+        ItemArchetypeDefinition? PickEquip(Func<ItemArchetypeDefinition, bool> isKind) =>
+            Pick(a => isKind(a) && a.RestrictedClass is null && a.Rarity == Rarity.Uncommon)
+            ?? Pick(a => isKind(a) && a.RestrictedClass is null && a.Rarity <= Rarity.Rare)
+            ?? Pick(a => isKind(a) && a.RestrictedClass is null)
+            ?? Pick(isKind);
+
         var picks = new[]
         {
             Pick(a => a.Effect == ConsumableEffectType.Heal),
             Pick(a => a.Effect == ConsumableEffectType.BuffAttack),
             Pick(a => a.Effect == ConsumableEffectType.BuffDefense),
-            Pick(a => a.Type == ItemType.Weapon && a.RestrictedClass is null) ?? Pick(a => a.Type == ItemType.Weapon),
-            Pick(a => a.Type == ItemType.Armor),
-            Pick(a => a.IsRanged && a.RestrictedClass is null) ?? Pick(a => a.IsRanged),
+            PickEquip(a => a.Type == ItemType.Weapon),
+            PickEquip(a => a.Type == ItemType.Armor),
+            PickEquip(a => a.IsRanged),
         };
 
         return picks.Where(p => p is not null).Select(p => p!).Distinct();

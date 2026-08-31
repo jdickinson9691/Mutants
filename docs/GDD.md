@@ -242,10 +242,25 @@ area/group to a capstone — is the standard every class follows.)
   world ticks) for a "potion." This is separate from — and doesn't cost
   Ions like — the `heal` command in §2/§2.1; a potion/food item is a
   one-time consumable you have to loot or buy first.
-- Rarity bands (Common/Uncommon/Rare/Epic/Legendary) modulate stat rolls
-  within a tier — original addition, since the source material never
-  specifies a rarity system, but is a near-universal expectation in a modern
-  loot-driven RPG and doesn't conflict with anything documented.
+- Rarity bands (Common/Uncommon/Rare/Epic/Legendary) — original addition,
+  since the source material never specifies a rarity system, but a
+  near-universal expectation in a modern loot-driven RPG.
+  - **For equippables (weapon / armour / ranged), rarity is *derived from
+    power*, not authored.** Each archetype carries a `powerMultiplier`
+    (~0.5 "crude" → 1.0 "standard" → ~1.8 "fine" → ~2.9 "relic"); it
+    scales the per-tier combat baseline (`LootScaling.EquipBonusFor`,
+    band ≈ 0.5×–3.5×), and `Rarity.ForPower` names the band. So the
+    weakest weapon in a year does roughly half a baseline hit and the
+    best does several times it, and its rarity label always matches its
+    damage.
+  - **Rarity then governs how often the archetype is rolled onto a
+    monster's loot table** (`Rarity.DropWeight`: Common ×6 … Legendary
+    ×0.25), so a relic-class weapon is a genuine rare/unique find rather
+    than just a different colour. Government depots stock a dependable
+    mid-grade (Uncommon) piece; the extremes are loot only. A
+    Gatekeeper's guaranteed trophy sits deep in the Legendary band.
+  - Consumables and junk keep an authored rarity (a potion's strength
+    isn't a damage number).
 
 ## 6. Stores & economy `[SOURCE: purchasable NPC-run stores + Riblets]`
 

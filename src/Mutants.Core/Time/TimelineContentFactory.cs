@@ -19,6 +19,9 @@ public static class TimelineContentFactory
 
     private static readonly double[] LootDropChances = [0.5, 0.25, 0.15];
 
+    /// <summary>The <c>powerMultiplier</c> of a Gatekeeper's guaranteed weapon trophy — deep in the Legendary band (see <see cref="Rarity.ForPower"/>).</summary>
+    private const double GatekeeperTrophyPower = 2.8;
+
     private static readonly string[] TrophyNouns =
         ["Blade", "Sigil", "Crown", "Gauntlet", "Reliquary", "Warhorn", "Chronometer", "Standard"];
 
@@ -66,9 +69,9 @@ public static class TimelineContentFactory
             $"Warden of {year}'s {noun}",
             ItemType.Weapon,
             DisplayTier(year),
-            Rarity.Legendary,
+            RarityExtensions.ForPower(GatekeeperTrophyPower),
             Value: (int)Math.Round(LootScaling.ValueFor(tier, Rarity.Legendary)),
-            AttackBonus: (int)Math.Round(LootScaling.CombatBonusFor(tier, Rarity.Legendary)));
+            AttackBonus: (int)Math.Round(LootScaling.EquipBonusFor(tier, GatekeeperTrophyPower)));
 
         return new Monster(
             $"The Warden of {year}",
@@ -99,8 +102,16 @@ public static class TimelineContentFactory
                 archetype.AmmoCapacity,
                 archetype.RangedEffect,
                 magnitude: archetype.EffectMagnitude > 0 ? archetype.EffectMagnitude : 1.0,
-                restrictedClass: archetype.RestrictedClass);
+                restrictedClass: archetype.RestrictedClass,
+                powerMultiplier: archetype.PowerMultiplier);
         }
+
+        // Weapons/armour take their combat bonus from the archetype's
+        // power multiplier (which also fixed its rarity, in the loader);
+        // everything else is flat.
+        var equipBonus = archetype.IsEquippable
+            ? (int)Math.Round(LootScaling.EquipBonusFor(tier, archetype.PowerMultiplier))
+            : 0;
 
         return new Item(
             archetype.Name,
@@ -108,8 +119,8 @@ public static class TimelineContentFactory
             displayTier,
             archetype.Rarity,
             Value: (int)Math.Round(LootScaling.ValueFor(tier, archetype.Rarity)),
-            AttackBonus: archetype.Type == ItemType.Weapon ? (int)Math.Round(LootScaling.CombatBonusFor(tier, archetype.Rarity)) : 0,
-            DefenseBonus: archetype.Type == ItemType.Armor ? (int)Math.Round(LootScaling.CombatBonusFor(tier, archetype.Rarity)) : 0,
+            AttackBonus: archetype.Type == ItemType.Weapon ? equipBonus : 0,
+            DefenseBonus: archetype.Type == ItemType.Armor ? equipBonus : 0,
             RestrictedClass: archetype.RestrictedClass,
             ConsumableEffect: archetype.Effect,
             EffectMagnitude: archetype.EffectMagnitude,
@@ -131,18 +142,41 @@ public static class TimelineContentFactory
         }
 
         var rng = DeterministicRandom.For(worldSeed, year, $"loot:{speciesId}");
-        var indices = Enumerable.Range(0, lootPool.Count).ToList();
+        var remaining = lootPool.ToList();
         var entries = new List<LootTableEntry>();
 
-        for (var i = 0; i < LootEntriesPerMonster && indices.Count > 0; i++)
+        for (var i = 0; i < LootEntriesPerMonster && remaining.Count > 0; i++)
         {
-            var pick = rng.Next(indices.Count);
-            var archetype = lootPool[indices[pick]];
-            indices.RemoveAt(pick);
+            // Weighted by rarity: a Legendary weapon is on a monster's
+            // table far less often than a Common one, so it stays a rare
+            // find even once it exists in the pool.
+            var archetype = WeightedRemove(remaining, a => a.Rarity.DropWeight(), rng);
             entries.Add(new LootTableEntry(ForArchetype(archetype, year), LootDropChances[Math.Min(i, LootDropChances.Length - 1)]));
         }
 
         return entries;
+    }
+
+    /// <summary>Removes and returns one element of <paramref name="items"/>, chosen with probability proportional to <paramref name="weight"/>.</summary>
+    private static T WeightedRemove<T>(List<T> items, Func<T, double> weight, Random rng)
+    {
+        var total = items.Sum(weight);
+        var roll = rng.NextDouble() * total;
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            roll -= weight(items[i]);
+            if (roll <= 0)
+            {
+                var picked = items[i];
+                items.RemoveAt(i);
+                return picked;
+            }
+        }
+
+        var last = items[^1];
+        items.RemoveAt(items.Count - 1);
+        return last;
     }
 
     private static (int Hp, int Attack, int Defense, int Speed) StatsFor(MonsterArchetype archetype, double tier)

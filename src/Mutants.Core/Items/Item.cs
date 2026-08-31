@@ -69,11 +69,18 @@ public sealed record Item(
     public static Item CreateRanged(
         string name, int tier, Rarity rarity, RangedKind kind, int ammoCapacity,
         RangedEffectType rangedEffect = RangedEffectType.None, double magnitude = 1.0,
-        CharacterClass? restrictedClass = null)
+        CharacterClass? restrictedClass = null, double? powerMultiplier = null)
     {
+        // When a power multiplier is given (the content path) it drives
+        // both the AttackBonus curve and the rarity band; otherwise fall
+        // back to the rarity-keyed shim (tests / sandbox fixtures).
+        var attackBonus = powerMultiplier is { } mult
+            ? LootScaling.EquipBonusFor(tier, mult)
+            : LootScaling.CombatBonusFor(tier, rarity);
+
         var item = new Item(name, ItemType.Ranged, tier, rarity,
             Value: LootScaling.ValueFor(tier, rarity),
-            AttackBonus: LootScaling.CombatBonusFor(tier, rarity),
+            AttackBonus: attackBonus,
             RestrictedClass: restrictedClass,
             EffectMagnitude: magnitude,
             RangedKind: kind,

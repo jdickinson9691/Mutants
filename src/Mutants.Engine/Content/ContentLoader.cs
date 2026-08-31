@@ -35,9 +35,7 @@ public static class ContentLoader
             .Select(ToSpecies)
             .ToList();
 
-        var archetypes = ReadJson<List<ItemArchetypeData>>(Path.Combine(contentDirectory, "item-archetypes.json"))
-            .Select(ToArchetype)
-            .ToList();
+        var archetypes = LoadItemArchetypes(Path.Combine(contentDirectory, "item-archetypes.json"));
 
         var eras = ReadJson<List<EraData>>(Path.Combine(contentDirectory, "eras.json"))
             .Select(ToEra)
@@ -69,6 +67,10 @@ public static class ContentLoader
 
     public static IReadOnlyList<AbilityData> LoadAbilities(string path) => ReadJson<List<AbilityData>>(path);
 
+    /// <summary>Reads and validates <c>item-archetypes.json</c> into live definitions (equippable rarity derived from <c>powerMultiplier</c>). Throws <see cref="ContentException"/> on a bad enum / out-of-range multiplier.</summary>
+    public static IReadOnlyList<ItemArchetypeDefinition> LoadItemArchetypes(string path) =>
+        ReadJson<List<ItemArchetypeData>>(path).Select(ToArchetype).ToList();
+
     /// <summary>Reads <c>npc-population.json</c> — a single <c>{ "totalCount": N }</c>. Returns the count, defaulting to 12 if the field is absent.</summary>
     public static int LoadNpcCount(string path) => Math.Max(0, ReadJson<NpcPopulationConfig>(path).TotalCount);
 
@@ -87,11 +89,6 @@ public static class ContentLoader
         if (!Enum.TryParse<ItemType>(data.Type, ignoreCase: true, out var type))
         {
             throw new ContentException($"Item archetype '{data.Id}': unknown type '{data.Type}'.");
-        }
-
-        if (!Enum.TryParse<Rarity>(data.Rarity, ignoreCase: true, out var rarity))
-        {
-            throw new ContentException($"Item archetype '{data.Id}': unknown rarity '{data.Rarity}'.");
         }
 
         CharacterClass? restrictedClass = null;
@@ -130,10 +127,36 @@ public static class ContentLoader
             throw new ContentException($"Item archetype '{data.Id}': type 'Ranged' requires a rangedKind ('Wand', 'Bow', or 'Gun').");
         }
 
+        var isEquippable = type is ItemType.Weapon or ItemType.Armor || rangedKind != RangedKind.None;
+
+        Rarity rarity;
+        var powerMultiplier = 1.0;
+        if (isEquippable)
+        {
+            // Rarity is DERIVED from power for equippables — the JSON's
+            // `rarity` (if any) is ignored on purpose (docs/GDD.md §5).
+            powerMultiplier = data.PowerMultiplier;
+            if (powerMultiplier is < LootScaling.MinPowerMultiplier or > LootScaling.MaxPowerMultiplier)
+            {
+                throw new ContentException(
+                    $"Item archetype '{data.Id}': powerMultiplier {powerMultiplier} is outside " +
+                    $"[{LootScaling.MinPowerMultiplier}, {LootScaling.MaxPowerMultiplier}].");
+            }
+
+            rarity = RarityExtensions.ForPower(powerMultiplier);
+        }
+        else
+        {
+            if (!Enum.TryParse(data.Rarity, ignoreCase: true, out rarity))
+            {
+                throw new ContentException($"Item archetype '{data.Id}': unknown rarity '{data.Rarity}'.");
+            }
+        }
+
         return new ItemArchetypeDefinition(
             data.Id, data.Name, type, rarity, restrictedClass,
             effect, data.EffectMagnitude, data.EffectDurationTicks, data.ThemeTags,
-            rangedKind, data.AmmoCapacity, rangedEffect);
+            rangedKind, data.AmmoCapacity, rangedEffect, powerMultiplier);
     }
 
     private static EraDefinition ToEra(EraData data) =>

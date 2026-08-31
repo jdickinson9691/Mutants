@@ -130,6 +130,33 @@ public class TimeWorldContentTests
     }
 
     [Fact]
+    public void ShippedWeaponCatalog_SpansTheFullRarityRange_FromCrudeToRelic()
+    {
+        var archetypes = ContentLoader.LoadItemArchetypes(Path.Combine(RealContentDirectory(), "item-archetypes.json"));
+        var weaponRarities = archetypes
+            .Where(a => a.Type == ItemType.Weapon)
+            .Select(a => a.Rarity)
+            .ToHashSet();
+
+        // A minimal-damage weapon and a rare high-damage one must both exist.
+        Assert.Contains(Rarity.Common, weaponRarities);
+        Assert.Contains(Rarity.Legendary, weaponRarities);
+        // ...and the bands in between, so gear progression has rungs.
+        Assert.True(weaponRarities.Count >= 4, $"only {weaponRarities.Count} weapon rarity bands in the catalog");
+    }
+
+    [Fact]
+    public void ShippedEquippables_HaveRarityConsistentWithTheirPower()
+    {
+        var archetypes = ContentLoader.LoadItemArchetypes(Path.Combine(RealContentDirectory(), "item-archetypes.json"));
+
+        foreach (var a in archetypes.Where(a => a.IsEquippable))
+        {
+            Assert.Equal(RarityExtensions.ForPower(a.PowerMultiplier), a.Rarity);
+        }
+    }
+
+    [Fact]
     public void EveryYearHasAGovernmentStoreCarryingAFullyLoadedRangedWeapon()
     {
         var world = ShippedWorld();

@@ -112,4 +112,59 @@ public class TimelineContentFactoryTests
         Assert.Equal(1, TimelineContentFactory.DisplayTier(2000));
         Assert.True(TimelineContentFactory.DisplayTier(5000) > TimelineContentFactory.DisplayTier(2000));
     }
+
+    [Fact]
+    public void ForArchetype_WeaponPowerDrivesBothDamageAndRarity()
+    {
+        ItemArchetypeDefinition Weapon(string id, double power) =>
+            new(id, id, ItemType.Weapon, RarityExtensions.ForPower(power), null,
+                ConsumableEffectType.None, 0, 0, ["common"], PowerMultiplier: power);
+
+        var crude = TimelineContentFactory.ForArchetype(Weapon("crude", 0.5), 2600);
+        var relic = TimelineContentFactory.ForArchetype(Weapon("relic", 2.9), 2600);
+
+        Assert.True(relic.AttackBonus > crude.AttackBonus * 3, "a relic weapon hits far harder");
+        Assert.Equal(Rarity.Common, crude.Rarity);
+        Assert.Equal(Rarity.Legendary, relic.Rarity);
+    }
+
+    [Fact]
+    public void BuildLootTable_WeightsPicksSoRareWeaponsAreScarce()
+    {
+        // A pool with a weapon in every rarity band; the crude one and the
+        // relic one are equally "present" — only the drop weighting differs.
+        ItemArchetypeDefinition W(string id, double power) =>
+            new(id, id, ItemType.Weapon, RarityExtensions.ForPower(power), null,
+                ConsumableEffectType.None, 0, 0, ["common"], PowerMultiplier: power);
+        IReadOnlyList<ItemArchetypeDefinition> pool =
+            [W("crude", 0.5), W("std", 1.0), W("fine", 1.6), W("master", 2.2), W("relic", 2.9)];
+
+        var byRarity = new Dictionary<Rarity, int>();
+        for (var year = 2000; year < 3000; year++)
+        {
+            var monster = TimelineContentFactory.ForSpecies(worldSeed: 42, Baseline, year, pool)();
+            foreach (var entry in monster.LootTable)
+            {
+                byRarity[entry.Item.Rarity] = byRarity.GetValueOrDefault(entry.Item.Rarity) + 1;
+            }
+        }
+
+        var total = byRarity.Values.Sum();
+        Assert.True(byRarity.GetValueOrDefault(Rarity.Common) + byRarity.GetValueOrDefault(Rarity.Uncommon) > total * 0.6,
+            "the bulk of weapon drops should be the low bands");
+        Assert.True(byRarity.GetValueOrDefault(Rarity.Legendary) < total * 0.08,
+            "a relic weapon should be a rare pull");
+    }
+
+    [Fact]
+    public void Gatekeeper_TrophyIsALegendaryWeaponThatOutclassesAStandardOne()
+    {
+        var trophy = TimelineContentFactory.Gatekeeper(worldSeed: 7, 3000).LootTable[0].Item;
+        var standard = TimelineContentFactory.ForArchetype(
+            new("std", "Std", ItemType.Weapon, Rarity.Uncommon, null, ConsumableEffectType.None, 0, 0, ["common"]),
+            3000);
+
+        Assert.Equal(Rarity.Legendary, trophy.Rarity);
+        Assert.True(trophy.AttackBonus > standard.AttackBonus * 2);
+    }
 }

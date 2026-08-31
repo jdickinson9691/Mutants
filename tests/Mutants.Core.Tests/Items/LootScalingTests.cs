@@ -66,4 +66,60 @@ public class LootScalingTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => LootScaling.TierBaseValue(0.5));
     }
+
+    // --- power-band equip scaling (weapons / armour / ranged) ----------------
+
+    [Fact]
+    public void EquipBonusFor_ScalesWithBothTierAndPowerMultiplier()
+    {
+        var crudeEarly = LootScaling.EquipBonusFor(tier: 1, powerMultiplier: 0.5);
+        var crudeLate = LootScaling.EquipBonusFor(tier: 9, powerMultiplier: 0.5);
+        var relicEarly = LootScaling.EquipBonusFor(tier: 1, powerMultiplier: 2.9);
+
+        Assert.True(crudeLate > crudeEarly, "same weapon class, later year -> bigger bonus");
+        Assert.True(relicEarly > crudeEarly * 3, "a relic at least triples a crude weapon of the same tier");
+    }
+
+    [Fact]
+    public void EquipBonusFor_ClampsThePowerMultiplierToItsBand()
+    {
+        Assert.Equal(
+            LootScaling.EquipBonusFor(3.0, LootScaling.MaxPowerMultiplier),
+            LootScaling.EquipBonusFor(3.0, 99.0), precision: 6);
+        Assert.Equal(
+            LootScaling.EquipBonusFor(3.0, LootScaling.MinPowerMultiplier),
+            LootScaling.EquipBonusFor(3.0, 0.01), precision: 6);
+    }
+
+    [Theory]
+    [InlineData(0.5, Rarity.Common)]
+    [InlineData(0.74, Rarity.Common)]
+    [InlineData(1.0, Rarity.Uncommon)]
+    [InlineData(1.6, Rarity.Rare)]
+    [InlineData(2.2, Rarity.Epic)]
+    [InlineData(2.6, Rarity.Legendary)]
+    [InlineData(2.95, Rarity.Legendary)]
+    public void RarityForPower_BandsTheMultiplier(double multiplier, Rarity expected)
+    {
+        Assert.Equal(expected, RarityExtensions.ForPower(multiplier));
+    }
+
+    [Fact]
+    public void RepresentativeMultiplier_RoundTripsThroughForPower()
+    {
+        foreach (var rarity in System.Enum.GetValues<Rarity>())
+        {
+            Assert.Equal(rarity, RarityExtensions.ForPower(LootScaling.RepresentativeMultiplier(rarity)));
+        }
+    }
+
+    [Fact]
+    public void DropWeight_FallsAsRarityRises()
+    {
+        Assert.True(Rarity.Common.DropWeight() > Rarity.Uncommon.DropWeight());
+        Assert.True(Rarity.Uncommon.DropWeight() > Rarity.Rare.DropWeight());
+        Assert.True(Rarity.Rare.DropWeight() > Rarity.Epic.DropWeight());
+        Assert.True(Rarity.Epic.DropWeight() > Rarity.Legendary.DropWeight());
+        Assert.True(Rarity.Common.DropWeight() > Rarity.Legendary.DropWeight() * 20);
+    }
 }
