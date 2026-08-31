@@ -112,7 +112,7 @@ public sealed class WorldSimulation
         if (Mutants.Core.Time.TimeScale.IsValidYear(player.CurrentYear))
         {
             var here = World.GetYear(player.CurrentYear);
-            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, _random, Broadcast);
+            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player, _random, Broadcast);
         }
     }
 }

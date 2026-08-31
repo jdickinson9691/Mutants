@@ -1,3 +1,4 @@
+using Mutants.Core.Characters;
 using Mutants.Core.Events;
 using Mutants.Core.Ions;
 using Mutants.Core.Monsters;
@@ -12,33 +13,61 @@ namespace Mutants.Engine.Npc;
 /// player is standing in (<see cref="YearPopulation"/>) — the monster
 /// counterpart to <see cref="NpcController"/>. Each tick every living
 /// monster heals if hurt (spending Ions, first converting a carried item
-/// if broke), grabs loot off the floor of its room, or wanders through an
-/// exit; monsters sharing a room may fight each other, the loser dropping
-/// its carried items plus a loot-table roll where it fell; and a slow
-/// trickle respawns the population back toward its soft cap. Everything
-/// is thresholds/chances — original tuning, not GDD-specified.
+/// if broke), grabs loot off the floor of its room, closes on the player
+/// if it's within <see cref="AggroRange"/> (otherwise wanders through a
+/// random exit); monsters sharing a room may fight each other, the loser
+/// dropping its carried items plus a loot-table roll where it fell; a slow
+/// trickle respawns the population back toward its soft cap; and finally a
+/// monster standing in the player's room lands one ambush hit — so
+/// lingering next to a monster instead of fighting or fleeing costs HP.
+/// Everything is thresholds/chances — original tuning, not GDD-specified.
 /// </summary>
 public static class MonsterController
 {
-    private const double WanderChance = 0.35;
+    private const double WanderChance = 0.25;
     private const double InfightChance = 0.20;
     private const double HealHpThreshold = 0.40;
     private const int RespawnCheckInterval = 12;
     private const double RespawnChance = 0.25;
     private const int DuelRoundCap = 200;
 
+    /// <summary>
+    /// A monster this many rooms (Manhattan) from the player or nearer
+    /// stops wandering and moves to close the distance; one that's already
+    /// in the player's room holds position rather than drifting off. Kept
+    /// deliberately short so "something stirs to the north" (one room away)
+    /// is a real approach, not a monster that vanishes before you can act.
+    /// </summary>
+    private const int AggroRange = 1;
+
     public static void Tick(
         YearPopulation population,
         LevelMap map,
         IReadOnlyList<Func<Monster>> roster,
+        Mutant player,
         IRandomSource random,
         BroadcastChannel broadcast)
     {
+        var playerHere = TimeScale.IsValidYear(player.CurrentYear);
+
         foreach (var monster in population.Monsters.Where(m => !m.Health.IsDead).ToList())
         {
-            if (!TryHeal(monster) && !TryGrabLoot(population, monster) && random.NextDouble() < WanderChance)
+            if (!TryHeal(monster) && !TryGrabLoot(population, monster))
             {
-                Wander(map, monster, random);
+                var distance = playerHere ? ManhattanDistance(monster.Position, player.Position) : int.MaxValue;
+
+                if (distance == 0)
+                {
+                    // Toe to toe with the player — hold, don't wander off.
+                }
+                else if (distance <= AggroRange)
+                {
+                    StepToward(map, monster, player.Position, random);
+                }
+                else if (random.NextDouble() < WanderChance)
+                {
+                    Wander(map, monster, random);
+                }
             }
 
             monster.AdvanceIonRegenTick(IonEconomy.TicksPerIonRegen(monster.Tier, classDrainMultiplier: 1.0));
@@ -46,6 +75,11 @@ public static class MonsterController
 
         ResolveInfighting(population, random, broadcast);
         MaybeRespawn(population, map, roster, random);
+
+        if (playerHere)
+        {
+            ResolveAmbush(population, player, random, broadcast);
+        }
     }
 
     /// <summary>Hurt monster → heal (converting a carried item first if out of Ions). True if it acted.</summary>
@@ -90,6 +124,41 @@ public static class MonsterController
             monster.MoveTo(move.Destination!.Value);
         }
     }
+
+    /// <summary>Steps one room along whichever exit most reduces the Manhattan distance to <paramref name="target"/>; holds if none does.</summary>
+    private static void StepToward(LevelMap map, Monster monster, Coordinate target, IRandomSource random)
+    {
+        var exits = map.GetRoom(monster.Position).ExitDescriptions.Keys
+            .OrderBy(_ => random.NextDouble()) // break ties without always favouring one axis
+            .ToList();
+
+        var bestDistance = ManhattanDistance(monster.Position, target);
+        Coordinate? bestRoom = null;
+
+        foreach (var dir in exits)
+        {
+            var move = map.TryMove(monster.Position, dir);
+            if (!move.Success)
+            {
+                continue;
+            }
+
+            var distance = ManhattanDistance(move.Destination!.Value, target);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestRoom = move.Destination.Value;
+            }
+        }
+
+        if (bestRoom is { } room)
+        {
+            monster.MoveTo(room);
+        }
+    }
+
+    private static int ManhattanDistance(Coordinate a, Coordinate b) =>
+        Math.Abs(a.East - b.East) + Math.Abs(a.North - b.North);
 
     private static void ResolveInfighting(YearPopulation population, IRandomSource random, BroadcastChannel broadcast)
     {
@@ -143,6 +212,35 @@ public static class MonsterController
         }
 
         return first.Health.IsDead ? second : first;
+    }
+
+    /// <summary>
+    /// A living monster sharing the player's room lands one free hit. Only
+    /// the hardest-hitting co-located monster attacks per tick, so a
+    /// crowded room is dangerous but not instantly lethal. The player
+    /// avoids it by <c>fight</c>ing (resolved before the tick) or leaving.
+    /// </summary>
+    private static void ResolveAmbush(YearPopulation population, Mutant player, IRandomSource random, BroadcastChannel broadcast)
+    {
+        if (player.Health.IsDead)
+        {
+            return;
+        }
+
+        var attacker = population.Monsters
+            .Where(m => !m.Health.IsDead && m.Position.Equals(player.Position))
+            .OrderByDescending(m => m.AttackPower)
+            .FirstOrDefault();
+
+        if (attacker is null)
+        {
+            return;
+        }
+
+        // An ambush catches you unbraced — only half your defense applies, so
+        // a lingering low-tier monster still stings rather than pinging for 1.
+        var dealt = player.Health.Damage(CombatResolver.RollDamage(attacker.AttackPower, player.EffectiveDefense / 2, random));
+        broadcast.Publish(GameEvent.Ambushed(attacker.Name, player.Name, dealt));
     }
 
     private static void MaybeRespawn(

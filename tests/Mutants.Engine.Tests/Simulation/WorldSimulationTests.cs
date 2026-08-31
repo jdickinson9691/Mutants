@@ -17,6 +17,14 @@ public class WorldSimulationTests
         return mutant;
     }
 
+    /// <summary>Parks the player on a coordinate no room occupies, so the spatial monster sim (aggro/ambush) stays out of these bookkeeping-focused tests.</summary>
+    private static Mutant OffGridPlayer(string name, TimeWorld world, int year)
+    {
+        var mutant = NewMutant(name, world, year);
+        mutant.PlaceAt(new Core.World.Coordinate(999, 999));
+        return mutant;
+    }
+
     [Fact]
     public void Tick_RegeneratesIonsForADepletedMutantInEarlyYears()
     {
@@ -40,7 +48,7 @@ public class WorldSimulationTests
     public void Tick_StillNetDrainsIonsDeepInTheFuture()
     {
         var world = World();
-        var player = NewMutant("Player", world, 4900);
+        var player = OffGridPlayer("Player", world, 4900);
         var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.5));
         var startingIons = player.Ions.Current;
 
@@ -56,7 +64,7 @@ public class WorldSimulationTests
     public void Tick_SkipsDeadNpcsEntirely()
     {
         var world = World();
-        var player = NewMutant("Player", world, 2000);
+        var player = OffGridPlayer("Player", world, 2000);
         var npc = NewMutant("Vex", world, 2000);
         npc.Health.Damage(npc.Health.Max);
         var startingPosition = npc.Position;
@@ -121,7 +129,7 @@ public class WorldSimulationTests
     public void Tick_WithNoNpcs_JustDoesPlayerBookkeeping()
     {
         var world = World();
-        var player = NewMutant("Player", world, 2000);
+        var player = OffGridPlayer("Player", world, 2000);
         var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.5));
 
         simulation.Tick(player);

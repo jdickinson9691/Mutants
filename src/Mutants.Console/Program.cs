@@ -282,6 +282,13 @@ while (running)
     {
         simulation.Tick(mutant);
         shownBroadcastCount = RenderNewBroadcastEvents(simulation.Broadcast, shownBroadcastCount);
+
+        if (mutant.Health.IsDead)
+        {
+            // A monster sharing the room struck the killing blow this tick (see MonsterController's ambush).
+            AnsiConsole.MarkupLine("[red]You're struck down where you stand.[/]");
+            running = false;
+        }
     }
 }
 
