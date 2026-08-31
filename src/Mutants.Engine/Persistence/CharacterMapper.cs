@@ -2,6 +2,7 @@ using Mutants.Core.Characters;
 using Mutants.Core.Classes;
 using Mutants.Core.Items;
 using Mutants.Core.Stats;
+using Mutants.Core.Time;
 using Mutants.Core.World;
 
 namespace Mutants.Engine.Persistence;
@@ -9,7 +10,7 @@ namespace Mutants.Engine.Persistence;
 /// <summary>Converts between the live <see cref="Mutant"/> domain object and its <see cref="CharacterSaveData"/> save-file shape.</summary>
 public static class CharacterMapper
 {
-    public static CharacterSaveData ToSaveData(Mutant mutant)
+    public static CharacterSaveData ToSaveData(Mutant mutant, long worldSeed)
     {
         var inventory = mutant.Inventory.Select(ToItemSaveData).ToList();
 
@@ -24,6 +25,7 @@ public static class CharacterMapper
 
         return new CharacterSaveData
         {
+            SchemaVersion = CharacterSaveData.CurrentSchemaVersion,
             Name = mutant.Name,
             Class = mutant.Class.ToString(),
             Level = mutant.Level,
@@ -37,13 +39,12 @@ public static class CharacterMapper
             CurrentIons = mutant.Ions.Current,
             MaxIons = mutant.Ions.Max,
             Riblets = mutant.Riblets,
-            UnlockedTimeLevel = mutant.UnlockedTimeLevel,
-            CurrentTimeLevel = mutant.CurrentTimeLevel,
+            WorldSeed = worldSeed,
+            CurrentYear = mutant.CurrentYear,
+            FurthestYearReached = mutant.FurthestYearReached,
             PositionEast = mutant.Position.East,
             PositionNorth = mutant.Position.North,
-            DefeatedGatekeepers = Enumerable.Range(1, mutant.UnlockedTimeLevel)
-                .Where(mutant.HasDefeatedGatekeeper)
-                .ToList(),
+            DefeatedGatekeepers = mutant.DefeatedGatekeeperYears.OrderBy(y => y).ToList(),
             Inventory = inventory,
             EquippedWeaponIndex = equippedWeaponIndex >= 0 ? equippedWeaponIndex : null,
             EquippedArmorIndex = equippedArmorIndex >= 0 ? equippedArmorIndex : null,
@@ -56,12 +57,33 @@ public static class CharacterMapper
         var characterClass = Enum.Parse<CharacterClass>(data.Class);
         var stats = new StatBlock(data.Strength, data.Agility, data.Faith, data.Intellect);
 
+        int currentYear;
+        int furthestYear;
+        IEnumerable<int> defeatedGatekeeperYears;
+
+        if (data.SchemaVersion >= 2)
+        {
+            currentYear = data.CurrentYear;
+            furthestYear = Math.Max(data.FurthestYearReached, data.CurrentYear);
+            defeatedGatekeeperYears = data.DefeatedGatekeepers;
+        }
+        else
+        {
+            // Schema 1 → 2: map the old discrete level onto the timeline
+            // (old level N ≈ year 2000 + (N-1)·375). The character survives;
+            // the world reshuffles under a fresh seed (rolled by the caller),
+            // so the old per-level gatekeeper flags no longer mean anything.
+            currentYear = LegacyLevelToYear(data.CurrentTimeLevel);
+            furthestYear = LegacyLevelToYear(Math.Max(data.UnlockedTimeLevel, data.CurrentTimeLevel));
+            defeatedGatekeeperYears = [];
+        }
+
         var mutant = Mutant.Restore(
             data.Name, characterClass, data.Level, data.Xp, stats,
             data.CurrentHp, data.MaxHp, data.CurrentIons, data.MaxIons, data.Riblets,
-            data.UnlockedTimeLevel, data.CurrentTimeLevel,
+            currentYear, furthestYear,
             new Coordinate(data.PositionEast, data.PositionNorth),
-            data.DefeatedGatekeepers);
+            defeatedGatekeeperYears);
 
         var items = data.Inventory.Select(FromItemSaveData).ToList();
         foreach (var item in items)
@@ -81,6 +103,10 @@ public static class CharacterMapper
 
         return mutant;
     }
+
+    /// <summary>Old discrete level N → the year that level occupied on the new timeline, clamped to 2000–5000.</summary>
+    private static int LegacyLevelToYear(int level) =>
+        Math.Clamp(TimeScale.MinYear + (Math.Max(1, level) - 1) * 375, TimeScale.MinYear, TimeScale.MaxYear);
 
     private static ItemSaveData ToItemSaveData(Item item) => new()
     {

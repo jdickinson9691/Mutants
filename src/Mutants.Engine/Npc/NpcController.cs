@@ -2,8 +2,8 @@ using Mutants.Core.Characters;
 using Mutants.Core.Economy;
 using Mutants.Core.Ions;
 using Mutants.Core.Items;
-using Mutants.Core.Levels;
 using Mutants.Core.Monsters;
+using Mutants.Core.Time;
 using Mutants.Core.World;
 using Mutants.Engine.Combat;
 using Mutants.Engine.Simulation;
@@ -30,14 +30,12 @@ public static class NpcController
     private const double LowHealthThreshold = 0.30;
     private const int ExcessJunkThreshold = 3;
 
-    /// <summary>
-    /// How often, per tick, a ready NPC (not low on Ions/HP) even
-    /// considers pushing one level deeper — keeps a level's population
-    /// from draining out the moment everyone qualifies, since "considers"
-    /// still requires affording the Ion cost and (for a fresh level)
-    /// winning a real gatekeeper fight.
-    /// </summary>
+    /// <summary>How often, per tick, a ready NPC (not low on Ions/HP) even considers jumping to another year — kept low so a year's population doesn't churn every tick.</summary>
     private const double TravelAttemptChance = 0.10;
+
+    /// <summary>An NPC's per-jump reach, in years — it picks a random offset in ±[<see cref="MinTravelHop"/>, <see cref="MaxTravelHop"/>], clamped to the timeline.</summary>
+    private const int MinTravelHop = 50;
+    private const int MaxTravelHop = 300;
 
     /// <summary>
     /// Decides and executes one tick's action for <paramref name="npc"/>.
@@ -58,7 +56,7 @@ public static class NpcController
         IRandomSource random,
         IReadOnlyList<Store>? stores = null,
         IReadOnlyList<Func<Monster>>? monsterRoster = null,
-        GameWorld? world = null)
+        TimeWorld? world = null)
     {
         if (npc.Health.IsDead)
         {
@@ -110,54 +108,44 @@ public static class NpcController
     }
 
     /// <summary>
-    /// Rolls whether to even attempt pushing one level deeper this tick,
-    /// then only actually calls <see cref="TimeTravelResolver.Travel"/> —
-    /// spending Ions and possibly fighting a gatekeeper — once the level
-    /// exists and both the character-level and Ion-cost gates are already
-    /// known to pass, so an NPC never "wastes" a tick failing a check it
-    /// could see coming; only a genuine gatekeeper loss returns as a
-    /// failed <see cref="NpcGoal.Travel"/> result here. Null means nothing
-    /// happened - the caller falls through to trade/grind as normal.
-    /// NPCs only ever push forward (never retreat) - there's no goal that
-    /// would make an autonomous NPC want to go shallower once established
-    /// somewhere.
+    /// Rolls whether to jump to another year this tick, picks a target a
+    /// short hop away (usually forward — see <see cref="ForwardTravelBias"/>),
+    /// and calls <see cref="TimeTravelResolver.Travel"/> if the NPC can
+    /// afford the Ion cost. Null means nothing happened — the caller falls
+    /// through to trade/grind. There is no Gatekeeper fight during travel
+    /// any more, so this never "loses"; a failed result just means the
+    /// jump was unaffordable and is reported as such.
     /// </summary>
-    private static NpcTickResult? TryTravel(Mutant npc, GameWorld world, IRandomSource random)
+    private const double ForwardTravelBias = 0.8;
+
+    private static NpcTickResult? TryTravel(Mutant npc, TimeWorld world, IRandomSource random)
     {
         if (random.NextDouble() > TravelAttemptChance)
         {
             return null;
         }
 
-        var targetLevel = npc.CurrentTimeLevel + 1;
-        var targetDefinition = world.TryGetLevel(targetLevel);
-        if (targetDefinition is null)
+        var hop = MinTravelHop + (int)(random.NextDouble() * (MaxTravelHop - MinTravelHop + 1));
+        var forward = random.NextDouble() < ForwardTravelBias;
+        var targetYear = Math.Clamp(
+            npc.CurrentYear + (forward ? hop : -hop),
+            TimeScale.MinYear,
+            TimeScale.MaxYear);
+
+        if (targetYear == npc.CurrentYear)
         {
-            return null; // already at the deepest level that exists
+            return null;
         }
 
-        if (npc.Level < targetDefinition.MinCharacterLevelToUnlock)
+        if (!npc.Ions.CanAfford(IonEconomy.TimeTravelCost(npc.CurrentYear, targetYear)))
         {
-            return null; // not strong enough yet
+            return null;
         }
 
-        if (!npc.Ions.CanAfford(IonEconomy.TimeTravelCost(targetLevel)))
-        {
-            return null; // can't afford the jump yet
-        }
-
-        var result = TimeTravelResolver.Travel(npc, world, targetLevel, random);
-
-        // Only set MonsterName (which WorldSimulation.Tick uses to broadcast a
-        // win/loss Slain event, same as a normal grind-fight) when a gatekeeper
-        // was actually fought - a plain Ion-cost hop to an already-unlocked
-        // level has no fight to report here (its own TimeTraveled broadcast
-        // covers that case instead).
-        var gatekeeperName = result.GatekeeperFight is not null ? $"The Gatekeeper of Level {targetLevel}" : null;
-
+        var result = TimeTravelResolver.Travel(npc, world, targetYear, random);
         return result.Success
-            ? new NpcTickResult(npc.Name, NpcGoal.Travel, gatekeeperName, result.GatekeeperFight, $"time traveled to level {targetLevel}")
-            : new NpcTickResult(npc.Name, NpcGoal.Travel, gatekeeperName, result.GatekeeperFight, $"was defeated by level {targetLevel}'s gatekeeper");
+            ? new NpcTickResult(npc.Name, NpcGoal.Travel, null, null, $"time traveled to {targetYear} A.D.")
+            : null;
     }
 
     private static bool IsLow(int current, int max, double threshold) => max > 0 && current < max * threshold;

@@ -14,13 +14,13 @@ Anything not marked that way fills a documented gap in the historical record.
 
 ## 1. High concept
 
-You are a Mutant in the year 2000 A.D., clawing your way to being the most
-powerful, richest being on the planet `[SOURCE]`. You explore a grid-based
-city and wasteland, fight monsters for loot, convert junk into Ions to
-survive and travel, buy and run stores, and burn Ions to leap between
-increasingly dangerous "time travel levels." Every other Mutant you meet in
-the world — friendly, hostile, or running a shop — is an NPC governed by the
-same rules you are.
+You are a Mutant starting in the year 2000 A.D., clawing your way to being
+the most powerful, richest being on the planet `[SOURCE]`. You explore a
+grid-based city and wasteland, fight monsters for loot, convert junk into
+Ions to survive and travel, buy and run stores, and burn Ions to `travel`
+anywhere on the 2000–5000 A.D. timeline — later years are richer and far
+more dangerous. Every other Mutant you meet in the world — friendly,
+hostile, or running a shop — is an NPC governed by the same rules you are.
 
 ## 2. Core resource: Ions `[SOURCE]`
 
@@ -30,8 +30,8 @@ Ions are the single unified resource for:
   usable at any time (no location or combat requirement) and, like every
   other action, advances one tick `[SOURCE]`.
 - **Spellcasting** — arcane/divine classes spend Ions per ability.
-- **Time travel** — spend a (level-dependent) lump of Ions to travel to another
-  time-travel level.
+- **Time travel** — spend Ions proportional to how many years you jump
+  (see §3.2) to move anywhere on the 2000–5000 A.D. timeline.
 
 Ions are generated almost entirely by **converting items** — `convert <item>`
 destroys the item and adds Ions based on the item's tier/value `[SOURCE
@@ -40,14 +40,17 @@ choice, mirrored exactly from the source game: **wield it, sell it, or burn
 it** `[SOURCE]`.
 
 ### 2.1 Ion economy tuning (original)
-- Passive drain: 1 Ion per N game-ticks, scaled slightly up at deeper time
-  levels (deeper levels are harsher survival environments).
+- Passive drain: 1 Ion per N game-ticks, scaled slightly up further into
+  the future (later years are harsher survival environments) — the scaling
+  key is the whole-number difficulty tier for the current year (see §3.2).
 - Item→Ion conversion value = `base_item_value * 0.4`, rounded down, with a
   minimum of 1. This keeps converting strictly worse than selling in Riblets
   when a store is reachable, but better than nothing when it isn't — replicating
   the "quasi semi-flawed but usable" economy the original was known for,
   without the parts that made it exploitable.
-- Time travel cost = `25 * target_level` Ions (see §4).
+- Time travel cost = `ceil(0.2 * |target_year - current_year|)` Ions,
+  minimum 1 for any real jump, symmetric (retreating toward the present
+  costs the same as advancing). Original tuning.
 - `heal` restores HP at 1 Ion per 1 HP — no specific ratio survives in the
   historical record, and this one is deliberately steep (not a cheap
   top-off) so healing genuinely competes with travel/casting/survival for
@@ -57,8 +60,8 @@ it** `[SOURCE]`.
 ## 3. Movement & the world map
 
 ### 3.1 Grid and compass `[SOURCE]`
-Each time-travel level is a 2D grid of rooms addressed by East/West and
-North/South offsets from a level's origin, exactly matching the surviving
+Each year's map is a 2D grid of rooms addressed by East/West and
+North/South offsets from the origin, exactly matching the surviving
 screenshot's `Compass: (2E : 0N)` readout. Movement commands are single-letter
 directions: `n`, `s`, `e`, `w` (and optionally `ne/nw/se/sw` as a v1.1
 stretch goal, not in the original).
@@ -71,30 +74,47 @@ stretch goal, not in the original).
 - Available exits are always listed explicitly, e.g. `north - area
   continues.` `[SOURCE style]`.
 
-### 3.2 Levels & time travel `[SOURCE: confirmed mechanic + Ion cost]`
-- The world is organized into a sequence of **time-travel levels**, each a
-  separate grid map with its own room content, monster roster, loot tables,
-  and store population. Level 1 is the "present" city; each level deeper is a
-  different era (a specific theme-per-level list is content work, not
-  mechanics — see `docs/CONTENT_PLAN.md` once populated).
-- Command: `travel <level>` (only to levels you've unlocked — see below) or
-  `travel next` / `travel prev` for adjacent levels.
-- Cost: `25 * target_level` Ions, deducted on success. Insufficient Ions
-  produces a warning and blocks the jump — this exact failure mode is
-  independently confirmed by a historical MBBSEmu bug report about a "warning
-  when attempting to time travel without enough ions."
-- **Unlocking** a new level requires reaching a minimum character level *and*
-  defeating that level's "gatekeeper" monster once (original design, gives
-  loot-and-level scaling somewhere to anchor on).
-- Levels only go one direction deeper until a level cap; a `travel prev`
-  always works for free (no cost to retreat to a shallower, already-unlocked
-  level) so lower-level content stays reachable for restocking/trading.
+### 3.2 The timeline & time travel `[SOURCE: confirmed mechanic + Ion cost]`
+- The world is a **continuous timeline** from year **2000 A.D.** (the
+  "present" city, where every character starts) to **5000 A.D.**. There are
+  no discrete levels: difficulty, monster stats, and loot value all scale
+  smoothly with the year. Year 2000 sits at scaling "tier" 1.0 and every
+  375 years advances the tier by 1, so year 5000 is tier ~9.0
+  (`Mutants.Core.Time.TimeScale`).
+- **Each year has its own grid map**, generated deterministically from a
+  per-save **world seed** plus the year — the same year always produces the
+  same layout, so it can be a pure function of the save with nothing about
+  the geometry stored. Room descriptions are drawn from ~15 authored
+  **era bands** (Ruined City → … → The Final Instant) that tile the 3000
+  years; a year takes its theme and monster/loot pools from its band.
+- Command: `travel <year>` (any year 2000–5000), `travel +N` / `travel -N`
+  (relative), or `travel next` / `travel prev` (the next/previous
+  Gatekeeper year).
+- Cost: `ceil(0.2 * |target_year - current_year|)` Ions, minimum 1,
+  deducted on success. Symmetric — retreating toward the present costs the
+  same as advancing (this supersedes the earlier "retreat is free" rule now
+  that travel is otherwise unrestricted). Insufficient Ions produces a
+  warning and blocks the jump — the failure mode independently confirmed by
+  a historical MBBSEmu bug report about a "warning when attempting to time
+  travel without enough ions."
+- **Travel is otherwise unrestricted**: no unlock, no minimum character
+  level, no gate. How hard the fights get is the only limiter.
+- **Gatekeepers** are still here, but as tough optional encounters rather
+  than gates. The world seed places one every random 50–100 years across
+  the timeline; a Gatekeeper year holds a bullet-sponge boss (~3× a regular
+  monster's HP for that year) guarding a guaranteed year-scaled **Legendary
+  weapon trophy**, present until you beat it once. It blocks nothing —
+  travelling past a Gatekeeper year was never restricted.
+- **Persistence**: map layouts are regenerated from the seed, not stored.
+  What the save keeps per character is the world seed, the current and
+  furthest-reached year, and the set of cleared Gatekeeper years. (Player
+  store ownership is currently session-only — a known limitation.)
 
 ### 3.3 Death & recall
 - Dying drops a portion of unconverted inventory at the death location (loot
-  becomes lootable by other NPCs/players) and returns the character to their
-  level's home base with an Ion penalty. No source material describes death
-  handling, so this is original, tuned to punish but not erase progress.
+  becomes lootable by other NPCs/players) and returns the character to the
+  present with an Ion penalty. No source material describes death handling,
+  so this is original, tuned to punish but not erase progress.
 
 ## 4. Character classes
 
@@ -122,9 +142,10 @@ blaster) so the two arcane classes don't overlap mechanically.
 
 ### 4.1 Leveling
 - XP from monster kills, scaled by monster level relative to the killer.
-- Level cap per time-travel level context: a soft cap exists at
-  `character_level = 10 * unlocked_time_level` to keep power and depth loosely
-  paired without hard-blocking grinding.
+- Soft level cap tied to progress: `character_level ≈ 10 * tier`, where
+  `tier` is the scaling tier for the **furthest year the character has
+  reached** (`TimeScale.SoftLevelCapForYear`, clamped to 10–30). Keeps
+  power and depth loosely paired without hard-blocking grinding.
 - Every level grants a stat increase; every **5th level** grants a new class
   ability (see §4.2), rewarding both steady growth and periodic power spikes.
 
@@ -160,16 +181,18 @@ area/group to a capstone — is the standard every class follows.)
 
 ## 5. Loot system `[SOURCE: wield/sell/convert]`
 
-- **Sources of loot**: monster drops on defeat (weighted table per monster,
-  scaled to the time-travel level it lives on) and **random location spawns**
-  (a periodic chance per room, per tick, for an item to appear on the ground —
-  matches the brief "random chance of spawning in a location" requirement;
-  original spawn-rate tuning).
-- **Scaling**: every item has a `tier` equal to the time-travel level it was
-  generated on (or dropped by a monster native to that level); tier drives
-  base stats, sell price, and Ion-conversion value, so loot from level 5 is
-  categorically better than loot from level 1 — this directly implements the
-  "loot scales based on time travel level" requirement.
+- **Sources of loot**: monster drops on defeat (a small themed table per
+  monster, built from item archetypes and scaled to the **year** it's
+  fought in) and **random location spawns** (a periodic chance per room,
+  per tick, for an item to appear on the ground — matches the brief "random
+  chance of spawning in a location" requirement; original spawn-rate
+  tuning).
+- **Scaling**: an item's `tier` is derived from the **year** it was
+  generated in (`TimeScale.TierForYear`, a continuous 1.0–9.0 across
+  2000–5000); tier drives base stats, sell price, and Ion-conversion value
+  via `LootScaling`, so loot from year 4000 is categorically better than
+  loot from year 2100 — this implements "loot scales based on time travel
+  level" against the continuous timeline.
 - **Disposition**: every lootable item supports the same three verbs as the
   original — `wield` (equip if class-compatible), `sell <item>` (at any
   store, price is store-and-negotiation-dependent, see §6), `convert <item>`
@@ -190,16 +213,19 @@ area/group to a capstone — is the standard every class follows.)
 ## 6. Stores & economy `[SOURCE: purchasable NPC-run stores + Riblets]`
 
 ### 6.1 NPC government stores
-- The in-fiction government continuously seeds new stores into each level's
-  city area `[SOURCE]`. These are the baseline places to sell loot for
-  **Riblets** and buy consumables/basic gear.
-- Prices scale with the store's home time-travel level (a level-5 store deals
-  in level-5-tier goods and pays/charges accordingly) — this is how "an
-  economy based on the time travel level" gets implemented concretely.
+- Every year has a government store, placed deterministically by the world
+  seed `[SOURCE]`. These are the baseline places to sell loot for
+  **Riblets** and buy consumables/basic gear; each stocks the same staple
+  kinds (a heal item, an attack potion, a defense potion, a weapon, an
+  armour piece), pulled from the year's era themes.
+- Prices scale with the **year** (a year-4000 store deals in year-4000-tier
+  goods and pays/charges accordingly) — this is how "an economy based on
+  the time travel level" gets implemented against the timeline.
 
 ### 6.2 Player-owned stores `[SOURCE: players can buy government stores]`
 - A player (human or NPC) can purchase an available government-built store
-  slot in a level's city for a Riblet cost scaled to that level.
+  slot in a year for a Riblet cost scaled to that year's tier.
+  (Ownership currently lasts only for the session — see §3.2.)
 - Once owned, the player stocks it manually (deposit items from inventory,
   set an asking price per item, within store-level-appropriate bounds to
   prevent trivial arbitrage).
@@ -224,20 +250,22 @@ repair costs) so currency doesn't purely inflate.
 
 Since v1 has no network multiplayer, the world needs to feel alive:
 
-- A configurable population of NPC "Mutants" exists per time-travel level,
-  each a full character with class, level, inventory, and Ion pool — built
-  on the *exact same character/inventory/ability code path* as the human
-  player, per the requirement that NPCs "play like players, with the same
-  character classes and restrictions."
+- A configurable population of NPC "Mutants" is scattered across the whole
+  timeline (a single `totalCount`, each spawned in a random year and
+  fast-levelled into that year's soft-cap band), each a full character with
+  class, level, inventory, and Ion pool — built on the *exact same
+  character/inventory/ability code path* as the human player, per the
+  requirement that NPCs "play like players, with the same character classes
+  and restrictions."
 - Each NPC runs a lightweight behavior loop each tick: assess Ion level (seek
   conversion fodder or a store if low), assess HP (retreat/heal if low),
-  otherwise pursue its current goal (grind monsters near its level, path to
-  a store to trade, attempt a time-travel jump if it has both the Ions and
-  the level-unlock, occasionally visit/stock a store it owns).
+  otherwise pursue its current goal (grind monsters in its year, trade at
+  its year's store, hop a short way along the timeline — usually forward —
+  if it can afford the Ion cost).
 - NPCs participate in the same kill-feed / **telepathic broadcast** channel
   as the player `[SOURCE]` — "X was slain by Y," "Z reached level N," "W time
-  traveled to level 5" — so the leaderboard and the "who's doing what" feel of
-  the original survives without a live human population.
+  traveled to 3200 A.D." — so the leaderboard and the "who's doing what"
+  feel of the original survives without a live human population.
 - NPC decision-making is intentionally simple and rule-based for v1 (finite
   state machine, not full pathfinding AI/ML) to keep it debuggable and cheap
   to simulate at scale; an upgrade path to smarter behavior is a documented
@@ -246,7 +274,7 @@ Since v1 has no network multiplayer, the world needs to feel alive:
 ## 8. Leaderboards `[SOURCE: MutantLink cross-board high scores]`
 
 Displayed on the game's start/title screen, refreshed each session:
-- **Deepest Time Travel Level Reached** (all-time, across player + NPCs).
+- **Furthest Year Reached** (all-time, across player + NPCs).
 - **Highest Character Level** (all-time, across player + NPCs).
 - Both boards show top 10, with the human player's own best highlighted even
   if outside the top 10.
@@ -286,8 +314,12 @@ yours) using NPCs instead of real concurrent users.
 
 ## 12. Open design questions for follow-up
 
-- Exact number of time-travel levels for v1 launch content (recommend
-  starting with 5–8 fully realized levels rather than many shallow ones).
+- Number and boundaries of the era bands across 2000–5000 (currently ~15;
+  more, finer bands would give tighter thematic progression).
+- Ion-cost coefficient tuning: at `0.2/year` a fresh character can't afford
+  the first meaningful jump until it has converted some loot — intended, but
+  worth revisiting.
+- Persisting player store ownership across sessions (currently session-only).
 - Whether NPC store ownership should be capped (to avoid NPCs monopolizing
   all store slots before the human player can buy in).
 - Save format: single local save vs. multiple character slots.

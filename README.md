@@ -8,15 +8,22 @@ restrictions as the human player.
 ## Status
 
 All 8 milestones of the planned sequence (see Roadmap below) are built:
-a playable console game with combat, loot, an NPC economy, multi-level
-time travel, save/load with leaderboards, and a Windows installer build/
-release pipeline. Content is data-driven (`src/Mutants.Content/*.json`,
-loaded by `Mutants.Engine.Content.ContentLoader`) rather than hardcoded —
-all 8 levels of the GDD's "5–8 levels for v1 launch" range, a full
-item/monster catalog, store catalogs, and complete per-class ability
-tables that are castable in combat; see `docs/CONTENT_PLAN.md` for
-exactly what's shipped versus still open (launch-volume catalog now —
-~55 monsters, ~108 items; only optional polish remains).
+a playable console game with combat, loot, an NPC economy, time travel,
+save/load with leaderboards, and a Windows installer build/release
+pipeline.
+
+The world is a **continuous 2000–5000 A.D. timeline** (not discrete
+levels): you `travel` to any year for an Ion cost proportional to the
+distance, and monsters, loot, maps, and stores all scale smoothly by
+year. Each year's map is generated deterministically from a per-save
+world seed. "Gatekeeper" years — placed by the seed every random 50–100
+years — hold a tough optional boss guarding a Legendary trophy, but gate
+nothing. Content is a set of tier-free catalogs in
+`src/Mutants.Content/*.json` (`monster-species`, `item-archetypes`,
+`eras`, `store-templates`), loaded by
+`Mutants.Engine.Content.ContentLoader.LoadTimeWorld` into a
+`Mutants.Core.Time.TimeWorld`; see `docs/CONTENT_PLAN.md` for the shape
+and what's still open (tuning and polish only).
 
 ## Building & running
 
@@ -61,18 +68,19 @@ attaches the installer to a GitHub Release automatically — see
 ## Roadmap (see `docs/TECH_STACK.md` for detail)
 
 1. ✅ Core domain model (classes, stats, Ions, items) + unit tests
-2. ✅ Grid movement on a single level
+2. ✅ Grid movement
 3. ✅ Combat, loot drops, convert/sell/wield
 4. ✅ NPC simulation loop
 5. ✅ Stores (government + player-owned) and the Riblet economy
-6. ✅ Multi-level time travel with scaling
+6. ✅ Time travel with scaling — reworked from 8 discrete levels into the
+   continuous 2000–5000 A.D. timeline described above
 7. ✅ Leaderboards + start screen + save/load
 8. ✅ Windows installer packaging
 
 Each step above is engine-complete (tested, playable end to end) with
 data-driven content behind it — see `docs/CONTENT_PLAN.md` for exactly
-what's shipped and what's still open (optional polish only — level-5
-store slot, config-driven NPC classes).
+what's shipped and what's still open (tuning and polish only — Ion-cost
+balance, persisting player-store ownership, finer era bands).
 
 ## License / provenance
 

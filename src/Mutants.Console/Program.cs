@@ -4,7 +4,7 @@ using Mutants.Core.Economy;
 using Mutants.Core.Events;
 using Mutants.Core.Ions;
 using Mutants.Core.Items;
-using Mutants.Core.Levels;
+using Mutants.Core.Time;
 using Mutants.Core.World;
 using Mutants.Engine;
 using Mutants.Engine.Combat;
@@ -14,83 +14,45 @@ using Mutants.Engine.Persistence;
 using Mutants.Engine.Simulation;
 using Spectre.Console;
 
-// Covers all 8 of docs/TECH_STACK.md's milestones: grid movement, combat/
-// loot/convert/sell/wield, NPC simulation, stores and the Riblet economy,
-// multi-level time travel, leaderboards/start screen/save-load, and
-// Windows installer packaging (installer/*.iss, .github/workflows/). All
-// game rules here (movement legality, combat resolution, NPC AI, store
-// transactions, time travel, persistence, character state) live in
-// Mutants.Core / Mutants.Engine; this file is presentation/input only,
-// per docs/AGENTS.md's Console/UI Agent contract.
+// The world is a continuous timeline (docs/GDD.md §3.2): the player starts
+// in the year 2000 A.D. and `travel`s - spending Ions - to any year up to
+// 5000, with monsters and loot scaling smoothly by year. Nothing gates
+// travel; the only limits are the Ion cost (ceil(0.2 * |Δyear|),
+// symmetric) and how hard the fights get. Every year's map is generated
+// deterministically from a per-save world seed, so revisiting a year is
+// stable. "Gatekeeper" years - a random 50-100 years apart, placed by the
+// seed - hold a tough guaranteed encounter guarding a year-scaled
+// Legendary trophy, but block nothing.
 //
-// The world is loaded from Mutants.Content's JSON (see LoadWorld() below)
-// - all 8 levels of the GDD's "5-8 levels for v1 launch" range, a
-// tier-1..8 monster roster, an item catalog, and store catalogs, all per
-// docs/CONTENT_PLAN.md - falling back to Levels.TestWorld's tiny 3-level
-// sandbox only if content is missing or malformed. Ability tables
-// (Mutants.Content/abilities.json) are loaded
-// too (LoadAbilities() below) and now execute via Engine.Combat.
-// CombatSession: the player's own "fight" is interactive and round-by-
-// round ("attack" or "cast <ability>" each round; "abilities" lists what's
-// unlocked so far) - NPC auto-combat and gatekeeper fights still use
-// CombatResolver.Fight's instant, fully-automated resolution unchanged.
-// A handful of GDD abilities (Resurrect Lite, Fence's Favor, Blink, Mana
-// Well) have no 1v1 combat translation and are refused at cast time with
-// no Ion cost - see AbilityEffectType.None's doc comment.
+// Content is data-driven (Mutants.Content/*.json - monster-species,
+// item-archetypes, eras, store-templates - loaded by
+// Mutants.Engine.Content.ContentLoader.LoadTimeWorld), falling back to
+// Mutants.Core.Time.TestTimeWorld's tiny 3-era sandbox if the files are
+// missing/malformed. Ability tables (abilities.json) load too and execute
+// via Engine.Combat.CombatSession: the player's own `fight` is
+// interactive and round-by-round.
 //
-// Two separate ways to recover HP: "heal" spends Ions directly (§2/§2.1,
-// usable any time, no item needed), and "use"/"eat"/"drink <item>"
-// consumes a food/potion item for an instant flat heal or a temporary
-// attack/defense buff (Item.ConsumableEffect) - both go through the same
-// per-tick expiry (Mutant.AdvanceEffectTicks, called from
-// WorldSimulation.Tick) so a potion's buff persists into the player's next
-// fight, not just the command that drank it.
+// All game rules (movement, combat, NPC AI, store transactions, travel,
+// persistence, character state) live in Mutants.Core / Mutants.Engine;
+// this file is presentation/input only, per docs/AGENTS.md's Console/UI
+// contract. Input is read via plain Console.ReadLine() (Spectre's
+// interactive prompts hard-fail on redirected stdin); Spectre is still
+// used for all output styling.
 //
-// Only the player's own character is saved/loaded as a full character
-// (see Persistence.CharacterSaveData) - NPCs are re-simulated fresh each
-// session (docs/GDD.md doesn't ask for NPC persistence, only for the
-// leaderboard to have "meaning across NPC-simulated seasons," which is
-// satisfied by recording their personal bests, not their full state).
-// The save/leaderboard file lives at %APPDATA%\Chronomutants\mutants.db —
-// not a folder relative to the exe, since an installed copy typically
-// lives under Program Files, unwritable without elevation.
+// Only the player's own character is saved (Persistence.CharacterSaveData,
+// which also carries the world seed) - NPCs are re-simulated fresh each
+// session, scattered across the whole timeline, and only contribute their
+// personal bests to the leaderboard. The save/leaderboard DB lives at
+// %APPDATA%\Chronomutants\mutants.db.
 //
-// Every level gets its own native NPC population (Content.NpcPopulationData's
-// per-level count + starting character-level range - see
-// SpawnNpcPopulation() below) - each NPC wanders/fights/trades against ITS
-// OWN current level's content, resolved fresh every tick from GameWorld
-// (WorldSimulation.Tick), and may independently push one level deeper on
-// its own (NpcController's Travel goal, GDD §7's "attempt a time-travel
-// jump if it has both the Ions and the level-unlock") - the exact same
-// TimeTravelResolver the player's own "travel" command uses.
-//
-// There's still no spatial monster placement (rooms don't carry
-// monsters) — "fight" spawns a random monster from the current level's
-// tier-scaled roster on demand, same as NpcController does for NPCs.
-// Stores, unlike monsters, ARE placed spatially per level — buying/
-// selling requires standing in the right room, same as movement already
-// works. docs/GDD.md §9's real background tick (every ~2 seconds,
-// independent of player input) isn't implemented — this console instead
-// advances the world by one tick per player command, a synchronous
-// stand-in that keeps the loop simple and scriptable.
-
-// Input is read via plain Console.ReadLine() rather than Spectre's
-// interactive prompts (TextPrompt/SelectionPrompt): those require a real
-// interactive terminal and hard-fail when stdin is redirected (e.g. piped
-// input, some CI/test harnesses). Spectre is still used for all output
-// styling. Console.ReadLine() also degrades cleanly to null at end-of-input
-// instead of throwing, which we treat as "quit."
+// KNOWN LIMITATION (parity with the pre-timeline build): player store
+// ownership is session-only - it is not written to the save. Cleared
+// Gatekeeper years and the world seed do persist.
 
 AnsiConsole.Write(new FigletText("Chronomutants").Color(Color.Green));
-AnsiConsole.MarkupLine("[grey](pre-release build — 8 levels of content, abilities now castable in combat)[/]");
+AnsiConsole.MarkupLine("[grey](pre-release build — the continuous 2000–5000 A.D. timeline)[/]");
 AnsiConsole.WriteLine();
 
-// %APPDATA%\Chronomutants — not a folder relative to the exe: an
-// installed copy typically lives under Program Files, which a
-// non-elevated player can't write to, so the save file needs a real
-// per-user, always-writable location (docs/TECH_STACK.md's installer
-// milestone). Falls back to a local "saves" folder if ApplicationData
-// somehow isn't available (e.g. some minimal/CI environments).
 var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 var savesDirectory = string.IsNullOrEmpty(appDataFolder)
     ? "saves"
@@ -102,27 +64,32 @@ using var repository = new GameRepository(savePath);
 RenderLeaderboards(repository);
 AnsiConsole.WriteLine();
 
-var world = LoadWorld();
 var abilities = LoadAbilities();
 var random = new SystemRandomSource();
 
-var mutant = HandleStartScreen(repository, world);
-if (mutant is null)
+var start = HandleStartScreen(repository);
+if (start is null)
 {
     return;
 }
 
-// GDD §7 calls for "a configurable population" - Content.NpcPopulationData
-// is that config, one entry per level (count + starting character-level
-// range); every level in the world gets its own native population now,
-// each already unlocked up through its home level.
-var npcs = SpawnNpcPopulation(world, random);
+var (mutant, worldSeed) = start.Value;
+var world = LoadTimeWorld(worldSeed);
+
+// Place / re-place the character now that the world exists.
+var startingRoom = world.GetYear(mutant.CurrentYear).Map;
+if (startingRoom.TryGetRoom(mutant.Position) is null)
+{
+    mutant.PlaceAt(startingRoom.Start);
+}
+
+var npcs = SpawnNpcs(world, random);
 var simulation = new WorldSimulation(world, npcs, random);
 var shownBroadcastCount = 0;
 
 AnsiConsole.WriteLine();
 AnsiConsole.MarkupLine($"Welcome, [bold]{Markup.Escape(mutant.Name)}[/] the [bold]{mutant.Class}[/]. Type [yellow]help[/] for commands.");
-AnsiConsole.MarkupLine($"[grey]{npcs.Count} other Mutants are already out there, fending for themselves.[/]");
+AnsiConsole.MarkupLine($"[grey]{npcs.Count} other Mutants are scattered across the centuries, fending for themselves.[/]");
 AnsiConsole.WriteLine();
 
 RenderRoom(mutant, world);
@@ -134,7 +101,7 @@ while (running)
     var rawInput = Console.ReadLine();
     if (rawInput is null)
     {
-        break; // end of input (e.g. piped stdin exhausted) - quit gracefully
+        break;
     }
 
     var input = rawInput.Trim();
@@ -168,7 +135,7 @@ while (running)
         case "fight" or "f":
             if (!HandleFight(mutant, world, random, simulation.Broadcast, abilities))
             {
-                running = false; // defeated - see HandleFight
+                running = false;
             }
 
             break;
@@ -191,7 +158,7 @@ while (running)
             break;
 
         case "stores":
-            RenderStores(world.GetLevel(mutant.CurrentTimeLevel).StoreSlots);
+            RenderStores(world.GetYear(mutant.CurrentYear).StoreSlots);
             break;
 
         case "shop":
@@ -207,7 +174,7 @@ while (running)
             break;
 
         case "save":
-            HandleSave(mutant, repository);
+            HandleSave(mutant, repository, worldSeed);
             RecordNpcLeaderboardBests(npcs, repository);
             break;
 
@@ -267,7 +234,7 @@ while (running)
 
 if (!mutant.Health.IsDead)
 {
-    HandleSave(mutant, repository);
+    HandleSave(mutant, repository, worldSeed);
 }
 
 RecordNpcLeaderboardBests(npcs, repository);
@@ -277,10 +244,10 @@ AnsiConsole.MarkupLine(mutant.Health.IsDead
     : "[grey]Farewell, Mutant. Progress saved.[/]");
 return;
 
-static void HandleSave(Mutant mutant, GameRepository repository)
+static void HandleSave(Mutant mutant, GameRepository repository, long worldSeed)
 {
-    repository.SaveCharacter(CharacterMapper.ToSaveData(mutant));
-    repository.RecordPersonalBests(mutant.Name, isPlayer: true, mutant.UnlockedTimeLevel, mutant.Level);
+    repository.SaveCharacter(CharacterMapper.ToSaveData(mutant, worldSeed));
+    repository.RecordPersonalBests(mutant.Name, isPlayer: true, mutant.FurthestYearReached, mutant.Level);
     AnsiConsole.MarkupLine("[green]Game saved.[/]");
 }
 
@@ -289,7 +256,7 @@ static void RecordNpcLeaderboardBests(IReadOnlyList<Mutant> npcs, GameRepository
 {
     foreach (var npc in npcs)
     {
-        repository.RecordPersonalBests(npc.Name, isPlayer: false, npc.UnlockedTimeLevel, npc.Level);
+        repository.RecordPersonalBests(npc.Name, isPlayer: false, npc.FurthestYearReached, npc.Level);
     }
 }
 
@@ -301,7 +268,7 @@ static string? ReadNonEmptyLine(string prompt)
         var line = Console.ReadLine();
         if (line is null)
         {
-            return null; // end of input
+            return null;
         }
 
         var trimmed = line.Trim();
@@ -328,7 +295,7 @@ static CharacterClass? ReadClassChoice()
         var line = Console.ReadLine();
         if (line is null)
         {
-            return null; // end of input
+            return null;
         }
 
         var trimmed = line.Trim();
@@ -347,30 +314,29 @@ static CharacterClass? ReadClassChoice()
     }
 }
 
-/// <summary>The title-screen "new game or load a save" flow. Returns null only on end-of-input (quit).</summary>
 static string ContentDirectory() => Path.Combine(AppContext.BaseDirectory, "Content");
 
 /// <summary>
-/// Loads the real, authored world from Mutants.Content (see
-/// docs/CONTENT_PLAN.md). Falls back to Levels.TestWorld's small sandbox
-/// world if the content files are missing or malformed, so a broken or
-/// incomplete deployment degrades to something playable instead of
-/// crashing outright.
+/// Loads the real, authored timeline from Mutants.Content. Falls back to
+/// Mutants.Core.Time.TestTimeWorld's small sandbox if the content files
+/// are missing or malformed, so a broken deployment degrades to something
+/// playable instead of crashing. <paramref name="worldSeed"/> fixes the
+/// Gatekeeper schedule and every year's map/store layout.
 /// </summary>
-static GameWorld LoadWorld()
+static TimeWorld LoadTimeWorld(long worldSeed)
 {
     try
     {
-        return ContentLoader.LoadWorld(ContentDirectory());
+        return ContentLoader.LoadTimeWorld(ContentDirectory(), worldSeed);
     }
     catch (ContentException ex)
     {
-        AnsiConsole.MarkupLine($"[red]Couldn't load content ({Markup.Escape(ex.Message)}) - falling back to the built-in sandbox world.[/]");
-        return TestWorld.Build();
+        AnsiConsole.MarkupLine($"[red]Couldn't load content ({Markup.Escape(ex.Message)}) - falling back to the built-in sandbox timeline.[/]");
+        return TestTimeWorld.Build(worldSeed);
     }
 }
 
-/// <summary>Loads abilities.json's mechanical ability tables (see AbilityData). An empty list on missing/malformed content just means 'abilities' and 'cast' have nothing to show/use - not fatal, unlike LoadWorld.</summary>
+/// <summary>Loads abilities.json's mechanical ability tables (see AbilityData). An empty list on missing/malformed content just means 'abilities' and 'cast' have nothing to show/use.</summary>
 static IReadOnlyList<AbilityData> LoadAbilities()
 {
     try
@@ -383,44 +349,24 @@ static IReadOnlyList<AbilityData> LoadAbilities()
     }
 }
 
-/// <summary>Spawns every level's native NPC population per npc-population.json, skipping any configured level the loaded world doesn't actually have (e.g. TestWorld's 3-level sandbox against the real 5-level config). Falls back to 5 level-1 NPCs, matching this game's original level-1-only behavior, if the config is missing/malformed entirely.</summary>
-static List<Mutant> SpawnNpcPopulation(GameWorld world, IRandomSource random)
+/// <summary>Spawns the whole NPC population (npc-population.json's totalCount), scattered across the timeline. Falls back to 12 if the config is missing/malformed.</summary>
+static List<Mutant> SpawnNpcs(TimeWorld world, IRandomSource random)
 {
-    var config = LoadNpcPopulationConfig();
-    var npcs = new List<Mutant>();
-
-    foreach (var entry in config)
-    {
-        var levelDefinition = world.TryGetLevel(entry.LevelNumber);
-        if (levelDefinition is null)
-        {
-            continue;
-        }
-
-        npcs.AddRange(NpcPopulation.Spawn(entry.Count, levelDefinition.Map, random, entry.LevelNumber, entry.MinLevel, entry.MaxLevel));
-    }
-
-    if (npcs.Count == 0)
-    {
-        npcs.AddRange(NpcPopulation.Spawn(5, world.GetLevel(1).Map, random));
-    }
-
-    return npcs;
-}
-
-static IReadOnlyList<NpcPopulationData> LoadNpcPopulationConfig()
-{
+    int count;
     try
     {
-        return ContentLoader.LoadNpcPopulation(Path.Combine(ContentDirectory(), "npc-population.json"));
+        count = ContentLoader.LoadNpcCount(Path.Combine(ContentDirectory(), "npc-population.json"));
     }
     catch (ContentException)
     {
-        return [];
+        count = 12;
     }
+
+    return NpcPopulation.Spawn(count, world, random).ToList();
 }
 
-static Mutant? HandleStartScreen(GameRepository repository, GameWorld world)
+/// <summary>The title-screen "new game or load a save" flow. Returns null only on end-of-input (quit); otherwise the character plus the world seed to build the timeline from.</summary>
+static (Mutant Mutant, long WorldSeed)? HandleStartScreen(GameRepository repository)
 {
     var savedNames = repository.ListSavedCharacterNames();
     if (savedNames.Count > 0)
@@ -439,7 +385,7 @@ static Mutant? HandleStartScreen(GameRepository repository, GameWorld world)
         var input = ReadNonEmptyLine("> ");
         if (input is null)
         {
-            return null; // end of input
+            return null;
         }
 
         if (string.Equals(input, "new", StringComparison.OrdinalIgnoreCase))
@@ -472,33 +418,28 @@ static Mutant? HandleStartScreen(GameRepository repository, GameWorld world)
             return null;
         }
 
-        var mutant = new Mutant(name, characterClass.Value);
-        mutant.PlaceAt(world.GetLevel(mutant.CurrentTimeLevel).Map.Start);
-        return mutant;
+        return (new Mutant(name, characterClass.Value), System.Random.Shared.NextInt64());
     }
 
     var saveData = repository.LoadCharacter(choice)!;
     var loaded = CharacterMapper.FromSaveData(saveData);
+    var seed = saveData is { SchemaVersion: >= 2, WorldSeed: not 0 }
+        ? saveData.WorldSeed
+        : System.Random.Shared.NextInt64();
 
-    // Defensive: if the world's content ever changes, a saved position
-    // might no longer exist - fall back to that level's start room rather
-    // than crash on the next GetRoom() call.
-    var levelDefinition = world.TryGetLevel(loaded.CurrentTimeLevel);
-    if (levelDefinition is null || levelDefinition.Map.TryGetRoom(loaded.Position) is null)
+    if (saveData.SchemaVersion < CharacterSaveData.CurrentSchemaVersion)
     {
-        levelDefinition ??= world.GetLevel(1);
-        loaded.SetCurrentTimeLevel(levelDefinition.LevelNumber);
-        loaded.PlaceAt(levelDefinition.Map.Start);
+        AnsiConsole.MarkupLine("[yellow]This save predates the timeline rework — your character carries over, dropped into the year that matches its old depth. The world is freshly generated.[/]");
     }
 
     AnsiConsole.MarkupLine($"[green]Welcome back, {Markup.Escape(loaded.Name)}![/]");
-    return loaded;
+    return (loaded, seed);
 }
 
 static void RenderLeaderboards(GameRepository repository, string? highlightName = null)
 {
     AnsiConsole.MarkupLine("[yellow]═══ Leaderboards ═══[/]");
-    RenderLeaderboardBoard(repository, "Deepest Time Level Reached", repository.TopByTimeLevel(10), e => e.DeepestTimeLevelReached, highlightName);
+    RenderLeaderboardBoard(repository, "Furthest Year Reached", repository.TopByFurthestYear(10), e => e.FurthestYearReached, highlightName);
     RenderLeaderboardBoard(repository, "Highest Character Level", repository.TopByCharacterLevel(10), e => e.HighestCharacterLevelReached, highlightName);
 }
 
@@ -525,7 +466,6 @@ static void RenderLeaderboardBoard(
         table.AddRow((index + 1).ToString(), nameCell, value(entry).ToString(), entry.IsPlayer ? "player" : "NPC");
     }
 
-    // docs/GDD.md §8: the player's own best is shown even if outside the top 10.
     if (highlightName is not null && !top.Any(e => string.Equals(e.Name, highlightName, StringComparison.OrdinalIgnoreCase)))
     {
         var own = repository.GetLeaderboardEntry(highlightName);
@@ -549,7 +489,7 @@ static (string Command, string Argument) SplitCommand(string input)
     };
 }
 
-/// <summary>Handles "convert/wield &lt;item&gt;" commands. Returns false if <paramref name="command"/> isn't one of those verbs. ("sell" now requires a store — see HandleSellToStore.)</summary>
+/// <summary>Handles "convert/wield/use/eat/drink &lt;item&gt;" commands. Returns false if <paramref name="command"/> isn't one of those verbs.</summary>
 static bool TryHandleItemCommand(Mutant mutant, string command, string argument)
 {
     if (command is not ("convert" or "wield" or "use" or "eat" or "drink"))
@@ -643,7 +583,7 @@ static StoreListing? FindListing(Store store, string argument)
 static StoreSlot? FindStoreSlotAt(IReadOnlyList<StoreSlot> storeSlots, Coordinate position) =>
     storeSlots.FirstOrDefault(s => s.Location == position);
 
-/// <summary>Splits "&lt;item&gt; &lt;price&gt;" - the last whitespace token is the price, everything before it is the item name/index (so multi-word item names still work).</summary>
+/// <summary>Splits "&lt;item&gt; &lt;price&gt;" - the last whitespace token is the price, everything before it is the item name/index.</summary>
 static (string ItemArg, int Price)? SplitItemAndPrice(string argument)
 {
     var tokens = argument.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -655,9 +595,9 @@ static (string ItemArg, int Price)? SplitItemAndPrice(string argument)
     return (string.Join(' ', tokens[..^1]), price);
 }
 
-static void HandleShop(Mutant mutant, GameWorld world)
+static void HandleShop(Mutant mutant, TimeWorld world)
 {
-    var storeSlots = world.GetLevel(mutant.CurrentTimeLevel).StoreSlots;
+    var storeSlots = world.GetYear(mutant.CurrentYear).StoreSlots;
     var slot = FindStoreSlotAt(storeSlots, mutant.Position);
     if (slot?.Store is not { } store)
     {
@@ -668,9 +608,9 @@ static void HandleShop(Mutant mutant, GameWorld world)
     RenderShop(store);
 }
 
-static void HandleBuyFromStore(Mutant mutant, GameWorld world, string argument)
+static void HandleBuyFromStore(Mutant mutant, TimeWorld world, string argument)
 {
-    var storeSlots = world.GetLevel(mutant.CurrentTimeLevel).StoreSlots;
+    var storeSlots = world.GetYear(mutant.CurrentYear).StoreSlots;
     var slot = FindStoreSlotAt(storeSlots, mutant.Position);
     if (slot?.Store is not { } store)
     {
@@ -697,9 +637,9 @@ static void HandleBuyFromStore(Mutant mutant, GameWorld world, string argument)
     AnsiConsole.MarkupLine($"[green]Bought {Markup.Escape(listing.Item.Name)} for {listing.AskingPrice} Riblets.[/]");
 }
 
-static void HandleSellToStore(Mutant mutant, GameWorld world, string argument)
+static void HandleSellToStore(Mutant mutant, TimeWorld world, string argument)
 {
-    var storeSlots = world.GetLevel(mutant.CurrentTimeLevel).StoreSlots;
+    var storeSlots = world.GetYear(mutant.CurrentYear).StoreSlots;
     var slot = FindStoreSlotAt(storeSlots, mutant.Position);
     if (slot?.Store is not { } store)
     {
@@ -726,9 +666,9 @@ static void HandleSellToStore(Mutant mutant, GameWorld world, string argument)
     AnsiConsole.MarkupLine($"[yellow]Sold {Markup.Escape(item.Name)} to {Markup.Escape(store.Name)} for {price} Riblets.[/]");
 }
 
-static void HandleBuyStore(Mutant mutant, GameWorld world)
+static void HandleBuyStore(Mutant mutant, TimeWorld world)
 {
-    var storeSlots = world.GetLevel(mutant.CurrentTimeLevel).StoreSlots;
+    var storeSlots = world.GetYear(mutant.CurrentYear).StoreSlots;
     var slot = FindStoreSlotAt(storeSlots, mutant.Position);
     if (slot is null)
     {
@@ -749,14 +689,17 @@ static void HandleBuyStore(Mutant mutant, GameWorld world)
     }
 
     slot.Purchase(mutant);
-    AnsiConsole.MarkupLine($"[green]You now own a store here: {Markup.Escape(slot.Store!.Name)}![/] Use [yellow]deposit[/]/[yellow]withdraw[/]/[yellow]reprice[/]/[yellow]collect[/] to run it.");
+    AnsiConsole.MarkupLine($"[green]You now own a store here: {Markup.Escape(slot.Store!.Name)}![/] Use [yellow]deposit[/]/[yellow]withdraw[/]/[yellow]reprice[/]/[yellow]collect[/] to run it. [grey](Store ownership is session-only for now.)[/]");
 }
 
-/// <summary>Collects from every store the Mutant owns, across every level — an owner needn't be standing there to collect (docs/GDD.md §6.2's "idle-income loop").</summary>
-static void HandleCollect(Mutant mutant, GameWorld world)
+/// <summary>Collects from every store the Mutant owns across every year visited this session — an owner needn't be standing there (docs/GDD.md §6.2's "idle-income loop").</summary>
+static void HandleCollect(Mutant mutant, TimeWorld world)
 {
-    var allSlots = Enumerable.Range(1, world.MaxLevel).SelectMany(n => world.GetLevel(n).StoreSlots);
-    var owned = allSlots.Where(s => s.Store?.Owner == mutant).ToList();
+    var owned = world.VisitedYears
+        .SelectMany(y => world.GetYear(y).StoreSlots)
+        .Where(s => s.Store?.Owner == mutant)
+        .ToList();
+
     if (owned.Count == 0)
     {
         AnsiConsole.MarkupLine("[red]You don't own a store.[/] Find an empty slot and use [yellow]buy-store[/].");
@@ -778,7 +721,7 @@ static void HandleCollect(Mutant mutant, GameWorld world)
         : "[grey]Nothing to collect yet.[/]");
 }
 
-/// <summary>docs/GDD.md §2 [SOURCE]: "spend Ions to heal wounds directly," usable at any time - no location, no combat, no item required, unlike every other resource-spending command in this game.</summary>
+/// <summary>docs/GDD.md §2 [SOURCE]: "spend Ions to heal wounds directly," usable at any time.</summary>
 static void HandleHeal(Mutant mutant)
 {
     if (mutant.Health.Current >= mutant.Health.Max)
@@ -797,9 +740,9 @@ static void HandleHeal(Mutant mutant)
     AnsiConsole.MarkupLine($"[green]You heal for {healed} HP.[/] ({mutant.Health.Current}/{mutant.Health.Max} HP, {mutant.Ions.Current}/{mutant.Ions.Max} Ions left)");
 }
 
-static void HandleStoreManagement(Mutant mutant, GameWorld world, string command, string argument)
+static void HandleStoreManagement(Mutant mutant, TimeWorld world, string command, string argument)
 {
-    var storeSlots = world.GetLevel(mutant.CurrentTimeLevel).StoreSlots;
+    var storeSlots = world.GetYear(mutant.CurrentYear).StoreSlots;
     var slot = FindStoreSlotAt(storeSlots, mutant.Position);
     if (slot?.Store is not { } store || store.Owner != mutant)
     {
@@ -867,24 +810,30 @@ static void HandleStoreManagement(Mutant mutant, GameWorld world, string command
     }
 }
 
-/// <summary>Spawns a random monster from the current level's tier-scaled roster and resolves combat. Returns false if the Mutant was defeated (caller should end the session).</summary>
 /// <summary>
-/// The player's own fights are interactive and round-by-round via
-/// CombatSession - "attack" or "cast <ability>" each round - unlike NPC
-/// auto-combat and gatekeeper fights (still CombatResolver.Fight's instant,
-/// fully-automated resolution; see this file's header). End-of-input
-/// mid-fight (e.g. piped stdin running out) auto-attacks each remaining
-/// round rather than getting stuck, since a fight is otherwise unbounded
-/// mid-prompt and the outer loop needs to reach its own end-of-input to quit.
+/// Resolves one fight. In a Gatekeeper year the player hasn't cleared, the
+/// opponent is that year's Gatekeeper (a bullet sponge guarding a
+/// Legendary trophy, which drops through the normal loot path on a win);
+/// otherwise it's a random monster from the year's roster. The fight
+/// itself is interactive and round-by-round via CombatSession - "attack"
+/// or "cast <ability>" each round. Returns false if the Mutant was
+/// defeated (caller ends the session). End-of-input mid-fight auto-attacks
+/// each remaining round.
 /// </summary>
-static bool HandleFight(Mutant mutant, GameWorld world, IRandomSource random, BroadcastChannel broadcast, IReadOnlyList<AbilityData> abilities)
+static bool HandleFight(Mutant mutant, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, IReadOnlyList<AbilityData> abilities)
 {
-    var levelDefinition = world.GetLevel(mutant.CurrentTimeLevel);
-    var roster = levelDefinition.MonsterRoster;
-    var monster = roster[System.Random.Shared.Next(roster.Count)]();
+    var year = mutant.CurrentYear;
+    var yearContent = world.GetYear(year);
+
+    var isGatekeeperFight = yearContent.Gatekeeper is not null && !mutant.HasDefeatedGatekeeper(year);
+    var monster = isGatekeeperFight
+        ? yearContent.Gatekeeper!()
+        : yearContent.MonsterRoster[System.Random.Shared.Next(yearContent.MonsterRoster.Count)]();
     var levelBefore = mutant.Level;
 
-    AnsiConsole.MarkupLine($"A [bold]{Markup.Escape(monster.Name)}[/] (tier {monster.Tier}) attacks!");
+    AnsiConsole.MarkupLine(isGatekeeperFight
+        ? $"[bold]{Markup.Escape(monster.Name)} rises to meet you![/] (tier {monster.Tier})"
+        : $"A [bold]{Markup.Escape(monster.Name)}[/] (tier {monster.Tier}) attacks!");
 
     var usableAbilities = abilities
         .Where(a => string.Equals(a.Class, mutant.Class.ToString(), StringComparison.OrdinalIgnoreCase) && a.Level <= mutant.Level)
@@ -911,14 +860,14 @@ static bool HandleFight(Mutant mutant, GameWorld world, IRandomSource random, Br
                     if (ability is null)
                     {
                         AnsiConsole.MarkupLine($"[red]No ability named '{Markup.Escape(abilityName)}' available.[/] Type 'abilities' outside combat to see your list.");
-                        continue; // doesn't consume a round
+                        continue;
                     }
 
                     var castResult = session.Cast(ability);
                     AnsiConsole.MarkupLine(castResult.Success ? $"[blue]{Markup.Escape(castResult.Message)}[/]" : $"[red]{Markup.Escape(castResult.Message)}[/]");
                     if (!castResult.Success)
                     {
-                        continue; // failed cast doesn't consume a round
+                        continue;
                     }
 
                     PrintNewLogLines(session, ref loggedSoFar);
@@ -934,10 +883,24 @@ static bool HandleFight(Mutant mutant, GameWorld world, IRandomSource random, Br
         PrintNewLogLines(session, ref loggedSoFar);
     }
 
+    var foe = monster.Name.StartsWith("The ", StringComparison.OrdinalIgnoreCase)
+        ? monster.Name
+        : $"the {monster.Name}";
+
     if (session.MutantWon)
     {
-        AnsiConsole.MarkupLine($"[green]You defeated the {Markup.Escape(monster.Name)}! +{session.XpAwarded} XP.[/]");
+        AnsiConsole.MarkupLine($"[green]You defeated {Markup.Escape(foe)}! +{session.XpAwarded} XP.[/]");
         broadcast.Publish(GameEvent.Slain(monster.Name, mutant.Name));
+
+        if (isGatekeeperFight)
+        {
+            mutant.RecordGatekeeperDefeat(year);
+            var trophy = session.ItemsDropped.FirstOrDefault();
+            AnsiConsole.MarkupLine(trophy is not null
+                ? $"[bold yellow]The Gatekeeper of {year} yields its {Markup.Escape(trophy.Name)}![/]"
+                : $"[bold]The Gatekeeper of {year} is broken. This year is yours.[/]");
+        }
+
         if (mutant.Level > levelBefore)
         {
             broadcast.Publish(GameEvent.LevelReached(mutant.Name, mutant.Level));
@@ -947,10 +910,8 @@ static bool HandleFight(Mutant mutant, GameWorld world, IRandomSource random, Br
         return true;
     }
 
-    // docs/GDD.md §3.3 (death & recall - dropping inventory, returning to a
-    // home base with an Ion penalty) is not implemented yet; a defeat here
-    // just ends the session.
-    AnsiConsole.MarkupLine($"[red]You were defeated by the {Markup.Escape(monster.Name)}...[/]");
+    // docs/GDD.md §3.3 (death & recall) is not implemented yet; a defeat here just ends the session.
+    AnsiConsole.MarkupLine($"[red]You were defeated by {Markup.Escape(foe)}...[/]");
     broadcast.Publish(GameEvent.Slain(mutant.Name, monster.Name));
     return false;
 }
@@ -965,7 +926,7 @@ static void PrintNewLogLines(CombatSession session, ref int loggedSoFar)
     loggedSoFar = session.Log.Count;
 }
 
-/// <summary>Lists the player's class's abilities - locked ones (by level) shown greyed, and the handful with no combat effect flagged as such (see AbilityEffectType.None).</summary>
+/// <summary>Lists the player's class's abilities - locked ones greyed, the handful with no combat effect flagged.</summary>
 static void RenderAbilities(Mutant mutant, IReadOnlyList<AbilityData> abilities)
 {
     var classAbilities = abilities
@@ -1005,78 +966,99 @@ static void RenderAbilities(Mutant mutant, IReadOnlyList<AbilityData> abilities)
     AnsiConsole.Write(table);
 }
 
-/// <summary>Handles "travel next/prev/&lt;level&gt;" — docs/GDD.md §3.2.</summary>
-static void HandleTravel(Mutant mutant, GameWorld world, IRandomSource random, BroadcastChannel broadcast, string argument)
+/// <summary>Handles "travel &lt;year&gt;", "travel +N"/"-N" (relative years), and "travel next"/"prev" (the next/previous Gatekeeper year) — docs/GDD.md §3.2.</summary>
+static void HandleTravel(Mutant mutant, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, string argument)
 {
-    int targetLevel;
-    switch (argument.Trim().ToLowerInvariant())
+    var arg = argument.Trim();
+    int targetYear;
+
+    switch (arg.ToLowerInvariant())
     {
         case "":
-            AnsiConsole.MarkupLine("[red]Travel where?[/] Try 'travel next', 'travel prev', or 'travel <level number>'.");
+            AnsiConsole.MarkupLine("[red]Travel when?[/] Try 'travel 3200', 'travel +150', 'travel -100', or 'travel next'/'prev' (Gatekeeper years).");
             return;
 
         case "next":
-            targetLevel = mutant.CurrentTimeLevel + 1;
-            break;
-
-        case "prev" or "previous":
-            targetLevel = mutant.CurrentTimeLevel - 1;
-            if (targetLevel < 1)
+        {
+            var next = world.Gatekeepers.NextAfter(mutant.CurrentYear);
+            if (next is null)
             {
-                AnsiConsole.MarkupLine("[red]You're already at the shallowest level.[/]");
+                AnsiConsole.MarkupLine("[grey]No Gatekeeper years remain ahead of you.[/]");
                 return;
             }
 
+            targetYear = next.Value;
             break;
+        }
+
+        case "prev" or "previous":
+        {
+            var prev = world.Gatekeepers.PreviousBefore(mutant.CurrentYear);
+            if (prev is null)
+            {
+                AnsiConsole.MarkupLine("[grey]No Gatekeeper years behind you.[/]");
+                return;
+            }
+
+            targetYear = prev.Value;
+            break;
+        }
 
         default:
-            if (!int.TryParse(argument.Trim(), out targetLevel))
+            if ((arg.StartsWith('+') || arg.StartsWith('-')) && int.TryParse(arg, out var delta))
             {
-                AnsiConsole.MarkupLine("[red]'travel' needs 'next', 'prev', or a level number.[/]");
+                targetYear = mutant.CurrentYear + delta;
+            }
+            else if (int.TryParse(arg, out var absolute))
+            {
+                targetYear = absolute;
+            }
+            else
+            {
+                AnsiConsole.MarkupLine("[red]'travel' needs a year (e.g. 3200), a relative offset (+150 / -100), or 'next'/'prev'.[/]");
                 return;
             }
 
             break;
     }
 
-    if (targetLevel == mutant.CurrentTimeLevel)
+    if (targetYear == mutant.CurrentYear)
     {
         AnsiConsole.MarkupLine("[grey]You're already there.[/]");
         return;
     }
 
-    var levelBefore = mutant.Level;
-    var result = TimeTravelResolver.Travel(mutant, world, targetLevel, random);
-
-    var gatekeeperFight = result.GatekeeperFight;
-    if (gatekeeperFight is not null)
+    if (!TimeScale.IsValidYear(targetYear))
     {
-        AnsiConsole.MarkupLine($"[bold]The Gatekeeper of Level {targetLevel} blocks your way![/]");
-        foreach (var line in gatekeeperFight.Log)
+        AnsiConsole.MarkupLine($"[red]The timeline only runs from {TimeScale.MinYear} to {TimeScale.MaxYear} A.D.[/]");
+        return;
+    }
+
+    var cost = IonEconomy.TimeTravelCost(mutant.CurrentYear, targetYear);
+    if (Math.Abs(targetYear - mutant.CurrentYear) > 500)
+    {
+        AnsiConsole.Markup($"[yellow]That's a {Math.Abs(targetYear - mutant.CurrentYear)}-year jump — {cost} Ions (you have {mutant.Ions.Current}). Proceed? (y/n)[/] ");
+        var confirm = Console.ReadLine();
+        if (confirm is null || !confirm.Trim().StartsWith("y", StringComparison.OrdinalIgnoreCase))
         {
-            AnsiConsole.MarkupLine(Markup.Escape(line));
+            AnsiConsole.MarkupLine("[grey]Stayed put.[/]");
+            return;
         }
     }
+
+    var levelBefore = mutant.Level;
+    var result = TimeTravelResolver.Travel(mutant, world, targetYear, random);
 
     if (!result.Success)
     {
         AnsiConsole.MarkupLine(result.FailureReason switch
         {
-            TimeTravelFailureReason.UnknownLevel => $"[red]There is no level {targetLevel}.[/]",
-            TimeTravelFailureReason.BelowMinimumCharacterLevel =>
-                $"[red]You need to be at least character level {world.GetLevel(targetLevel).MinCharacterLevelToUnlock} to attempt level {targetLevel}.[/]",
-            TimeTravelFailureReason.LostToGatekeeper => $"[red]The gatekeeper defeated you. Level {targetLevel} remains locked.[/]",
+            TimeTravelFailureReason.YearOutOfRange => $"[red]{targetYear} is off the timeline (2000–5000).[/]",
             TimeTravelFailureReason.InsufficientIons =>
-                $"[red]Not enough Ions ({IonEconomy.TimeTravelCost(targetLevel)} needed; you have {mutant.Ions.Current}).[/]",
+                $"[red]Not enough Ions ({cost} needed; you have {mutant.Ions.Current}).[/]",
             _ => "[red]Travel failed.[/]",
         });
         return;
-    }
-
-    if (gatekeeperFight is { MutantWon: true })
-    {
-        AnsiConsole.MarkupLine($"[green]You defeated the Gatekeeper of Level {targetLevel}! Level {targetLevel} is now unlocked.[/]");
-        broadcast.Publish(GameEvent.Slain($"The Gatekeeper of Level {targetLevel}", mutant.Name));
     }
 
     if (mutant.Level > levelBefore)
@@ -1084,8 +1066,9 @@ static void HandleTravel(Mutant mutant, GameWorld world, IRandomSource random, B
         broadcast.Publish(GameEvent.LevelReached(mutant.Name, mutant.Level));
     }
 
-    AnsiConsole.MarkupLine($"[bold]You travel to level {targetLevel}: {Markup.Escape(world.GetLevel(targetLevel).Map.Name)}.[/]");
-    broadcast.Publish(GameEvent.TimeTraveled(mutant.Name, targetLevel));
+    var arrival = world.GetYear(targetYear);
+    AnsiConsole.MarkupLine($"[bold]You travel to {targetYear} A.D. — {Markup.Escape(arrival.Era.Name)}.[/] [grey]({result.IonsSpent} Ions)[/]");
+    broadcast.Publish(GameEvent.TimeTraveled(mutant.Name, targetYear));
     RenderRoom(mutant, world);
 }
 
@@ -1095,19 +1078,19 @@ static void RenderNpcs(IReadOnlyList<Mutant> npcs)
     table.AddColumn("Name");
     table.AddColumn("Class");
     table.AddColumn("Level");
-    table.AddColumn("Time Level");
+    table.AddColumn("Year");
     table.AddColumn("HP");
     table.AddColumn("Ions");
     table.AddColumn("Location");
     table.AddColumn("Status");
 
-    foreach (var npc in npcs)
+    foreach (var npc in npcs.OrderBy(n => n.CurrentYear))
     {
         table.AddRow(
             Markup.Escape(npc.Name),
             npc.Class.ToString(),
             npc.Level.ToString(),
-            npc.CurrentTimeLevel.ToString(),
+            npc.CurrentYear.ToString(),
             $"{npc.Health.Current}/{npc.Health.Max}",
             $"{npc.Ions.Current}/{npc.Ions.Max}",
             Markup.Escape(npc.Position.ToString()),
@@ -1149,7 +1132,7 @@ static void RenderStores(IReadOnlyList<StoreSlot> storeSlots)
 {
     if (storeSlots.Count == 0)
     {
-        AnsiConsole.MarkupLine("[grey]No stores on this level yet.[/]");
+        AnsiConsole.MarkupLine("[grey]No stores this year.[/]");
         return;
     }
 
@@ -1253,9 +1236,9 @@ static void RenderInventory(Mutant mutant)
     AnsiConsole.Write(table);
 }
 
-static void HandleMove(Mutant mutant, GameWorld world, Direction direction)
+static void HandleMove(Mutant mutant, TimeWorld world, Direction direction)
 {
-    var map = world.GetLevel(mutant.CurrentTimeLevel).Map;
+    var map = world.GetYear(mutant.CurrentYear).Map;
     var result = map.TryMove(mutant.Position, direction);
     if (!result.Success)
     {
@@ -1267,10 +1250,10 @@ static void HandleMove(Mutant mutant, GameWorld world, Direction direction)
     RenderRoom(mutant, world);
 }
 
-static void RenderRoom(Mutant mutant, GameWorld world)
+static void RenderRoom(Mutant mutant, TimeWorld world)
 {
-    var levelDefinition = world.GetLevel(mutant.CurrentTimeLevel);
-    var room = levelDefinition.Map.GetRoom(mutant.Position);
+    var yearContent = world.GetYear(mutant.CurrentYear);
+    var room = yearContent.Map.GetRoom(mutant.Position);
 
     RenderStatusBar(mutant, world);
     AnsiConsole.WriteLine();
@@ -1291,7 +1274,12 @@ static void RenderRoom(Mutant mutant, GameWorld world)
         AnsiConsole.MarkupLine("[green]There are no exits. You are stuck.[/]");
     }
 
-    var slot = FindStoreSlotAt(levelDefinition.StoreSlots, mutant.Position);
+    if (yearContent.Gatekeeper is not null && !mutant.HasDefeatedGatekeeper(mutant.CurrentYear))
+    {
+        AnsiConsole.MarkupLine("[bold red]A Gatekeeper holds this year. It will not let you leave unnoticed — [yellow]fight[/] when you're ready.[/]");
+    }
+
+    var slot = FindStoreSlotAt(yearContent.StoreSlots, mutant.Position);
     if (slot is not null)
     {
         AnsiConsole.MarkupLine(slot.Store switch
@@ -1305,14 +1293,15 @@ static void RenderRoom(Mutant mutant, GameWorld world)
     AnsiConsole.WriteLine();
 }
 
-static void RenderStatusBar(Mutant mutant, GameWorld world)
+static void RenderStatusBar(Mutant mutant, TimeWorld world)
 {
-    var levelDefinition = world.GetLevel(mutant.CurrentTimeLevel);
+    var yearContent = world.GetYear(mutant.CurrentYear);
     var status = $"[red]HP {mutant.Health.Current}/{mutant.Health.Max}[/]  " +
                  $"[blue]Ions {mutant.Ions.Current}/{mutant.Ions.Max}[/]  " +
                  $"[yellow]Riblets {mutant.Riblets}[/]  " +
                  $"Char Level {mutant.Level}  " +
-                 $"Time Level {mutant.CurrentTimeLevel}/{mutant.UnlockedTimeLevel} unlocked  " +
+                 $"Year {mutant.CurrentYear} A.D.  " +
+                 $"Furthest {mutant.FurthestYearReached}  " +
                  $"Location {Markup.Escape(mutant.Position.ToString())}";
 
     if (mutant.ActiveEffects.Count > 0)
@@ -1327,7 +1316,7 @@ static void RenderStatusBar(Mutant mutant, GameWorld world)
     }
 
     AnsiConsole.Write(new Panel(status)
-        .Header($"[bold]{Markup.Escape(mutant.Name)}[/] — {Markup.Escape(levelDefinition.Map.Name)}")
+        .Header($"[bold]{Markup.Escape(mutant.Name)}[/] — {Markup.Escape(yearContent.Era.Name)}, {mutant.CurrentYear} A.D.")
         .Expand());
 }
 
@@ -1336,19 +1325,21 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("[yellow]Commands:[/]");
     AnsiConsole.MarkupLine("  [green]n[/]/[green]s[/]/[green]e[/]/[green]w[/] (or north/south/east/west) - move");
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room");
-    AnsiConsole.MarkupLine("  [green]fight[/] (or f)        - fight a random monster from this level's roster");
+    AnsiConsole.MarkupLine("  [green]fight[/] (or f)        - fight a monster from this year's roster (or its Gatekeeper)");
     AnsiConsole.MarkupLine("    (each round, type [green]attack[/] or [green]cast <ability>[/])");
     AnsiConsole.MarkupLine("  [green]heal[/]                - spend Ions to recover HP (usable any time)");
     AnsiConsole.MarkupLine("  [green]abilities[/] (or spells) - list your class's abilities unlocked so far");
-    AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]/[green]<N>[/] - jump between time-travel levels");
+    AnsiConsole.MarkupLine("  [green]travel <year>[/]      - jump to a year (2000–5000); costs ceil(0.2·|Δyear|) Ions");
+    AnsiConsole.MarkupLine("  [green]travel +N[/]/[green]-N[/]      - jump N years forward/back");
+    AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]   - jump to the next/previous Gatekeeper year");
     AnsiConsole.MarkupLine("  [green]inventory[/] (or i)    - list what you're carrying");
-    AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Mutants out in the world");
+    AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Mutants out in the timeline");
     AnsiConsole.MarkupLine("  [green]news[/] (or broadcast) - show recent kill-feed events");
     AnsiConsole.MarkupLine("  [green]convert <item>[/]     - destroy an item for Ions");
     AnsiConsole.MarkupLine("  [green]wield <item>[/]       - equip a weapon or armor item");
     AnsiConsole.MarkupLine("  [green]use[/]/[green]eat[/]/[green]drink <item>[/] - consume a potion or food item");
     AnsiConsole.MarkupLine("    ('<item>' is either its inventory number or its name)");
-    AnsiConsole.MarkupLine("  [green]stores[/]              - list every store on this level");
+    AnsiConsole.MarkupLine("  [green]stores[/]              - list every store this year");
     AnsiConsole.MarkupLine("  [green]shop[/]                - browse the store in your current room");
     AnsiConsole.MarkupLine("  [green]buy <item>[/]         - buy a listed item (must be at a store)");
     AnsiConsole.MarkupLine("  [green]sell <item>[/]        - sell an item to the store here (must be at a store)");

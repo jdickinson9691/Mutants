@@ -100,6 +100,9 @@ public sealed class TimeWorld
 
     public EraTable Eras => _eras;
 
+    /// <summary>Every year <see cref="GetYear"/> has been called for this session — the set whose store slots hold live, mutable state (ownership, capital, listings).</summary>
+    public IReadOnlyCollection<int> VisitedYears => _cache.Keys;
+
     /// <summary>The content of <paramref name="year"/> — built once, then served from cache.</summary>
     public YearContent GetYear(int year)
     {

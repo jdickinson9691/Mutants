@@ -23,35 +23,31 @@ public class IonEconomyTests
     }
 
     [Theory]
-    [InlineData(1, 25)]
-    [InlineData(2, 50)]
-    [InlineData(5, 125)]
-    [InlineData(10, 250)]
-    public void TimeTravelCost_IsTwentyFiveTimesTargetLevel(int targetLevel, int expectedCost)
+    [InlineData(2000, 2000, 0)]     // staying put is free
+    [InlineData(2000, 2100, 20)]    // ceil(0.2 * 100)
+    [InlineData(2000, 2500, 100)]
+    [InlineData(2500, 2000, 100)]   // symmetric — retreating costs the same
+    [InlineData(2000, 2003, 1)]     // ceil(0.2 * 3) = 1
+    [InlineData(2000, 5000, 600)]
+    public void TimeTravelCost_IsCeilOfPointTwoTimesTheYearDistance(int fromYear, int toYear, int expectedCost)
     {
-        Assert.Equal(expectedCost, IonEconomy.TimeTravelCost(targetLevel));
+        Assert.Equal(expectedCost, IonEconomy.TimeTravelCost(fromYear, toYear));
     }
 
     [Fact]
-    public void TimeTravelCost_RejectsLevelBelowOne()
+    public void TicksPerIonDrain_TightensAtHigherScalingTiers()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => IonEconomy.TimeTravelCost(0));
-    }
+        var low = IonEconomy.TicksPerIonDrain(scalingTier: 1, classDrainMultiplier: 1.0);
+        var high = IonEconomy.TicksPerIonDrain(scalingTier: 5, classDrainMultiplier: 1.0);
 
-    [Fact]
-    public void TicksPerIonDrain_TightensAtDeeperTimeLevels()
-    {
-        var shallow = IonEconomy.TicksPerIonDrain(timeLevel: 1, classDrainMultiplier: 1.0);
-        var deep = IonEconomy.TicksPerIonDrain(timeLevel: 5, classDrainMultiplier: 1.0);
-
-        Assert.True(deep <= shallow, "Deeper time levels should drain Ions at least as fast as shallow ones.");
+        Assert.True(high <= low, "Higher scaling tiers should drain Ions at least as fast as lower ones.");
     }
 
     [Fact]
     public void TicksPerIonDrain_HigherClassMultiplierDrainsFaster()
     {
-        var slowClass = IonEconomy.TicksPerIonDrain(timeLevel: 1, classDrainMultiplier: 0.8); // e.g. Warrior
-        var fastClass = IonEconomy.TicksPerIonDrain(timeLevel: 1, classDrainMultiplier: 1.3); // e.g. Mage
+        var slowClass = IonEconomy.TicksPerIonDrain(scalingTier: 1, classDrainMultiplier: 0.8); // e.g. Warrior
+        var fastClass = IonEconomy.TicksPerIonDrain(scalingTier: 1, classDrainMultiplier: 1.3); // e.g. Mage
 
         Assert.True(fastClass <= slowClass, "A higher drain multiplier should mean fewer ticks per Ion (faster drain).");
     }
@@ -59,7 +55,7 @@ public class IonEconomyTests
     [Fact]
     public void TicksPerIonDrain_NeverGoesBelowOne()
     {
-        var result = IonEconomy.TicksPerIonDrain(timeLevel: 50, classDrainMultiplier: 5.0);
+        var result = IonEconomy.TicksPerIonDrain(scalingTier: 50, classDrainMultiplier: 5.0);
         Assert.True(result >= 1);
     }
 }

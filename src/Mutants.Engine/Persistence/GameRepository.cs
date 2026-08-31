@@ -61,7 +61,7 @@ public sealed class GameRepository : IDisposable
     /// track each character's best-ever showing, never a snapshot that
     /// could regress.
     /// </summary>
-    public void RecordPersonalBests(string name, bool isPlayer, int deepestTimeLevel, int highestCharacterLevel)
+    public void RecordPersonalBests(string name, bool isPlayer, int furthestYearReached, int highestCharacterLevel)
     {
         var collection = _db.GetCollection<LeaderboardEntry>(LeaderboardCollection);
         collection.EnsureIndex(e => e.Name, unique: true);
@@ -69,18 +69,18 @@ public sealed class GameRepository : IDisposable
         var entry = collection.FindOne(e => e.Name == name) ?? new LeaderboardEntry { Name = name, IsPlayer = isPlayer };
 
         entry.IsPlayer = isPlayer;
-        entry.DeepestTimeLevelReached = Math.Max(entry.DeepestTimeLevelReached, deepestTimeLevel);
+        entry.FurthestYearReached = Math.Max(entry.FurthestYearReached, furthestYearReached);
         entry.HighestCharacterLevelReached = Math.Max(entry.HighestCharacterLevelReached, highestCharacterLevel);
         entry.LastUpdatedUtc = DateTime.UtcNow;
 
         collection.Upsert(entry);
     }
 
-    /// <summary>Top entries by deepest time-travel level reached, highest first.</summary>
-    public IReadOnlyList<LeaderboardEntry> TopByTimeLevel(int count) =>
+    /// <summary>Top entries by furthest year reached, highest first.</summary>
+    public IReadOnlyList<LeaderboardEntry> TopByFurthestYear(int count) =>
         _db.GetCollection<LeaderboardEntry>(LeaderboardCollection)
             .FindAll()
-            .OrderByDescending(e => e.DeepestTimeLevelReached)
+            .OrderByDescending(e => e.FurthestYearReached)
             .ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
             .Take(count)
             .ToList();

@@ -1,94 +1,98 @@
 # Content Plan
 
-The data schema is finalized: `src/Mutants.Content/*.json`, loaded by
-`Mutants.Engine.Content.ContentLoader` into the same domain types
-(`Item`, `Monster`, `LevelMap`, `Store`, `GameWorld`) everything else in
-the engine already works with. Real content now lives directly in that
-format — see the files listed below rather than duplicating their content
-here. `Mutants.Core.World.TestLevel` / `Monsters.TestMonsters` /
-`Economy.TestStores` / `Levels.TestWorld` remain as a small hand-coded
-fallback (used automatically if the JSON is missing or malformed) and as
-lightweight fixtures for unit tests that don't want file I/O — they are
-not launch content.
+The world is a **continuous 2000–5000 A.D. timeline** (docs/GDD.md §3.2),
+not a fixed set of levels. Content is a set of **tier-free catalogs** in
+`src/Mutants.Content/*.json`, loaded by
+`Mutants.Engine.Content.ContentLoader.LoadTimeWorld(dir, worldSeed)` into a
+`Mutants.Core.Time.TimeWorld`. `TimeWorld.GetYear(year)` builds a
+`YearContent` on demand — map, era, monster roster, store slots,
+Gatekeeper — scaling every number from the year via
+`Mutants.Core.Time.TimeScale` / `MonsterScaling` / `LootScaling`.
+`Mutants.Core.Time.TestTimeWorld` is a 3-era hand-built fallback (used if
+the JSON is missing/malformed) and a fixture for tests that don't want
+file I/O.
 
-## Sections
+## Catalogs
 
-- [x] Monster roster per time-travel level (stats, XP, loot table, tags e.g. "undead")
-      — `monsters.json`: 6 regular monsters + 1 gatekeeper per level, tiers
-      1–8 (level 1 has no gatekeeper), all following
-      `Mutants.Core.Monsters.MonsterScaling`'s baseline curve (a tier-N
-      monster is a sensible fight around character level `10 * N`; a
-      gatekeeper is ~3x a regular monster's HP at the same attack/defense/
-      speed). Each level's six regulars span a spread of archetypes —
-      roughly baseline, glass-cannon, skirmisher, heavy bruiser, plus two
-      `"undead"`-tagged casters (matches docs/GDD.md §4.2's Priest "Turn
-      Undead" ability, which checks this tag in combat).
-- [x] Item catalog per tier/rarity (weapons, armor, consumables, "junk"/convertible items)
-      — `items.json`: ~108 items across tiers 1–8 (13 per tier: 3–4
-      weapons, 3 armor, 3 junk, 2–3 consumables, plus the gatekeeper
-      trophy), including two class-restricted weapons per tier from tier 3
-      up (one per tier for tiers 1–2) so every one of the 5 classes has a
-      restricted weapon reachable by the mid-game, and a guaranteed
-      Legendary "trophy" per gatekeeper. Every item is
-      convertible/sellable regardless of type, and value (so Ion/Riblet
-      payout) always scales by the item's own tier and rarity via
-      `Mutants.Core.Items.LootScaling` — there's no type-based
-      restriction anywhere in `Mutant.Convert`/`Sell` or `Store`.
-      **Consumables are now usable**: every tier has one food item
-      (`effect: "Heal"`, flat HP, no duration) and both potions — a
-      `BuffAttack` and a `BuffDefense` one, each a temporary stat bonus
-      lasting 15 world ticks — `use`/`eat`/`drink <item>` in the console,
-      backed by
-      `Mutant.Consume`/`AdvanceEffectTicks`. A Consumable with no `effect`
-      data is flavor-only (still sellable/convertible, but "use" refuses
-      it) — none currently ship that way, but the schema supports it.
-- [x] Level themes, names, and room-text banks
-      — `levels/level-1.json` .. `level-8.json`. All 8 levels of the GDD's
-      "5–8 levels for v1 launch" range now shipped: Ruined City, Neon
-      Undercity, Ashfall Wastes, Drowned Archives, The Undercroft, The
-      Frostbound Vaults, The Shattered Orbital, and the finale — The
-      Chronofracture.
-- [x] Store catalog templates per level (what a government store stocks/pays by default)
-      — `stores.json`: a government store on every level, plus a
-      purchasable empty slot on every level for player ownership (levels
-      1, 2, 4 had one already; 3, 6, 7, 8 gained one in this pass — level 5
-      is the one level still without a purchasable slot).
-- [x] NPC population parameters per level (count, starting character-level range)
-      — `npc-population.json`: an entry for every level, all now consumed.
-      Every level gets its own native NPC population (already unlocked
-      through its home level, fast-leveled into its `minLevel`–`maxLevel`
-      range and topped off to full HP/Ions), each acting against its own
-      current level's map/roster/stores every tick and able to
-      independently push one level deeper on its own (see
-      `Mutants.Engine.Npc.NpcController`'s Travel goal). Character class
-      per NPC is still uniform-random, not config-driven.
-- [x] Full ability tables for Warrior, Thief, Priest, Mage, Wizard (tiers 1–6 each)
-      — `abilities.json`: Warrior and Priest are docs/GDD.md §4.2-sourced;
-      Thief, Mage, and Wizard are original design (each entry's `source`
-      field says which) filling the gap the GDD explicitly left open,
-      following its own stated pattern (6 tiers, single-target → group/
-      area → capstone) and each class's flavor from the GDD's class table.
-      **Wired and executable**: `abilities.json` now carries mechanical
+- [x] **Monster species** — `monster-species.json`. ~25 species: `{ id,
+      name, tags, archetype, lootThemeTags }`, no numbers. `archetype` is
+      one of `Baseline | Caster | Bruiser | Skirmisher`
+      (`Mutants.Core.Time.MonsterArchetype`); `TimelineContentFactory`
+      turns it into concrete stats at the encounter year, as a fixed
+      offset from `MonsterScaling`'s baseline for that year. `"undead"`
+      tags carry through to combat (Priest "Turn Undead", GDD §4.2).
+      Loot is rolled from item archetypes whose `themeTags` intersect the
+      species' `lootThemeTags` (or the era's), scaled to the year.
+
+- [x] **Item archetypes** — `item-archetypes.json`. ~32 archetypes: `{ id,
+      name, type, rarity, restrictedClass?, effect?, effectMagnitude?,
+      effectDurationTicks?, themeTags }`, no tier. `TimelineContentFactory.
+      ForArchetype(archetype, year)` produces a concrete `Item` whose
+      Value / AttackBonus / DefenseBonus come from `LootScaling` at that
+      year. Includes a generic staple set (weapon / armour / junk / a
+      Heal food / a BuffAttack potion / a BuffDefense potion), one
+      class-restricted weapon per class, and per-theme flavour armour and
+      junk for eight themes (scrap, neon, ash, drowned, deep, frost,
+      orbital, paradox).
+
+- [x] **Era bands** — `eras.json`. 14 bands from year 2000 to 4950,
+      `fromYear` ascending (the first must be 2000). Each: `{ fromYear,
+      name, roomText[], speciesIds[], itemThemeTags[] }`. A year resolves
+      to the last band whose `fromYear` ≤ it (`EraTable.EraForYear`).
+      `YearMapFactory` generates that year's grid deterministically from
+      `(worldSeed, year)` — a 9–25-room connected blob via
+      `GridLevelBuilder` — with room text drawn from the band's pool.
+      Bands: Ruined City, The Rust Quarter, The Neon Undercity, The
+      Drowned Sprawl, The Ashfall Wastes, The Undercroft, The Buried
+      Reaches, The Frostbound Vaults, The Glacier Deeps, The Shattered
+      Orbital, The Vacuum Reaches, The Chronofracture, The Long Now, The
+      Final Instant.
+
+- [x] **Store template** — `store-templates.json`: `{ playerSlotBaseCost,
+      playerSlotCostPerTier }`. Every year gets one government store
+      (seeded room; stocks the staple kinds pulled from the year's era
+      themes, priced via `EconomyPricing`) and one vacant player slot
+      (seeded room; cost `base + perTier·(tier-1)`).
+
+- [x] **Gatekeepers** — no file; `GatekeeperSchedule` places one every
+      random 50–100 years from the world seed. A Gatekeeper year's
+      `YearContent.Gatekeeper` is a ~3×-HP bullet sponge with a
+      guaranteed year-scaled Legendary weapon trophy
+      (`Warden of <year>'s <noun>`). Gates nothing (GDD §3.2).
+
+- [x] **NPC count** — `npc-population.json`: `{ "totalCount": N }`.
+      `NpcPopulation.Spawn` scatters that many NPCs across the timeline,
+      each in a random year, fast-levelled into that year's soft-cap band.
+      Character class per NPC is still uniform-random, not config-driven.
+
+- [x] **Ability tables** — `abilities.json` (unchanged by the timeline
+      rework). Warrior/Priest are docs/GDD.md §4.2-sourced; Thief/Mage/
+      Wizard are original design (`source` field per entry). Mechanical
       fields (`effect`, `magnitude`, `ionCost`, `condition`, `tag`,
-      `durationRounds`) consumed by `Mutants.Engine.Combat.CombatSession`
-      — the player's own fights are interactive (`fight` → each round
-      `attack` or `cast <ability>`; `abilities` lists what's unlocked).
-      Every multi-target/ally GDD ability was adapted to a single-target
-      equivalent for this 1v1 engine (see `ContentDtos.AbilityData`'s doc
-      comment for the full mapping); 4 abilities with no honest 1v1
-      translation (Resurrect Lite, Fence's Favor, Blink, Mana Well) are
-      `effect: "None"` and refused at cast time with no Ion cost rather
-      than silently doing nothing.
+      `durationRounds`) drive `Mutants.Engine.Combat.CombatSession`. Four
+      abilities with no honest 1v1 translation (Resurrect Lite, Fence's
+      Favor, Blink, Mana Well) are `effect: "None"` and refused at cast
+      time.
 
-## Open follow-up work (not content — engine features content is now blocked on or ready for)
+## Validation
 
-All GDD-mandated content sections above are now fully populated (all 8
-levels, every level's monster/item/store/NPC-population entries), at a
-comfortable launch volume: 6 regular monsters + 1 gatekeeper per level
-(~55 monsters) and 13 items per tier (~108 items). What remains is
-optional, not new plumbing, whenever there's appetite for it: a
-purchasable store slot for level 5 to match every other level;
-config-driven NPC class distribution (`npc-population.json`) instead of
-today's uniform-random pick; still more monsters/items per level if the
-game wants a denser catalog; and levels beyond 8 if it ever extends past
-the GDD's stated v1 range.
+`Mutants.Engine.Tests.Content.TimeWorldContentTests` loads the shipped
+catalogs and checks: every era/species/theme cross-reference resolves;
+sampled years across 2000–5000 generate well-formed, fully-connected maps;
+monster/loot power rises with the year; Gatekeeper years are 50–100 years
+apart and each yields a Legendary weapon trophy; every year's government
+store stocks all staple kinds. `EraTable` / `TimeWorld` constructor
+validation is surfaced as `ContentException` by the loader.
+
+## Open follow-up work
+
+Not new plumbing — tuning and polish:
+
+- **Ion-cost coefficient** (`IonEconomy.IonsPerYearTravelled = 0.2`): a
+  fresh character can't afford the first meaningful jump until it converts
+  some loot. Intended friction, but worth revisiting.
+- **Persist player store ownership** across sessions (currently
+  session-only; the save keeps world seed + years + cleared Gatekeepers).
+- **More / finer era bands** for tighter thematic progression.
+- **Config-driven NPC class distribution** instead of uniform-random.
+- **Denser rosters / catalogs** if the game wants more variety per year.

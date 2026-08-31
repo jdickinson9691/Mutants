@@ -1,72 +1,48 @@
 using Mutants.Core.Characters;
 using Mutants.Core.Ions;
-using Mutants.Core.Levels;
-using Mutants.Engine.Combat;
+using Mutants.Core.Time;
 
 namespace Mutants.Engine.Simulation;
 
 /// <summary>
-/// Resolves a time-travel attempt — docs/GDD.md §3.2. Retreating to an
-/// already-unlocked, shallower-or-equal level is always free. Reaching a
-/// never-before-unlocked level requires the character to meet that
-/// level's minimum level and (if the level defines one) defeat its
-/// gatekeeper first — win, and the level unlocks; lose, and nothing is
-/// charged or changed. Any level gain (new or previously unlocked) then
-/// costs <see cref="IonEconomy.TimeTravelCost"/> Ions, per the GDD's
-/// exact formula and its "insufficient Ions blocks the jump" failure
-/// mode.
+/// Resolves a <c>travel</c> attempt on the continuous timeline —
+/// docs/GDD.md §3.2. Travel is unrestricted: any year in
+/// 2000–5000 you can afford. The only checks are that the year is on the
+/// timeline and that the Mutant can pay
+/// <see cref="IonEconomy.TimeTravelCost"/> (symmetric — retreating costs
+/// the same as advancing). No unlock, no minimum character level, no
+/// Gatekeeper gate; Gatekeepers are just tough encounters in their year,
+/// handled by the fight flow, not here.
 /// </summary>
 public static class TimeTravelResolver
 {
-    public static TimeTravelResult Travel(Mutant mutant, GameWorld world, int targetLevel, IRandomSource random)
+    /// <summary>
+    /// <paramref name="random"/> is unused now (kept so callers that
+    /// thread an <see cref="IRandomSource"/> don't have to change) — there
+    /// is no Gatekeeper fight during travel any more.
+    /// </summary>
+    public static TimeTravelResult Travel(Mutant mutant, TimeWorld world, int targetYear, IRandomSource random)
     {
-        var targetDefinition = world.TryGetLevel(targetLevel);
-        if (targetDefinition is null)
+        _ = random;
+
+        if (!TimeScale.IsValidYear(targetYear))
         {
-            return TimeTravelResult.Failed(TimeTravelFailureReason.UnknownLevel);
+            return TimeTravelResult.Failed(TimeTravelFailureReason.YearOutOfRange);
         }
 
-        var isRetreat = targetLevel <= mutant.CurrentTimeLevel && targetLevel <= mutant.UnlockedTimeLevel;
-        if (isRetreat)
+        var cost = IonEconomy.TimeTravelCost(mutant.CurrentYear, targetYear);
+        if (cost > 0 && !mutant.Ions.CanAfford(cost))
         {
-            mutant.SetCurrentTimeLevel(targetLevel);
-            mutant.PlaceAt(targetDefinition.Map.Start);
-            return TimeTravelResult.Traveled(targetLevel);
+            return TimeTravelResult.Failed(TimeTravelFailureReason.InsufficientIons);
         }
 
-        FightResult? gatekeeperFight = null;
-
-        if (targetLevel > mutant.UnlockedTimeLevel)
+        if (cost > 0)
         {
-            if (mutant.Level < targetDefinition.MinCharacterLevelToUnlock)
-            {
-                return TimeTravelResult.Failed(TimeTravelFailureReason.BelowMinimumCharacterLevel);
-            }
-
-            if (targetDefinition.Gatekeeper is not null && !mutant.HasDefeatedGatekeeper(targetLevel))
-            {
-                var gatekeeper = targetDefinition.Gatekeeper();
-                gatekeeperFight = CombatResolver.Fight(mutant, gatekeeper, random);
-                if (!gatekeeperFight.MutantWon)
-                {
-                    return TimeTravelResult.Failed(TimeTravelFailureReason.LostToGatekeeper, gatekeeperFight);
-                }
-
-                mutant.RecordGatekeeperDefeat(targetLevel);
-            }
-
-            mutant.UnlockTimeLevel(targetLevel);
+            mutant.Ions.Spend(cost);
         }
 
-        var cost = IonEconomy.TimeTravelCost(targetLevel);
-        if (!mutant.Ions.CanAfford(cost))
-        {
-            return TimeTravelResult.Failed(TimeTravelFailureReason.InsufficientIons, gatekeeperFight);
-        }
-
-        mutant.Ions.Spend(cost);
-        mutant.SetCurrentTimeLevel(targetLevel);
-        mutant.PlaceAt(targetDefinition.Map.Start);
-        return TimeTravelResult.Traveled(targetLevel, gatekeeperFight);
+        mutant.SetCurrentYear(targetYear);
+        mutant.PlaceAt(world.GetYear(targetYear).Map.Start);
+        return TimeTravelResult.Traveled(targetYear, cost);
     }
 }

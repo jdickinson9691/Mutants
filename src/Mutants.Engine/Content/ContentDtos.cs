@@ -6,88 +6,6 @@ namespace Mutants.Engine.Content;
 // objects. Deliberately separate from the save-file DTOs in
 // Persistence — different concern, different lifecycle.
 
-public sealed class CoordinateData
-{
-    public int East { get; set; }
-    public int North { get; set; }
-}
-
-public sealed class ItemTemplateData
-{
-    public string Id { get; set; } = "";
-    public string Name { get; set; } = "";
-    public string Type { get; set; } = "";
-    public int Tier { get; set; }
-    public string Rarity { get; set; } = "";
-    public string? RestrictedClass { get; set; }
-
-    /// <summary>One of Mutants.Core.Items.ConsumableEffectType's names ("None", "Heal", "BuffAttack", "BuffDefense") — only meaningful for a Consumable item; defaults to "None" (flavor-only) if omitted.</summary>
-    public string Effect { get; set; } = "None";
-
-    /// <summary>Meaning depends on Effect: flat HP for Heal, a flat stat bonus for BuffAttack/BuffDefense.</summary>
-    public double EffectMagnitude { get; set; }
-
-    /// <summary>How many world ticks a BuffAttack/BuffDefense effect lasts. Unused (and should stay 0) for Heal, which is instant.</summary>
-    public int EffectDurationTicks { get; set; }
-}
-
-public sealed class LootEntryData
-{
-    public string ItemId { get; set; } = "";
-    public double DropChance { get; set; }
-}
-
-public sealed class MonsterTemplateData
-{
-    public string Id { get; set; } = "";
-    public string Name { get; set; } = "";
-    public int Tier { get; set; }
-    public List<string> Tags { get; set; } = [];
-    public int MaxHp { get; set; }
-    public int AttackPower { get; set; }
-    public int Defense { get; set; }
-    public int Speed { get; set; }
-    public int XpReward { get; set; }
-    public List<LootEntryData> LootTable { get; set; } = [];
-}
-
-public sealed class RoomData
-{
-    public int East { get; set; }
-    public int North { get; set; }
-    public string Description { get; set; } = "";
-
-    /// <summary>Direction name ("North"/"South"/"East"/"West") -> exit flavor text. Explicit per room, not auto-inferred, so authors control connectivity directly.</summary>
-    public Dictionary<string, string> Exits { get; set; } = [];
-}
-
-public sealed class LevelData
-{
-    public int LevelNumber { get; set; }
-    public string Name { get; set; } = "";
-    public CoordinateData Start { get; set; } = new();
-    public int MinCharacterLevelToUnlock { get; set; } = 1;
-    public string? GatekeeperMonsterId { get; set; }
-    public List<string> MonsterRosterIds { get; set; } = [];
-    public List<RoomData> Rooms { get; set; } = [];
-}
-
-public sealed class StoreListingData
-{
-    public string ItemId { get; set; } = "";
-    public int AskingPrice { get; set; }
-}
-
-public sealed class StoreSlotData
-{
-    public int LevelNumber { get; set; }
-    public string Name { get; set; } = "";
-    public CoordinateData Location { get; set; } = new();
-    public int PurchaseCost { get; set; }
-    public bool IsGovernment { get; set; }
-    public List<StoreListingData> Listings { get; set; } = [];
-}
-
 /// <summary>
 /// One ability tier for one class. Flavor (Name/Description/Source) plus
 /// mechanical parameters consumed by Mutants.Engine.Combat.CombatSession
@@ -138,12 +56,10 @@ public sealed class AbilityData
     public string? Tag { get; set; }
 }
 
-public sealed class NpcPopulationData
+/// <summary><c>npc-population.json</c> — a single total NPC count for the whole timeline (they're scattered across it, not bucketed per level any more).</summary>
+public sealed class NpcPopulationConfig
 {
-    public int LevelNumber { get; set; }
-    public int Count { get; set; }
-    public int MinLevel { get; set; } = 1;
-    public int MaxLevel { get; set; } = 1;
+    public int TotalCount { get; set; } = 12;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,186 +1,132 @@
 using Mutants.Core.Characters;
 using Mutants.Core.Classes;
 using Mutants.Core.Ions;
-using Mutants.Core.Levels;
-using Mutants.Core.Monsters;
-using Mutants.Core.World;
+using Mutants.Core.Time;
 using Mutants.Engine.Simulation;
 
 namespace Mutants.Engine.Tests.Simulation;
 
 public class TimeTravelResolverTests
 {
-    // A fixed 0.5 roll keeps combat's damage-variance factor at exactly 1.0.
     private static StubRandomSource NeutralRandom() => StubRandomSource.Fixed(0.5);
 
-    private static GameWorld ThreeLevelWorld() => new(
-    [
-        new WorldLevelDefinition(1, TestLevel.Build(), TestMonsters.RosterFor(1), []),
-        new WorldLevelDefinition(2, GridLevelBuilder.Build("Level 2", Coordinate.Origin, new Dictionary<Coordinate, string> { [Coordinate.Origin] = "A hazy level 2." }),
-            TestMonsters.RosterFor(2), [], gatekeeper: () => TestMonsters.Gatekeeper(2), minCharacterLevelToUnlock: 5),
-        new WorldLevelDefinition(3, GridLevelBuilder.Build("Level 3", Coordinate.Origin, new Dictionary<Coordinate, string> { [Coordinate.Origin] = "A hazy level 3." }),
-            TestMonsters.RosterFor(3), [], gatekeeper: () => TestMonsters.Gatekeeper(3), minCharacterLevelToUnlock: 10),
-    ]);
+    private static TimeWorld World() => TestTimeWorld.Build(seed: 4242);
 
-    /// <summary>
-    /// LevelUp() doesn't enforce the soft cap itself (see its doc
-    /// comment), so this can reach any level directly. Also tops up Ions
-    /// well past what the class formula would naturally give at this
-    /// level: Ions come from converting loot (docs/GDD.md §2), a
-    /// separate resource from XP/level, so a character meeting a time
-    /// level's minimum character level has no guaranteed Ion balance —
-    /// these tests are about TimeTravelResolver's sequencing, not
-    /// grinding a realistic Ion stockpile.
-    /// </summary>
-    private static Mutant HighLevelMutant(int level)
+    private static Mutant RichMutant(int startingYear = 2000)
     {
-        var mutant = new Mutant("Rook", CharacterClass.Warrior);
-        for (var i = 1; i < level; i++)
-        {
-            mutant.LevelUp();
-        }
-
-        mutant.Ions.SetMax(500);
-        mutant.Ions.Add(500);
+        var mutant = new Mutant("Rook", CharacterClass.Warrior, startingYear);
+        mutant.Ions.SetMax(2000);
+        mutant.Ions.Add(2000);
         return mutant;
     }
 
     [Fact]
-    public void Travel_ToAnUndefinedLevel_Fails()
+    public void Travel_ToAYearOffTheTimeline_Fails()
+    {
+        var mutant = RichMutant();
+        var result = TimeTravelResolver.Travel(mutant, World(), targetYear: 9999, NeutralRandom());
+
+        Assert.False(result.Success);
+        Assert.Equal(TimeTravelFailureReason.YearOutOfRange, result.FailureReason);
+        Assert.Equal(2000, mutant.CurrentYear);
+    }
+
+    [Fact]
+    public void Travel_ChargesCeilOfPointTwoTimesTheDistance_Symmetrically()
+    {
+        var mutant = RichMutant(2000);
+
+        var forward = TimeTravelResolver.Travel(mutant, World(), targetYear: 2500, NeutralRandom());
+        Assert.True(forward.Success);
+        Assert.Equal(100, forward.IonsSpent); // ceil(0.2 * 500)
+
+        var back = TimeTravelResolver.Travel(mutant, World(), targetYear: 2000, NeutralRandom());
+        Assert.True(back.Success);
+        Assert.Equal(100, back.IonsSpent); // retreat costs the same
+    }
+
+    [Fact]
+    public void Travel_WithoutEnoughIons_FailsAndChangesNothing()
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);
-        var result = TimeTravelResolver.Travel(mutant, ThreeLevelWorld(), targetLevel: 99, NeutralRandom());
+        mutant.Ions.Spend(mutant.Ions.Current); // 0 Ions
 
-        Assert.False(result.Success);
-        Assert.Equal(TimeTravelFailureReason.UnknownLevel, result.FailureReason);
-    }
-
-    [Fact]
-    public void Travel_ToCurrentLevelOne_SucceedsAsAFreeRetreat()
-    {
-        var mutant = new Mutant("Rook", CharacterClass.Warrior);
-        var startingIons = mutant.Ions.Current;
-
-        var result = TimeTravelResolver.Travel(mutant, ThreeLevelWorld(), targetLevel: 1, NeutralRandom());
-
-        Assert.True(result.Success);
-        Assert.Equal(1, result.NewLevel);
-        Assert.Equal(startingIons, mutant.Ions.Current); // free
-    }
-
-    [Fact]
-    public void Travel_Deeper_BelowMinimumCharacterLevel_Fails()
-    {
-        var mutant = new Mutant("Rook", CharacterClass.Warrior); // level 1, needs level 5 for level 2
-        var result = TimeTravelResolver.Travel(mutant, ThreeLevelWorld(), targetLevel: 2, NeutralRandom());
-
-        Assert.False(result.Success);
-        Assert.Equal(TimeTravelFailureReason.BelowMinimumCharacterLevel, result.FailureReason);
-        Assert.Equal(1, mutant.UnlockedTimeLevel);
-    }
-
-    [Fact]
-    public void Travel_Deeper_MeetsMinimumLevel_FightsAndBeatsGatekeeper_Unlocks()
-    {
-        var mutant = HighLevelMutant(5);
-        var result = TimeTravelResolver.Travel(mutant, ThreeLevelWorld(), targetLevel: 2, NeutralRandom());
-
-        Assert.True(result.Success);
-        Assert.Equal(2, result.NewLevel);
-        Assert.NotNull(result.GatekeeperFight);
-        Assert.True(result.GatekeeperFight!.MutantWon);
-        Assert.Equal(2, mutant.UnlockedTimeLevel);
-        Assert.Equal(2, mutant.CurrentTimeLevel);
-        Assert.True(mutant.HasDefeatedGatekeeper(2));
-    }
-
-    [Fact]
-    public void Travel_Deeper_LosingToGatekeeper_FailsWithNoUnlockAndNoIonsSpent()
-    {
-        var mutant = HighLevelMutant(5);
-        mutant.Health.Damage(mutant.Health.Max - 1); // 1 HP - the gatekeeper will win
-        var startingIons = mutant.Ions.Current;
-
-        var result = TimeTravelResolver.Travel(mutant, ThreeLevelWorld(), targetLevel: 2, NeutralRandom());
-
-        Assert.False(result.Success);
-        Assert.Equal(TimeTravelFailureReason.LostToGatekeeper, result.FailureReason);
-        Assert.NotNull(result.GatekeeperFight);
-        Assert.False(result.GatekeeperFight!.MutantWon);
-        Assert.Equal(1, mutant.UnlockedTimeLevel);
-        Assert.Equal(1, mutant.CurrentTimeLevel);
-        Assert.False(mutant.HasDefeatedGatekeeper(2));
-        Assert.Equal(startingIons, mutant.Ions.Current);
-    }
-
-    [Fact]
-    public void Travel_Deeper_AlreadyDefeatedGatekeeper_SkipsTheRefight()
-    {
-        var mutant = HighLevelMutant(5);
-        mutant.RecordGatekeeperDefeat(2);
-        mutant.UnlockTimeLevel(2);
-
-        var result = TimeTravelResolver.Travel(mutant, ThreeLevelWorld(), targetLevel: 2, NeutralRandom());
-
-        Assert.True(result.Success);
-        Assert.Null(result.GatekeeperFight); // no fight needed this time
-    }
-
-    [Fact]
-    public void Travel_Deeper_InsufficientIons_FailsButKeepsAnyGatekeeperUnlockEarned()
-    {
-        var mutant = HighLevelMutant(5);
-        mutant.Ions.Spend(mutant.Ions.Current); // 0 Ions - can't afford the 50-Ion trip to level 2
-
-        var result = TimeTravelResolver.Travel(mutant, ThreeLevelWorld(), targetLevel: 2, NeutralRandom());
+        var result = TimeTravelResolver.Travel(mutant, World(), targetYear: 3000, NeutralRandom());
 
         Assert.False(result.Success);
         Assert.Equal(TimeTravelFailureReason.InsufficientIons, result.FailureReason);
-        Assert.NotNull(result.GatekeeperFight);
-        Assert.True(result.GatekeeperFight!.MutantWon);
-        Assert.Equal(2, mutant.UnlockedTimeLevel); // unlock is permanent even though the jump itself failed
-        Assert.True(mutant.HasDefeatedGatekeeper(2));
-        Assert.Equal(1, mutant.CurrentTimeLevel); // never actually arrived
+        Assert.Equal(2000, mutant.CurrentYear);
     }
 
     [Fact]
-    public void Travel_ToAlreadyUnlockedDeeperLevel_ChargesIonsWithNoGatekeeperRefight()
+    public void Travel_Success_MovesTheYear_SpendsIons_AndAdvancesFurthestYearReached()
     {
-        var mutant = HighLevelMutant(5);
-        mutant.RecordGatekeeperDefeat(2);
-        mutant.UnlockTimeLevel(2);
-        mutant.SetCurrentTimeLevel(1); // currently retreated back to level 1
-        var startingIons = mutant.Ions.Current;
+        var mutant = RichMutant(2000);
+        var before = mutant.Ions.Current;
 
-        var result = TimeTravelResolver.Travel(mutant, ThreeLevelWorld(), targetLevel: 2, NeutralRandom());
+        var result = TimeTravelResolver.Travel(mutant, World(), targetYear: 4200, NeutralRandom());
 
         Assert.True(result.Success);
-        Assert.Null(result.GatekeeperFight);
-        Assert.Equal(startingIons - IonEconomy.TimeTravelCost(2), mutant.Ions.Current);
+        Assert.Equal(4200, result.NewYear);
+        Assert.Equal(4200, mutant.CurrentYear);
+        Assert.Equal(4200, mutant.FurthestYearReached);
+        Assert.Equal(before - result.IonsSpent, mutant.Ions.Current);
     }
 
     [Fact]
-    public void Travel_RetreatToAnUnlockedShallowerLevel_IsFree()
+    public void Travel_Retreat_MovesCurrentYearButNotFurthestYearReached()
     {
-        var mutant = HighLevelMutant(5);
-        TimeTravelResolver.Travel(mutant, ThreeLevelWorld(), targetLevel: 2, NeutralRandom()); // now at level 2
-        var ionsAtLevel2 = mutant.Ions.Current;
+        var mutant = RichMutant(2000);
+        TimeTravelResolver.Travel(mutant, World(), targetYear: 4000, NeutralRandom());
 
-        var result = TimeTravelResolver.Travel(mutant, ThreeLevelWorld(), targetLevel: 1, NeutralRandom());
+        TimeTravelResolver.Travel(mutant, World(), targetYear: 2300, NeutralRandom());
+
+        Assert.Equal(2300, mutant.CurrentYear);
+        Assert.Equal(4000, mutant.FurthestYearReached);
+    }
+
+    [Fact]
+    public void Travel_PlacesTheMutantAtTheDestinationYearsStartRoom()
+    {
+        var mutant = RichMutant(2000);
+        var world = World();
+
+        TimeTravelResolver.Travel(mutant, world, targetYear: 3300, NeutralRandom());
+
+        Assert.Equal(world.GetYear(3300).Map.Start, mutant.Position);
+    }
+
+    [Fact]
+    public void Travel_NeverFightsAGatekeeper_EvenIntoAGatekeeperYear()
+    {
+        var world = World();
+        var gatekeeperYear = world.GatekeeperYears.First();
+        var mutant = RichMutant(2000);
+        var hpBefore = mutant.Health.Current;
+
+        var result = TimeTravelResolver.Travel(mutant, world, gatekeeperYear, NeutralRandom());
 
         Assert.True(result.Success);
-        Assert.Equal(1, mutant.CurrentTimeLevel);
-        Assert.Equal(ionsAtLevel2, mutant.Ions.Current); // retreat charged nothing
+        Assert.Equal(hpBefore, mutant.Health.Current); // no fight happened
+        Assert.False(mutant.HasDefeatedGatekeeper(gatekeeperYear)); // still there to fight in-year
     }
 
     [Fact]
-    public void Travel_PlacesTheMutantAtTheDestinationLevelsStartRoom()
+    public void Travel_ToTheSameYear_IsAFreeNoOp()
     {
-        var mutant = HighLevelMutant(5);
-        var world = ThreeLevelWorld();
+        var mutant = RichMutant(2500);
+        var before = mutant.Ions.Current;
 
-        TimeTravelResolver.Travel(mutant, world, targetLevel: 2, NeutralRandom());
+        var result = TimeTravelResolver.Travel(mutant, World(), targetYear: 2500, NeutralRandom());
 
-        Assert.Equal(world.GetLevel(2).Map.Start, mutant.Position);
+        Assert.True(result.Success);
+        Assert.Equal(0, result.IonsSpent);
+        Assert.Equal(before, mutant.Ions.Current);
+    }
+
+    [Fact]
+    public void TimeTravelCostConstant_IsWiredThroughIonEconomy()
+    {
+        Assert.Equal(100, IonEconomy.TimeTravelCost(2000, 2500));
     }
 }

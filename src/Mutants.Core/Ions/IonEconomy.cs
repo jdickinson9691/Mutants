@@ -33,33 +33,43 @@ public static class IonEconomy
     /// </summary>
     public const int HpPerIonHealed = 1;
 
-    /// <summary>Time travel costs 25 * target_level Ions — docs/GDD.md §3.2.</summary>
-    public static int TimeTravelCost(int targetLevel)
+    /// <summary>Ions spent per year of the timeline crossed by a <c>travel</c> — docs/GDD.md §3.2. Original tuning.</summary>
+    public const double IonsPerYearTravelled = 0.2;
+
+    /// <summary>
+    /// Ion cost of travelling from <paramref name="fromYear"/> to
+    /// <paramref name="toYear"/> — <c>ceil(0.2 × |Δyear|)</c>, minimum 1
+    /// for any real jump, 0 for staying put. Symmetric: retreating toward
+    /// the present costs the same as advancing (this supersedes the old
+    /// "retreat is free" rule now that travel is otherwise unrestricted).
+    /// </summary>
+    public static int TimeTravelCost(int fromYear, int toYear)
     {
-        if (targetLevel < 1)
+        var distance = Math.Abs(toYear - fromYear);
+        if (distance == 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(targetLevel), targetLevel,
-                "Target level must be at least 1.");
+            return 0;
         }
 
-        return 25 * targetLevel;
+        return Math.Max(1, (int)Math.Ceiling(IonsPerYearTravelled * distance));
     }
 
     /// <summary>
-    /// Passive drain is "1 Ion per N game-ticks, scaled slightly up at
-    /// deeper time levels" (docs/GDD.md §2.1). The base interval and the
-    /// exact per-level scaling are NOT specified in the GDD — this curve
-    /// (10 ticks/Ion at level 1, tightening by 1 tick per level down to a
-    /// floor of 3) is original placeholder tuning pending Design Agent
-    /// sign-off, applied on top of the per-class <c>IonDrainMultiplier</c>
-    /// in <see cref="Classes.ClassDefinition"/>.
+    /// Passive drain is "1 Ion per N game-ticks, scaled slightly up
+    /// further into the future" (docs/GDD.md §2.1). The base interval and
+    /// the exact scaling are NOT GDD-specified — this curve (10 ticks/Ion
+    /// at tier 1, tightening by 1 tick per whole tier down to a floor of
+    /// 3) is original placeholder tuning, applied on top of the per-class
+    /// <c>IonDrainMultiplier</c> in <see cref="Classes.ClassDefinition"/>.
+    /// <paramref name="scalingTier"/> is the whole-number difficulty tier
+    /// for the current year (see Mutants.Core.Time.TimeScale).
     /// </summary>
-    public static int TicksPerIonDrain(int timeLevel, double classDrainMultiplier)
+    public static int TicksPerIonDrain(int scalingTier, double classDrainMultiplier)
     {
-        if (timeLevel < 1)
+        if (scalingTier < 1)
         {
-            throw new ArgumentOutOfRangeException(nameof(timeLevel), timeLevel,
-                "Time level must be at least 1.");
+            throw new ArgumentOutOfRangeException(nameof(scalingTier), scalingTier,
+                "Scaling tier must be at least 1.");
         }
 
         if (classDrainMultiplier <= 0)
@@ -68,7 +78,7 @@ public static class IonEconomy
                 "Drain multiplier must be positive.");
         }
 
-        var baseTicks = Math.Max(3, 10 - (timeLevel - 1));
+        var baseTicks = Math.Max(3, 10 - (scalingTier - 1));
         // A higher class drain multiplier means faster drain -> fewer ticks per Ion.
         return Math.Max(1, (int)Math.Round(baseTicks / classDrainMultiplier));
     }

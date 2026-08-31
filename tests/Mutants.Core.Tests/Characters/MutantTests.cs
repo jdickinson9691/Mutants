@@ -55,10 +55,10 @@ public class MutantTests
     }
 
     [Fact]
-    public void GainXp_StopsAtSoftLevelCapForUnlockedTimeLevel()
+    public void GainXp_StopsAtSoftLevelCapForFurthestYearReached()
     {
-        // unlockedTimeLevel 1 -> soft cap of character level 10.
-        var mutant = new Mutant("Rook", CharacterClass.Priest, unlockedTimeLevel: 1);
+        // Year 2000 -> soft cap of character level 10.
+        var mutant = new Mutant("Rook", CharacterClass.Priest, startingYear: 2000);
 
         mutant.GainXp(Leveling.CumulativeXpForLevel(Leveling.MaxCharacterLevel));
 
@@ -66,15 +66,17 @@ public class MutantTests
     }
 
     [Fact]
-    public void UnlockTimeLevel_RaisesSoftCapAndNeverRegresses()
+    public void SetCurrentYear_RaisesFurthestYearReachedButNeverRegressesIt()
     {
-        var mutant = new Mutant("Rook", CharacterClass.Priest, unlockedTimeLevel: 1);
+        var mutant = new Mutant("Rook", CharacterClass.Priest, startingYear: 2000);
 
-        mutant.UnlockTimeLevel(3);
-        Assert.Equal(3, mutant.UnlockedTimeLevel);
+        mutant.SetCurrentYear(3125);
+        Assert.Equal(3125, mutant.CurrentYear);
+        Assert.Equal(3125, mutant.FurthestYearReached);
 
-        mutant.UnlockTimeLevel(2); // lower than current — should be ignored
-        Assert.Equal(3, mutant.UnlockedTimeLevel);
+        mutant.SetCurrentYear(2100); // retreat: current moves, furthest doesn't
+        Assert.Equal(2100, mutant.CurrentYear);
+        Assert.Equal(3125, mutant.FurthestYearReached);
     }
 
     [Fact]
@@ -510,28 +512,28 @@ public class MutantTests
     }
 
     [Fact]
-    public void CurrentTimeLevel_DefaultsToOne()
+    public void CurrentYear_DefaultsToTheStartOfTheTimeline()
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);
-        Assert.Equal(1, mutant.CurrentTimeLevel);
+        Assert.Equal(2000, mutant.CurrentYear);
+        Assert.Equal(2000, mutant.FurthestYearReached);
     }
 
     [Fact]
-    public void SetCurrentTimeLevel_UpdatesTheValue()
+    public void SetCurrentYear_ClampsOutOfRangeYearsToTheTimeline()
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);
-        mutant.SetCurrentTimeLevel(3);
-        Assert.Equal(3, mutant.CurrentTimeLevel);
+        mutant.SetCurrentYear(9999);
+        Assert.Equal(5000, mutant.CurrentYear);
 
-        mutant.SetCurrentTimeLevel(1); // unlike UnlockedTimeLevel, this can move back down freely
-        Assert.Equal(1, mutant.CurrentTimeLevel);
+        mutant.SetCurrentYear(1000);
+        Assert.Equal(2000, mutant.CurrentYear);
     }
 
     [Fact]
-    public void SetCurrentTimeLevel_RejectsLevelBelowOne()
+    public void Constructor_RejectsAStartingYearOffTheTimeline()
     {
-        var mutant = new Mutant("Rook", CharacterClass.Warrior);
-        Assert.Throws<ArgumentOutOfRangeException>(() => mutant.SetCurrentTimeLevel(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Mutant("Rook", CharacterClass.Warrior, startingYear: 1900));
     }
 
     [Fact]
@@ -541,8 +543,8 @@ public class MutantTests
         var mutant = Mutant.Restore(
             "Rook", CharacterClass.Warrior, level: 7, xp: 555, stats,
             currentHp: 40, maxHp: 60, currentIons: 5, maxIons: 30, riblets: 250,
-            unlockedTimeLevel: 3, currentTimeLevel: 2, position: new Coordinate(2, -1),
-            defeatedGatekeepers: [2, 3]);
+            currentYear: 2900, furthestYearReached: 3200, position: new Coordinate(2, -1),
+            defeatedGatekeeperYears: [2412, 3187]);
 
         Assert.Equal("Rook", mutant.Name);
         Assert.Equal(CharacterClass.Warrior, mutant.Class);
@@ -554,12 +556,12 @@ public class MutantTests
         Assert.Equal(5, mutant.Ions.Current);
         Assert.Equal(30, mutant.Ions.Max);
         Assert.Equal(250, mutant.Riblets);
-        Assert.Equal(3, mutant.UnlockedTimeLevel);
-        Assert.Equal(2, mutant.CurrentTimeLevel);
+        Assert.Equal(3200, mutant.FurthestYearReached);
+        Assert.Equal(2900, mutant.CurrentYear);
         Assert.Equal(new Coordinate(2, -1), mutant.Position);
-        Assert.True(mutant.HasDefeatedGatekeeper(2));
-        Assert.True(mutant.HasDefeatedGatekeeper(3));
-        Assert.False(mutant.HasDefeatedGatekeeper(4));
+        Assert.True(mutant.HasDefeatedGatekeeper(2412));
+        Assert.True(mutant.HasDefeatedGatekeeper(3187));
+        Assert.False(mutant.HasDefeatedGatekeeper(4000));
         Assert.Empty(mutant.Inventory);
         Assert.Null(mutant.EquippedWeapon);
     }

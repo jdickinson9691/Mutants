@@ -76,13 +76,13 @@ public class GameRepositoryTests
     public void RecordPersonalBests_CreatesANewEntry()
     {
         using var repository = GameRepository.InMemory();
-        repository.RecordPersonalBests("Rook", isPlayer: true, deepestTimeLevel: 2, highestCharacterLevel: 5);
+        repository.RecordPersonalBests("Rook", isPlayer: true, furthestYearReached: 2400, highestCharacterLevel: 5);
 
         var entry = repository.GetLeaderboardEntry("Rook");
 
         Assert.NotNull(entry);
         Assert.True(entry!.IsPlayer);
-        Assert.Equal(2, entry.DeepestTimeLevelReached);
+        Assert.Equal(2400, entry.FurthestYearReached);
         Assert.Equal(5, entry.HighestCharacterLevelReached);
     }
 
@@ -90,12 +90,12 @@ public class GameRepositoryTests
     public void RecordPersonalBests_NeverLowersAnExistingBest()
     {
         using var repository = GameRepository.InMemory();
-        repository.RecordPersonalBests("Rook", true, deepestTimeLevel: 3, highestCharacterLevel: 10);
+        repository.RecordPersonalBests("Rook", true, furthestYearReached: 3400, highestCharacterLevel: 10);
 
-        repository.RecordPersonalBests("Rook", true, deepestTimeLevel: 1, highestCharacterLevel: 1);
+        repository.RecordPersonalBests("Rook", true, furthestYearReached: 2100, highestCharacterLevel: 1);
 
         var entry = repository.GetLeaderboardEntry("Rook");
-        Assert.Equal(3, entry!.DeepestTimeLevelReached);
+        Assert.Equal(3400, entry!.FurthestYearReached);
         Assert.Equal(10, entry.HighestCharacterLevelReached);
     }
 
@@ -103,24 +103,24 @@ public class GameRepositoryTests
     public void RecordPersonalBests_RaisesAnExistingBestWhenBeaten()
     {
         using var repository = GameRepository.InMemory();
-        repository.RecordPersonalBests("Rook", true, deepestTimeLevel: 1, highestCharacterLevel: 1);
+        repository.RecordPersonalBests("Rook", true, furthestYearReached: 2100, highestCharacterLevel: 1);
 
-        repository.RecordPersonalBests("Rook", true, deepestTimeLevel: 4, highestCharacterLevel: 12);
+        repository.RecordPersonalBests("Rook", true, furthestYearReached: 4400, highestCharacterLevel: 12);
 
         var entry = repository.GetLeaderboardEntry("Rook");
-        Assert.Equal(4, entry!.DeepestTimeLevelReached);
+        Assert.Equal(4400, entry!.FurthestYearReached);
         Assert.Equal(12, entry.HighestCharacterLevelReached);
     }
 
     [Fact]
-    public void TopByTimeLevel_OrdersDescending()
+    public void TopByFurthestYear_OrdersDescending()
     {
         using var repository = GameRepository.InMemory();
-        repository.RecordPersonalBests("Low", false, 1, 1);
-        repository.RecordPersonalBests("High", false, 5, 3);
-        repository.RecordPersonalBests("Mid", false, 3, 2);
+        repository.RecordPersonalBests("Low", false, 2100, 1);
+        repository.RecordPersonalBests("High", false, 4800, 3);
+        repository.RecordPersonalBests("Mid", false, 3200, 2);
 
-        var top = repository.TopByTimeLevel(10);
+        var top = repository.TopByFurthestYear(10);
 
         Assert.Equal(["High", "Mid", "Low"], top.Select(e => e.Name));
     }
@@ -129,9 +129,9 @@ public class GameRepositoryTests
     public void TopByCharacterLevel_OrdersDescending()
     {
         using var repository = GameRepository.InMemory();
-        repository.RecordPersonalBests("Low", false, 1, 1);
-        repository.RecordPersonalBests("High", false, 1, 20);
-        repository.RecordPersonalBests("Mid", false, 1, 10);
+        repository.RecordPersonalBests("Low", false, 2100, 1);
+        repository.RecordPersonalBests("High", false, 2100, 20);
+        repository.RecordPersonalBests("Mid", false, 2100, 10);
 
         var top = repository.TopByCharacterLevel(10);
 
@@ -139,15 +139,15 @@ public class GameRepositoryTests
     }
 
     [Fact]
-    public void TopByTimeLevel_RespectsTheRequestedCount()
+    public void TopByFurthestYear_RespectsTheRequestedCount()
     {
         using var repository = GameRepository.InMemory();
         for (var i = 1; i <= 15; i++)
         {
-            repository.RecordPersonalBests($"Npc{i}", false, i, i);
+            repository.RecordPersonalBests($"Npc{i}", false, 2000 + i * 100, i);
         }
 
-        Assert.Equal(10, repository.TopByTimeLevel(10).Count);
+        Assert.Equal(10, repository.TopByFurthestYear(10).Count);
     }
 
     [Fact]

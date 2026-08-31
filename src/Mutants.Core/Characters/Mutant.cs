@@ -2,6 +2,7 @@ using Mutants.Core.Classes;
 using Mutants.Core.Ions;
 using Mutants.Core.Items;
 using Mutants.Core.Stats;
+using Mutants.Core.Time;
 using Mutants.Core.World;
 
 namespace Mutants.Core.Characters;
@@ -23,16 +24,20 @@ public sealed class Mutant
     public HealthPool Health { get; }
     public IonPool Ions { get; }
 
-    /// <summary>The deepest time-travel level this Mutant has unlocked — drives the soft level cap.</summary>
-    public int UnlockedTimeLevel { get; private set; }
+    /// <summary>The furthest-future year this Mutant has ever reached — drives the soft level cap (<see cref="TimeScale.SoftLevelCapForYear"/>). Only ever climbs.</summary>
+    public int FurthestYearReached { get; private set; } = TimeScale.MinYear;
 
-    /// <summary>Which time-travel level this Mutant is currently standing in — docs/GDD.md §3.2.</summary>
-    public int CurrentTimeLevel { get; private set; } = 1;
+    /// <summary>Which year this Mutant is currently standing in — docs/GDD.md §3.2. Between <see cref="TimeScale.MinYear"/> and <see cref="TimeScale.MaxYear"/>.</summary>
+    public int CurrentYear { get; private set; } = TimeScale.MinYear;
 
     /// <summary>Current grid position on whichever <see cref="LevelMap"/> this Mutant is on — docs/GDD.md §3.1.</summary>
     public Coordinate Position { get; private set; } = Coordinate.Origin;
 
+    /// <summary>The Gatekeeper years this Mutant has already cleared — see <see cref="HasDefeatedGatekeeper"/>.</summary>
     private readonly HashSet<int> _defeatedGatekeepers = [];
+
+    /// <summary>The set of Gatekeeper years this Mutant has cleared. Read-only.</summary>
+    public IReadOnlyCollection<int> DefeatedGatekeeperYears => _defeatedGatekeepers;
 
     /// <summary>
     /// Riblets on hand — docs/GDD.md §6's store currency. Full store
@@ -99,11 +104,16 @@ public sealed class Mutant
         }
     }
 
-    public Mutant(string name, CharacterClass characterClass, int unlockedTimeLevel = 1)
+    public Mutant(string name, CharacterClass characterClass, int startingYear = TimeScale.MinYear)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
             throw new ArgumentException("Name cannot be empty.", nameof(name));
+        }
+
+        if (!TimeScale.IsValidYear(startingYear))
+        {
+            throw new ArgumentOutOfRangeException(nameof(startingYear), startingYear, $"Year must be between {TimeScale.MinYear} and {TimeScale.MaxYear}.");
         }
 
         Name = name;
@@ -112,7 +122,8 @@ public sealed class Mutant
         Level = 1;
         Xp = 0;
         Stats = ClassDefinition.BaseStats;
-        UnlockedTimeLevel = unlockedTimeLevel;
+        CurrentYear = startingYear;
+        FurthestYearReached = startingYear;
         Health = new HealthPool(ClassDefinition.MaxHpAtLevel(Level));
         Ions = new IonPool(ClassDefinition.MaxIonsAtLevel(Level));
     }
@@ -121,8 +132,8 @@ public sealed class Mutant
     private Mutant(
         string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
         int currentHp, int maxHp, int currentIons, int maxIons, int riblets,
-        int unlockedTimeLevel, int currentTimeLevel, Coordinate position,
-        IEnumerable<int> defeatedGatekeepers)
+        int currentYear, int furthestYearReached, Coordinate position,
+        IEnumerable<int> defeatedGatekeeperYears)
     {
         Name = name;
         Class = characterClass;
@@ -133,18 +144,18 @@ public sealed class Mutant
         Health = new HealthPool(maxHp, currentHp);
         Ions = new IonPool(maxIons, currentIons);
         Riblets = riblets;
-        UnlockedTimeLevel = unlockedTimeLevel;
-        CurrentTimeLevel = currentTimeLevel;
+        CurrentYear = Math.Clamp(currentYear, TimeScale.MinYear, TimeScale.MaxYear);
+        FurthestYearReached = Math.Clamp(furthestYearReached, TimeScale.MinYear, TimeScale.MaxYear);
         Position = position;
-        _defeatedGatekeepers = new HashSet<int>(defeatedGatekeepers);
+        _defeatedGatekeepers = new HashSet<int>(defeatedGatekeeperYears);
     }
 
     /// <summary>See the private snapshot constructor above — this is its public entry point, used by Mutants.Engine.Persistence when loading a save.</summary>
     public static Mutant Restore(
         string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
         int currentHp, int maxHp, int currentIons, int maxIons, int riblets,
-        int unlockedTimeLevel, int currentTimeLevel, Coordinate position,
-        IEnumerable<int> defeatedGatekeepers)
+        int currentYear, int furthestYearReached, Coordinate position,
+        IEnumerable<int> defeatedGatekeeperYears)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -154,7 +165,7 @@ public sealed class Mutant
         return new Mutant(
             name, characterClass, level, xp, stats,
             currentHp, maxHp, currentIons, maxIons, riblets,
-            unlockedTimeLevel, currentTimeLevel, position, defeatedGatekeepers);
+            currentYear, furthestYearReached, position, defeatedGatekeeperYears);
     }
 
     /// <summary>
@@ -171,7 +182,7 @@ public sealed class Mutant
 
         Xp += amount;
         var levelsGained = 0;
-        var cap = Leveling.SoftLevelCap(UnlockedTimeLevel);
+        var cap = TimeScale.SoftLevelCapForYear(FurthestYearReached);
 
         while (Level < cap && Xp >= Leveling.CumulativeXpForLevel(Level + 1))
         {
@@ -196,36 +207,28 @@ public sealed class Mutant
         Ions.SetMax(ClassDefinition.MaxIonsAtLevel(Level));
     }
 
-    /// <summary>Unlocks a deeper time-travel level, raising the soft level cap. Never regresses.</summary>
-    public void UnlockTimeLevel(int timeLevel)
-    {
-        if (timeLevel > UnlockedTimeLevel)
-        {
-            UnlockedTimeLevel = timeLevel;
-        }
-    }
-
     /// <summary>
-    /// Moves this Mutant to a different time-travel level — docs/GDD.md
-    /// §3.2. Legality (unlocked? affordable?) and the actual Ion charge
-    /// are Mutants.Engine.Simulation.TimeTravelResolver's job; this just
-    /// records where the Mutant now is.
+    /// Moves this Mutant to a different year — docs/GDD.md §3.2. The Ion
+    /// charge and range check are
+    /// Mutants.Engine.Simulation.TimeTravelResolver's job; this records
+    /// where the Mutant now is and advances
+    /// <see cref="FurthestYearReached"/> if this is new ground. The year
+    /// is clamped to the timeline defensively.
     /// </summary>
-    public void SetCurrentTimeLevel(int timeLevel)
+    public void SetCurrentYear(int year)
     {
-        if (timeLevel < 1)
+        CurrentYear = Math.Clamp(year, TimeScale.MinYear, TimeScale.MaxYear);
+        if (CurrentYear > FurthestYearReached)
         {
-            throw new ArgumentOutOfRangeException(nameof(timeLevel), timeLevel, "Time level must be at least 1.");
+            FurthestYearReached = CurrentYear;
         }
-
-        CurrentTimeLevel = timeLevel;
     }
 
-    /// <summary>Whether this Mutant has already defeated the given level's gatekeeper — docs/GDD.md §3.2.</summary>
-    public bool HasDefeatedGatekeeper(int timeLevel) => _defeatedGatekeepers.Contains(timeLevel);
+    /// <summary>Whether this Mutant has already beaten the Gatekeeper standing watch over <paramref name="year"/> — docs/GDD.md §3.2. Gatekeepers gate nothing; this just stops the trophy fight repeating.</summary>
+    public bool HasDefeatedGatekeeper(int year) => _defeatedGatekeepers.Contains(year);
 
-    /// <summary>Records a gatekeeper defeat, so future travel to that level doesn't require refighting it.</summary>
-    public void RecordGatekeeperDefeat(int timeLevel) => _defeatedGatekeepers.Add(timeLevel);
+    /// <summary>Records a Gatekeeper-year win, so returning to that year doesn't re-spawn its Gatekeeper.</summary>
+    public void RecordGatekeeperDefeat(int year) => _defeatedGatekeepers.Add(year);
 
     /// <summary>
     /// Advances passive Ion drain by one world tick — docs/GDD.md §2:

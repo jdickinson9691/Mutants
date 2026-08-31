@@ -1,7 +1,7 @@
 using Mutants.Core.Characters;
 using Mutants.Core.Events;
 using Mutants.Core.Ions;
-using Mutants.Core.Levels;
+using Mutants.Core.Time;
 using Mutants.Engine.Npc;
 
 namespace Mutants.Engine.Simulation;
@@ -23,14 +23,14 @@ namespace Mutants.Engine.Simulation;
 /// </summary>
 public sealed class WorldSimulation
 {
-    public GameWorld World { get; }
+    public TimeWorld World { get; }
     public BroadcastChannel Broadcast { get; }
     public IReadOnlyList<Mutant> Npcs { get; }
 
     private readonly IRandomSource _random;
 
     public WorldSimulation(
-        GameWorld world,
+        TimeWorld world,
         IReadOnlyList<Mutant> npcs,
         IRandomSource random,
         BroadcastChannel? broadcast = null)
@@ -58,7 +58,8 @@ public sealed class WorldSimulation
                 continue;
             }
 
-            var ticksPerDrain = IonEconomy.TicksPerIonDrain(mutant.UnlockedTimeLevel, mutant.ClassDefinition.IonDrainMultiplier);
+            var scalingTier = TimelineContentFactory.DisplayTier(mutant.CurrentYear);
+            var ticksPerDrain = IonEconomy.TicksPerIonDrain(scalingTier, mutant.ClassDefinition.IonDrainMultiplier);
             mutant.AdvanceIonDrainTick(ticksPerDrain);
             mutant.AdvanceEffectTicks();
         }
@@ -70,20 +71,21 @@ public sealed class WorldSimulation
                 continue;
             }
 
-            var levelDefinition = World.TryGetLevel(npc.CurrentTimeLevel);
-            if (levelDefinition is null)
+            if (!TimeScale.IsValidYear(npc.CurrentYear))
             {
-                continue; // shouldn't happen outside a corrupt save, but don't crash the tick over it
+                continue; // shouldn't happen (SetCurrentYear clamps), but don't crash the tick over it
             }
 
-            var activeStores = levelDefinition.StoreSlots
+            var yearContent = World.GetYear(npc.CurrentYear);
+
+            var activeStores = yearContent.StoreSlots
                 .Where(slot => slot.Store is not null)
                 .Select(slot => slot.Store!)
                 .ToList();
 
             var levelBefore = npc.Level;
-            var timeLevelBefore = npc.CurrentTimeLevel;
-            var result = NpcController.Act(npc, levelDefinition.Map, _random, activeStores, levelDefinition.MonsterRoster, World);
+            var yearBefore = npc.CurrentYear;
+            var result = NpcController.Act(npc, yearContent.Map, _random, activeStores, yearContent.MonsterRoster, World);
 
             if (result.Fight is { } fight)
             {
@@ -92,9 +94,9 @@ public sealed class WorldSimulation
                     : GameEvent.Slain(npc.Name, result.MonsterName!));
             }
 
-            if (npc.CurrentTimeLevel != timeLevelBefore)
+            if (npc.CurrentYear != yearBefore)
             {
-                Broadcast.Publish(GameEvent.TimeTraveled(npc.Name, npc.CurrentTimeLevel));
+                Broadcast.Publish(GameEvent.TimeTraveled(npc.Name, npc.CurrentYear));
             }
 
             if (npc.Level > levelBefore)

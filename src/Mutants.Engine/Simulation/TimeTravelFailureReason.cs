@@ -1,16 +1,11 @@
 namespace Mutants.Engine.Simulation;
 
+/// <summary>Why a <see cref="TimeTravelResolver.Travel"/> attempt failed. Travel is otherwise unrestricted — no unlock, no Gatekeeper gate, no minimum character level.</summary>
 public enum TimeTravelFailureReason
 {
-    /// <summary>No level is defined with that number.</summary>
-    UnknownLevel,
+    /// <summary>The target year is outside the timeline (2000–5000).</summary>
+    YearOutOfRange,
 
-    /// <summary>The Mutant's character level is below that level's Mutants.Core.Levels.WorldLevelDefinition.MinCharacterLevelToUnlock.</summary>
-    BelowMinimumCharacterLevel,
-
-    /// <summary>The level's gatekeeper had to be fought to unlock it, and the Mutant lost.</summary>
-    LostToGatekeeper,
-
-    /// <summary>Not enough Ions to pay Mutants.Core.Ions.IonEconomy.TimeTravelCost for this jump.</summary>
+    /// <summary>Not enough Ions to pay <see cref="Mutants.Core.Ions.IonEconomy.TimeTravelCost"/> for this jump.</summary>
     InsufficientIons,
 }

@@ -1,28 +1,29 @@
-using Mutants.Engine.Combat;
-
 namespace Mutants.Engine.Simulation;
 
 /// <summary>Outcome of a single <see cref="TimeTravelResolver.Travel"/> attempt.</summary>
 public sealed record TimeTravelResult
 {
     public bool Success { get; }
-    public int? NewLevel { get; }
+
+    /// <summary>The year travelled to, on success.</summary>
+    public int? NewYear { get; }
+
+    /// <summary>Ions spent on a successful jump.</summary>
+    public int IonsSpent { get; }
+
     public TimeTravelFailureReason? FailureReason { get; }
 
-    /// <summary>Set if a gatekeeper fight happened during this attempt (win or lose).</summary>
-    public FightResult? GatekeeperFight { get; }
-
-    private TimeTravelResult(bool success, int? newLevel, TimeTravelFailureReason? failureReason, FightResult? gatekeeperFight)
+    private TimeTravelResult(bool success, int? newYear, int ionsSpent, TimeTravelFailureReason? failureReason)
     {
         Success = success;
-        NewLevel = newLevel;
+        NewYear = newYear;
+        IonsSpent = ionsSpent;
         FailureReason = failureReason;
-        GatekeeperFight = gatekeeperFight;
     }
 
-    public static TimeTravelResult Traveled(int newLevel, FightResult? gatekeeperFight = null) =>
-        new(true, newLevel, null, gatekeeperFight);
+    public static TimeTravelResult Traveled(int newYear, int ionsSpent) =>
+        new(true, newYear, ionsSpent, null);
 
-    public static TimeTravelResult Failed(TimeTravelFailureReason reason, FightResult? gatekeeperFight = null) =>
-        new(false, null, reason, gatekeeperFight);
+    public static TimeTravelResult Failed(TimeTravelFailureReason reason) =>
+        new(false, null, 0, reason);
 }

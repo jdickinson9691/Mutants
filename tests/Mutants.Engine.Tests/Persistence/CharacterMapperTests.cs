@@ -7,19 +7,24 @@ namespace Mutants.Engine.Tests.Persistence;
 
 public class CharacterMapperTests
 {
+    private const long TestSeed = 8675309L;
+
     [Fact]
-    public void RoundTrip_PreservesCoreStats()
+    public void RoundTrip_PreservesCoreStatsAndTimelinePosition()
     {
         var original = new Mutant("Rook", CharacterClass.Warrior);
         original.GainXp(150);
         original.AddRiblets(42);
-        original.UnlockTimeLevel(2);
-        original.SetCurrentTimeLevel(2);
-        original.RecordGatekeeperDefeat(2);
+        original.SetCurrentYear(3400);
+        original.SetCurrentYear(2600); // current moves back; furthest stays at 3400
+        original.RecordGatekeeperDefeat(3187);
         original.PlaceAt(new Core.World.Coordinate(3, -2));
 
-        var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original));
+        var save = CharacterMapper.ToSaveData(original, TestSeed);
+        var restored = CharacterMapper.FromSaveData(save);
 
+        Assert.Equal(CharacterSaveData.CurrentSchemaVersion, save.SchemaVersion);
+        Assert.Equal(TestSeed, save.WorldSeed);
         Assert.Equal(original.Name, restored.Name);
         Assert.Equal(original.Class, restored.Class);
         Assert.Equal(original.Level, restored.Level);
@@ -30,10 +35,45 @@ public class CharacterMapperTests
         Assert.Equal(original.Ions.Current, restored.Ions.Current);
         Assert.Equal(original.Ions.Max, restored.Ions.Max);
         Assert.Equal(original.Riblets, restored.Riblets);
-        Assert.Equal(original.UnlockedTimeLevel, restored.UnlockedTimeLevel);
-        Assert.Equal(original.CurrentTimeLevel, restored.CurrentTimeLevel);
+        Assert.Equal(2600, restored.CurrentYear);
+        Assert.Equal(3400, restored.FurthestYearReached);
         Assert.Equal(original.Position, restored.Position);
-        Assert.True(restored.HasDefeatedGatekeeper(2));
+        Assert.True(restored.HasDefeatedGatekeeper(3187));
+    }
+
+    [Fact]
+    public void FromSaveData_MigratesASchemaOneBlob_ToTheTimeline()
+    {
+        var legacy = new CharacterSaveData
+        {
+            SchemaVersion = 1,
+            Name = "Legacy",
+            Class = nameof(CharacterClass.Thief),
+            Level = 22,
+            Xp = 5000,
+            Strength = 12,
+            Agility = 30,
+            Faith = 10,
+            Intellect = 14,
+            CurrentHp = 40,
+            MaxHp = 80,
+            CurrentIons = 15,
+            MaxIons = 60,
+            Riblets = 700,
+            UnlockedTimeLevel = 5,
+            CurrentTimeLevel = 4,
+            DefeatedGatekeepers = [2, 3, 4], // old level numbers — discarded by the migration
+        };
+
+        var restored = CharacterMapper.FromSaveData(legacy);
+
+        Assert.Equal("Legacy", restored.Name);
+        Assert.Equal(22, restored.Level);
+        Assert.Equal(700, restored.Riblets);
+        // old level 4 -> 2000 + 3*375 = 3125; furthest from old level 5 -> 3500.
+        Assert.Equal(3125, restored.CurrentYear);
+        Assert.Equal(3500, restored.FurthestYearReached);
+        Assert.Empty(restored.DefeatedGatekeeperYears);
     }
 
     [Fact]
@@ -49,7 +89,7 @@ public class CharacterMapperTests
         original.Wield(weapon);
         original.Wield(armor);
 
-        var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original));
+        var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original, TestSeed));
 
         Assert.Equal(3, restored.Inventory.Count);
         Assert.Contains(restored.Inventory, i => i == weapon);
@@ -65,7 +105,7 @@ public class CharacterMapperTests
         var original = new Mutant("Rook", CharacterClass.Warrior);
         original.AddToInventory(Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common));
 
-        var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original));
+        var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original, TestSeed));
 
         Assert.Null(restored.EquippedWeapon);
         Assert.Null(restored.EquippedArmor);
@@ -75,7 +115,7 @@ public class CharacterMapperTests
     public void RoundTrip_HandlesEmptyInventory()
     {
         var original = new Mutant("Rook", CharacterClass.Warrior);
-        var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original));
+        var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original, TestSeed));
 
         Assert.Empty(restored.Inventory);
     }
