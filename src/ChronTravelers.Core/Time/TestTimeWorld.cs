@@ -58,21 +58,21 @@ public static class TestTimeWorld
     private static IReadOnlyList<SpeciesDefinition> BuildSpecies() =>
     [
         new SpeciesDefinition("scavenger", "Scavenger", [], MonsterArchetype.Baseline, ["scrap", "common"]),
-        new SpeciesDefinition("rubble-brute", "Rubble Brute", [], MonsterArchetype.Bruiser, ["scrap", "common"]),
-        new SpeciesDefinition("scrapyard-wraith", "Scrapyard Wraith", ["undead"], MonsterArchetype.Caster, ["scrap"]),
+        new SpeciesDefinition("rubble-brute", "Rubble Hulk", [], MonsterArchetype.Bruiser, ["scrap", "common"]),
+        new SpeciesDefinition("scrapyard-wraith", "Static Echo", ["echo"], MonsterArchetype.Caster, ["scrap"]),
         new SpeciesDefinition("dune-stalker", "Dune Stalker", [], MonsterArchetype.Skirmisher, ["ash", "common"]),
-        new SpeciesDefinition("ash-wraith", "Ash Wraith", ["undead"], MonsterArchetype.Caster, ["ash"]),
+        new SpeciesDefinition("ash-wraith", "Ashfall Echo", ["echo"], MonsterArchetype.Caster, ["ash"]),
         new SpeciesDefinition("ashfall-behemoth", "Ashfall Behemoth", [], MonsterArchetype.Bruiser, ["ash", "common"]),
         new SpeciesDefinition("fracture-wisp", "Fracture Wisp", [], MonsterArchetype.Skirmisher, ["paradox", "common"]),
-        new SpeciesDefinition("paradox-wraith", "Paradox Wraith", ["undead"], MonsterArchetype.Caster, ["paradox"]),
+        new SpeciesDefinition("paradox-wraith", "Paradox Echo", ["echo"], MonsterArchetype.Caster, ["paradox"]),
         new SpeciesDefinition("bulwark-construct", "Bulwark Construct", [], MonsterArchetype.Bruiser, ["paradox", "common"]),
     ];
 
     private static IReadOnlyList<ItemArchetypeDefinition> BuildItemArchetypes() =>
     [
-        Weapon("blade", "Salvaged Blade", Rarity.Common, ["scrap", "ash", "paradox", "common"]),
-        Weapon("warrior-arm", "Bruiser's Maul", Rarity.Uncommon, ["scrap", "ash", "paradox"], CharacterClassRestriction: Classes.CharacterClass.Soldier),
-        Armor("plate", "Layered Plating", Rarity.Common, ["scrap", "ash", "paradox", "common"]),
+        Weapon("blade", "Salvaged Machete", Rarity.Common, ["scrap", "ash", "paradox", "common"]),
+        Weapon("warrior-arm", "Breacher's Maul", Rarity.Uncommon, ["scrap", "ash", "paradox"], CharacterClassRestriction: Classes.CharacterClass.Soldier),
+        Armor("plate", "Layered Plate Carrier", Rarity.Common, ["scrap", "ash", "paradox", "common"]),
         Junk("shard", "Salvage Shard", Rarity.Common, ["scrap", "ash", "paradox", "common"]),
         Food("ration", "Ration Pack", magnitude: 12, ["scrap", "ash", "paradox", "common"]),
         Potion("stim", "Combat Stim", ConsumableEffectType.BuffAttack, magnitude: 4, ["scrap", "ash", "paradox", "common"]),

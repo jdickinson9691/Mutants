@@ -28,7 +28,7 @@ public sealed class Monster
     public IReadOnlyList<LootTableEntry> LootTable { get; }
 
     /// <summary>
-    /// Free-form tags (e.g. "undead") — docs/CONTENT_PLAN.md's monster
+    /// Free-form tags (e.g. "echo") — docs/CONTENT_PLAN.md's monster
     /// roster item calls these out explicitly, matched against by tag-
     /// conditioned abilities like Doctor's Turn Undead.
     /// </summary>

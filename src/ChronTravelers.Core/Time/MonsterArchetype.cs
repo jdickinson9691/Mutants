@@ -12,7 +12,7 @@ public enum MonsterArchetype
     /// <summary>Exactly the year's baseline HP/attack/defense/speed.</summary>
     Baseline,
 
-    /// <summary>Glass cannon — lower HP/defense, higher attack and speed. Most <c>undead</c> species are casters.</summary>
+    /// <summary>Glass cannon — lower HP/defense, higher attack and speed. Most <c>echo</c> species are casters.</summary>
     Caster,
 
     /// <summary>Tank — higher HP/defense, lower attack and speed.</summary>

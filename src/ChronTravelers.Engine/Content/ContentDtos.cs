@@ -52,7 +52,7 @@ public sealed class AbilityData
     /// <summary>Gates a Damage effect to only apply its bonus under a specific circumstance: "TargetUndamaged", "TargetBelow25Percent", "TargetTagged", or empty for no condition.</summary>
     public string Condition { get; set; } = "";
 
-    /// <summary>The monster tag a "TargetTagged" condition checks for (e.g. "undead").</summary>
+    /// <summary>The monster tag a "TargetTagged" condition checks for (e.g. "echo").</summary>
     public string? Tag { get; set; }
 }
 
