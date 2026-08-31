@@ -717,7 +717,11 @@ static Item? FindInventoryItem(Traveler traveler, string argument)
         return traveler.Inventory[index - 1];
     }
 
-    return traveler.Inventory.FirstOrDefault(i => string.Equals(i.Name, argument, StringComparison.OrdinalIgnoreCase));
+    // Exact name wins; otherwise any item whose name contains the text
+    // (so `wield marshal` finds "Marshal's Repeater" — names wrap in the
+    // inventory table and carry apostrophes, so exact-only is a trap).
+    return traveler.Inventory.FirstOrDefault(i => string.Equals(i.Name, argument, StringComparison.OrdinalIgnoreCase))
+        ?? traveler.Inventory.FirstOrDefault(i => i.Name.Contains(argument, StringComparison.OrdinalIgnoreCase));
 }
 
 static StoreListing? FindListing(Store store, string argument)
@@ -732,7 +736,8 @@ static StoreListing? FindListing(Store store, string argument)
         return store.Listings[index - 1];
     }
 
-    return store.Listings.FirstOrDefault(l => string.Equals(l.Item.Name, argument, StringComparison.OrdinalIgnoreCase));
+    return store.Listings.FirstOrDefault(l => string.Equals(l.Item.Name, argument, StringComparison.OrdinalIgnoreCase))
+        ?? store.Listings.FirstOrDefault(l => l.Item.Name.Contains(argument, StringComparison.OrdinalIgnoreCase));
 }
 
 static StoreSlot? FindStoreSlotAt(IReadOnlyList<StoreSlot> storeSlots, Coordinate position) =>
