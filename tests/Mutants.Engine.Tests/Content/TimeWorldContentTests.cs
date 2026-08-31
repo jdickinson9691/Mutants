@@ -130,6 +130,25 @@ public class TimeWorldContentTests
     }
 
     [Fact]
+    public void EveryYearHasAGovernmentStoreCarryingAFullyLoadedRangedWeapon()
+    {
+        var world = ShippedWorld();
+
+        foreach (var year in SampleYears)
+        {
+            var government = world.GetYear(year).StoreSlots
+                .Where(s => s.Store is { IsGovernmentRun: true })
+                .Select(s => s.Store!)
+                .Single();
+
+            var ranged = government.Listings.Select(l => l.Item).FirstOrDefault(i => i.IsRanged);
+            Assert.True(ranged is not null, $"Year {year}: no ranged weapon in the government store.");
+            Assert.True(ranged!.AmmoCapacity > 0, $"Year {year}: ranged weapon has no ammo capacity.");
+            Assert.Equal(ranged.AmmoCapacity, ranged.AmmoRemaining);
+        }
+    }
+
+    [Fact]
     public void SameSeed_RebuildsAnIdenticalYear()
     {
         var a = ContentLoader.LoadTimeWorld(RealContentDirectory(), 999).GetYear(3141);

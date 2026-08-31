@@ -204,6 +204,7 @@ public sealed class TimeWorld
             Pick(a => a.Effect == ConsumableEffectType.BuffDefense),
             Pick(a => a.Type == ItemType.Weapon && a.RestrictedClass is null) ?? Pick(a => a.Type == ItemType.Weapon),
             Pick(a => a.Type == ItemType.Armor),
+            Pick(a => a.IsRanged && a.RestrictedClass is null) ?? Pick(a => a.IsRanged),
         };
 
         return picks.Where(p => p is not null).Select(p => p!).Distinct();

@@ -140,6 +140,45 @@ public class CharacterMapperTests
     }
 
     [Fact]
+    public void RoundTrip_PreservesAHalfSpentEquippedRangedWeapon_AndReEquipsIt()
+    {
+        var original = new Mutant("Rook", CharacterClass.Warrior);
+        var wand = Item.CreateRanged("Hexbolt Wand", 3, Rarity.Rare, RangedKind.Wand, ammoCapacity: 5,
+            rangedEffect: RangedEffectType.Weaken, magnitude: 2);
+        wand.AmmoRemaining = 2; // fired three of five
+        var junk = Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common);
+        original.AddToInventory(wand);
+        original.AddToInventory(junk);
+        original.Wield(wand);
+
+        var restored = CharacterMapper.FromSaveData(CharacterMapper.ToSaveData(original, TestSeed));
+
+        var restoredWand = restored.Inventory.Single(i => i.IsRanged);
+        Assert.Equal(RangedKind.Wand, restoredWand.RangedKind);
+        Assert.Equal(RangedEffectType.Weaken, restoredWand.RangedEffect);
+        Assert.Equal(5, restoredWand.AmmoCapacity);
+        Assert.Equal(2, restoredWand.AmmoRemaining);
+        Assert.Equal(wand.InstanceId, restoredWand.InstanceId);
+        Assert.Equal(restoredWand, restored.EquippedRanged);
+    }
+
+    [Fact]
+    public void FromSaveData_LeavesEquippedRangedNull_ForALegacyBlobWithoutTheField()
+    {
+        var restored = CharacterMapper.FromSaveData(new CharacterSaveData
+        {
+            SchemaVersion = 2,
+            Name = "Rook",
+            Class = nameof(CharacterClass.Warrior),
+            Strength = 10, Agility = 10, Faith = 10, Intellect = 10,
+            CurrentHp = 30, MaxHp = 30, CurrentIons = 10, MaxIons = 10,
+            CurrentYear = 2000, FurthestYearReached = 2000,
+        });
+
+        Assert.Null(restored.EquippedRanged);
+    }
+
+    [Fact]
     public void OwnedStores_RoundTripAcrossSave_ThenApplyOwnedStores_RestoresOwnershipCapitalAndListings()
     {
         var world = TestTimeWorld.Build(seed: 4242);

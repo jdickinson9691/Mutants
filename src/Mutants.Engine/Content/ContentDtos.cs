@@ -96,6 +96,15 @@ public sealed class ItemArchetypeData
     public double EffectMagnitude { get; set; }
     public int EffectDurationTicks { get; set; }
 
+    /// <summary>One of Mutants.Core.Items.RangedKind's names ("Wand"/"Bow"/"Gun"); "None" for a non-ranged archetype. When set, <c>type</c> must be "Ranged". Additive — old JSON without it loads as "None".</summary>
+    public string RangedKind { get; set; } = "None";
+
+    /// <summary>Built-in shot count for a ranged archetype. Ignored when <see cref="RangedKind"/> is "None".</summary>
+    public int AmmoCapacity { get; set; }
+
+    /// <summary>One of Mutants.Core.Items.RangedEffectType's names ("Weaken"); "None" for a damage-only ranged weapon. <see cref="EffectMagnitude"/> doubles as the ranged damage multiplier / Weaken amount.</summary>
+    public string RangedEffect { get; set; } = "None";
+
     public List<string> ThemeTags { get; set; } = [];
 }
 

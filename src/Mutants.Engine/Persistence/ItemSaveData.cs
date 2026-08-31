@@ -17,4 +17,20 @@ public sealed class ItemSaveData
 
     public double EffectMagnitude { get; set; }
     public int EffectDurationTicks { get; set; }
+
+    // --- Ranged weapons (additive; old blobs deserialize as "None" / 0 / "") ---
+
+    /// <summary>One of Mutants.Core.Items.RangedKind's names; "None" for a non-ranged item.</summary>
+    public string RangedKind { get; set; } = "None";
+
+    public int AmmoCapacity { get; set; }
+
+    /// <summary>Live shots left — the whole reason a ranged weapon needs per-instance save state.</summary>
+    public int AmmoRemaining { get; set; }
+
+    /// <summary>One of Mutants.Core.Items.RangedEffectType's names; "None" for a damage-only ranged weapon.</summary>
+    public string RangedEffect { get; set; } = "None";
+
+    /// <summary>The ranged weapon's unique instance id (empty string for every non-ranged item).</summary>
+    public string InstanceId { get; set; } = "";
 }

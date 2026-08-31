@@ -1,3 +1,4 @@
+using Mutants.Core.Items;
 using Mutants.Engine.Content;
 
 namespace Mutants.Engine.Tests.Content;
@@ -130,6 +131,61 @@ public class ContentLoaderTests
         dir.WriteFile("monster-species.json", MinimalSpeciesJson);
         // no item-archetypes.json / eras.json
         Assert.Throws<ContentException>(() => ContentLoader.LoadTimeWorld(dir.Path, worldSeed: 1));
+    }
+
+    [Fact]
+    public void LoadTimeWorld_ParsesARangedArchetype_AndStocksItWithAFullMagazine()
+    {
+        using var dir = new TempContentDirectory();
+        var withWand = MinimalArchetypesJson.TrimEnd().TrimEnd(']')
+            + """
+            ,
+              { "id": "wand", "name": "Test Wand", "type": "Ranged", "rarity": "Uncommon", "rangedKind": "Wand", "ammoCapacity": 5, "rangedEffect": "Weaken", "effectMagnitude": 2, "themeTags": ["common"] }
+            ]
+            """;
+
+        var world = ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir, archetypes: withWand), worldSeed: 1);
+
+        var government = world.GetYear(2400).StoreSlots
+            .Select(s => s.Store)
+            .Single(s => s is { IsGovernmentRun: true })!;
+
+        var ranged = government.Listings.Select(l => l.Item).Single(i => i.IsRanged);
+        Assert.Equal(RangedKind.Wand, ranged.RangedKind);
+        Assert.Equal(RangedEffectType.Weaken, ranged.RangedEffect);
+        Assert.Equal(5, ranged.AmmoCapacity);
+        Assert.Equal(5, ranged.AmmoRemaining);
+        Assert.NotEqual(Guid.Empty, ranged.InstanceId);
+    }
+
+    [Fact]
+    public void LoadTimeWorld_ThrowsOnUnknownRangedKind()
+    {
+        using var dir = new TempContentDirectory();
+        var badRanged = MinimalArchetypesJson.TrimEnd().TrimEnd(']')
+            + """
+            ,
+              { "id": "boom", "name": "Bazooka", "type": "Ranged", "rangedKind": "Bazooka", "ammoCapacity": 3, "themeTags": ["common"] }
+            ]
+            """;
+
+        Assert.Throws<ContentException>(() =>
+            ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir, archetypes: badRanged), worldSeed: 1));
+    }
+
+    [Fact]
+    public void LoadTimeWorld_ThrowsWhenRangedKindIsSetButTypeIsNotRanged()
+    {
+        using var dir = new TempContentDirectory();
+        var mismatched = MinimalArchetypesJson.TrimEnd().TrimEnd(']')
+            + """
+            ,
+              { "id": "oops", "name": "Confused Bow", "type": "Weapon", "rangedKind": "Bow", "ammoCapacity": 8, "themeTags": ["common"] }
+            ]
+            """;
+
+        Assert.Throws<ContentException>(() =>
+            ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir, archetypes: mismatched), worldSeed: 1));
     }
 
     [Fact]

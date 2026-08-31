@@ -5,6 +5,7 @@
   { "id": "sealed-ration",    "name": "Sealed Ration",    "type": "Consumable", "rarity": "Common",   "effect": "Heal",       "effectMagnitude": 14, "themeTags": ["common"] },
   { "id": "combat-stim",      "name": "Combat Stim",      "type": "Consumable", "rarity": "Uncommon", "effect": "BuffAttack", "effectMagnitude": 5, "effectDurationTicks": 15, "themeTags": ["common"] },
   { "id": "ward-draught",     "name": "Ward Draught",     "type": "Consumable", "rarity": "Uncommon", "effect": "BuffDefense","effectMagnitude": 5, "effectDurationTicks": 15, "themeTags": ["common"] },
+  { "id": "hexbolt-wand",     "name": "Hexbolt Wand",     "type": "Ranged", "rarity": "Uncommon", "rangedKind": "Wand", "ammoCapacity": 5,  "rangedEffect": "Weaken", "effectMagnitude": 2, "themeTags": ["common"] },
 
   { "id": "warrior-maul",     "name": "Breacher's Maul",  "type": "Weapon", "rarity": "Uncommon", "restrictedClass": "Warrior", "themeTags": ["common"] },
   { "id": "thief-fang",       "name": "Backalley Fang",   "type": "Weapon", "rarity": "Uncommon", "restrictedClass": "Thief",   "themeTags": ["common"] },
@@ -15,6 +16,7 @@
   { "id": "scrap-cleaver",    "name": "Scrap Cleaver",    "type": "Weapon", "rarity": "Common",   "themeTags": ["scrap"] },
   { "id": "hardplate-harness","name": "Hardplate Harness","type": "Armor",  "rarity": "Uncommon", "themeTags": ["scrap"] },
   { "id": "copper-wiring",    "name": "Copper Wiring",    "type": "Junk",   "rarity": "Uncommon", "themeTags": ["scrap"] },
+  { "id": "recurve-bow",      "name": "Recurve Bow",      "type": "Ranged", "rarity": "Uncommon", "rangedKind": "Bow", "ammoCapacity": 10, "themeTags": ["scrap", "ash"] },
 
   { "id": "arc-cleaver",      "name": "Arc Cleaver",      "type": "Weapon", "rarity": "Uncommon", "themeTags": ["neon"] },
   { "id": "neon-carapace",    "name": "Neon Carapace",    "type": "Armor",  "rarity": "Rare",     "themeTags": ["neon"] },
@@ -36,6 +38,7 @@
   { "id": "voidsteel-carapace","name": "Voidsteel Carapace","type": "Armor","rarity": "Epic",     "themeTags": ["orbital"] },
   { "id": "cracked-nav-core", "name": "Cracked Nav Core", "type": "Junk",   "rarity": "Rare",     "themeTags": ["orbital"] },
   { "id": "railgun-shard",    "name": "Railgun Shard",    "type": "Weapon", "rarity": "Rare",     "themeTags": ["orbital"] },
+  { "id": "slug-carbine",     "name": "Slug Carbine",     "type": "Ranged", "rarity": "Rare",     "rangedKind": "Gun", "ammoCapacity": 8, "themeTags": ["orbital", "paradox"] },
 
   { "id": "paradox-bulwark",  "name": "Paradox Bulwark",  "type": "Armor",  "rarity": "Epic",     "themeTags": ["paradox"] },
   { "id": "splintered-hourglass","name": "Splintered Hourglass","type": "Junk","rarity": "Epic",  "themeTags": ["paradox"] },

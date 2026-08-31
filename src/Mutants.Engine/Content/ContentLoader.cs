@@ -110,9 +110,30 @@ public static class ContentLoader
             throw new ContentException($"Item archetype '{data.Id}': unknown effect '{data.Effect}'.");
         }
 
+        if (!Enum.TryParse<RangedKind>(data.RangedKind, ignoreCase: true, out var rangedKind))
+        {
+            throw new ContentException($"Item archetype '{data.Id}': unknown rangedKind '{data.RangedKind}'.");
+        }
+
+        if (!Enum.TryParse<RangedEffectType>(data.RangedEffect, ignoreCase: true, out var rangedEffect))
+        {
+            throw new ContentException($"Item archetype '{data.Id}': unknown rangedEffect '{data.RangedEffect}'.");
+        }
+
+        if (rangedKind != RangedKind.None && type != ItemType.Ranged)
+        {
+            throw new ContentException($"Item archetype '{data.Id}': rangedKind '{data.RangedKind}' requires type 'Ranged' (got '{data.Type}').");
+        }
+
+        if (rangedKind == RangedKind.None && type == ItemType.Ranged)
+        {
+            throw new ContentException($"Item archetype '{data.Id}': type 'Ranged' requires a rangedKind ('Wand', 'Bow', or 'Gun').");
+        }
+
         return new ItemArchetypeDefinition(
             data.Id, data.Name, type, rarity, restrictedClass,
-            effect, data.EffectMagnitude, data.EffectDurationTicks, data.ThemeTags);
+            effect, data.EffectMagnitude, data.EffectDurationTicks, data.ThemeTags,
+            rangedKind, data.AmmoCapacity, rangedEffect);
     }
 
     private static EraDefinition ToEra(EraData data) =>

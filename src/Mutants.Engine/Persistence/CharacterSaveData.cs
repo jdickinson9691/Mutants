@@ -60,6 +60,9 @@ public sealed class CharacterSaveData
     /// <summary>Index into <see cref="Inventory"/> of the equipped armor, or null.</summary>
     public int? EquippedArmorIndex { get; set; }
 
+    /// <summary>Index into <see cref="Inventory"/> of the equipped ranged weapon, or null. Additive — old blobs deserialize as null.</summary>
+    public int? EquippedRangedIndex { get; set; }
+
     /// <summary>The player-owned stores, one per year the player has bought into. Re-attached on load (see CharacterMapper.ApplyOwnedStores). Additive — old blobs deserialize as an empty list.</summary>
     public List<OwnedStoreSaveData> OwnedStores { get; set; } = [];
 

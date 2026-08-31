@@ -89,6 +89,19 @@ public static class TimelineContentFactory
         var tier = TimeScale.TierForYear(year);
         var displayTier = DisplayTier(year);
 
+        if (archetype.IsRanged)
+        {
+            return Item.CreateRanged(
+                archetype.Name,
+                displayTier,
+                archetype.Rarity,
+                archetype.RangedKind,
+                archetype.AmmoCapacity,
+                archetype.RangedEffect,
+                magnitude: archetype.EffectMagnitude > 0 ? archetype.EffectMagnitude : 1.0,
+                restrictedClass: archetype.RestrictedClass);
+        }
+
         return new Item(
             archetype.Name,
             archetype.Type,

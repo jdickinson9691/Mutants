@@ -32,6 +32,8 @@ public static class CharacterMapper
         var inventoryList = mutant.Inventory.ToList();
         var equippedWeaponIndex = mutant.EquippedWeapon is null ? null : (int?)inventoryList.IndexOf(mutant.EquippedWeapon);
         var equippedArmorIndex = mutant.EquippedArmor is null ? null : (int?)inventoryList.IndexOf(mutant.EquippedArmor);
+        // A ranged weapon carries a unique InstanceId, so IndexOf pins the exact instance (unlike weapon/armor above).
+        var equippedRangedIndex = mutant.EquippedRanged is null ? null : (int?)inventoryList.IndexOf(mutant.EquippedRanged);
 
         return new CharacterSaveData
         {
@@ -58,6 +60,7 @@ public static class CharacterMapper
             Inventory = inventory,
             EquippedWeaponIndex = equippedWeaponIndex >= 0 ? equippedWeaponIndex : null,
             EquippedArmorIndex = equippedArmorIndex >= 0 ? equippedArmorIndex : null,
+            EquippedRangedIndex = equippedRangedIndex >= 0 ? equippedRangedIndex : null,
             OwnedStores = (ownedStoresByYear ?? new Dictionary<int, Store>())
                 .OrderBy(pair => pair.Key)
                 .Select(pair => new OwnedStoreSaveData
@@ -154,6 +157,11 @@ public static class CharacterMapper
             mutant.Wield(items[armorIndex]);
         }
 
+        if (data.EquippedRangedIndex is { } rangedIndex && rangedIndex >= 0 && rangedIndex < items.Count)
+        {
+            mutant.Wield(items[rangedIndex]);
+        }
+
         return mutant;
     }
 
@@ -174,18 +182,44 @@ public static class CharacterMapper
         ConsumableEffect = item.ConsumableEffect.ToString(),
         EffectMagnitude = item.EffectMagnitude,
         EffectDurationTicks = item.EffectDurationTicks,
+        RangedKind = item.RangedKind.ToString(),
+        AmmoCapacity = item.AmmoCapacity,
+        AmmoRemaining = item.AmmoRemaining,
+        RangedEffect = item.RangedEffect.ToString(),
+        InstanceId = item.InstanceId == Guid.Empty ? "" : item.InstanceId.ToString(),
     };
 
-    private static Item FromItemSaveData(ItemSaveData data) => new(
-        data.Name,
-        Enum.Parse<ItemType>(data.Type),
-        data.Tier,
-        Enum.Parse<Rarity>(data.Rarity),
-        data.Value,
-        data.AttackBonus,
-        data.DefenseBonus,
-        data.RestrictedClass is null ? null : Enum.Parse<CharacterClass>(data.RestrictedClass),
-        Enum.TryParse<ConsumableEffectType>(data.ConsumableEffect, out var effect) ? effect : ConsumableEffectType.None,
-        data.EffectMagnitude,
-        data.EffectDurationTicks);
+    private static Item FromItemSaveData(ItemSaveData data)
+    {
+        var rangedKind = Enum.TryParse<RangedKind>(data.RangedKind, out var rk) ? rk : RangedKind.None;
+        var isRanged = rangedKind != RangedKind.None;
+
+        var item = new Item(
+            data.Name,
+            Enum.Parse<ItemType>(data.Type),
+            data.Tier,
+            Enum.Parse<Rarity>(data.Rarity),
+            data.Value,
+            data.AttackBonus,
+            data.DefenseBonus,
+            data.RestrictedClass is null ? null : Enum.Parse<CharacterClass>(data.RestrictedClass),
+            Enum.TryParse<ConsumableEffectType>(data.ConsumableEffect, out var effect) ? effect : ConsumableEffectType.None,
+            data.EffectMagnitude,
+            data.EffectDurationTicks,
+            rangedKind,
+            data.AmmoCapacity,
+            Enum.TryParse<RangedEffectType>(data.RangedEffect, out var rangedEffect) ? rangedEffect : RangedEffectType.None,
+            isRanged
+                ? (Guid.TryParse(data.InstanceId, out var id) && id != Guid.Empty ? id : Guid.NewGuid())
+                : Guid.Empty);
+
+        if (isRanged)
+        {
+            item.AmmoRemaining = data.AmmoCapacity > 0
+                ? Math.Clamp(data.AmmoRemaining, 0, data.AmmoCapacity)
+                : Math.Max(0, data.AmmoRemaining);
+        }
+
+        return item;
+    }
 }
