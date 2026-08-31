@@ -24,41 +24,44 @@ public sealed record ClassDefinition(
 {
     /// <summary>All five class definitions, keyed by <see cref="CharacterClass"/>.</summary>
     public static readonly IReadOnlyDictionary<CharacterClass, ClassDefinition> All =
+        // IonsPerLevel bumped +1 across the board after playtesting: the
+        // pool grew too slowly to keep pace with travel + heal + cast all
+        // drawing on it (paired with the cheaper travel coefficient).
         new Dictionary<CharacterClass, ClassDefinition>
         {
             [CharacterClass.Warrior] = new(
                 CharacterClass.Warrior, PrimaryStat.Strength,
                 BaseStats: new StatBlock(Strength: 15, Agility: 10, Faith: 8, Intellect: 8),
                 BaseHp: 30, HpPerLevel: 6,
-                BaseIons: 20, IonsPerLevel: 3,
+                BaseIons: 20, IonsPerLevel: 4,
                 IonDrainMultiplier: 0.8),
 
             [CharacterClass.Thief] = new(
                 CharacterClass.Thief, PrimaryStat.Agility,
                 BaseStats: new StatBlock(Strength: 9, Agility: 15, Faith: 8, Intellect: 10),
                 BaseHp: 24, HpPerLevel: 5,
-                BaseIons: 24, IonsPerLevel: 3,
+                BaseIons: 24, IonsPerLevel: 4,
                 IonDrainMultiplier: 0.9),
 
             [CharacterClass.Priest] = new(
                 CharacterClass.Priest, PrimaryStat.Faith,
                 BaseStats: new StatBlock(Strength: 9, Agility: 8, Faith: 15, Intellect: 10),
                 BaseHp: 22, HpPerLevel: 4,
-                BaseIons: 30, IonsPerLevel: 3,
+                BaseIons: 30, IonsPerLevel: 4,
                 IonDrainMultiplier: 1.0),
 
             [CharacterClass.Mage] = new(
                 CharacterClass.Mage, PrimaryStat.Intellect,
                 BaseStats: new StatBlock(Strength: 7, Agility: 9, Faith: 8, Intellect: 16),
                 BaseHp: 18, HpPerLevel: 3,
-                BaseIons: 34, IonsPerLevel: 4,
+                BaseIons: 34, IonsPerLevel: 5,
                 IonDrainMultiplier: 1.3),
 
             [CharacterClass.Wizard] = new(
                 CharacterClass.Wizard, PrimaryStat.Intellect,
                 BaseStats: new StatBlock(Strength: 7, Agility: 10, Faith: 9, Intellect: 15),
                 BaseHp: 18, HpPerLevel: 3,
-                BaseIons: 32, IonsPerLevel: 4,
+                BaseIons: 32, IonsPerLevel: 5,
                 IonDrainMultiplier: 1.2),
         };
 

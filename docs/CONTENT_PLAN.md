@@ -103,11 +103,11 @@ validation is surfaced as `ContentException` by the loader.
 
 Not new plumbing — tuning and polish:
 
-- **Travel throughput** (`IonEconomy.IonsPerYearTravelled = 0.1`): tuned
-  after playtesting alongside passive Ion regen + a 3:1 heal ratio +
-  starter rations (the early game was an attrition spiral before). Long
-  `travel <year>` jumps are still gated by the Ion-pool cap into the
-  mid-game — see docs/GDD.md §12.
+- **Travel throughput** (`IonEconomy.IonsPerYearTravelled = 0.04`): tuned
+  across playtests (0.2 → 0.1 → 0.04) alongside passive Ion regen, a 3:1
+  heal ratio, +1 IonsPerLevel on every class, and a steeper early tier
+  curve — so an affordable early hop now lands in a meaningfully harder
+  year. Only a full cross-timeline leap is still an end-game Ion commit.
 - **More / finer era bands** for tighter thematic progression.
 - **Config-driven NPC class distribution** instead of uniform-random.
 - **Denser rosters / catalogs** if the game wants more variety per year.

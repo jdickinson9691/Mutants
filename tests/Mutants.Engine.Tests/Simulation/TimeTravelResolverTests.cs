@@ -38,11 +38,11 @@ public class TimeTravelResolverTests
 
         var forward = TimeTravelResolver.Travel(mutant, World(), targetYear: 2500, NeutralRandom());
         Assert.True(forward.Success);
-        Assert.Equal(50, forward.IonsSpent); // ceil(0.1 * 500)
+        Assert.Equal(20, forward.IonsSpent); // ceil(0.04 * 500)
 
         var back = TimeTravelResolver.Travel(mutant, World(), targetYear: 2000, NeutralRandom());
         Assert.True(back.Success);
-        Assert.Equal(50, back.IonsSpent); // retreat costs the same
+        Assert.Equal(20, back.IonsSpent); // retreat costs the same
     }
 
     [Fact]
@@ -127,6 +127,6 @@ public class TimeTravelResolverTests
     [Fact]
     public void TimeTravelCostConstant_IsWiredThroughIonEconomy()
     {
-        Assert.Equal(50, IonEconomy.TimeTravelCost(2000, 2500));
+        Assert.Equal(20, IonEconomy.TimeTravelCost(2000, 2500));
     }
 }

@@ -42,7 +42,7 @@ public class MonsterControllerTests
         monster.PlaceAt(Coordinate.Origin);
         pop.AddMonster(monster);
 
-        MonsterController.Tick(pop, map, [], OffMapPlayer(), StubRandomSource.Fixed(0.0), new BroadcastChannel());
+        MonsterController.Tick(pop, map, [], OffMapPlayer(), playerLingered: false, StubRandomSource.Fixed(0.0), new BroadcastChannel());
 
         Assert.NotEqual(Coordinate.Origin, monster.Position);
         Assert.True(map.Rooms.ContainsKey(monster.Position));
@@ -58,7 +58,7 @@ public class MonsterControllerTests
         monster.PlaceAt(Coordinate.Origin);
         pop.AddMonster(monster);
 
-        MonsterController.Tick(pop, map, [], OffMapPlayer(), StubRandomSource.Fixed(0.99), new BroadcastChannel());
+        MonsterController.Tick(pop, map, [], OffMapPlayer(), playerLingered: false, StubRandomSource.Fixed(0.99), new BroadcastChannel());
 
         Assert.True(monster.Health.Current > 10, "A hurt monster with Ions should heal.");
         Assert.True(monster.Ions.Current < 30, "Healing should spend Ions.");
@@ -76,7 +76,7 @@ public class MonsterControllerTests
         monster.PlaceAt(Coordinate.Origin);
         pop.AddMonster(monster);
 
-        MonsterController.Tick(pop, map, [], OffMapPlayer(), StubRandomSource.Fixed(0.99), new BroadcastChannel());
+        MonsterController.Tick(pop, map, [], OffMapPlayer(), playerLingered: false, StubRandomSource.Fixed(0.99), new BroadcastChannel());
 
         Assert.Empty(monster.Inventory);
         Assert.True(monster.Health.Current > 8, "It should convert the scrap for Ions and heal.");
@@ -102,7 +102,7 @@ public class MonsterControllerTests
         var broadcast = new BroadcastChannel();
 
         // 0.9, 0.9 -> neither monster wanders off the shared room; 0.1 -> the infight fires; 0.1s -> the duel.
-        MonsterController.Tick(pop, map, [], OffMapPlayer(), new StubRandomSource(0.9, 0.9, 0.1), broadcast);
+        MonsterController.Tick(pop, map, [], OffMapPlayer(), playerLingered: false, new StubRandomSource(0.9, 0.9, 0.1), broadcast);
 
         Assert.DoesNotContain(weakling, pop.Monsters);
         Assert.Contains(bruiser, pop.Monsters);
@@ -126,7 +126,7 @@ public class MonsterControllerTests
         pop.AddMonster(stalker);
 
         // 0.99 would suppress a wander roll — but an aggroed monster doesn't roll, it closes.
-        MonsterController.Tick(pop, map, [], player, StubRandomSource.Fixed(0.99), new BroadcastChannel());
+        MonsterController.Tick(pop, map, [], player, playerLingered: false, StubRandomSource.Fixed(0.99), new BroadcastChannel());
 
         Assert.Equal(player.Position, stalker.Position);
     }
@@ -146,7 +146,7 @@ public class MonsterControllerTests
         pop.AddMonster(lurker);
         var broadcast = new BroadcastChannel();
 
-        MonsterController.Tick(pop, map, [], player, StubRandomSource.Fixed(0.0), broadcast);
+        MonsterController.Tick(pop, map, [], player, playerLingered: true, StubRandomSource.Fixed(0.0), broadcast);
 
         Assert.Equal(Coordinate.Origin, lurker.Position); // held, didn't drift off
         Assert.True(player.Health.Current < fullHp, "A co-located monster should land an ambush hit.");
@@ -167,7 +167,27 @@ public class MonsterControllerTests
         far.PlaceAt(new Coordinate(1, 1)); // two rooms away — out of aggro range
         pop.AddMonster(far);
 
-        MonsterController.Tick(pop, map, [], player, StubRandomSource.Fixed(0.99), new BroadcastChannel());
+        MonsterController.Tick(pop, map, [], player, playerLingered: true, StubRandomSource.Fixed(0.99), new BroadcastChannel());
+
+        Assert.Equal(fullHp, player.Health.Current);
+    }
+
+    [Fact]
+    public void Tick_NoAmbushOnTheTurnThePlayerArrives_EvenSharingTheRoom()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+
+        var player = new Mutant("Prey", CharacterClass.Warrior);
+        player.PlaceAt(Coordinate.Origin);
+        var fullHp = player.Health.Current;
+
+        var lurker = new Monster("Lurker", 1, maxHp: 30, attackPower: 12, defense: 2, speed: 8, xpReward: 40);
+        lurker.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(lurker);
+
+        // playerLingered: false — they just stepped in; the ambush waits a turn.
+        MonsterController.Tick(pop, map, [], player, playerLingered: false, StubRandomSource.Fixed(0.0), new BroadcastChannel());
 
         Assert.Equal(fullHp, player.Health.Current);
     }
@@ -194,7 +214,7 @@ public class MonsterControllerTests
 
         for (var i = 0; i < 120; i++)
         {
-            MonsterController.Tick(pop, content.Map, content.MonsterRoster, player, StubRandomSource.Fixed(0.0), new BroadcastChannel());
+            MonsterController.Tick(pop, content.Map, content.MonsterRoster, player, playerLingered: false, StubRandomSource.Fixed(0.0), new BroadcastChannel());
             Assert.True(pop.Monsters.Count(m => !m.Health.IsDead) <= cap, "Respawn should never overshoot the soft cap.");
         }
 

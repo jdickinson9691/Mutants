@@ -40,11 +40,17 @@ public static class MonsterController
     /// </summary>
     private const int AggroRange = 1;
 
+    /// <param name="playerLingered">
+    /// True if the player neither moved nor changed year since the last
+    /// tick. Only a lingering player gets ambushed — arriving in a room (or
+    /// travelling into a year) always buys one free turn to size it up.
+    /// </param>
     public static void Tick(
         YearPopulation population,
         LevelMap map,
         IReadOnlyList<Func<Monster>> roster,
         Mutant player,
+        bool playerLingered,
         IRandomSource random,
         BroadcastChannel broadcast)
     {
@@ -76,7 +82,7 @@ public static class MonsterController
         ResolveInfighting(population, random, broadcast);
         MaybeRespawn(population, map, roster, random);
 
-        if (playerHere)
+        if (playerHere && playerLingered)
         {
             ResolveAmbush(population, player, random, broadcast);
         }

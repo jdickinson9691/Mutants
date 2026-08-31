@@ -29,6 +29,11 @@ public sealed class WorldSimulation
 
     private readonly IRandomSource _random;
 
+    // Where the player was at the end of the previous tick — lets the
+    // monster sim tell "stood still" (ambushable) from "just arrived".
+    private int? _lastPlayerYear;
+    private Mutants.Core.World.Coordinate _lastPlayerPosition;
+
     public WorldSimulation(
         TimeWorld world,
         IReadOnlyList<Mutant> npcs,
@@ -111,8 +116,12 @@ public sealed class WorldSimulation
         // stay frozen where they were placed until visited.
         if (Mutants.Core.Time.TimeScale.IsValidYear(player.CurrentYear))
         {
+            var lingered = _lastPlayerYear == player.CurrentYear && _lastPlayerPosition.Equals(player.Position);
             var here = World.GetYear(player.CurrentYear);
-            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player, _random, Broadcast);
+            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player, lingered, _random, Broadcast);
         }
+
+        _lastPlayerYear = player.CurrentYear;
+        _lastPlayerPosition = player.Position;
     }
 }

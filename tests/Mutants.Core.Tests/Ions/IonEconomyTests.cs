@@ -24,11 +24,11 @@ public class IonEconomyTests
 
     [Theory]
     [InlineData(2000, 2000, 0)]     // staying put is free
-    [InlineData(2000, 2100, 10)]    // ceil(0.1 * 100)
-    [InlineData(2000, 2500, 50)]
-    [InlineData(2500, 2000, 50)]    // symmetric — retreating costs the same
-    [InlineData(2000, 2005, 1)]     // ceil(0.1 * 5) = 1
-    [InlineData(2000, 5000, 300)]
+    [InlineData(2000, 2100, 4)]     // ceil(0.04 * 100)
+    [InlineData(2000, 2500, 20)]
+    [InlineData(2500, 2000, 20)]    // symmetric — retreating costs the same
+    [InlineData(2000, 2005, 1)]     // ceil(0.04 * 5) = 1
+    [InlineData(2000, 5000, 120)]
     public void TimeTravelCost_IsCeilOfTheCoefficientTimesTheYearDistance(int fromYear, int toYear, int expectedCost)
     {
         Assert.Equal(expectedCost, IonEconomy.TimeTravelCost(fromYear, toYear));

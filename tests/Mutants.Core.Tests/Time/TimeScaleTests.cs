@@ -6,13 +6,22 @@ namespace Mutants.Core.Tests.Time;
 public class TimeScaleTests
 {
     [Theory]
-    [InlineData(2000, 1.0)]
-    [InlineData(2375, 2.0)]
-    [InlineData(2750, 3.0)]
-    [InlineData(5000, 9.0)]
+    [InlineData(2000, 1.0)]  // start
+    [InlineData(2250, 2.0)]  // steep early slope: 1 tier / 250 yrs
+    [InlineData(3000, 5.0)]  // the knee
+    [InlineData(4000, 7.0)]  // gentle late slope: 1 tier / 500 yrs
+    [InlineData(5000, 9.0)]  // end
     public void TierForYear_MapsTheTimelineOntoTiersOneThroughNine(int year, double expectedTier)
     {
         Assert.Equal(expectedTier, TimeScale.TierForYear(year), precision: 6);
+    }
+
+    [Fact]
+    public void TierForYear_IsContinuousAtTheKnee()
+    {
+        Assert.Equal(TimeScale.KneeTier, TimeScale.TierForYear(TimeScale.KneeYear), precision: 6);
+        Assert.Equal(TimeScale.KneeTier + 1 / TimeScale.LateYearsPerTier,
+            TimeScale.TierForYear(TimeScale.KneeYear + 1), precision: 6);
     }
 
     [Fact]
@@ -38,8 +47,8 @@ public class TimeScaleTests
 
     [Theory]
     [InlineData(2000, 10)]
-    [InlineData(2375, 20)]
-    [InlineData(2750, 30)]
+    [InlineData(2250, 20)]
+    [InlineData(3000, 30)] // 10 * tier 5 -> clamped at the hard cap
     [InlineData(5000, 30)]
     public void SoftLevelCapForYear_TracksTheYearButNeverExceedsTheHardCap(int year, int expectedCap)
     {

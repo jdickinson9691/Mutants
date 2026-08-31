@@ -53,13 +53,12 @@ it** `[SOURCE]`.
   when a store is reachable, but better than nothing when it isn't — replicating
   the "quasi semi-flawed but usable" economy the original was known for,
   without the parts that made it exploitable.
-- Time travel cost = `ceil(0.1 * |target_year - current_year|)` Ions,
+- Time travel cost = `ceil(0.04 * |target_year - current_year|)` Ions,
   minimum 1 for any real jump, symmetric (retreating toward the present
-  costs the same as advancing). Original tuning (lowered from 0.2 after
-  playtesting). Note the Ion **pool cap** effectively bounds a single
-  jump's distance — long leaps are a mid/late-game capability, and
-  `travel next`/`prev` (short Gatekeeper-year hops) is the early path
-  across the timeline.
+  costs the same as advancing). Original tuning (0.2 → 0.1 → 0.04 across
+  playtests). The Ion **pool cap** still bounds a single jump's distance,
+  but at 0.04 a one-tier early hop (~250 yrs) is affordable from level 1;
+  only a full cross-timeline leap is a late-game commitment.
 - `heal` restores HP at 3 HP per 1 Ion — no ratio survives in the
   historical record; 3:1 keeps healing a real competitor for the Ion pool
   without making the early game an attrition death (playtested; was 1:1).
@@ -93,9 +92,11 @@ stretch goal, not in the original).
 - The world is a **continuous timeline** from year **2000 A.D.** (the
   "present" city, where every character starts) to **5000 A.D.**. There are
   no discrete levels: difficulty, monster stats, and loot value all scale
-  smoothly with the year. Year 2000 sits at scaling "tier" 1.0 and every
-  375 years advances the tier by 1, so year 5000 is tier ~9.0
-  (`Mutants.Core.Time.TimeScale`).
+  smoothly with the year. Year 2000 sits at scaling "tier" 1.0 and year
+  5000 at tier 9.0, on a **piecewise curve that's steeper early** — one
+  tier per 250 years through 2000–3000 (reaching tier 5), then one per 500
+  years after — so a short early hop actually changes the fight instead of
+  the first ~600 years all playing the same (`Mutants.Core.Time.TimeScale`).
 - **Each year has its own grid map**, generated deterministically from a
   per-save **world seed** plus the year — the same year always produces the
   same layout, so it can be a pure function of the save with nothing about
@@ -105,13 +106,16 @@ stretch goal, not in the original).
 - Command: `travel <year>` (any year 2000–5000), `travel +N` / `travel -N`
   (relative), or `travel next` / `travel prev` (the next/previous
   Gatekeeper year).
-- Cost: `ceil(0.2 * |target_year - current_year|)` Ions, minimum 1,
-  deducted on success. Symmetric — retreating toward the present costs the
-  same as advancing (this supersedes the earlier "retreat is free" rule now
-  that travel is otherwise unrestricted). Insufficient Ions produces a
-  warning and blocks the jump — the failure mode independently confirmed by
-  a historical MBBSEmu bug report about a "warning when attempting to time
-  travel without enough ions."
+- Cost: `ceil(0.04 * |target_year - current_year|)` Ions, minimum 1,
+  deducted on success (coefficient lowered 0.2 → 0.1 → 0.04 across
+  playtests so mid-range hops are affordable from low level — a one-tier
+  early jump is ~10 Ions, a full cross-timeline leap still ~120).
+  Symmetric — retreating toward the present costs the same as advancing
+  (this supersedes the earlier "retreat is free" rule now that travel is
+  otherwise unrestricted). Insufficient Ions produces a warning and blocks
+  the jump — the failure mode independently confirmed by a historical
+  MBBSEmu bug report about a "warning when attempting to time travel
+  without enough ions."
 - **Travel is otherwise unrestricted**: no unlock, no minimum character
   level, no gate. How hard the fights get is the only limiter.
 - **Gatekeepers** are still here, but as tough optional encounters rather
@@ -366,12 +370,13 @@ yours) using NPCs instead of real concurrent users.
 
 - Number and boundaries of the era bands across 2000–5000 (currently ~15;
   more, finer bands would give tighter thematic progression).
-- Travel throughput vs. Ion-pool cap: because a jump is paid from the
-  instantaneous Ion pool, and the pool grows only a few points per level,
-  `travel <far year>` stays gated on pool size well into the mid-game —
-  the timeline is really traversed via `travel next` short hops. If that
-  feels too restrictive, the levers are a steeper Ion-pool curve, an even
-  lower cost coefficient, or a "charge a jump over several ticks" mechanic.
+- Travel throughput vs. Ion-pool cap: a jump is paid from the
+  instantaneous Ion pool. Playtest tuning (coefficient 0.2 → 0.04,
+  +1 IonsPerLevel across all classes, and a steeper early tier curve so
+  affordable hops land in a meaningfully harder year) has made mid-range
+  travel practical from low level; a full cross-timeline leap is still a
+  deliberate ~120-Ion end-game commitment. If even that later feels wrong,
+  the remaining lever is a "charge a jump over several ticks" mechanic.
 - Whether NPC store ownership should be capped (to avoid NPCs monopolizing
   all store slots before the human player can buy in).
 - Save format: single local save vs. multiple character slots.

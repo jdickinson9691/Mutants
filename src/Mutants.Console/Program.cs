@@ -18,7 +18,7 @@ using Spectre.Console;
 // The world is a continuous timeline (docs/GDD.md §3.2): the player starts
 // in the year 2000 A.D. and `travel`s - spending Ions - to any year up to
 // 5000, with monsters and loot scaling smoothly by year. Nothing gates
-// travel; the only limits are the Ion cost (ceil(0.1 * |Δyear|),
+// travel; the only limits are the Ion cost (ceil(0.04 * |Δyear|),
 // symmetric) and how hard the fights get. Every year's map is generated
 // deterministically from a per-save world seed, so revisiting a year is
 // stable. "Gatekeeper" years - a random 50-100 years apart, placed by the
@@ -1676,7 +1676,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]monsters[/] (or mobs)  - list the monsters roaming this year");
     AnsiConsole.MarkupLine("  [green]heal[/]                - spend Ions to recover HP (usable any time)");
     AnsiConsole.MarkupLine("  [green]abilities[/] (or spells) - list your class's abilities unlocked so far");
-    AnsiConsole.MarkupLine("  [green]travel <year>[/]      - jump to a year (2000–5000); costs ceil(0.1·|Δyear|) Ions");
+    AnsiConsole.MarkupLine("  [green]travel <year>[/]      - jump to a year (2000–5000); costs ceil(0.04·|Δyear|) Ions");
     AnsiConsole.MarkupLine("  [green]travel +N[/]/[green]-N[/]      - jump N years forward/back");
     AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]   - jump to the next/previous Gatekeeper year");
     AnsiConsole.MarkupLine("  [green]inventory[/] (or i)    - list what you're carrying");

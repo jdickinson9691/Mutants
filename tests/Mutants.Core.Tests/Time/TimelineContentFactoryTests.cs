@@ -30,7 +30,7 @@ public class TimelineContentFactoryTests
     public void ForSpecies_BaselineArchetypeMatchesMonsterScalingAtTheYearsTier()
     {
         var monster = TimelineContentFactory.ForSpecies(1, Baseline, 2375, Pool)();
-        var tier = TimeScale.TierForYear(2375); // 2.0
+        var tier = TimeScale.TierForYear(2375); // 2.5 on the steep early slope
 
         Assert.Equal((int)System.Math.Round(MonsterScaling.BaseHp(tier)), monster.Health.Max);
         Assert.Equal((int)System.Math.Round(MonsterScaling.BaseAttackPower(tier)), monster.AttackPower);

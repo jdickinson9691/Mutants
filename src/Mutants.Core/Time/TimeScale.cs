@@ -11,33 +11,51 @@ namespace Mutants.Core.Time;
 ///
 /// <see cref="TierForYear"/> is the bridge to the existing tuning curves
 /// (<see cref="Monsters.MonsterScaling"/>, <see cref="Items.LootScaling"/>,
-/// which now take a fractional tier): year 2000 → tier 1.0, and every
-/// <see cref="YearsPerTier"/> years advances the tier by 1, so year 5000
-/// → tier 9.0. That keeps a year's monsters/loot in the same power band
-/// the old level-N content occupied (old level N ≈ year
-/// <c>2000 + (N-1) * 375</c>).
+/// which now take a fractional tier): year 2000 → tier 1.0, year 5000 →
+/// tier 9.0. The curve is deliberately <em>steeper early</em> — one tier
+/// per <see cref="EarlyYearsPerTier"/> years through the first millennium
+/// (2000–<see cref="KneeYear"/>, tiers 1→<see cref="KneeTier"/>), then a
+/// gentler <see cref="LateYearsPerTier"/> years per tier after — so a
+/// modest early hop actually changes the fight, instead of the whole
+/// 2000–2600 span playing identically (playtest feedback).
 /// </summary>
 public static class TimeScale
 {
     public const int MinYear = 2000;
     public const int MaxYear = 5000;
 
-    /// <summary>Years of the timeline that correspond to one tier of scaling.</summary>
+    /// <summary>Legacy reference only: the old flat rate, still used by the schema-1 save migration's level→year mapping.</summary>
     public const double YearsPerTier = 375.0;
+
+    /// <summary>Where the difficulty curve changes slope.</summary>
+    public const int KneeYear = 3000;
+
+    /// <summary>The tier reached at <see cref="KneeYear"/>.</summary>
+    public const double KneeTier = 5.0;
+
+    /// <summary>Years per tier before the knee — the steep early stretch.</summary>
+    public const double EarlyYearsPerTier = 250.0;
+
+    /// <summary>Years per tier after the knee — the gentler late stretch (KneeTier..9.0 across KneeYear..MaxYear).</summary>
+    public const double LateYearsPerTier = 500.0;
 
     /// <summary>True if <paramref name="year"/> is a travellable year (2000–5000 inclusive).</summary>
     public static bool IsValidYear(int year) => year >= MinYear && year <= MaxYear;
 
     /// <summary>
     /// The fractional scaling tier for <paramref name="year"/> — 1.0 at
-    /// year 2000, rising by 1 every <see cref="YearsPerTier"/> years to
-    /// 9.0 at year 5000. Feeds the <c>double</c> overloads on
-    /// <see cref="Monsters.MonsterScaling"/> / <see cref="Items.LootScaling"/>.
+    /// year 2000, <see cref="KneeTier"/> at <see cref="KneeYear"/>, 9.0 at
+    /// year 5000, piecewise-linear with a steeper early slope. Feeds the
+    /// <c>double</c> overloads on <see cref="Monsters.MonsterScaling"/> /
+    /// <see cref="Items.LootScaling"/>.
     /// </summary>
     public static double TierForYear(int year)
     {
         RequireInRange(year);
-        return 1 + (year - MinYear) / YearsPerTier;
+
+        return year <= KneeYear
+            ? 1 + (year - MinYear) / EarlyYearsPerTier
+            : KneeTier + (year - KneeYear) / LateYearsPerTier;
     }
 
     /// <summary>

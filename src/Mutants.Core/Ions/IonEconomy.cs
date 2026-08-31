@@ -34,12 +34,13 @@ public static class IonEconomy
 
     /// <summary>
     /// Ions spent per year of the timeline crossed by a <c>travel</c> —
-    /// docs/GDD.md §3.2. Original tuning, lowered from 0.2 after
-    /// playtesting: at 0.1 a small hop (a Gatekeeper year, ~50–100 yrs)
-    /// costs 5–10 Ions, a ~375-year era jump ~38, and a cross-timeline
-    /// leap stays a real end-game Ion commitment.
+    /// docs/GDD.md §3.2. Original tuning, lowered again (0.2 → 0.1 → 0.04)
+    /// after playtesting: at 0.04 a one-tier early hop (~250 yrs) costs
+    /// ~10 Ions — affordable from level 1, so mid-range travel is finally
+    /// worth doing — while a full cross-timeline leap (3000 yrs) is still a
+    /// ~120-Ion end-game commitment.
     /// </summary>
-    public const double IonsPerYearTravelled = 0.1;
+    public const double IonsPerYearTravelled = 0.04;
 
     /// <summary>
     /// Ion cost of travelling from <paramref name="fromYear"/> to
