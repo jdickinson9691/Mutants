@@ -4,7 +4,7 @@
   "start": { "east": 0, "north": 0 },
   "minCharacterLevelToUnlock": 5,
   "gatekeeperMonsterId": "undercity-warden",
-  "monsterRosterIds": ["rust-crawler", "circuit-wraith", "riot-drone"],
+  "monsterRosterIds": ["rust-crawler", "circuit-wraith", "riot-drone", "neon-revenant", "transit-enforcer", "wire-skulker"],
   "rooms": [
     { "east": 0, "north": 0, "description": "Flickering neon signage buzzes over a flooded platform.",
       "exits": { "East": "area continues.", "North": "area continues." } },

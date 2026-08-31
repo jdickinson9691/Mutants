@@ -4,7 +4,7 @@
   "start": { "east": 0, "north": 0 },
   "minCharacterLevelToUnlock": 30,
   "gatekeeperMonsterId": "last-helmsman",
-  "monsterRosterIds": ["void-drifter", "vacuum-wraith", "hull-breacher"],
+  "monsterRosterIds": ["void-drifter", "vacuum-wraith", "hull-breacher", "vac-lich", "hull-juggernaut", "debris-skimmer"],
   "rooms": [
     { "east": 0, "north": 0, "description": "Emergency lighting flickers red along a buckled corridor; the artificial gravity stutters.",
       "exits": { "East": "area continues.", "North": "area continues." } },

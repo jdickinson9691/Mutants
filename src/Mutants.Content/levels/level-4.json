@@ -4,7 +4,7 @@
   "start": { "east": 0, "north": 0 },
   "minCharacterLevelToUnlock": 15,
   "gatekeeperMonsterId": "drowned-king",
-  "monsterRosterIds": ["drowned-archivist", "flood-serpent", "static-eel"],
+  "monsterRosterIds": ["drowned-archivist", "flood-serpent", "static-eel", "sodden-lector", "bulk-diver", "current-darter"],
   "rooms": [
     { "east": 0, "north": 0, "description": "Waist-deep water laps at a collapsed atrium, papers dissolving in the murk.",
       "exits": { "East": "area continues." } },

@@ -15,8 +15,8 @@ loaded by `Mutants.Engine.Content.ContentLoader`) rather than hardcoded —
 all 8 levels of the GDD's "5–8 levels for v1 launch" range, a full
 item/monster catalog, store catalogs, and complete per-class ability
 tables that are castable in combat; see `docs/CONTENT_PLAN.md` for
-exactly what's shipped versus still open (mostly just more volume —
-more monsters/items per level).
+exactly what's shipped versus still open (launch-volume catalog now —
+~55 monsters, ~108 items; only optional polish remains).
 
 ## Building & running
 
@@ -71,8 +71,8 @@ attaches the installer to a GitHub Release automatically — see
 
 Each step above is engine-complete (tested, playable end to end) with
 data-driven content behind it — see `docs/CONTENT_PLAN.md` for exactly
-what's shipped and what's still open (mostly just more volume — more
-monsters/items per level).
+what's shipped and what's still open (optional polish only — level-5
+store slot, config-driven NPC classes).
 
 ## License / provenance
 

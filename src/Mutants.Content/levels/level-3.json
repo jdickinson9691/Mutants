@@ -4,7 +4,7 @@
   "start": { "east": 0, "north": 0 },
   "minCharacterLevelToUnlock": 10,
   "gatekeeperMonsterId": "ashfall-colossus",
-  "monsterRosterIds": ["dune-stalker", "ash-wraith", "sand-reaver"],
+  "monsterRosterIds": ["dune-stalker", "ash-wraith", "sand-reaver", "cinder-shade", "ashfall-behemoth", "glass-strider"],
   "rooms": [
     { "east": 0, "north": 0, "description": "Heat shimmers over a fractured intersection of buried highway.",
       "exits": { "North": "area continues.", "South": "area continues.", "East": "area continues.", "West": "area continues." } },

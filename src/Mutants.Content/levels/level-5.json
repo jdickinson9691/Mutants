@@ -4,7 +4,7 @@
   "start": { "east": 0, "north": 0 },
   "minCharacterLevelToUnlock": 20,
   "gatekeeperMonsterId": "undercroft-sovereign",
-  "monsterRosterIds": ["undercroft-sentinel", "bone-choir", "deep-warden"],
+  "monsterRosterIds": ["undercroft-sentinel", "bone-choir", "deep-warden", "crypt-cantor", "undercroft-breaker", "vault-creeper"],
   "rooms": [
     { "east": 0, "north": 0, "description": "The air is heavy and still, filtered through groaning bunker vents.",
       "exits": { "East": "area continues.", "West": "area continues.", "North": "area continues." } },

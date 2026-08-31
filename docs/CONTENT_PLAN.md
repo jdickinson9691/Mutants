@@ -14,25 +14,31 @@ not launch content.
 ## Sections
 
 - [x] Monster roster per time-travel level (stats, XP, loot table, tags e.g. "undead")
-      — `monsters.json`: 3 regular monsters + 1 gatekeeper per level, tiers
-      1–8, all following `Mutants.Core.Monsters.MonsterScaling`'s baseline
-      curve (a tier-N monster is a sensible fight around character level
-      `10 * N`; a gatekeeper is ~3x a regular monster's HP at the same
-      attack/defense/speed). A couple per level are tagged `"undead"`
-      (matches docs/GDD.md §4.2's Priest "Turn Undead" ability, which
-      checks this tag in combat).
+      — `monsters.json`: 6 regular monsters + 1 gatekeeper per level, tiers
+      1–8 (level 1 has no gatekeeper), all following
+      `Mutants.Core.Monsters.MonsterScaling`'s baseline curve (a tier-N
+      monster is a sensible fight around character level `10 * N`; a
+      gatekeeper is ~3x a regular monster's HP at the same attack/defense/
+      speed). Each level's six regulars span a spread of archetypes —
+      roughly baseline, glass-cannon, skirmisher, heavy bruiser, plus two
+      `"undead"`-tagged casters (matches docs/GDD.md §4.2's Priest "Turn
+      Undead" ability, which checks this tag in combat).
 - [x] Item catalog per tier/rarity (weapons, armor, consumables, "junk"/convertible items)
-      — `items.json`: ~60 items across tiers 1–8, including a few
-      class-restricted pieces per tier (rotating through all 5 classes)
-      and a guaranteed Legendary "trophy" per gatekeeper. Every item is
+      — `items.json`: ~108 items across tiers 1–8 (13 per tier: 3–4
+      weapons, 3 armor, 3 junk, 2–3 consumables, plus the gatekeeper
+      trophy), including two class-restricted weapons per tier from tier 3
+      up (one per tier for tiers 1–2) so every one of the 5 classes has a
+      restricted weapon reachable by the mid-game, and a guaranteed
+      Legendary "trophy" per gatekeeper. Every item is
       convertible/sellable regardless of type, and value (so Ion/Riblet
       payout) always scales by the item's own tier and rarity via
       `Mutants.Core.Items.LootScaling` — there's no type-based
       restriction anywhere in `Mutant.Convert`/`Sell` or `Store`.
       **Consumables are now usable**: every tier has one food item
-      (`effect: "Heal"`, flat HP, no duration) and one potion
-      (`BuffAttack` or `BuffDefense`, a temporary stat bonus lasting 15
-      world ticks) — `use`/`eat`/`drink <item>` in the console, backed by
+      (`effect: "Heal"`, flat HP, no duration) and both potions — a
+      `BuffAttack` and a `BuffDefense` one, each a temporary stat bonus
+      lasting 15 world ticks — `use`/`eat`/`drink <item>` in the console,
+      backed by
       `Mutant.Consume`/`AdvanceEffectTicks`. A Consumable with no `effect`
       data is flavor-only (still sellable/convertible, but "use" refuses
       it) — none currently ship that way, but the schema supports it.
@@ -77,9 +83,12 @@ not launch content.
 ## Open follow-up work (not content — engine features content is now blocked on or ready for)
 
 All GDD-mandated content sections above are now fully populated (all 8
-levels, every level's monster/item/store/NPC-population entries). What
-remains is pure volume, not new plumbing, whenever there's appetite for
-it: more monsters/items per level (each level's roster is still a lean
-"3 regular + 1 gatekeeper"), a purchasable store slot for level 5 to match
-every other level, and levels beyond 8 if the game ever wants to extend
-past the GDD's stated v1 range.
+levels, every level's monster/item/store/NPC-population entries), at a
+comfortable launch volume: 6 regular monsters + 1 gatekeeper per level
+(~55 monsters) and 13 items per tier (~108 items). What remains is
+optional, not new plumbing, whenever there's appetite for it: a
+purchasable store slot for level 5 to match every other level;
+config-driven NPC class distribution (`npc-population.json`) instead of
+today's uniform-random pick; still more monsters/items per level if the
+game wants a denser catalog; and levels beyond 8 if it ever extends past
+the GDD's stated v1 range.

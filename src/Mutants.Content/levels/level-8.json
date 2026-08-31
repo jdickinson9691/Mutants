@@ -4,7 +4,7 @@
   "start": { "east": 0, "north": 0 },
   "minCharacterLevelToUnlock": 35,
   "gatekeeperMonsterId": "the-chronarch",
-  "monsterRosterIds": ["fracture-wisp", "paradox-wraith", "bulwark-construct"],
+  "monsterRosterIds": ["fracture-wisp", "paradox-wraith", "bulwark-construct", "epoch-shade", "causality-colossus", "timeslip-stalker"],
   "rooms": [
     { "east": 0, "north": 0, "description": "Reality stutters here — the edges of the room double and flicker out of sync with themselves.",
       "exits": { "North": "area continues.", "South": "area continues.", "East": "area continues.", "West": "area continues." } },

@@ -4,7 +4,7 @@
   "start": { "east": 0, "north": 0 },
   "minCharacterLevelToUnlock": 25,
   "gatekeeperMonsterId": "frostbound-custodian",
-  "monsterRosterIds": ["rime-stalker", "cryo-revenant", "vault-sentinel"],
+  "monsterRosterIds": ["rime-stalker", "cryo-revenant", "vault-sentinel", "frost-wight", "glacier-warden", "rime-skater"],
   "rooms": [
     { "east": 0, "north": 0, "description": "A wall of frost blooms across cracked vault doors; your breath fogs in the dead air.",
       "exits": { "North": "area continues.", "South": "area continues.", "East": "area continues.", "West": "area continues." } },

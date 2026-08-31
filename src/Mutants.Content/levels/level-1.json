@@ -4,7 +4,7 @@
   "start": { "east": 0, "north": 0 },
   "minCharacterLevelToUnlock": 1,
   "gatekeeperMonsterId": null,
-  "monsterRosterIds": ["scavenger", "junk-golem", "feral-dog"],
+  "monsterRosterIds": ["scavenger", "junk-golem", "feral-dog", "scrapyard-wraith", "rubble-brute", "alley-runner"],
   "rooms": [
     { "east": 0, "north": 0, "description": "You are standing at the crossroads of a ruined city block.",
       "exits": { "North": "area continues.", "South": "area continues.", "East": "area continues.", "West": "area continues." } },
