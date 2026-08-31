@@ -12,6 +12,15 @@ public class MonsterScalingTests
         Assert.True(MonsterScaling.BaseDefense(5) > MonsterScaling.BaseDefense(1));
         Assert.True(MonsterScaling.BaseSpeed(5) > MonsterScaling.BaseSpeed(1));
         Assert.True(MonsterScaling.XpReward(5) > MonsterScaling.XpReward(1));
+        Assert.True(MonsterScaling.BaseIons(5) > MonsterScaling.BaseIons(1));
+    }
+
+    [Fact]
+    public void BaseIons_IsSmallerThanBaseHp_AndHasBothOverloads()
+    {
+        Assert.True(MonsterScaling.BaseIons(3) < MonsterScaling.BaseHp(3), "A monster's Ion pool should be well under its HP.");
+        Assert.Equal(MonsterScaling.BaseIons(4), (int)System.Math.Round(MonsterScaling.BaseIons(4.0)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => MonsterScaling.BaseIons(0.5));
     }
 
     [Theory]

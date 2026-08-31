@@ -29,6 +29,9 @@ public static class MonsterScaling
     /// <summary>XP reward for defeating a tier-N monster — deliberately generous relative to <see cref="Stats.Leveling.CumulativeXpForLevel"/> so a handful of kills advances a level.</summary>
     public static double XpReward(double tier) => Require(tier, 40 * tier);
 
+    /// <summary>Ion pool for a tier-N monster — deliberately smaller than a player's (a monster uses it for the odd <c>heal</c>, not as a deep resource). Original tuning.</summary>
+    public static double BaseIons(double tier) => Require(tier, 8 + 4 * tier);
+
     public static int BaseHp(int tier) => Round(BaseHp((double)tier));
 
     public static int BaseAttackPower(int tier) => Round(BaseAttackPower((double)tier));
@@ -38,6 +41,8 @@ public static class MonsterScaling
     public static int BaseSpeed(int tier) => Round(BaseSpeed((double)tier));
 
     public static int XpReward(int tier) => Round(XpReward((double)tier));
+
+    public static int BaseIons(int tier) => Round(BaseIons((double)tier));
 
     // Plain Math.Round (banker's rounding) so the int overloads are a
     // byte-for-byte no-op refactor of the previous integer arithmetic.

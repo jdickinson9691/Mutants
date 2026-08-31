@@ -38,13 +38,14 @@ public static class TimelineContentFactory
         var tier = TimeScale.TierForYear(year);
         var (hp, attack, defense, speed) = StatsFor(species.Archetype, tier);
         var xp = (int)Math.Round(MonsterScaling.XpReward(tier));
+        var ions = (int)Math.Round(MonsterScaling.BaseIons(tier));
         var displayTier = DisplayTier(year);
         var tags = species.Tags;
         var name = species.Name;
 
         var loot = BuildLootTable(worldSeed, year, species.Id, lootPool);
 
-        return () => new Monster(name, displayTier, hp, attack, defense, speed, xp, loot, tags);
+        return () => new Monster(name, displayTier, hp, attack, defense, speed, xp, loot, tags, maxIons: ions);
     }
 
     /// <summary>
@@ -78,7 +79,8 @@ public static class TimelineContentFactory
             speed: (int)Math.Round(MonsterScaling.BaseSpeed(tier)),
             xpReward: (int)Math.Round(MonsterScaling.XpReward(tier) * 5),
             lootTable: [new LootTableEntry(trophy, dropChance: 1.0)],
-            tags: []);
+            tags: [],
+            maxIons: (int)Math.Round(MonsterScaling.BaseIons(tier) * 2));
     }
 
     /// <summary>A concrete item from <paramref name="archetype"/> as it would drop / be stocked in <paramref name="year"/>.</summary>
