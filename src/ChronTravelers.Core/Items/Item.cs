@@ -32,7 +32,8 @@ public sealed record Item(
     RangedKind RangedKind = RangedKind.None,
     int AmmoCapacity = 0,
     RangedEffectType RangedEffect = RangedEffectType.None,
-    Guid InstanceId = default)
+    Guid InstanceId = default,
+    bool IsTimeShard = false)
 {
     /// <summary>Shots left in a ranged weapon (starts at <see cref="AmmoCapacity"/>). Mutable — decremented by ChronTravelers.Engine.Combat.RangedResolver. 0 for every non-ranged item.</summary>
     public int AmmoRemaining { get; set; }

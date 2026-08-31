@@ -146,6 +146,29 @@ public class MonsterControllerTests
     }
 
     [Fact]
+    public void Tick_AMonsterNeverTakesATimeShard_EvenBrokeAndUnarmed()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var monster = new Monster("Scrounger", 2, 40, 8, 3, 10, 80, maxIons: 30);
+        monster.Ions.Spend(monster.Ions.Current); // broke -> would scavenge fuel
+        monster.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(monster);
+
+        var shard = new Item("Time Shard", ItemType.Weapon, 3, Rarity.Legendary, Value: 500, AttackBonus: 99, IsTimeShard: true);
+        pop.AddGroundLoot(Coordinate.Origin, shard);
+
+        for (var i = 0; i < 5; i++)
+        {
+            Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99));
+        }
+
+        Assert.DoesNotContain(shard, monster.Inventory);
+        Assert.Null(monster.EquippedWeapon);
+        Assert.Contains(shard, pop.LootAt(Coordinate.Origin));
+    }
+
+    [Fact]
     public void Tick_AMonsterUpgradesToABetterGroundWeaponAndHitsHarderForIt()
     {
         var map = FourRoomMap();

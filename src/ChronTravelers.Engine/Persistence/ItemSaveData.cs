@@ -33,4 +33,7 @@ public sealed class ItemSaveData
 
     /// <summary>The ranged weapon's unique instance id (empty string for every non-ranged item).</summary>
     public string InstanceId { get; set; } = "";
+
+    /// <summary>True only for a Time Shard. Additive — old blobs deserialize as false.</summary>
+    public bool IsTimeShard { get; set; }
 }

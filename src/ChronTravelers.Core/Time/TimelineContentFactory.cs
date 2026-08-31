@@ -96,6 +96,44 @@ public static class TimelineContentFactory
         return () => new Monster(name, displayTier, apexHp, apexAttack, apexDefense, speed, apexXp, loot, tags, maxIons: apexIons, isApex: true);
     }
 
+    /// <summary>The Time Shard's damage is this much more than the year's best weapon.</summary>
+    private const double TimeShardEdge = 1.25;
+
+    /// <summary>
+    /// The Time Shard for <paramref name="year"/> — a melee weapon whose
+    /// AttackBonus is <see cref="TimeShardEdge"/>× the highest of any weapon
+    /// (melee or ranged) available in that year, with a Credit
+    /// (<see cref="Item.Value"/>) that scales with the year. Exactly one is
+    /// placed on the floor per year (see <see cref="YearPopulation.Seed"/>);
+    /// monsters and NPCs can't take it.
+    /// </summary>
+    public static Item TimeShard(int year, IReadOnlyList<ItemArchetypeDefinition> itemArchetypes)
+    {
+        var tier = TimeScale.TierForYear(year);
+
+        var bestWeaponBonus = itemArchetypes
+            .Where(a => a.Type is ItemType.Weapon or ItemType.Ranged)
+            .Select(a => LootScaling.EquipBonusFor(tier, a.PowerMultiplier))
+            .DefaultIfEmpty(LootScaling.EquipBonusFor(tier, 1.0))
+            .Max();
+
+        return new Item(
+            "Time Shard",
+            ItemType.Weapon,
+            DisplayTier(year),
+            Rarity.Legendary,
+            Value: (int)Math.Round(LootScaling.ValueFor(tier, Rarity.Legendary) * 2.0),
+            AttackBonus: (int)Math.Round(bestWeaponBonus * TimeShardEdge),
+            IsTimeShard: true);
+    }
+
+    /// <summary>A single random item scaled to <paramref name="year"/>, rarity-weighted so most floor loot is humble — for the ~third of the grid that's seeded with loot on year load.</summary>
+    public static Item RandomFloorItem(Random rng, IReadOnlyList<ItemArchetypeDefinition> itemArchetypes, int year)
+    {
+        var pick = WeightedPick(itemArchetypes, a => a.Rarity.DropWeight(), rng);
+        return ForArchetype(pick, year);
+    }
+
     /// <summary>
     /// The Warden standing watch over a Warden year (see
     /// <see cref="WardenSchedule"/>): a "bullet sponge" — ~3× a

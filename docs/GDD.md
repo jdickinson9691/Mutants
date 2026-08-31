@@ -253,14 +253,19 @@ area/group to a capstone — is the standard every class follows.)
 
 - **Sources of loot**: monster drops on defeat (a themed table per
   monster, built from item archetypes and scaled to the **year** it's
-  fought in) and **random location spawns** (a periodic chance per room,
-  per tick, for an item to appear on the ground — matches the brief "random
-  chance of spawning in a location" requirement; original spawn-rate
-  tuning). Defeated-monster loot — the rolled drops plus anything the
-  monster had scavenged — **falls to the floor where it died**; nothing
-  auto-enters the player's pack. `look` lists it and `take <item>` /
-  `take all` picks it up. (NPC grinding is abstract and off-grid, so an
-  NPC's kills still go straight into its inventory.)
+  fought in); **on-load floor loot** — when a year is first entered,
+  ~a third of its grid rooms are seeded with one random (rarity-weighted,
+  year-scaled) item each so a year never feels empty; and **random
+  location spawns** (a periodic chance per room, per tick, for an item to
+  appear on the ground). Defeated-monster loot — the rolled drops plus
+  anything the monster had scavenged — **falls to the floor where it
+  died**; nothing auto-enters the player's pack. `look` lists it and
+  `take <item>` / `take all` picks it up. (NPC grinding is abstract and
+  off-grid, so an NPC's kills still go straight into its inventory.)
+- **Time Shard** (one per year, on the floor): a Legendary melee weapon
+  whose AttackBonus is 1.25× the strongest weapon of any kind available
+  that year, and whose Credit value scales with the year. Monsters and
+  NPCs never pick one up — it's the player's to take, wield, or sell.
 - **Drop composition**: a regular monster's table is built by category so
   a kill always pays and occasionally supplies you — a **guaranteed
   sell/convert fodder** piece (a junk item, drop chance 1.0), a real

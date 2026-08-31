@@ -58,6 +58,10 @@ public sealed class YearPopulation
     /// (<see cref="Monster.IsApex"/>) are placed in further rooms alongside
     /// the regular population. If <paramref name="wardenFactory"/> is
     /// non-null its monster is built and stationed at the map's start room.
+    /// If <paramref name="floorLootFactory"/> is non-null, ~a third of the
+    /// grid's rooms get a random item on load; if
+    /// <paramref name="timeShardFactory"/> is non-null, one further room
+    /// gets a single Time Shard.
     /// </summary>
     public static YearPopulation Seed(
         long worldSeed,
@@ -65,7 +69,9 @@ public sealed class YearPopulation
         LevelMap map,
         IReadOnlyList<Func<Monster>> roster,
         Func<Monster>? wardenFactory,
-        IReadOnlyList<Func<Monster>>? apexRoster = null)
+        IReadOnlyList<Func<Monster>>? apexRoster = null,
+        Func<Item>? floorLootFactory = null,
+        Func<Item>? timeShardFactory = null)
     {
         var rng = DeterministicRandom.For(worldSeed, year, "monsters");
 
@@ -119,7 +125,39 @@ public sealed class YearPopulation
             warden.PlaceAt(map.Start);
         }
 
-        return new YearPopulation(monsters, warden, count);
+        var population = new YearPopulation(monsters, warden, count);
+
+        // --- floor loot -------------------------------------------------
+        // A separate deterministic shuffle of every room (start included)
+        // so a year never feels empty: one room gets the Time Shard, then
+        // ~a third of the grid gets a random item.
+        if (floorLootFactory is not null || timeShardFactory is not null)
+        {
+            var lootRng = DeterministicRandom.For(worldSeed, year, "floorloot-rooms");
+            var lootRooms = map.Rooms.Keys.OrderBy(c => c.North).ThenBy(c => c.East).ToList();
+            for (var i = lootRooms.Count - 1; i > 0; i--)
+            {
+                var j = lootRng.Next(i + 1);
+                (lootRooms[i], lootRooms[j]) = (lootRooms[j], lootRooms[i]);
+            }
+
+            var next = 0;
+            if (timeShardFactory is not null && next < lootRooms.Count)
+            {
+                population.AddGroundLoot(lootRooms[next++], timeShardFactory());
+            }
+
+            if (floorLootFactory is not null)
+            {
+                var itemRoomCount = Math.Max(1, (int)Math.Round(lootRooms.Count / 3.0));
+                for (var i = 0; i < itemRoomCount && next < lootRooms.Count; i++, next++)
+                {
+                    population.AddGroundLoot(lootRooms[next], floorLootFactory());
+                }
+            }
+        }
+
+        return population;
     }
 
     /// <summary>Living monsters standing at <paramref name="coordinate"/> (never the Warden).</summary>

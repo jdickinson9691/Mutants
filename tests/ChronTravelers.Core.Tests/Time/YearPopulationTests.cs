@@ -117,7 +117,9 @@ public class YearPopulationTests
     [Fact]
     public void GroundLoot_AddLootAtTakeRoundTrip()
     {
-        var pop = PopulationFor(1, 2000);
+        // A bare population (no loot factories) so the floor starts empty.
+        var map = TestTimeWorld.Build(1).GetYear(2000).Map;
+        var pop = YearPopulation.Seed(worldSeed: 1, year: 2000, map, roster: [], wardenFactory: null);
         var spot = new Coordinate(0, 0);
         var junk = Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common);
         var blade = Item.Create("Blade", ItemType.Weapon, 1, Rarity.Common);
@@ -133,6 +135,42 @@ public class YearPopulationTests
         Assert.Same(junk, pop.TakeGroundLoot(spot, _ => true));
         Assert.Empty(pop.LootAt(spot));
         Assert.Null(pop.TakeGroundLoot(spot, _ => true));
+    }
+
+    [Fact]
+    public void Seed_ScattersFloorLootOverAboutAThirdOfTheGrid_PlusExactlyOneTimeShard()
+    {
+        var content = TestTimeWorld.Build(seed: 314).GetYear(2600);
+        var pop = content.Population;
+
+        var roomsWithLoot = content.Map.Rooms.Keys.Count(c => pop.LootAt(c).Count > 0);
+        var expectedItemRooms = System.Math.Max(1, (int)System.Math.Round(content.Map.RoomCount / 3.0));
+
+        // ~a third get an item, plus one more for the shard (allow the shard
+        // room to coincide with nothing else).
+        Assert.InRange(roomsWithLoot, expectedItemRooms, expectedItemRooms + 1);
+
+        var shards = content.Map.Rooms.Keys
+            .SelectMany(c => pop.LootAt(c))
+            .Where(i => i.IsTimeShard)
+            .ToList();
+        Assert.Single(shards);
+        Assert.Equal(ItemType.Weapon, shards[0].Type);
+    }
+
+    [Fact]
+    public void Seed_FloorLootIsDeterministicForASeedAndYear()
+    {
+        static string Describe(int seed)
+        {
+            var content = TestTimeWorld.Build(seed).GetYear(2600);
+            return string.Join("|", content.Map.Rooms.Keys
+                .OrderBy(k => k.North).ThenBy(k => k.East)
+                .SelectMany(k => content.Population.LootAt(k).Select(i => $"{k}:{i.Name}")));
+        }
+
+        Assert.Equal(Describe(99), Describe(99));
+        Assert.NotEqual(Describe(99), Describe(100));
     }
 
     [Fact]

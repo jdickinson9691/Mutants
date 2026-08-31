@@ -165,6 +165,29 @@ public class TimelineContentFactoryTests
     }
 
     [Fact]
+    public void TimeShard_HitsAQuarterHarderThanTheYearsBestWeapon_AndItsValueScalesWithTheYear()
+    {
+        IReadOnlyList<ItemArchetypeDefinition> weapons =
+        [
+            new("w1", "Shiv", ItemType.Weapon, RarityExtensions.ForPower(0.6), null, ConsumableEffectType.None, 0, 0, ["common"], PowerMultiplier: 0.6),
+            new("w2", "Relic", ItemType.Weapon, RarityExtensions.ForPower(2.9), null, ConsumableEffectType.None, 0, 0, ["common"], PowerMultiplier: 2.9),
+            new("j", "Bits", ItemType.Junk, Rarity.Common, null, ConsumableEffectType.None, 0, 0, ["common"]),
+        ];
+
+        var early = TimelineContentFactory.TimeShard(2000, weapons);
+        var late = TimelineContentFactory.TimeShard(4800, weapons);
+
+        Assert.True(early.IsTimeShard);
+        Assert.Equal(ItemType.Weapon, early.Type);
+
+        var bestEarly = LootScaling.EquipBonusFor(TimeScale.TierForYear(2000), 2.9);
+        Assert.Equal((int)System.Math.Round(bestEarly * 1.25), early.AttackBonus);
+
+        Assert.True(late.AttackBonus > early.AttackBonus, "a later year's shard beats a later, stronger weapon set");
+        Assert.True(late.Value > early.Value, "the Credit value scales up with the year");
+    }
+
+    [Fact]
     public void Warden_IsABulletSpongeWithAGuaranteedLegendaryWeaponTrophy()
     {
         var year = 3210;

@@ -247,11 +247,12 @@ public static class MonsterController
         }
 
         // (a) Low on Ions → grab one thing to convert. Prefer junk/consumables
-        // so a good weapon on the ground survives for the player.
+        // so a good weapon on the ground survives for the player. Never a
+        // Time Shard — those are the player's alone.
         if (monster.Ions.Current < monster.Ions.Max * ScavengeForIonsBelow)
         {
-            var fuel = population.TakeGroundLoot(monster.Position, i => i.Type is not (ItemType.Weapon or ItemType.Armor))
-                       ?? population.TakeGroundLoot(monster.Position, _ => true);
+            var fuel = population.TakeGroundLoot(monster.Position, i => !i.IsTimeShard && i.Type is not (ItemType.Weapon or ItemType.Armor))
+                       ?? population.TakeGroundLoot(monster.Position, i => !i.IsTimeShard);
             if (fuel is not null)
             {
                 monster.AddToInventory(fuel);
@@ -263,7 +264,7 @@ public static class MonsterController
         // dropping the old one back for someone else.
         var currentBonus = monster.EquippedWeapon?.AttackBonus ?? 0;
         var upgrade = population.TakeGroundLoot(monster.Position,
-            i => i.Type == ItemType.Weapon && i.AttackBonus > currentBonus);
+            i => !i.IsTimeShard && i.Type == ItemType.Weapon && i.AttackBonus > currentBonus);
         if (upgrade is not null)
         {
             if (monster.EquippedWeapon is { } old)

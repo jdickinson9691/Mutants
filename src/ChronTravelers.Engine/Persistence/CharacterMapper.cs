@@ -187,6 +187,7 @@ public static class CharacterMapper
         AmmoRemaining = item.AmmoRemaining,
         RangedEffect = item.RangedEffect.ToString(),
         InstanceId = item.InstanceId == Guid.Empty ? "" : item.InstanceId.ToString(),
+        IsTimeShard = item.IsTimeShard,
     };
 
     private static Item FromItemSaveData(ItemSaveData data)
@@ -211,7 +212,8 @@ public static class CharacterMapper
             Enum.TryParse<RangedEffectType>(data.RangedEffect, out var rangedEffect) ? rangedEffect : RangedEffectType.None,
             isRanged
                 ? (Guid.TryParse(data.InstanceId, out var id) && id != Guid.Empty ? id : Guid.NewGuid())
-                : Guid.Empty);
+                : Guid.Empty,
+            data.IsTimeShard);
 
         if (isRanged)
         {

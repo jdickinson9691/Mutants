@@ -1917,6 +1917,10 @@ static void RenderRoom(Traveler traveler, TimeWorld world)
     if (ground.Count > 0)
     {
         AnsiConsole.MarkupLine($"[yellow]On the ground:[/] {Markup.Escape(NameList(ground.Select(i => i.Name).ToList()))}. [grey](take <item>)[/]");
+        if (ground.Any(i => i.IsTimeShard))
+        {
+            AnsiConsole.MarkupLine("  [bold magenta]A Time Shard glints among it — this year's, and yours alone.[/]");
+        }
     }
 
     var slot = FindStoreSlotAt(yearContent.StoreSlots, traveler.Position);

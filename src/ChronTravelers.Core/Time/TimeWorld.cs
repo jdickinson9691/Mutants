@@ -142,8 +142,15 @@ public sealed class TimeWorld
             ? () => TimelineContentFactory.Warden(WorldSeed, year)
             : null;
 
+        // A third of the grid gets a random item on year-load so a year
+        // never feels empty, plus exactly one Time Shard (a weapon 25%
+        // above the year's best, and a year-scaled Credit value).
+        var floorLootRng = DeterministicRandom.For(WorldSeed, year, "floorloot");
+        Func<Item> floorLoot = () => TimelineContentFactory.RandomFloorItem(floorLootRng, _itemArchetypes, year);
+        Func<Item> timeShard = () => TimelineContentFactory.TimeShard(year, _itemArchetypes);
+
         var stores = BuildStores(era, year, map);
-        var population = YearPopulation.Seed(WorldSeed, year, map, roster, warden, apexRoster);
+        var population = YearPopulation.Seed(WorldSeed, year, map, roster, warden, apexRoster, floorLoot, timeShard);
 
         return new YearContent(year, map, era, roster, stores, warden, tier, population);
     }
