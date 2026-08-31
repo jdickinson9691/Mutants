@@ -317,6 +317,14 @@ saved):
   **grab loot** off their room's floor, or — if hurt — **heal** from their
   own Ion pool, first **converting** a scavenged item if they're out of
   Ions (the same `heal` / `convert` the player uses).
+- A monster within **one room** of the player stops wandering and **closes
+  the distance**; one standing in the player's room **holds** there. If the
+  player then **lingers** (a turn without moving or travelling), the
+  hardest-hitting monster in the room lands one **ambush** hit (against
+  half the player's defence — you're unbraced). Moving in, or the turn you
+  arrive, is safe: pursuit makes the world stop feeling evasive, the ambush
+  makes standing still cost something, and neither replaces the deliberate
+  `fight`.
 - Two monsters sharing a room may **fight each other**; the loser dies and
   its carried items plus a loot-table roll drop on that room's floor,
   exactly as when a player kills it, and it posts to the same kill-feed.

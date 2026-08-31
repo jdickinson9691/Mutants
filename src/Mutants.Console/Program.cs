@@ -33,7 +33,11 @@ using Spectre.Console;
 // monster in the current room; only the player's current year is
 // simulated live (Mutants.Engine.Npc.MonsterController via
 // WorldSimulation.Tick), other years hold frozen monsters until visited,
-// and none of this is written to the save (a fresh session re-seeds).
+// and none of this is written to the save (a fresh session re-seeds). A
+// monster within one room of you closes in instead of wandering; one
+// sharing your room holds position and, if you linger there (don't move
+// or travel), lands an ambush hit. The inline kill-feed after each
+// command is capped and drops NPC time-hops - `news` still shows the lot.
 //
 // Ranged weapons (Mutants.Core.Items.Item / RangedKind - wands, bows,
 // later guns) reach one room away: `wield` one into its own slot, then
@@ -585,8 +589,16 @@ static bool TryHandleItemCommand(Mutant mutant, string command, string argument)
     switch (command)
     {
         case "convert":
+            if (mutant.Ions.Current >= mutant.Ions.Max)
+            {
+                AnsiConsole.MarkupLine($"[grey]Your Ion pool is full — converting {Markup.Escape(item.Name)} now would waste it. Sell it, or spend some Ions first.[/]");
+                break;
+            }
+
             var ions = mutant.Convert(item);
-            AnsiConsole.MarkupLine($"[blue]Converted {Markup.Escape(item.Name)} for {ions} Ions.[/]");
+            AnsiConsole.MarkupLine(ions > 0
+                ? $"[blue]Converted {Markup.Escape(item.Name)} for {ions} Ions.[/] ({mutant.Ions.Current}/{mutant.Ions.Max})"
+                : $"[grey]Converted {Markup.Escape(item.Name)}, but your Ion pool had no room for it.[/]");
             break;
 
         case "wield":
@@ -1333,6 +1345,11 @@ static void RenderMonsters(Mutant mutant, TimeWorld world)
         return;
     }
 
+    var here = living.Count(m => m.Position.Equals(mutant.Position));
+    AnsiConsole.MarkupLine(here > 0
+        ? $"[grey]{living.Count} monster(s) roaming — [red]{here} in your room[/].[/]"
+        : $"[grey]{living.Count} monster(s) roaming this year.[/]");
+
     var table = new Table().Expand();
     table.AddColumn("Name");
     table.AddColumn("Tier");
@@ -1340,7 +1357,7 @@ static void RenderMonsters(Mutant mutant, TimeWorld world)
     table.AddColumn("Ions");
     table.AddColumn("Location");
 
-    foreach (var m in living.OrderBy(m => m.Position.North).ThenBy(m => m.Position.East))
+    foreach (var m in living.OrderBy(m => m.Position.Equals(mutant.Position) ? 0 : 1).ThenBy(m => m.Position.North).ThenBy(m => m.Position.East))
     {
         var loc = Markup.Escape(m.Position.ToString()) + (m.Position.Equals(mutant.Position) ? " [green](here)[/]" : "");
         table.AddRow(Markup.Escape(m.Name), m.Tier.ToString(), $"{m.Health.Current}/{m.Health.Max}", $"{m.Ions.Current}/{m.Ions.Max}", loc);
@@ -1422,13 +1439,45 @@ static void RenderBroadcast(BroadcastChannel broadcast, int count)
     }
 }
 
-/// <summary>Prints any broadcast events published since <paramref name="alreadyShownCount"/>. Returns the new total shown.</summary>
+/// <summary>
+/// Prints broadcast events published since <paramref name="alreadyShownCount"/>,
+/// as an inline feed after a command. NPC time-hops are the bulk of the
+/// channel and are noise here — they're skipped inline but still kept for
+/// the full <c>news</c> view. Returns the new total (all events count as
+/// "seen" so they don't resurface later).
+/// </summary>
 static int RenderNewBroadcastEvents(BroadcastChannel broadcast, int alreadyShownCount)
 {
+    const int InlineFeedCap = 6;
+
     var events = broadcast.Events;
+    var fresh = new List<GameEvent>();
     for (var i = alreadyShownCount; i < events.Count; i++)
     {
-        AnsiConsole.MarkupLine($"[cyan]* {Markup.Escape(events[i].Message)}[/]");
+        if (events[i].Kind != GameEventKind.TimeTraveled)
+        {
+            fresh.Add(events[i]);
+        }
+    }
+
+    // Keep the tail and summarise the rest so a busy NPC tick doesn't bury
+    // the room — but an ambush on the player is never dropped.
+    var shown = fresh.Count <= InlineFeedCap
+        ? fresh
+        : fresh.Where(e => e.Kind == GameEventKind.Ambushed)
+            .Concat(fresh.Where(e => e.Kind != GameEventKind.Ambushed).TakeLast(InlineFeedCap))
+            .ToList();
+
+    foreach (var evt in shown)
+    {
+        var colour = evt.Kind == GameEventKind.Ambushed ? "red" : "cyan";
+        AnsiConsole.MarkupLine($"[{colour}]* {Markup.Escape(evt.Message)}[/]");
+    }
+
+    var hidden = fresh.Count - shown.Count;
+    if (hidden > 0)
+    {
+        AnsiConsole.MarkupLine($"[grey]  …and {hidden} more elsewhere in the timeline (see [yellow]news[/]).[/]");
     }
 
     return events.Count;
