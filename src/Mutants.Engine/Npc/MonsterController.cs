@@ -75,6 +75,11 @@ public static class MonsterController
     /// Rooms nothing will pursue, wander, or ambush into — the year's store
     /// tiles. A depot is a haven to shop and heal in.
     /// </param>
+    /// <param name="narration">
+    /// Optional sink for player-local ambient lines — a monster entering /
+    /// leaving the player's room (with the direction), or first coming
+    /// within earshot ("you hear something to the north").
+    /// </param>
     public static void Tick(
         YearPopulation population,
         LevelMap map,
@@ -84,13 +89,15 @@ public static class MonsterController
         bool playerLingered,
         IRandomSource random,
         BroadcastChannel broadcast,
-        IReadOnlySet<Coordinate>? safeRooms = null)
+        IReadOnlySet<Coordinate>? safeRooms = null,
+        ICollection<string>? narration = null)
     {
         var playerHere = TimeScale.IsValidYear(player.CurrentYear);
         var playerSafe = playerHere && safeRooms is not null && safeRooms.Contains(player.Position);
 
         foreach (var monster in population.Monsters.Where(m => !m.Health.IsDead).ToList())
         {
+            var startedAt = monster.Position;
             var distance = playerHere ? ManhattanDistance(monster.Position, player.Position) : int.MaxValue;
 
             // --- aggro accrual / decay -------------------------------------
@@ -138,6 +145,11 @@ public static class MonsterController
                         monster.RestTicks = RestTicksMin + (int)(random.NextDouble() * (RestTicksMax - RestTicksMin + 1));
                     }
                 }
+            }
+
+            if (narration is not null && playerHere && !monster.Position.Equals(startedAt))
+            {
+                NarrateMovement(narration, monster, startedAt, player.Position, random);
             }
 
             monster.AdvanceIonRegenTick(IonEconomy.TicksPerIonRegen(monster.Tier, classDrainMultiplier: 1.0));
@@ -267,6 +279,75 @@ public static class MonsterController
 
     private static int ManhattanDistance(Coordinate a, Coordinate b) =>
         Math.Abs(a.East - b.East) + Math.Abs(a.North - b.North);
+
+    /// <summary>The cardinal direction you'd step from <paramref name="from"/> toward <paramref name="to"/> (dominant axis).</summary>
+    private static Direction DirectionBetween(Coordinate from, Coordinate to)
+    {
+        var de = to.East - from.East;
+        var dn = to.North - from.North;
+        if (Math.Abs(de) >= Math.Abs(dn))
+        {
+            return de >= 0 ? Direction.East : Direction.West;
+        }
+
+        return dn >= 0 ? Direction.North : Direction.South;
+    }
+
+    private static readonly string[] EarshotLines =
+    [
+        "You hear something moving to the {0}.",
+        "Something stirs in the room to the {0}.",
+        "You catch movement off to the {0}.",
+        "A shape shifts about to the {0}.",
+    ];
+
+    private static readonly string[] EntersLines =
+    [
+        "{0} comes in from the {1}.",
+        "{0} shoulders in from the {1}.",
+        "{0} pads in from the {1}.",
+    ];
+
+    private static readonly string[] LeavesLines =
+    [
+        "The {0} moves off to the {1}.",
+        "The {0} slips away to the {1}.",
+        "The {0} breaks {1}.",
+    ];
+
+    private static string WithArticle(string name)
+    {
+        var vowel = name.Length > 0 && "AEIOUaeiou".Contains(name[0]);
+        return (vowel ? "An " : "A ") + name;
+    }
+
+    /// <summary>Adds a player-local line when a monster's move crosses into/out of the player's room, or first comes within one room.</summary>
+    private static void NarrateMovement(ICollection<string> narration, Monster monster, Coordinate from, Coordinate playerPos, IRandomSource random)
+    {
+        var to = monster.Position;
+        var wasHere = from.Equals(playerPos);
+        var nowHere = to.Equals(playerPos);
+
+        string Pick(string[] lines) => lines[Math.Min(lines.Length - 1, (int)(random.NextDouble() * lines.Length))];
+
+        if (nowHere && !wasHere)
+        {
+            narration.Add(string.Format(Pick(EntersLines), WithArticle(monster.Name), DirectionBetween(playerPos, from).Name()));
+            return;
+        }
+
+        if (wasHere && !nowHere)
+        {
+            narration.Add(string.Format(Pick(LeavesLines), monster.Name, DirectionBetween(playerPos, to).Name()));
+            return;
+        }
+
+        // First time within one room of the player (crossed from farther out).
+        if (ManhattanDistance(to, playerPos) == 1 && ManhattanDistance(from, playerPos) > 1)
+        {
+            narration.Add(string.Format(Pick(EarshotLines), DirectionBetween(playerPos, to).Name()));
+        }
+    }
 
     private static void ResolveInfighting(YearPopulation population, IRandomSource random, BroadcastChannel broadcast)
     {

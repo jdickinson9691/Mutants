@@ -294,6 +294,12 @@ while (running)
     if (running && !mutant.Health.IsDead)
     {
         simulation.Tick(mutant, playerActedIdly: IsIdleCommand(input));
+
+        foreach (var line in simulation.LastTickNarration)
+        {
+            AnsiConsole.MarkupLine($"[grey italic]{Markup.Escape(line)}[/]");
+        }
+
         shownBroadcastCount = RenderNewBroadcastEvents(simulation.Broadcast, shownBroadcastCount);
 
         if (mutant.Health.IsDead)
@@ -1728,10 +1734,21 @@ static void RenderRoom(Mutant mutant, TimeWorld world)
 
     foreach (var direction in exitDirections)
     {
-        if (population.HasLivingMonsterAt(mutant.Position.Move(direction)))
+        var adjacent = mutant.Position.Move(direction);
+        if (!population.HasLivingMonsterAt(adjacent))
         {
-            AnsiConsole.MarkupLine($"[grey]Something stirs to the {direction.Name()}.[/]");
+            continue;
         }
+
+        // Vary the phrasing, but keep it stable for a given room+direction.
+        var flavour = (Math.Abs(adjacent.East * 31 + adjacent.North * 17 + (int)direction) % 4) switch
+        {
+            0 => $"You hear something to the {direction.Name()}.",
+            1 => $"Something stirs to the {direction.Name()}.",
+            2 => $"There's movement in the room to the {direction.Name()}.",
+            _ => $"Something shuffles about to the {direction.Name()}.",
+        };
+        AnsiConsole.MarkupLine($"[grey]{flavour}[/]");
     }
 
     var ground = population.LootAt(mutant.Position);
@@ -1830,4 +1847,6 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("[grey]  Only a hostile monster in your room hits you, and only on an idle turn[/]");
     AnsiConsole.MarkupLine("[grey]  (look/status/wait/…). Acting is safe, a store room is a haven, and moving a[/]");
     AnsiConsole.MarkupLine("[grey]  couple of rooms away calms a monster back down.[/]");
+    AnsiConsole.MarkupLine("[grey]  Movement near you is called out — something coming into earshot, entering, or[/]");
+    AnsiConsole.MarkupLine("[grey]  leaving your room, with its direction; [yellow]monsters[/] shows each one's heading.[/]");
 }

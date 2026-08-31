@@ -27,7 +27,15 @@ public sealed class WorldSimulation
     public BroadcastChannel Broadcast { get; }
     public IReadOnlyList<Mutant> Npcs { get; }
 
+    /// <summary>
+    /// Player-local ambient narration from the most recent <see cref="Tick"/>
+    /// — "you hear something to the north," "the Alley Runner slips away
+    /// east," etc. Rebuilt each tick; not part of the shared kill-feed.
+    /// </summary>
+    public IReadOnlyList<string> LastTickNarration => _narration;
+
     private readonly IRandomSource _random;
+    private readonly List<string> _narration = [];
 
     // Where the player was at the end of the previous tick — lets the
     // monster sim tell "stood still" (ambushable) from "just arrived".
@@ -62,6 +70,8 @@ public sealed class WorldSimulation
     /// </param>
     public void Tick(Mutant player, bool playerActedIdly = false)
     {
+        _narration.Clear();
+
         foreach (var mutant in Npcs.Append(player))
         {
             if (mutant.Health.IsDead)
@@ -128,7 +138,7 @@ public sealed class WorldSimulation
             var previousPosition = _lastPlayerYear == player.CurrentYear ? _lastPlayerPosition : player.Position;
             var here = World.GetYear(player.CurrentYear);
             var safeRooms = here.StoreSlots.Select(slot => slot.Location).ToHashSet();
-            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player, previousPosition, lingered, _random, Broadcast, safeRooms);
+            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player, previousPosition, lingered, _random, Broadcast, safeRooms, _narration);
         }
 
         _lastPlayerYear = player.CurrentYear;

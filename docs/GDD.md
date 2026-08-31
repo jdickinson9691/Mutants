@@ -349,6 +349,11 @@ saved):
   walking (with the odd short pause), so it covers ground and its path is
   legible: the `monsters` list shows each one's heading, and you can read
   where it's going and cut it off.
+- **Movement is narrated** relative to you, in the source game's style —
+  a monster **first coming within one room** ("you hear something to the
+  north," with varied phrasing), **entering** your room ("a Rubble Brute
+  comes in from the south"), or **leaving** it ("the Alley Runner slips
+  away east"). `look` also lists what's stirring in each adjacent room.
 - Monsters do **not** automatically pursue or attack anyone who walks
   past. Each carries an **earned aggro meter** toward the player
   (`Mutants.Core.Monsters.AggroModel`), raised by:

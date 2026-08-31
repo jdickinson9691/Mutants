@@ -44,10 +44,11 @@ public class MonsterControllerTests
         bool playerLingered = false,
         BroadcastChannel? broadcast = null,
         IReadOnlySet<Coordinate>? safeRooms = null,
-        IReadOnlyList<Func<Monster>>? roster = null)
+        IReadOnlyList<Func<Monster>>? roster = null,
+        ICollection<string>? narration = null)
         => MonsterController.Tick(pop, map, roster ?? [], player,
             previousPlayerPosition ?? player.Position, playerLingered, random,
-            broadcast ?? new BroadcastChannel(), safeRooms);
+            broadcast ?? new BroadcastChannel(), safeRooms, narration);
 
     private static Monster Lurker(Coordinate at)
     {
@@ -130,6 +131,66 @@ public class MonsterControllerTests
             Tick(pop, map, player, StubRandomSource.Fixed(0.0));
             Assert.Equal(pausedAt, monster.Position);
         }
+    }
+
+    [Fact]
+    public void Tick_NarratesAMonsterEnteringThePlayersRoomWithTheDirectionItCameFrom()
+    {
+        var map = CorridorMap(4);
+        var pop = EmptyPopulation(map);
+        var player = new Mutant("Prey", CharacterClass.Warrior);
+        player.PlaceAt(Coordinate.Origin);
+
+        var m = Monster.Create("Beast", tier: 1);
+        m.PlaceAt(new Coordinate(1, 0)); // one room east
+        m.Heading = Direction.West;      // heading toward the player
+        pop.AddMonster(m);
+
+        var log = new List<string>();
+        Tick(pop, map, player, StubRandomSource.Fixed(0.5), narration: log);
+
+        Assert.Equal(Coordinate.Origin, m.Position);
+        Assert.Contains(log, l => l.Contains("Beast") && l.Contains("east"));
+    }
+
+    [Fact]
+    public void Tick_NarratesAMonsterLeavingThePlayersRoomWithTheDirectionItWent()
+    {
+        var map = CorridorMap(4);
+        var pop = EmptyPopulation(map);
+        var player = new Mutant("Prey", CharacterClass.Warrior);
+        player.PlaceAt(Coordinate.Origin);
+
+        var m = Monster.Create("Beast", tier: 1);
+        m.PlaceAt(Coordinate.Origin); // sharing the player's room
+        m.Heading = Direction.East;
+        pop.AddMonster(m);
+
+        var log = new List<string>();
+        Tick(pop, map, player, StubRandomSource.Fixed(0.5), narration: log);
+
+        Assert.Equal(new Coordinate(1, 0), m.Position);
+        Assert.Contains(log, l => l.Contains("Beast") && l.Contains("east"));
+    }
+
+    [Fact]
+    public void Tick_NarratesAMonsterFirstComingWithinOneRoom()
+    {
+        var map = CorridorMap(5);
+        var pop = EmptyPopulation(map);
+        var player = new Mutant("Prey", CharacterClass.Warrior);
+        player.PlaceAt(Coordinate.Origin);
+
+        var m = Monster.Create("Beast", tier: 1);
+        m.PlaceAt(new Coordinate(2, 0)); // two rooms east
+        m.Heading = Direction.West;
+        pop.AddMonster(m);
+
+        var log = new List<string>();
+        Tick(pop, map, player, StubRandomSource.Fixed(0.5), narration: log);
+
+        Assert.Equal(new Coordinate(1, 0), m.Position);
+        Assert.Contains(log, l => l.Contains("hear") || l.Contains("stir") || l.Contains("movement") || l.Contains("shuffle") || l.Contains("shift"));
     }
 
     [Fact]
