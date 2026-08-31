@@ -199,4 +199,55 @@ public class WorldSimulationTests
         Assert.True(pop.Monsters.Count < before, "An infight should have removed a monster from the current year's population.");
         Assert.Contains(simulation.Broadcast.Events, e => e.Message.Contains("was slain by"));
     }
+
+    [Fact]
+    public void Tick_KeepsSimulatingYearsThePlayerHasLeft_InfightingAndBroadcastingThere()
+    {
+        var world = World();
+
+        // The player visits 2000 (instantiating its population), then leaves for 3000.
+        var player = NewTraveler("Player", world, 2000);
+        var awayPop = world.GetYear(2000).Population;
+        var spot = awayPop.Monsters[0].Position;
+        awayPop.Monsters[1].PlaceAt(spot); // set up an infight back in 2000
+        var before = awayPop.Monsters.Count;
+
+        player.SetCurrentYear(3000);
+        player.PlaceAt(world.GetYear(3000).Map.Start);
+
+        var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.0));
+        simulation.Tick(player);
+
+        Assert.True(awayPop.Monsters.Count < before, "A year the player left should still run its monster infights.");
+        Assert.Contains(simulation.Broadcast.Events, e => e.Message.Contains("was slain by") && e.Year == 2000);
+    }
+
+    [Fact]
+    public void Tick_AYearThePlayerHasLeft_NeverAmbushesOrTracksAnyone()
+    {
+        var world = World();
+        var player = NewTraveler("Player", world, 2000);
+        var awayPop = world.GetYear(2000).Population;
+
+        // Enrage every monster in 2000, then leave. Unattended, none of this
+        // should touch the player (who is now in 3000).
+        foreach (var m in awayPop.Monsters)
+        {
+            m.RaiseAggro(Core.Monsters.AggroModel.Cap);
+        }
+
+        player.SetCurrentYear(3000);
+        world.GetYear(3000); // instantiate it
+        player.PlaceAt(new Core.World.Coordinate(999, 999)); // off-grid in 3000 too, so only the "away year" is under test
+        var fullHp = player.Health.Current;
+
+        var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.5));
+        for (var i = 0; i < 10; i++)
+        {
+            simulation.Tick(player, playerActedIdly: true);
+        }
+
+        Assert.Equal(fullHp, player.Health.Current);
+        Assert.DoesNotContain(simulation.Broadcast.Events, e => e.Message.Contains("ambushes"));
+    }
 }

@@ -433,10 +433,17 @@ saved):
   exactly as when a player kills it, and it posts to the same kill-feed.
 - A slow **respawn trickle** keeps an emptied year refilling toward a soft
   cap (~a third of its rooms) without ever overflowing.
-- Only the player's current year is simulated; every other year holds its
-  monsters frozen where they were placed until visited. NPC Travelers still
-  grind abstractly against their year's roster (spatial NPC↔monster
-  interaction is a follow-up).
+- **Every year that's been instantiated this session keeps simulating**,
+  not just the player's. The player's year runs the full loop (drift plus
+  aggro / shadowing / ambush / player-local narration); every other year
+  an NPC is in, or the player has passed through, runs an *unattended*
+  loop each tick — monsters there still drift, fight each other, heal,
+  grab ground loot and respawn, and their kills post to the shared feed
+  (tagged with the year, so the console keeps them in `news` rather than
+  the inline feed). A year nobody has entered stays dormant until someone
+  does. Nothing about any of this is saved. NPC Travelers still grind
+  abstractly against their year's roster rather than the placed monsters
+  (spatial NPC↔monster combat is a follow-up).
 
 ## 8. Leaderboards `[SOURCE: MutantLink cross-board high scores]`
 

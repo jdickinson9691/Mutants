@@ -82,11 +82,24 @@ public static class MonsterController
     /// leaving the player's room (with the direction), or first coming
     /// within earshot ("you hear something to the north").
     /// </param>
+    /// <param name="year">
+    /// The timeline year this population belongs to — used to tag the
+    /// events it publishes so the console's inline feed can filter to the
+    /// player's own year.
+    /// </param>
+    /// <param name="player">
+    /// The player, when <paramref name="year"/> is the year they're
+    /// standing in — drives aggro / shadowing / ambush / narration. Pass
+    /// <c>null</c> to run a year the player isn't in (see
+    /// <see cref="TickUnattended"/>): monsters still roam, infight, heal,
+    /// grab loot and respawn, but nothing tracks or ambushes anyone.
+    /// </param>
     public static void Tick(
         YearPopulation population,
         LevelMap map,
         IReadOnlyList<Func<Monster>> roster,
-        Traveler player,
+        int year,
+        Traveler? player,
         Coordinate previousPlayerPosition,
         bool playerLingered,
         IRandomSource random,
@@ -94,13 +107,13 @@ public static class MonsterController
         IReadOnlySet<Coordinate>? safeRooms = null,
         ICollection<string>? narration = null)
     {
-        var playerHere = TimeScale.IsValidYear(player.CurrentYear);
-        var playerSafe = playerHere && safeRooms is not null && safeRooms.Contains(player.Position);
+        var playerHere = player is not null && TimeScale.IsValidYear(player.CurrentYear);
+        var playerSafe = playerHere && safeRooms is not null && safeRooms.Contains(player!.Position);
 
         foreach (var monster in population.Monsters.Where(m => !m.Health.IsDead).ToList())
         {
             var startedAt = monster.Position;
-            var distance = playerHere ? ManhattanDistance(monster.Position, player.Position) : int.MaxValue;
+            var distance = playerHere ? ManhattanDistance(monster.Position, player!.Position) : int.MaxValue;
 
             // --- aggro accrual / decay -------------------------------------
             // An apex barely registers a passer-by (it picks its fights),
@@ -111,7 +124,7 @@ public static class MonsterController
             {
                 monster.DecayAggro(AggroModel.DecayPerTick);
             }
-            else if (player.Position.Equals(monster.Position) && !previousPlayerPosition.Equals(monster.Position))
+            else if (player!.Position.Equals(monster.Position) && !previousPlayerPosition.Equals(monster.Position))
             {
                 monster.RaiseAggro(AggroModel.EnterTileAggro * aggroScale); // stepped onto me
             }
@@ -133,7 +146,7 @@ public static class MonsterController
 
                 if (shadowing && distance is > 0 and <= AggroRange)
                 {
-                    StepToward(map, monster, player.Position, random, safeRooms);
+                    StepToward(map, monster, player!.Position, random, safeRooms);
                 }
                 else if (shadowing && distance == 0)
                 {
@@ -157,27 +170,44 @@ public static class MonsterController
 
             if (narration is not null && playerHere && !monster.Position.Equals(startedAt))
             {
-                NarrateMovement(narration, monster, startedAt, player.Position, random);
+                NarrateMovement(narration, monster, startedAt, player!.Position, random);
             }
 
             monster.AdvanceIonRegenTick(IonEconomy.TicksPerIonRegen(monster.Tier, classDrainMultiplier: 1.0));
         }
 
-        // Every event here happens in the year the player is standing in —
-        // MonsterController only ever runs for that one year.
-        var year = player.CurrentYear;
-
         ResolveInfighting(population, random, broadcast, year);
         MaybeRespawn(population, map, roster, random);
 
         if (playerHere && playerLingered && !playerSafe && population.TicksSinceAmbush >= AmbushCooldownTicks
-            && ResolveAmbush(population, player, random, broadcast, year))
+            && ResolveAmbush(population, player!, random, broadcast, year))
         {
             population.TicksSinceAmbush = 0;
         }
 
         population.TicksSinceAmbush++;
     }
+
+    /// <summary>
+    /// Runs one tick for a year the player is <b>not</b> standing in
+    /// (docs/GDD.md §7.1): its monsters still drift, fight each other,
+    /// heal, grab ground loot and respawn — so the timeline stays alive
+    /// while you're elsewhere and a year you cleared doesn't stay a
+    /// museum — but nothing tracks, shadows or ambushes anyone, and no
+    /// player-local narration is produced. Infight kills post to the same
+    /// broadcast channel, tagged with <paramref name="year"/>.
+    /// </summary>
+    public static void TickUnattended(
+        YearPopulation population,
+        LevelMap map,
+        IReadOnlyList<Func<Monster>> roster,
+        int year,
+        IRandomSource random,
+        BroadcastChannel broadcast,
+        IReadOnlySet<Coordinate>? safeRooms = null)
+        => Tick(population, map, roster, year, player: null,
+            previousPlayerPosition: default, playerLingered: false,
+            random, broadcast, safeRooms, narration: null);
 
     /// <summary>Hurt monster → heal (converting a carried item first if out of Ions). True if it acted.</summary>
     private static bool TryHeal(Monster monster)

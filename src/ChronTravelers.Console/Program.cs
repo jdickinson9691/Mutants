@@ -42,10 +42,12 @@ using Spectre.Console;
 // player heading for one on the `monsters` list actually finds it near
 // where it was), fight each other (the loser's loot drops on the floor -
 // `take` it), heal from their own Ion pool, and slowly respawn toward a
-// soft cap. `fight` engages a monster in the current room; only the
-// player's current year is simulated live
-// (ChronTravelers.Engine.Npc.MonsterController via WorldSimulation.Tick),
-// other years hold frozen monsters until visited, and none of this is
+// soft cap. `fight` engages a monster in the current room. Every year
+// that's been instantiated this session keeps simulating each tick
+// (ChronTravelers.Engine.Npc.MonsterController via WorldSimulation.Tick) -
+// the player's year with full aggro/ambush/narration, every other one
+// unattended (monsters still infight, drop loot, heal and respawn while
+// you're away). Years nobody has entered stay dormant. None of this is
 // written to the save (a fresh session re-seeds).
 // Monsters ignore passers-by: each carries an earned aggro meter
 // (ChronTravelers.Core.Monsters.AggroModel) raised by stepping onto its tile

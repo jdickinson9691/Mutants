@@ -46,7 +46,7 @@ public class MonsterControllerTests
         IReadOnlySet<Coordinate>? safeRooms = null,
         IReadOnlyList<Func<Monster>>? roster = null,
         ICollection<string>? narration = null)
-        => MonsterController.Tick(pop, map, roster ?? [], player,
+        => MonsterController.Tick(pop, map, roster ?? [], player.CurrentYear, player,
             previousPlayerPosition ?? player.Position, playerLingered, random,
             broadcast ?? new BroadcastChannel(), safeRooms, narration);
 
@@ -229,6 +229,30 @@ public class MonsterControllerTests
         Assert.NotEqual(start, monster.Position);
         Assert.True(map.Rooms.ContainsKey(monster.Position));
         Assert.Equal(1, Math.Abs(monster.Position.East - start.East) + Math.Abs(monster.Position.North - start.North));
+    }
+
+    [Fact]
+    public void TickUnattended_RoamsAndInfightsButNeverAmbushes_EvenWithHostileMonsters()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+
+        var a = Lurker(Coordinate.Origin);
+        var b = Lurker(Coordinate.Origin); // co-located → infight candidates
+        a.RaiseAggro(AggroModel.Cap);
+        b.RaiseAggro(AggroModel.Cap);
+        pop.AddMonster(a);
+        pop.AddMonster(b);
+        var broadcast = new BroadcastChannel();
+
+        // Fixed(0.0): both wander the same way (stay together) and the infight roll passes.
+        MonsterController.TickUnattended(pop, map, [], year: 3210, StubRandomSource.Fixed(0.0), broadcast);
+
+        Assert.Single(pop.Monsters.Where(m => !m.Health.IsDead));
+        var slain = Assert.Single(broadcast.Events);
+        Assert.Contains("was slain by", slain.Message);
+        Assert.Equal(3210, slain.Year);
+        Assert.DoesNotContain(broadcast.Events, e => e.Kind == GameEventKind.Ambushed);
     }
 
     [Fact]

@@ -127,9 +127,8 @@ public sealed class WorldSimulation
             }
         }
 
-        // Only the year the player is standing in runs live spatial monster
-        // simulation (movement, infighting, healing); other years' monsters
-        // stay frozen where they were placed until visited.
+        // The year the player is standing in runs the full spatial monster
+        // sim — movement plus aggro / shadowing / ambush / narration.
         if (ChronTravelers.Core.Time.TimeScale.IsValidYear(player.CurrentYear))
         {
             var lingered = playerActedIdly
@@ -138,7 +137,25 @@ public sealed class WorldSimulation
             var previousPosition = _lastPlayerYear == player.CurrentYear ? _lastPlayerPosition : player.Position;
             var here = World.GetYear(player.CurrentYear);
             var safeRooms = here.StoreSlots.Select(slot => slot.Location).ToHashSet();
-            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player, previousPosition, lingered, _random, Broadcast, safeRooms, _narration);
+            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player.CurrentYear, player, previousPosition, lingered, _random, Broadcast, safeRooms, _narration);
+        }
+
+        // Every other year that's been instantiated this session (the
+        // player's past stops, and every year an NPC is currently in) runs
+        // an unattended sim so its monsters keep fighting each other,
+        // dropping loot, healing and respawning while the player is away —
+        // docs/GDD.md §7.1. Bounded by the memo cache, which only holds
+        // years someone has actually entered.
+        foreach (var year in World.VisitedYears.ToList())
+        {
+            if (year == player.CurrentYear)
+            {
+                continue;
+            }
+
+            var content = World.GetYear(year);
+            var safe = content.StoreSlots.Select(slot => slot.Location).ToHashSet();
+            MonsterController.TickUnattended(content.Population, content.Map, content.MonsterRoster, year, _random, Broadcast, safe);
         }
 
         _lastPlayerYear = player.CurrentYear;
