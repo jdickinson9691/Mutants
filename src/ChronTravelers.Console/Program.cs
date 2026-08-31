@@ -15,6 +15,15 @@ using ChronTravelers.Engine.Persistence;
 using ChronTravelers.Engine.Simulation;
 using Spectre.Console;
 
+// Lore (docs/GDD.md §1): Project Meridian's temporal tunnel - a
+// classified government machine, Time-Tunnel-inspired - tore a standing
+// rupture on its first full-power run and "frayed" the downstream
+// timeline. The crew on the gantry, the Chron Travelers, were swept
+// loose and now surface at random years between 2000 and 5000 A.D.,
+// unable to steer. You ride Ion surges (tunnel-charge) to move through
+// the fray; the surface team never stops looking, but it can't pull you
+// back. Push deepest downstream and level up - that's the board.
+//
 // The world is a continuous timeline (docs/GDD.md §3.2): the player starts
 // in the year 2000 A.D. and `travel`s - spending Ions - to any year up to
 // 5000, with monsters and loot scaling smoothly by year. Nothing gates
@@ -22,8 +31,9 @@ using Spectre.Console;
 // symmetric) and how hard the fights get. Every year's map is generated
 // deterministically from a per-save world seed, so revisiting a year is
 // stable. "Warden" years - a random 50-100 years apart, placed by the
-// seed - hold a tough guaranteed encounter guarding a year-scaled
-// Legendary trophy, but block nothing.
+// seed - station an automated temporal-defense construct guarding a
+// year-scaled Legendary trophy from a pre-collapse tech cache, but
+// block nothing.
 //
 // Monsters are placed spatially in the year the player is standing in
 // (ChronTravelers.Core.Time.YearPopulation, seeded deterministically on first
@@ -78,6 +88,11 @@ using Spectre.Console;
 
 AnsiConsole.Write(new FigletText("ChronTravelers").Color(Color.Green));
 AnsiConsole.MarkupLine("[grey](pre-release build — the continuous 2000–5000 A.D. timeline)[/]");
+AnsiConsole.WriteLine();
+AnsiConsole.MarkupLine("[grey]Project Meridian's tunnel opened for eight seconds and never fully closed.[/]");
+AnsiConsole.MarkupLine("[grey]It frayed the future. The gantry crew fell downstream with it — you among them,[/]");
+AnsiConsole.MarkupLine("[grey]surfacing somewhere between 2000 and 5000 A.D. with no way to steer and no way home.[/]");
+AnsiConsole.MarkupLine("[grey]Ride the Ion surges. Go as far downstream as you can. The surface team is still looking.[/]");
 AnsiConsole.WriteLine();
 
 var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -378,10 +393,10 @@ static CharacterClass? ReadClassChoice()
 {
     var classes = Enum.GetValues<CharacterClass>();
 
-    AnsiConsole.MarkupLine("Choose your [green]class[/]:");
+    AnsiConsole.MarkupLine("Choose your [green]role[/] on the Meridian crew:");
     for (var i = 0; i < classes.Length; i++)
     {
-        AnsiConsole.MarkupLine($"  [green]{i + 1}[/]. {classes[i]}");
+        AnsiConsole.MarkupLine($"  [green]{i + 1}[/]. [bold]{classes[i]}[/] [grey]- {ClassBlurb(classes[i])}[/]");
     }
 
     while (true)
@@ -405,9 +420,20 @@ static CharacterClass? ReadClassChoice()
             return byName;
         }
 
-        AnsiConsole.MarkupLine("[red]Please enter a number from the list, or a class name.[/]");
+        AnsiConsole.MarkupLine("[red]Please enter a number from the list, or a role name.[/]");
     }
 }
+
+/// <summary>One-line flavour for the role-select screen (docs/GDD.md §4). Mechanics live in ChronTravelers.Core.Classes.</summary>
+static string ClassBlurb(CharacterClass characterClass) => characterClass switch
+{
+    CharacterClass.Soldier => "station security. Toughest, hardest-hitting, cheapest on Ions.",
+    CharacterClass.Spy => "recon and infiltration. Fast, evasive, deadly on the opening strike.",
+    CharacterClass.Doctor => "trauma medicine. Keeps you and any allies standing; wrecks fray-echoes.",
+    CharacterClass.Scientist => "tunnel theory. Glass cannon — huge Ion damage, little armour.",
+    CharacterClass.Engineer => "power and hardware. Control, sabotage, and dirty micro-jumps.",
+    _ => string.Empty,
+};
 
 static string ContentDirectory() => Path.Combine(AppContext.BaseDirectory, "Content");
 
@@ -513,6 +539,11 @@ static (Traveler Traveler, long WorldSeed, CharacterSaveData? LoadedSave)? Handl
             return null;
         }
 
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[grey]You were on the gantry when the tunnel lit. The next thing you knew, the lab was gone[/]");
+        AnsiConsole.MarkupLine($"[grey]and the sky was the wrong colour. Wherever — whenever — this is, you're the {characterClass} now, and[/]");
+        AnsiConsole.MarkupLine($"[grey]you're on your own. Downstream is the only direction that means anything.[/]");
+
         return (new Traveler(name, characterClass.Value), System.Random.Shared.NextInt64(), null);
     }
 
@@ -524,7 +555,7 @@ static (Traveler Traveler, long WorldSeed, CharacterSaveData? LoadedSave)? Handl
 
     if (saveData.SchemaVersion < CharacterSaveData.CurrentSchemaVersion)
     {
-        AnsiConsole.MarkupLine("[yellow]This save predates the timeline rework — your character carries over, dropped into the year that matches its old depth. The world is freshly generated.[/]");
+        AnsiConsole.MarkupLine("[yellow]This save predates the fray rework — your Traveler carries over, dropped into the year that matches its old depth downstream. The timeline is freshly generated.[/]");
     }
 
     AnsiConsole.MarkupLine($"[green]Welcome back, {Markup.Escape(loaded.Name)}![/]");
