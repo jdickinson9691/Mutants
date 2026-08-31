@@ -98,6 +98,15 @@ using Spectre.Console;
 // %APPDATA%\ChronTravelers\chrontravelers.db, and carries the world seed, the
 // current/furthest year, the cleared Warden years, and every store
 // the player owns (year + capital + listings, re-attached on load).
+//
+// Any unhandled exception (main thread or otherwise) is written to a
+// crash report under %APPDATA%\ChronTravelers\crashes\ before the process
+// exits — see CrashHandler / WriteCrashReport at the foot of this file —
+// so a packaged build that dies on the player still leaves something to
+// send back.
+
+AppDomain.CurrentDomain.UnhandledException += (_, e) => CrashHandler(e.ExceptionObject as Exception);
+System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) => CrashHandler(e.Exception);
 
 RenderTitle();
 
@@ -363,6 +372,71 @@ AnsiConsole.MarkupLine(traveler.Health.IsDead
     ? "[grey]Game over.[/]"
     : "[grey]Farewell, Traveler. Progress saved.[/]");
 return;
+
+/// <summary>
+/// Last line of defence for an unhandled exception: write a crash report,
+/// tell the player where it landed, and hold the window open so they can
+/// read it before it closes. Never throws — a failure here just falls
+/// through to the runtime's own exit.
+/// </summary>
+static void CrashHandler(Exception? ex)
+{
+    try
+    {
+        var path = WriteCrashReport(ex);
+
+        Console.WriteLine();
+        Console.WriteLine("ChronTravelers hit a problem it couldn't recover from and has to close.");
+        if (path is not null)
+        {
+            Console.WriteLine($"A crash report was written to:\n  {path}");
+            Console.WriteLine("Send that file along if you're reporting the bug.");
+        }
+
+        if (!Console.IsInputRedirected)
+        {
+            Console.WriteLine();
+            Console.Write("Press Enter to close. ");
+            Console.ReadLine();
+        }
+    }
+    catch
+    {
+        // If even the crash handler can't run, let the process die quietly.
+    }
+}
+
+/// <summary>Writes an unhandled-exception report to %APPDATA%\ChronTravelers\crashes\. Returns the file path, or null if it couldn't be written.</summary>
+static string? WriteCrashReport(Exception? ex)
+{
+    try
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var dir = string.IsNullOrEmpty(appData)
+            ? Path.Combine(AppContext.BaseDirectory, "crashes")
+            : Path.Combine(appData, "ChronTravelers", "crashes");
+        Directory.CreateDirectory(dir);
+
+        var file = Path.Combine(dir, $"crash-{DateTime.Now:yyyyMMdd-HHmmss-fff}.log");
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
+
+        var report =
+            "ChronTravelers crash report\n" +
+            $"Time (local): {DateTime.Now:yyyy-MM-dd HH:mm:ss} ({DateTimeOffset.Now:zzz})\n" +
+            $"Version:      {version}\n" +
+            $"Runtime:      {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}\n" +
+            $"OS:           {System.Runtime.InteropServices.RuntimeInformation.OSDescription}\n" +
+            new string('-', 60) + "\n" +
+            (ex?.ToString() ?? "(no exception object was supplied)") + "\n";
+
+        File.WriteAllText(file, report);
+        return file;
+    }
+    catch
+    {
+        return null;
+    }
+}
 
 static void HandleSave(Traveler traveler, GameRepository repository, long worldSeed, TimeWorld world)
 {
