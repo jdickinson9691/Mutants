@@ -37,6 +37,9 @@ public sealed class Monster
     /// <summary>Current grid position within its year's map — set by <see cref="PlaceAt"/> / <see cref="MoveTo"/>.</summary>
     public Coordinate Position { get; private set; } = Coordinate.Origin;
 
+    /// <summary>A defence penalty applied by a ranged <see cref="Items.RangedEffectType.Weaken"/> shot, consumed once by the next Mutants.Engine.Combat.CombatSession against this monster.</summary>
+    public int PendingDefensePenalty { get; set; }
+
     private readonly List<Item> _inventory = [];
 
     /// <summary>Items this monster is carrying — picked up off the ground, spent via <see cref="Convert"/>, and dropped where it dies.</summary>

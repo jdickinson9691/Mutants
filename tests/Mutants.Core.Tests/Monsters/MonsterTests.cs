@@ -28,6 +28,12 @@ public class MonsterTests
     }
 
     [Fact]
+    public void PendingDefensePenalty_DefaultsToZero()
+    {
+        Assert.Equal(0, Monster.Create("Beast", 1).PendingDefensePenalty);
+    }
+
+    [Fact]
     public void PlaceAt_And_MoveTo_UpdatePosition()
     {
         var monster = Monster.Create("Beast", 1);

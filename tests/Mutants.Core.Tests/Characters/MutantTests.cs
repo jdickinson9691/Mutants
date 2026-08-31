@@ -269,6 +269,27 @@ public class MutantTests
     }
 
     [Fact]
+    public void Wield_RoutesARangedWeaponToItsOwnSlot_AndUnequipsOnRemove()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var melee = Item.Create("Axe", ItemType.Weapon, 1, Rarity.Common);
+        var bow = Item.CreateRanged("Longbow", 1, Rarity.Uncommon, RangedKind.Bow, ammoCapacity: 10);
+        mutant.AddToInventory(melee);
+        mutant.AddToInventory(bow);
+
+        mutant.Wield(melee);
+        mutant.Wield(bow);
+
+        Assert.Equal(melee, mutant.EquippedWeapon);
+        Assert.Equal(bow, mutant.EquippedRanged);
+        Assert.Null(mutant.EquippedArmor);
+
+        mutant.RemoveFromInventory(bow);
+        Assert.Null(mutant.EquippedRanged);
+        Assert.Equal(melee, mutant.EquippedWeapon); // untouched
+    }
+
+    [Fact]
     public void Wield_AllowsOffClassGearAtAPenalty_RatherThanBlockingIt()
     {
         var mage = new Mutant("Zeta", CharacterClass.Mage);

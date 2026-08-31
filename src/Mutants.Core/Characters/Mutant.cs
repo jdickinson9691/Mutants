@@ -59,6 +59,9 @@ public sealed class Mutant
     public Item? EquippedWeapon { get; private set; }
     public Item? EquippedArmor { get; private set; }
 
+    /// <summary>The wielded ranged weapon (Wand / Bow / Gun), fired with <c>point</c> / <c>shoot</c>. Separate from <see cref="EquippedWeapon"/> — you carry a melee weapon and a ranged sidearm.</summary>
+    public Item? EquippedRanged { get; private set; }
+
     /// <summary>
     /// Turn order / "who acts first" stat for combat — original design
     /// (not GDD-specified), currently just the raw Agility stat.
@@ -466,6 +469,11 @@ public sealed class Mutant
         {
             EquippedArmor = null;
         }
+
+        if (EquippedRanged == item)
+        {
+            EquippedRanged = null;
+        }
     }
 
     /// <summary>
@@ -493,6 +501,9 @@ public sealed class Mutant
                 break;
             case ItemType.Armor:
                 EquippedArmor = item;
+                break;
+            case ItemType.Ranged:
+                EquippedRanged = item;
                 break;
             default:
                 throw new InvalidOperationException($"Unexpected wieldable item type '{item.Type}'.");
