@@ -5,7 +5,11 @@ namespace Mutants.Core.Items;
 /// to the point in the timeline it was generated on... tier drives base
 /// stats, sell price, and Ion-conversion value." The GDD confirms tier
 /// drives value but does not specify the curve — this linear baseline
-/// (10 * tier) is original tuning pending Design Agent sign-off.
+/// (<c>12 * tier + 10</c>) is original tuning pending Design Agent
+/// sign-off. The flat <c>+10</c> is a front-loaded bump from the earlier
+/// <c>10 * tier</c> after playtesting: it roughly doubles tier-1 loot
+/// value (a sale/convert that read as pocket lint now funds a real
+/// purchase after a short grind) while barely moving the high end.
 ///
 /// "Tier" is continuous: <see cref="Mutants.Core.Time.TimeScale"/> maps a
 /// year to a fractional tier, so every function has a <c>double</c>
@@ -22,7 +26,7 @@ public static class LootScaling
             throw new ArgumentOutOfRangeException(nameof(tier), tier, "Tier must be at least 1.");
         }
 
-        return 10 * tier;
+        return 12 * tier + 10;
     }
 
     /// <summary>Final item value = tier baseline, modulated by rarity — docs/GDD.md §5.</summary>

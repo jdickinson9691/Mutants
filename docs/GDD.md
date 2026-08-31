@@ -210,9 +210,11 @@ area/group to a capstone — is the standard every class follows.)
 - **Scaling**: an item's `tier` is derived from the **year** it was
   generated in (`TimeScale.TierForYear`, a continuous 1.0–9.0 across
   2000–5000); tier drives base stats, sell price, and Ion-conversion value
-  via `LootScaling`, so loot from year 4000 is categorically better than
-  loot from year 2100 — this implements "loot scales based on time travel
-  level" against the continuous timeline.
+  via `LootScaling` (value baseline `12 * tier + 10` — the flat term is a
+  playtest bump that roughly doubles tier-1 loot so an early grind funds a
+  real purchase, tapering to ~1.3× by tier 9), so loot from year 4000 is
+  categorically better than loot from year 2100 — this implements "loot
+  scales based on time travel level" against the continuous timeline.
 - **Disposition**: every lootable item supports the same three verbs as the
   original — `wield` (equip if class-compatible), `sell <item>` (at any
   store, price is store-and-negotiation-dependent, see §6), `convert <item>`

@@ -5,10 +5,10 @@ namespace Mutants.Core.Tests.Items;
 public class LootScalingTests
 {
     [Theory]
-    [InlineData(1, 10)]
-    [InlineData(2, 20)]
-    [InlineData(10, 100)]
-    public void TierBaseValue_IsTenTimesTier(int tier, int expected)
+    [InlineData(1, 22)]   // 12*1 + 10 — front-loaded early bump
+    [InlineData(2, 34)]
+    [InlineData(10, 130)]
+    public void TierBaseValue_IsTwelveTimesTierPlusTen(int tier, int expected)
     {
         Assert.Equal(expected, LootScaling.TierBaseValue(tier));
     }
@@ -22,8 +22,8 @@ public class LootScalingTests
     [Fact]
     public void ValueFor_AppliesRarityMultiplierToTierBaseline()
     {
-        Assert.Equal(10, LootScaling.ValueFor(tier: 1, Rarity.Common));
-        Assert.Equal(20, LootScaling.ValueFor(tier: 1, Rarity.Legendary));
+        Assert.Equal(22, LootScaling.ValueFor(tier: 1, Rarity.Common));
+        Assert.Equal(44, LootScaling.ValueFor(tier: 1, Rarity.Legendary));
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class LootScalingTests
     [Fact]
     public void DoubleOverloads_AreContinuousBetweenWholeTiers()
     {
-        Assert.Equal(25.0, LootScaling.TierBaseValue(2.5), precision: 6);
+        Assert.Equal(40.0, LootScaling.TierBaseValue(2.5), precision: 6); // 12*2.5 + 10
 
         var atTwo = LootScaling.ValueFor(2.0, Rarity.Common);
         var atHalf = LootScaling.ValueFor(2.5, Rarity.Common);

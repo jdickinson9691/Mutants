@@ -84,14 +84,14 @@ public class MutantTests
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);
         mutant.Ions.Spend(mutant.Ions.Current); // drain to 0 so Add() has headroom to observe
-        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 1, Rarity.Common); // value 10
+        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 1, Rarity.Common); // value 22
         mutant.AddToInventory(item);
 
         var gained = mutant.Convert(item);
 
-        Assert.Equal(4, gained); // floor(10 * 0.4) = 4
+        Assert.Equal(8, gained); // floor(22 * 0.4) = 8
         Assert.DoesNotContain(item, mutant.Inventory);
-        Assert.Equal(4, mutant.Ions.Current);
+        Assert.Equal(8, mutant.Ions.Current);
     }
 
     [Fact]
@@ -357,14 +357,14 @@ public class MutantTests
     public void Sell_RemovesItemAndAddsRiblets()
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);
-        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // value 20
+        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // value 34
         mutant.AddToInventory(item);
 
         var gained = mutant.Sell(item);
 
-        Assert.Equal(20, gained);
+        Assert.Equal(34, gained);
         Assert.DoesNotContain(item, mutant.Inventory);
-        Assert.Equal(20, mutant.Riblets);
+        Assert.Equal(34, mutant.Riblets);
     }
 
     [Fact]

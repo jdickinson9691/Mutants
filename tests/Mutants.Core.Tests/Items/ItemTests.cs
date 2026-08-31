@@ -26,9 +26,9 @@ public class ItemTests
     [Fact]
     public void ConvertValue_MatchesIonEconomyFormula()
     {
-        var item = Item.Create("Junk Scrap", ItemType.Junk, tier: 2, Rarity.Common); // value = 20
+        var item = Item.Create("Junk Scrap", ItemType.Junk, tier: 2, Rarity.Common); // value = 34
 
-        Assert.Equal(8, item.ConvertValue()); // floor(20 * 0.4) = 8
+        Assert.Equal(13, item.ConvertValue()); // floor(34 * 0.4) = 13
     }
 
     [Fact]
