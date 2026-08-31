@@ -33,13 +33,15 @@ using Spectre.Console;
 // monster in the current room; only the player's current year is
 // simulated live (Mutants.Engine.Npc.MonsterController via
 // WorldSimulation.Tick), other years hold frozen monsters until visited,
-// and none of this is written to the save (a fresh session re-seeds). A
-// monster within one room of you closes in instead of wandering; one
-// sharing your room holds position and, on a turn you spend idle (look /
-// status / wait / inventory / ...), lands one ambush hit - acting (move,
-// fight, heal, shop, wield) is safe, and a store room is a haven nothing
-// pursues or ambushes into. Keep moving and a chaser loses your trail
-// after ~4 rooms. The inline kill-feed after each command is capped and
+// and none of this is written to the save (a fresh session re-seeds).
+// Monsters ignore passers-by: each carries an earned aggro meter
+// (Mutants.Core.Monsters.AggroModel) raised by stepping onto its tile
+// repeatedly / lingering on it / being shot, and decaying when you leave.
+// Calm -> wanders and ignores you; Alert -> shadows you but no swing;
+// Hostile -> also lands one ambush hit, but only on an idle turn (look /
+// status / wait / ...), never while you're acting (move / fight / heal /
+// shop / wield) and never into a store room (a haven). `monsters` shows
+// each one's mood. The inline kill-feed after each command is capped and
 // drops NPC time-hops - `news` still shows the lot.
 //
 // Ranged weapons (Mutants.Core.Items.Item / RangedKind - wands, bows,
@@ -1375,12 +1377,19 @@ static void RenderMonsters(Mutant mutant, TimeWorld world)
     table.AddColumn("Tier");
     table.AddColumn("HP");
     table.AddColumn("Ions");
+    table.AddColumn("Mood");
     table.AddColumn("Location");
 
     foreach (var m in living.OrderBy(m => m.Position.Equals(mutant.Position) ? 0 : 1).ThenBy(m => m.Position.North).ThenBy(m => m.Position.East))
     {
         var loc = Markup.Escape(m.Position.ToString()) + (m.Position.Equals(mutant.Position) ? " [green](here)[/]" : "");
-        table.AddRow(Markup.Escape(m.Name), m.Tier.ToString(), $"{m.Health.Current}/{m.Health.Max}", $"{m.Ions.Current}/{m.Ions.Max}", loc);
+        var mood = AggroModel.MoodFor(m.Aggro) switch
+        {
+            AggroMood.Hostile => "[red]hostile[/]",
+            AggroMood.Alert => "[yellow]alert[/]",
+            _ => "[grey]calm[/]",
+        };
+        table.AddRow(Markup.Escape(m.Name), m.Tier.ToString(), $"{m.Health.Current}/{m.Health.Max}", $"{m.Ions.Current}/{m.Ions.Max}", mood, loc);
     }
 
     AnsiConsole.Write(table);
@@ -1770,7 +1779,9 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]wait[/] (or z)         - pass a turn (a monster in the room may get a hit in)");
     AnsiConsole.MarkupLine("  [green]help[/] (or ?)         - show this list");
     AnsiConsole.MarkupLine("  [green]quit[/] (or exit)      - leave the game (auto-saves unless you died)");
-    AnsiConsole.MarkupLine("[grey]  A monster sharing your room only hits you on an idle turn (look/status/wait/…).[/]");
-    AnsiConsole.MarkupLine("[grey]  Acting — moving, fighting, healing, shopping — is safe, and a store room is a haven.[/]");
-    AnsiConsole.MarkupLine("[grey]  Keep moving and a chasing monster loses your trail after a few rooms.[/]");
+    AnsiConsole.MarkupLine("[grey]  Monsters ignore you until provoked — mostly by stepping onto their tile over and[/]");
+    AnsiConsole.MarkupLine("[grey]  over, or shooting them ([yellow]monsters[/] shows each one's mood: calm/alert/hostile).[/]");
+    AnsiConsole.MarkupLine("[grey]  Only a hostile monster in your room hits you, and only on an idle turn[/]");
+    AnsiConsole.MarkupLine("[grey]  (look/status/wait/…). Acting is safe, a store room is a haven, and moving a[/]");
+    AnsiConsole.MarkupLine("[grey]  couple of rooms away calms a monster back down.[/]");
 }

@@ -144,10 +144,11 @@ public class WorldSimulationTests
         var year = 2000;
         var player = NewMutant("Player", world, year);
 
-        // Stand the player on a monster's tile that isn't a store haven.
+        // Stand the player on a hostile monster's tile that isn't a store haven.
         var content = world.GetYear(year);
         var storeTiles = content.StoreSlots.Select(s => s.Location).ToHashSet();
         var monster = content.Population.Monsters.First(m => !m.Health.IsDead && !storeTiles.Contains(m.Position));
+        monster.RaiseAggro(Mutants.Core.Monsters.AggroModel.Cap);
         player.PlaceAt(monster.Position);
 
         var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.4));

@@ -44,11 +44,16 @@ public static class RangedResolver
         var killed = target.Health.IsDead;
 
         var effectNote = "";
-        if (!killed && weapon.RangedEffect == RangedEffectType.Weaken)
+        if (!killed)
         {
-            var weaken = Math.Max(1, (int)Math.Round(magnitude));
-            target.PendingDefensePenalty += weaken;
-            effectNote = $" {target.Name}'s guard is rattled (-{weaken} defense next fight).";
+            target.RaiseAggro(Mutants.Core.Monsters.AggroModel.RangedHitAggro); // you shot it — it noticed
+
+            if (weapon.RangedEffect == RangedEffectType.Weaken)
+            {
+                var weaken = Math.Max(1, (int)Math.Round(magnitude));
+                target.PendingDefensePenalty += weaken;
+                effectNote = $" {target.Name}'s guard is rattled (-{weaken} defense next fight).";
+            }
         }
 
         var verb = weapon.RangedKind == RangedKind.Wand ? "blasts" : "hits";

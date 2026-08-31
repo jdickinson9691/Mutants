@@ -40,8 +40,19 @@ public sealed class Monster
     /// <summary>A defence penalty applied by a ranged <see cref="Items.RangedEffectType.Weaken"/> shot, consumed once by the next Mutants.Engine.Combat.CombatSession against this monster.</summary>
     public int PendingDefensePenalty { get; set; }
 
-    /// <summary>Consecutive ticks this monster has spent chasing the player (in aggro range without a fight). Past a threshold it loses interest and wanders, so the player can shake it by moving off. Reset when the player leaves range. Session state — not saved.</summary>
-    public int ChaseTicks { get; set; }
+    /// <summary>
+    /// How annoyed this monster is with the player — 0 = indifferent. Raised
+    /// by the player entering/lingering on its tile or shooting it (see
+    /// <see cref="AggroModel"/>), decays when the player leaves. Drives
+    /// whether it pursues or ambushes. Session state — not saved.
+    /// </summary>
+    public double Aggro { get; private set; }
+
+    /// <summary>Adds to <see cref="Aggro"/>, clamped to <see cref="AggroModel.Cap"/>.</summary>
+    public void RaiseAggro(double amount) => Aggro = Math.Clamp(Aggro + Math.Max(0, amount), 0, AggroModel.Cap);
+
+    /// <summary>Bleeds off <see cref="Aggro"/>, never below 0.</summary>
+    public void DecayAggro(double amount) => Aggro = Math.Max(0, Aggro - Math.Max(0, amount));
 
     private readonly List<Item> _inventory = [];
 

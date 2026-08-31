@@ -30,6 +30,18 @@ public class RangedResolverTests
     }
 
     [Fact]
+    public void Fire_RaisesTheTargetsAggro_WhenItSurvives()
+    {
+        var bow = Item.CreateRanged("Longbow", 2, Rarity.Uncommon, RangedKind.Bow, ammoCapacity: 10);
+        var target = Target();
+        Assert.Equal(0, target.Aggro);
+
+        RangedResolver.Fire(Shooter(), target, bow, Neutral());
+
+        Assert.Equal(AggroModel.RangedHitAggro, target.Aggro);
+    }
+
+    [Fact]
     public void Fire_GunAndWandPierceArmour_BowDoesNot()
     {
         var bow = Item.CreateRanged("Bow", 2, Rarity.Uncommon, RangedKind.Bow, 10);

@@ -13,20 +13,20 @@ namespace Mutants.Engine.Npc;
 /// player is standing in (<see cref="YearPopulation"/>) — the monster
 /// counterpart to <see cref="NpcController"/>. Each tick every living
 /// monster heals if hurt (spending Ions, first converting a carried item
-/// if broke), grabs loot off the floor of its room, closes on the player
-/// if it's within <see cref="AggroRange"/> (otherwise wanders through a
-/// random exit); monsters sharing a room may fight each other, the loser
-/// dropping its carried items plus a loot-table roll where it fell; a slow
-/// trickle respawns the population back toward its soft cap; and finally a
-/// monster standing in the player's room lands one ambush hit — so an
-/// <em>idle</em> turn next to a monster costs HP.
+/// if broke), grabs loot off the floor of its room, or moves; monsters
+/// sharing a room may fight each other, the loser dropping its carried
+/// items plus a loot-table roll where it fell; a slow trickle respawns the
+/// population back toward its soft cap.
 ///
-/// Three concessions keep the pressure from being oppressive: a monster
-/// that has chased the player for <see cref="ChaseGiveUpTicks"/> ticks
-/// without a fight loses interest and wanders (so you can shake a tail);
-/// nothing pursues, wanders, or ambushes into a <c>safeRoom</c> (a store);
-/// and the ambush only fires on a turn the player spent doing nothing (the
-/// console passes <c>playerLingered</c> only for informational commands).
+/// A monster does <b>not</b> pursue or attack anyone who simply walks past.
+/// Its behaviour is gated by an earned <see cref="Monster.Aggro"/> meter
+/// (see <see cref="Mutants.Core.Monsters.AggroModel"/>): stepping onto its
+/// tile, lingering on/next to it, or shooting it raises aggro; moving away
+/// bleeds it off. Below <c>AlertThreshold</c> the monster ignores the
+/// player and wanders; at Alert it shadows (moves to close) but takes no
+/// swing; only a <c>Hostile</c> monster lands an ambush hit — and only on
+/// a turn the player spent idle, never in a <c>safeRoom</c> (a store), and
+/// no more than once every <see cref="AmbushCooldownTicks"/> ticks.
 /// Everything is thresholds/chances — original tuning, not GDD-specified.
 /// </summary>
 public static class MonsterController
@@ -38,25 +38,26 @@ public static class MonsterController
     private const double RespawnChance = 0.25;
     private const int DuelRoundCap = 200;
 
-    /// <summary>Minimum ticks between ambush hits on the player, so a quick <c>status</c> + <c>monsters</c> check near a monster costs one hit, not three.</summary>
+    /// <summary>Minimum ticks between ambush hits on the player, so a quick <c>status</c> + <c>monsters</c> check near a hostile monster costs one hit, not three.</summary>
     private const int AmbushCooldownTicks = 2;
 
     /// <summary>
-    /// A monster this many rooms (Manhattan) from the player or nearer
-    /// stops wandering and moves to close the distance; one that's already
-    /// in the player's room holds position rather than drifting off. Kept
-    /// deliberately short so "something stirs to the north" (one room away)
-    /// is a real approach, not a monster that vanishes before you can act.
+    /// How near (Manhattan) the player has to be for a monster to accrue
+    /// aggro toward them and, once alerted, to move to close the distance.
+    /// Kept at one room so "something stirs to the north" is a real
+    /// approach.
     /// </summary>
     private const int AggroRange = 1;
 
-    /// <summary>After this many consecutive ticks chasing the player without a fight, a monster gives up and wanders — so moving off actually shakes it.</summary>
-    private const int ChaseGiveUpTicks = 4;
-
+    /// <param name="previousPlayerPosition">
+    /// Where the player stood at the end of the last tick — lets a monster
+    /// tell "stepped onto my tile" (a big aggro bump) from "was already
+    /// standing here".
+    /// </param>
     /// <param name="playerLingered">
     /// True only if the player spent this turn doing nothing (an
     /// informational command) and neither moved nor changed year. Only then
-    /// can a co-located monster ambush — acting (fighting, healing,
+    /// can a hostile co-located monster ambush — acting (fighting, healing,
     /// shopping, moving) is always safe.
     /// </param>
     /// <param name="safeRooms">
@@ -68,6 +69,7 @@ public static class MonsterController
         LevelMap map,
         IReadOnlyList<Func<Monster>> roster,
         Mutant player,
+        Coordinate previousPlayerPosition,
         bool playerLingered,
         IRandomSource random,
         BroadcastChannel broadcast,
@@ -78,39 +80,44 @@ public static class MonsterController
 
         foreach (var monster in population.Monsters.Where(m => !m.Health.IsDead).ToList())
         {
+            var distance = playerHere ? ManhattanDistance(monster.Position, player.Position) : int.MaxValue;
+
+            // --- aggro accrual / decay -------------------------------------
+            if (!playerHere || playerSafe || distance > AggroRange)
+            {
+                monster.DecayAggro(AggroModel.DecayPerTick);
+            }
+            else if (player.Position.Equals(monster.Position) && !previousPlayerPosition.Equals(monster.Position))
+            {
+                monster.RaiseAggro(AggroModel.EnterTileAggro); // stepped onto me
+            }
+            else if (distance == 0)
+            {
+                monster.RaiseAggro(AggroModel.CoLocatedPerTick); // parked on me
+            }
+            else
+            {
+                monster.RaiseAggro(AggroModel.AdjacentPerTick); // loitering next door
+            }
+
+            var mood = AggroModel.MoodFor(monster.Aggro);
+
+            // --- movement ------------------------------------------------------
             if (!TryHeal(monster) && !TryGrabLoot(population, monster))
             {
-                var distance = playerHere ? ManhattanDistance(monster.Position, player.Position) : int.MaxValue;
+                var shadowing = mood != AggroMood.Calm && playerHere && !playerSafe;
 
-                if (distance > AggroRange || playerSafe)
+                if (shadowing && distance is > 0 and <= AggroRange)
                 {
-                    // Out of aggro range (or the player's tucked into a
-                    // store) — the monster isn't tracking anyone.
-                    monster.ChaseTicks = 0;
-                    if (random.NextDouble() < WanderChance)
-                    {
-                        Wander(map, monster, random, safeRooms);
-                    }
+                    StepToward(map, monster, player.Position, random, safeRooms);
                 }
-                else
+                else if (shadowing && distance == 0)
                 {
-                    monster.ChaseTicks++;
-                    var winded = monster.ChaseTicks > ChaseGiveUpTicks;
-
-                    if (winded)
-                    {
-                        // Lost interest — drift off (this is how the player
-                        // shakes a tail: keep moving and it eventually stops).
-                        if (random.NextDouble() < WanderChance)
-                        {
-                            Wander(map, monster, random, safeRooms);
-                        }
-                    }
-                    else if (distance > 0)
-                    {
-                        StepToward(map, monster, player.Position, random, safeRooms);
-                    }
-                    // distance == 0 && !winded: hold, toe to toe.
+                    // Locked on and toe to toe — hold.
+                }
+                else if (random.NextDouble() < WanderChance)
+                {
+                    Wander(map, monster, random, safeRooms);
                 }
             }
 
@@ -265,10 +272,11 @@ public static class MonsterController
     }
 
     /// <summary>
-    /// A living monster sharing the player's room lands one free hit. Only
-    /// the hardest-hitting co-located monster attacks per tick, so a
-    /// crowded room is dangerous but not instantly lethal. The player
-    /// avoids it by <c>fight</c>ing (resolved before the tick) or leaving.
+    /// A <see cref="AggroMood.Hostile"/> monster sharing the player's room
+    /// lands one free hit. Only the hardest-hitting such monster attacks
+    /// per tick, so a crowded room is dangerous but not instantly lethal.
+    /// The player avoids it by <c>fight</c>ing (resolved before the tick),
+    /// leaving, or just never having provoked it.
     /// </summary>
     /// <returns>True if a monster actually landed a hit (drives the cooldown reset).</returns>
     private static bool ResolveAmbush(YearPopulation population, Mutant player, IRandomSource random, BroadcastChannel broadcast)
@@ -279,7 +287,9 @@ public static class MonsterController
         }
 
         var attacker = population.Monsters
-            .Where(m => !m.Health.IsDead && m.Position.Equals(player.Position))
+            .Where(m => !m.Health.IsDead
+                && m.Position.Equals(player.Position)
+                && AggroModel.MoodFor(m.Aggro) == AggroMood.Hostile)
             .OrderByDescending(m => m.AttackPower)
             .FirstOrDefault();
 

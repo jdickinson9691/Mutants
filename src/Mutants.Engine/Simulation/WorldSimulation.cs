@@ -125,9 +125,10 @@ public sealed class WorldSimulation
             var lingered = playerActedIdly
                 && _lastPlayerYear == player.CurrentYear
                 && _lastPlayerPosition.Equals(player.Position);
+            var previousPosition = _lastPlayerYear == player.CurrentYear ? _lastPlayerPosition : player.Position;
             var here = World.GetYear(player.CurrentYear);
             var safeRooms = here.StoreSlots.Select(slot => slot.Location).ToHashSet();
-            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player, lingered, _random, Broadcast, safeRooms);
+            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player, previousPosition, lingered, _random, Broadcast, safeRooms);
         }
 
         _lastPlayerYear = player.CurrentYear;

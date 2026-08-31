@@ -34,6 +34,34 @@ public class MonsterTests
     }
 
     [Fact]
+    public void Aggro_DefaultsToZero_RaisesClampedToCap_AndDecaysNeverBelowZero()
+    {
+        var m = Monster.Create("Beast", 1);
+        Assert.Equal(0, m.Aggro);
+
+        m.RaiseAggro(AggroModel.Cap + 100);
+        Assert.Equal(AggroModel.Cap, m.Aggro);
+
+        m.DecayAggro(AggroModel.Cap + 100);
+        Assert.Equal(0, m.Aggro);
+
+        m.RaiseAggro(-5);          // negatives are ignored, not subtracted
+        Assert.Equal(0, m.Aggro);
+    }
+
+    [Theory]
+    [InlineData(0.0, AggroMood.Calm)]
+    [InlineData(2.9, AggroMood.Calm)]
+    [InlineData(3.0, AggroMood.Alert)]
+    [InlineData(5.9, AggroMood.Alert)]
+    [InlineData(6.0, AggroMood.Hostile)]
+    [InlineData(12.0, AggroMood.Hostile)]
+    public void AggroModel_MoodFor_BandsTheMeter(double aggro, AggroMood expected)
+    {
+        Assert.Equal(expected, AggroModel.MoodFor(aggro));
+    }
+
+    [Fact]
     public void PlaceAt_And_MoveTo_UpdatePosition()
     {
         var monster = Monster.Create("Beast", 1);

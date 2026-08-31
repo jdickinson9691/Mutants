@@ -332,23 +332,27 @@ saved):
   **grab loot** off their room's floor, or — if hurt — **heal** from their
   own Ion pool, first **converting** a scavenged item if they're out of
   Ions (the same `heal` / `convert` the player uses).
-- A monster within **one room** of the player stops wandering and **closes
-  the distance**; one standing in the player's room **holds** there. On a
-  turn the player spends **idle** — an informational command (`look`,
-  `status`, `wait`, `inventory`, …), nothing that changes the world — the
-  hardest-hitting monster in the room lands one **ambush** hit (half the
-  player's defence — you're unbraced), rate-limited to every other tick.
-  *Acting* is always safe: moving, `fight`, `heal`, shopping, `wield`,
-  `travel`, `take` — and so is the turn you arrive. Two more valves keep
-  it from being oppressive:
-  - **Give up.** A monster that has chased for ~4 ticks without a fight
-    loses the trail and reverts to wandering, so a pursuing pack breaks
-    up if you keep moving.
-  - **Havens.** Nothing pursues, wanders, or ambushes into a room with a
-    store — a depot is a safe place to shop, heal, and plan.
-  The point: pursuit stops the world feeling evasive, the ambush makes
-  genuinely standing still cost something, and neither replaces the
-  deliberate `fight`.
+- Monsters do **not** automatically pursue or attack anyone who walks
+  past. Each carries an **earned aggro meter** toward the player
+  (`Mutants.Core.Monsters.AggroModel`), raised by:
+  - **stepping onto its tile** — the big one; do it over and over (pacing
+    a chokepoint, farming a spot) and it stacks faster than it decays;
+  - **lingering** on or next to it (a small trickle per tick);
+  - **shooting it** with a ranged weapon (a large jump — it noticed).
+  Moving a couple of rooms away, or ducking into a store, bleeds the
+  meter back down (faster than it builds), and it never persists across a
+  visit. Three bands:
+  - **Calm** (default) — wanders, ignores the player entirely.
+  - **Alert** — shadows the player (moves to close the distance) but
+    takes no swing.
+  - **Hostile** — also lands one **ambush** hit (half the player's
+    defence, rate-limited to every other tick) — but *only* on a turn the
+    player spent **idle** (`look` / `status` / `wait` / `inventory` / …).
+    Acting — moving, `fight`, `heal`, shopping, `wield`, `travel`, `take`
+    — is always safe, as is the turn you arrive and any room with a
+    store. The `monsters` list shows each one's current mood.
+  The point: the world is placid until you provoke it, the threat is
+  legible and escapable, and none of it replaces the deliberate `fight`.
 - Two monsters sharing a room may **fight each other**; the loser dies and
   its carried items plus a loot-table roll drop on that room's floor,
   exactly as when a player kills it, and it posts to the same kill-feed.
