@@ -14,10 +14,12 @@ namespace Mutants.Core.Time;
 /// </summary>
 public static class TimelineContentFactory
 {
-    /// <summary>How many item archetypes a regular monster's loot table pulls from its theme pool.</summary>
-    private const int LootEntriesPerMonster = 2;
-
-    private static readonly double[] LootDropChances = [0.5, 0.25, 0.15];
+    // A regular monster's drop is weighted toward sell/convert fodder, with
+    // a lesser chance of a piece of gear and a smaller one of a consumable —
+    // so a kill reliably pays out and now and then arms or supplies you.
+    private const double SellFodderDropChance = 0.75;
+    private const double GearDropChance = 0.35;
+    private const double ConsumableDropChance = 0.20;
 
     /// <summary>The <c>powerMultiplier</c> of a Gatekeeper's guaranteed weapon trophy — deep in the Legendary band (see <see cref="Rarity.ForPower"/>).</summary>
     private const double GatekeeperTrophyPower = 2.8;
@@ -142,41 +144,52 @@ public static class TimelineContentFactory
         }
 
         var rng = DeterministicRandom.For(worldSeed, year, $"loot:{speciesId}");
-        var remaining = lootPool.ToList();
         var entries = new List<LootTableEntry>();
 
-        for (var i = 0; i < LootEntriesPerMonster && remaining.Count > 0; i++)
+        void AddFrom(IEnumerable<ItemArchetypeDefinition> candidates, double dropChance)
         {
-            // Weighted by rarity: a Legendary weapon is on a monster's
-            // table far less often than a Common one, so it stays a rare
-            // find even once it exists in the pool.
-            var archetype = WeightedRemove(remaining, a => a.Rarity.DropWeight(), rng);
-            entries.Add(new LootTableEntry(ForArchetype(archetype, year), LootDropChances[Math.Min(i, LootDropChances.Length - 1)]));
+            var pool = candidates.ToList();
+            if (pool.Count == 0)
+            {
+                return;
+            }
+
+            // Rarity-weighted within the category: a Legendary weapon is
+            // still a far rarer roll than a Common one.
+            var pick = WeightedPick(pool, a => a.Rarity.DropWeight(), rng);
+            entries.Add(new LootTableEntry(ForArchetype(pick, year), dropChance));
+        }
+
+        AddFrom(lootPool.Where(a => a.Type == ItemType.Junk), SellFodderDropChance);
+        AddFrom(lootPool.Where(a => a.IsEquippable), GearDropChance);
+        AddFrom(lootPool.Where(a => a.Type == ItemType.Consumable), ConsumableDropChance);
+
+        if (entries.Count == 0)
+        {
+            // Pool had none of the three categories (shouldn't happen —
+            // TimeWorld.LootPoolFor backfills) — still give the kill a payout.
+            AddFrom(lootPool, SellFodderDropChance);
         }
 
         return entries;
     }
 
-    /// <summary>Removes and returns one element of <paramref name="items"/>, chosen with probability proportional to <paramref name="weight"/>.</summary>
-    private static T WeightedRemove<T>(List<T> items, Func<T, double> weight, Random rng)
+    /// <summary>Returns one element of <paramref name="items"/>, chosen with probability proportional to <paramref name="weight"/>.</summary>
+    private static T WeightedPick<T>(IReadOnlyList<T> items, Func<T, double> weight, Random rng)
     {
         var total = items.Sum(weight);
         var roll = rng.NextDouble() * total;
 
-        for (var i = 0; i < items.Count; i++)
+        foreach (var item in items)
         {
-            roll -= weight(items[i]);
+            roll -= weight(item);
             if (roll <= 0)
             {
-                var picked = items[i];
-                items.RemoveAt(i);
-                return picked;
+                return item;
             }
         }
 
-        var last = items[^1];
-        items.RemoveAt(items.Count - 1);
-        return last;
+        return items[^1];
     }
 
     private static (int Hp, int Attack, int Defense, int Speed) StatsFor(MonsterArchetype archetype, double tier)

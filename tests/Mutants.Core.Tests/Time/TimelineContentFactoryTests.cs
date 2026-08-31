@@ -70,6 +70,40 @@ public class TimelineContentFactoryTests
     }
 
     [Fact]
+    public void ForSpecies_LootTable_HasSellGearAndUseEntries_WithSellFodderTheLikeliest()
+    {
+        IReadOnlyList<ItemArchetypeDefinition> pool =
+        [
+            new("j", "Bits", ItemType.Junk, Rarity.Common, null, ConsumableEffectType.None, 0, 0, ["common"]),
+            new("w", "Blade", ItemType.Weapon, Rarity.Uncommon, null, ConsumableEffectType.None, 0, 0, ["common"], PowerMultiplier: 1.0),
+            new("p", "Tonic", ItemType.Consumable, Rarity.Common, null, ConsumableEffectType.Heal, 10, 0, ["common"]),
+        ];
+
+        var table = TimelineContentFactory.ForSpecies(7, Baseline, 2600, pool)().LootTable;
+
+        var junk = table.Single(e => e.Item.Type == ItemType.Junk);
+        var gear = table.Single(e => e.Item.Type == ItemType.Weapon);
+        var use = table.Single(e => e.Item.Type == ItemType.Consumable);
+
+        Assert.True(junk.DropChance > gear.DropChance, "sell fodder is the most common drop");
+        Assert.True(gear.DropChance > use.DropChance);
+        Assert.True(junk.DropChance >= 0.6, "a kill reliably yields something to sell/convert");
+    }
+
+    [Fact]
+    public void ForSpecies_LootTable_StillYieldsAPayoutWhenThePoolIsAllOneCategory()
+    {
+        IReadOnlyList<ItemArchetypeDefinition> weaponsOnly =
+        [
+            new("w", "Blade", ItemType.Weapon, Rarity.Common, null, ConsumableEffectType.None, 0, 0, ["common"], PowerMultiplier: 0.6),
+        ];
+
+        var table = TimelineContentFactory.ForSpecies(7, Baseline, 2600, weaponsOnly)().LootTable;
+
+        Assert.NotEmpty(table);
+    }
+
+    [Fact]
     public void Gatekeeper_IsABulletSpongeWithAGuaranteedLegendaryWeaponTrophy()
     {
         var year = 3210;

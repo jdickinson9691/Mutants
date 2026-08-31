@@ -54,6 +54,14 @@ public sealed class Monster
     /// <summary>Bleeds off <see cref="Aggro"/>, never below 0.</summary>
     public void DecayAggro(double amount) => Aggro = Math.Max(0, Aggro - Math.Max(0, amount));
 
+    /// <summary>
+    /// Ticks left in a "settle" — a roaming monster periodically stops for
+    /// a stretch instead of drifting every turn, so it's actually findable.
+    /// Set/decremented by Mutants.Engine.Npc.MonsterController; not used
+    /// while the monster is pursuing the player. Session state — not saved.
+    /// </summary>
+    public int RestTicks { get; set; }
+
     private readonly List<Item> _inventory = [];
 
     /// <summary>Items this monster is carrying — picked up off the ground, spent via <see cref="Convert"/>, and dropped where it dies.</summary>

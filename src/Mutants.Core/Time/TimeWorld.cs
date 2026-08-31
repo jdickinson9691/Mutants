@@ -147,13 +147,43 @@ public sealed class TimeWorld
     {
         var themes = species.LootThemeTags.Concat(era.ItemThemeTags).ToList();
         var pool = _itemArchetypes.Where(a => a.SharesThemeWith(themes)).ToList();
-        if (pool.Count > 0)
+
+        if (pool.Count == 0)
         {
-            return pool;
+            pool = _itemArchetypes.Where(a => a.SharesThemeWith(era.ItemThemeTags)).ToList();
         }
 
-        pool = _itemArchetypes.Where(a => a.SharesThemeWith(era.ItemThemeTags)).ToList();
-        return pool.Count > 0 ? pool : _itemArchetypes;
+        if (pool.Count == 0)
+        {
+            pool = _itemArchetypes.ToList();
+        }
+
+        // Every monster's loot table wants a junk / an equippable / a
+        // consumable to choose from (see TimelineContentFactory.BuildLootTable);
+        // if the themed pool is missing a category, borrow the cheapest one
+        // from the full catalogue so a kill can still yield each kind.
+        EnsureCategory(pool, a => a.Type == ItemType.Junk);
+        EnsureCategory(pool, a => a.IsEquippable && a.RestrictedClass is null);
+        EnsureCategory(pool, a => a.Type == ItemType.Consumable);
+
+        return pool;
+
+        void EnsureCategory(List<ItemArchetypeDefinition> p, Func<ItemArchetypeDefinition, bool> predicate)
+        {
+            if (p.Any(predicate))
+            {
+                return;
+            }
+
+            var fill = _itemArchetypes
+                .Where(predicate)
+                .OrderBy(a => a.Rarity)
+                .FirstOrDefault();
+            if (fill is not null)
+            {
+                p.Add(fill);
+            }
+        }
     }
 
     private IReadOnlyList<StoreSlot> BuildStores(EraDefinition era, int year, LevelMap map)

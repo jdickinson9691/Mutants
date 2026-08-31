@@ -108,6 +108,30 @@ public class MonsterControllerTests
     }
 
     [Fact]
+    public void Tick_ARoamingMonsterSettlesInPlaceForAStretchAfterMoving()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var monster = Monster.Create("Roamer", tier: 1);
+        monster.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(monster);
+        var player = OffMapPlayer();
+
+        // Fixed(0.0): it wanders this tick, then rolls into a rest.
+        Tick(pop, map, player, StubRandomSource.Fixed(0.0));
+        var settledAt = monster.Position;
+        Assert.NotEqual(Coordinate.Origin, settledAt);
+        Assert.True(monster.RestTicks > 0, "it should have settled after moving");
+
+        // While resting it holds position even though it 'would' wander.
+        for (var i = 0; i < 3; i++)
+        {
+            Tick(pop, map, player, StubRandomSource.Fixed(0.0));
+            Assert.Equal(settledAt, monster.Position);
+        }
+    }
+
+    [Fact]
     public void Tick_TwoMonstersSharingARoomCanFight_LoserDropsItsLootWhereItFell()
     {
         var map = FourRoomMap();

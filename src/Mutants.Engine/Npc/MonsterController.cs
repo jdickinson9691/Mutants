@@ -38,6 +38,12 @@ public static class MonsterController
     private const double RespawnChance = 0.25;
     private const int DuelRoundCap = 200;
 
+    /// <summary>After a roaming monster takes a step, the chance it then settles in place for a while (see <see cref="Monster.RestTicks"/>) instead of drifting every turn — so you can actually track one down.</summary>
+    private const double RestAfterWanderChance = 0.55;
+
+    private const int RestTicksMin = 4;
+    private const int RestTicksMax = 9;
+
     /// <summary>Minimum ticks between ambush hits on the player, so a quick <c>status</c> + <c>monsters</c> check near a hostile monster costs one hit, not three.</summary>
     private const int AmbushCooldownTicks = 2;
 
@@ -115,9 +121,17 @@ public static class MonsterController
                 {
                     // Locked on and toe to toe — hold.
                 }
+                else if (monster.RestTicks > 0)
+                {
+                    monster.RestTicks--; // settled in place for a stretch
+                }
                 else if (random.NextDouble() < WanderChance)
                 {
                     Wander(map, monster, random, safeRooms);
+                    if (random.NextDouble() < RestAfterWanderChance)
+                    {
+                        monster.RestTicks = RestTicksMin + (int)(random.NextDouble() * (RestTicksMax - RestTicksMin + 1));
+                    }
                 }
             }
 

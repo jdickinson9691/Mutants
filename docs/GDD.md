@@ -117,7 +117,12 @@ stretch goal, not in the original).
   MBBSEmu bug report about a "warning when attempting to time travel
   without enough ions."
 - **Travel is otherwise unrestricted**: no unlock, no minimum character
-  level, no gate. How hard the fights get is the only limiter.
+  level, no gate. How hard the fights get is the only limiter — and
+  **overreaching is a deliberate option**: jumping well past your level
+  band drops you among monsters (and loot, and gear) scaled far above you,
+  a high-risk raid for a shot at better equipment. The console flags such
+  a jump ("2450 A.D. is around tier 3 — scales to ~level 30, you're level
+  1") and asks to confirm, but never forbids it.
 - **Gatekeepers** are still here, but as tough optional encounters rather
   than gates. The world seed places one every random 50–100 years across
   the timeline; a Gatekeeper year holds a bullet-sponge boss (~3× a regular
@@ -201,12 +206,20 @@ area/group to a capstone — is the standard every class follows.)
 
 ## 5. Loot system `[SOURCE: wield/sell/convert]`
 
-- **Sources of loot**: monster drops on defeat (a small themed table per
+- **Sources of loot**: monster drops on defeat (a themed table per
   monster, built from item archetypes and scaled to the **year** it's
   fought in) and **random location spawns** (a periodic chance per room,
   per tick, for an item to appear on the ground — matches the brief "random
   chance of spawning in a location" requirement; original spawn-rate
   tuning).
+- **Drop composition**: a regular monster's table is built by category so
+  a kill reliably pays and occasionally supplies you — **sell/convert
+  fodder** (a junk item) at the highest chance (~0.75), then a **piece of
+  gear** (weapon / armour / ranged, rarity-weighted) at ~0.35, then a
+  **consumable** at ~0.20. If a species' theme pool lacks a category the
+  world generator borrows the cheapest one from the full catalogue, so
+  every monster can drop something to sell, something to wear, and
+  something to use.
 - **Scaling**: an item's `tier` is derived from the **year** it was
   generated in (`TimeScale.TierForYear`, a continuous 1.0–9.0 across
   2000–5000); tier drives base stats, sell price, and Ion-conversion value
@@ -331,7 +344,10 @@ saved):
 - Monsters occupy specific rooms and, each tick, **wander** through exits,
   **grab loot** off their room's floor, or — if hurt — **heal** from their
   own Ion pool, first **converting** a scavenged item if they're out of
-  Ions (the same `heal` / `convert` the player uses).
+  Ions (the same `heal` / `convert` the player uses). A roaming monster
+  doesn't drift every turn — after a step it often **settles** in place
+  for a stretch, so you can actually track one down instead of chasing a
+  ghost around the map.
 - Monsters do **not** automatically pursue or attack anyone who walks
   past. Each carries an **earned aggro meter** toward the player
   (`Mutants.Core.Monsters.AggroModel`), raised by:

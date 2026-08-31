@@ -1285,9 +1285,23 @@ static void HandleTravel(Mutant mutant, TimeWorld world, IRandomSource random, B
     }
 
     var cost = IonEconomy.TimeTravelCost(mutant.CurrentYear, targetYear);
-    if (Math.Abs(targetYear - mutant.CurrentYear) > 500)
+    var yearGap = Math.Abs(targetYear - mutant.CurrentYear);
+    var targetTier = TimelineContentFactory.DisplayTier(targetYear);
+    // Well above your level band — allowed (that's how you go loot-hunting
+    // in the deep future), but you should know what you're walking into.
+    var overreaching = mutant.Level < 10 * (targetTier - 2);
+
+    if (yearGap > 500 || overreaching)
     {
-        AnsiConsole.Markup($"[yellow]That's a {Math.Abs(targetYear - mutant.CurrentYear)}-year jump — {cost} Ions (you have {mutant.Ions.Current}). Proceed? (y/n)[/] ");
+        if (overreaching)
+        {
+            AnsiConsole.MarkupLine(
+                $"[yellow]Heads up:[/] {targetYear} A.D. is around tier {targetTier} — its monsters and loot " +
+                $"scale to roughly level {10 * targetTier}, and you're level {mutant.Level}. " +
+                "Better gear if you can grab it and run; a quick death if you can't.");
+        }
+
+        AnsiConsole.Markup($"[yellow]That's a {yearGap}-year jump — {cost} Ions (you have {mutant.Ions.Current}). Proceed? (y/n)[/] ");
         var confirm = Console.ReadLine();
         if (confirm is null || !confirm.Trim().StartsWith("y", StringComparison.OrdinalIgnoreCase))
         {
