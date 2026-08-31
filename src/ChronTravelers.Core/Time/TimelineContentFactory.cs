@@ -15,10 +15,11 @@ namespace ChronTravelers.Core.Time;
 public static class TimelineContentFactory
 {
     // A regular monster's drop is weighted toward sell/convert fodder —
-    // a near-certain junk piece plus a real chance at a second — with a
-    // lesser chance of gear and a smaller one of a consumable. So a couple
-    // of kills reliably funds a purchase, and now and then you get armed.
-    private const double SellFodderDropChance = 0.9;
+    // a *guaranteed* junk piece (every kill leaves something worth picking
+    // up) plus a real chance at a second — with a lesser chance of gear and
+    // a smaller one of a consumable. So a couple of kills reliably funds a
+    // purchase, and now and then you get armed.
+    private const double SellFodderDropChance = 1.0;
     private const double SecondSellFodderDropChance = 0.35;
     private const double GearDropChance = 0.35;
     private const double ConsumableDropChance = 0.20;

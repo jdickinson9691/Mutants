@@ -215,7 +215,7 @@ while (running)
             RenderAbilities(traveler, abilities);
             break;
 
-        case "inventory" or "i":
+        case "inventory" or "inv" or "i" or "bag":
             RenderInventory(traveler);
             break;
 
@@ -259,6 +259,14 @@ while (running)
 
         default:
             var (command, argument) = SplitCommand(input);
+
+            // `look <dir>` — peek into the adjacent room without moving.
+            // (Bare `look`/`l` is handled in the switch above.)
+            if (command is "look" or "l")
+            {
+                HandleLookDirection(traveler, world, argument);
+                break;
+            }
 
             // "attack"/"atk"/"a" are the in-combat verbs; accepting them out
             // here as a `fight` alias means the extra lines a player (or a
@@ -649,7 +657,7 @@ static (string Command, string Argument) SplitCommand(string input)
 /// </summary>
 static bool IsIdleCommand(string input) => SplitCommand(input).Command is
     "look" or "l" or "status" or "stat" or "wait" or "z" or "help" or "?"
-    or "inventory" or "i" or "abilities" or "spells" or "npcs" or "who"
+    or "inventory" or "inv" or "i" or "bag" or "abilities" or "spells" or "npcs" or "who"
     or "monsters" or "mobs" or "news" or "broadcast" or "stores"
     or "leaderboard" or "board";
 
@@ -1121,7 +1129,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
     if (session.TravelerWon)
     {
         AnsiConsole.MarkupLine($"[green]You defeated {Markup.Escape(foe)}! +{session.XpAwarded} XP.[/]");
-        broadcast.Publish(GameEvent.Slain(monster.Name, traveler.Name, year));
+        broadcast.Publish(GameEvent.Slain(monster.Name, traveler.Name, year, victimIsCreature: true));
 
         if (isWardenFight)
         {
@@ -1154,7 +1162,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
 
     // docs/GDD.md §3.3 (death & recall) is not implemented yet; a defeat here just ends the session.
     AnsiConsole.MarkupLine($"[red]You were defeated by {Markup.Escape(foe)}...[/]");
-    broadcast.Publish(GameEvent.Slain(traveler.Name, monster.Name, year));
+    broadcast.Publish(GameEvent.Slain(traveler.Name, monster.Name, year, killerIsCreature: true));
     return false;
 }
 
@@ -1239,7 +1247,7 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
         return;
     }
 
-    broadcast.Publish(GameEvent.Slain(target.Name, traveler.Name, traveler.CurrentYear));
+    broadcast.Publish(GameEvent.Slain(target.Name, traveler.Name, traveler.CurrentYear, victimIsCreature: true));
     traveler.GainXp(target.XpReward);
 
     var drops = LootDropRoller.Roll(target.LootTable, random).Concat(target.Inventory).ToList();
@@ -1768,6 +1776,63 @@ static bool HandleMove(Traveler traveler, TimeWorld world, Direction direction)
     return true;
 }
 
+/// <summary>`look &lt;dir&gt;` — peek into the adjacent room (its description, who's standing in it, what's on the floor) without stepping in.</summary>
+static void HandleLookDirection(Traveler traveler, TimeWorld world, string argument)
+{
+    var direction = DirectionExtensions.Parse(argument.Trim());
+    if (direction is null)
+    {
+        AnsiConsole.MarkupLine("[red]Look where?[/] Try [yellow]look north[/] (or just [yellow]look[/] for the room you're in).");
+        return;
+    }
+
+    var yearContent = world.GetYear(traveler.CurrentYear);
+    var step = yearContent.Map.TryMove(traveler.Position, direction.Value);
+    if (!step.Success || step.DestinationRoom is null)
+    {
+        AnsiConsole.MarkupLine($"[grey]You look {direction.Value.Name()} — solid wall, no way through.[/]");
+        return;
+    }
+
+    var there = step.Destination!.Value;
+    AnsiConsole.MarkupLine($"[grey]To the {direction.Value.Name()} ({Markup.Escape(there.ToString())}):[/] {Markup.Escape(step.DestinationRoom.Description)}");
+
+    var population = yearContent.Population;
+
+    var warden = population.Warden;
+    if (warden is not null && !warden.Health.IsDead
+        && !traveler.HasDefeatedWarden(traveler.CurrentYear)
+        && warden.Position.Equals(there))
+    {
+        AnsiConsole.MarkupLine($"  [bold red]{Markup.Escape(warden.Name)} stands watch there.[/]");
+    }
+
+    var whoLine = population.MonstersAt(there)
+        .OrderBy(m => m.IsApex ? 0 : 1)
+        .Select(m => m.IsApex
+            ? $"[bold red]{Markup.Escape(m.Name)}[/] [red](apex)[/]"
+            : Markup.Escape(m.Name))
+        .ToList();
+    AnsiConsole.MarkupLine(whoLine.Count > 0
+        ? $"  [red]You can make out {NameListMarkup(whoLine)} in there.[/]"
+        : "  [grey]Nothing moving that you can see.[/]");
+
+    var ground = population.LootAt(there);
+    if (ground.Count > 0)
+    {
+        AnsiConsole.MarkupLine($"  [yellow]On the floor:[/] {Markup.Escape(NameList(ground.Select(i => i.Name).ToList()))}.");
+    }
+}
+
+/// <summary>Like <see cref="NameList"/> but the parts already carry markup, so it doesn't escape them.</summary>
+static string NameListMarkup(IReadOnlyList<string> names) => names.Count switch
+{
+    0 => "nothing",
+    1 => names[0],
+    2 => $"{names[0]} and {names[1]}",
+    _ => $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}",
+};
+
 static void RenderRoom(Traveler traveler, TimeWorld world)
 {
     var yearContent = world.GetYear(traveler.CurrentYear);
@@ -1895,6 +1960,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("[yellow]Commands:[/]");
     AnsiConsole.MarkupLine("  [green]n[/]/[green]s[/]/[green]e[/]/[green]w[/] (or north/south/east/west) - move");
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room (monsters here / nearby, ground loot)");
+    AnsiConsole.MarkupLine("  [green]look <dir>[/]          - peek into the adjacent room (what's there, on the floor) without moving");
     AnsiConsole.MarkupLine("  [green]fight[/] (or f, attack, a) [green]<name>[/] - fight a monster in this room (or the Warden at the year's start)");
     AnsiConsole.MarkupLine("    (each round, type [green]attack[/] or [green]cast <ability>[/])");
     AnsiConsole.MarkupLine("  [green]shoot[/]/[green]point <dir>[/] - fire your readied ranged weapon one room away (finite built-in ammo)");
@@ -1905,7 +1971,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]travel <year>[/]      - jump to a year (2000–5000); costs ceil(0.04·|Δyear|) Ions");
     AnsiConsole.MarkupLine("  [green]travel +N[/]/[green]-N[/]      - jump N years forward/back");
     AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]   - jump to the next/previous Warden year");
-    AnsiConsole.MarkupLine("  [green]inventory[/] (or i)    - list what you're carrying");
+    AnsiConsole.MarkupLine("  [green]inventory[/] (or inv, i, bag) - list what you're carrying");
     AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Travelers out in the timeline");
     AnsiConsole.MarkupLine("  [green]news[/] (or broadcast) - show recent kill-feed events");
     AnsiConsole.MarkupLine("  [green]convert <item>[/]     - destroy an item for Ions (a spent ranged weapon is worth a fraction)");

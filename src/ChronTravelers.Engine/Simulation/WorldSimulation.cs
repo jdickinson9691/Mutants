@@ -112,8 +112,8 @@ public sealed class WorldSimulation
             if (result.Fight is { } fight)
             {
                 Broadcast.Publish(fight.TravelerWon
-                    ? GameEvent.Slain(result.MonsterName!, npc.Name, yearBefore)
-                    : GameEvent.Slain(npc.Name, result.MonsterName!, yearBefore));
+                    ? GameEvent.Slain(result.MonsterName!, npc.Name, yearBefore, victimIsCreature: true)
+                    : GameEvent.Slain(npc.Name, result.MonsterName!, yearBefore, killerIsCreature: true));
             }
 
             if (npc.CurrentYear != yearBefore)

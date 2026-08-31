@@ -93,6 +93,23 @@ public class TimelineContentFactoryTests
     }
 
     [Fact]
+    public void ForSpecies_LootTable_AlwaysGuaranteesAtLeastOneDrop()
+    {
+        IReadOnlyList<ItemArchetypeDefinition> pool =
+        [
+            new("j", "Bits", ItemType.Junk, Rarity.Common, null, ConsumableEffectType.None, 0, 0, ["common"]),
+            new("w", "Blade", ItemType.Weapon, Rarity.Uncommon, null, ConsumableEffectType.None, 0, 0, ["common"], PowerMultiplier: 1.0),
+            new("p", "Tonic", ItemType.Consumable, Rarity.Common, null, ConsumableEffectType.Heal, 10, 0, ["common"]),
+        ];
+
+        for (var year = 2000; year < 2600; year += 37)
+        {
+            var table = TimelineContentFactory.ForSpecies(9, Baseline, year, pool)().LootTable;
+            Assert.Contains(table, e => e.DropChance >= 1.0); // every kill leaves something worth taking
+        }
+    }
+
+    [Fact]
     public void ForSpecies_LootTable_StillYieldsAPayoutWhenThePoolIsAllOneCategory()
     {
         IReadOnlyList<ItemArchetypeDefinition> weaponsOnly =

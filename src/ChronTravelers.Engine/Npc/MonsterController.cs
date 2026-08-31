@@ -415,7 +415,7 @@ public static class MonsterController
             }
 
             population.RemoveMonster(loser);
-            broadcast.Publish(GameEvent.Slain(loser.Name, winner.Name, year));
+            broadcast.Publish(GameEvent.Slain(loser.Name, winner.Name, year, victimIsCreature: true, killerIsCreature: true));
         }
     }
 

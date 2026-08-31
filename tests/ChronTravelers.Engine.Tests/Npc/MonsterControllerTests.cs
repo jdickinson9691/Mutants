@@ -280,7 +280,8 @@ public class MonsterControllerTests
         Assert.DoesNotContain(weakling, pop.Monsters);
         Assert.Contains(bruiser, pop.Monsters);
         Assert.Equal(2, pop.LootAt(spot).Count);
-        Assert.Contains(broadcast.Events, e => e.Message == "Weakling was slain by Bruiser.");
+        // Both are monsters (common nouns) → the feed gives them articles.
+        Assert.Contains(broadcast.Events, e => e.Message == "A Weakling was slain by a Bruiser.");
     }
 
     // --- earned aggro -----------------------------------------------------

@@ -250,13 +250,14 @@ area/group to a capstone — is the standard every class follows.)
   chance of spawning in a location" requirement; original spawn-rate
   tuning).
 - **Drop composition**: a regular monster's table is built by category so
-  a kill reliably pays and occasionally supplies you — **sell/convert
-  fodder** (a junk item) at the highest chance (~0.75), then a **piece of
-  gear** (weapon / armour / ranged, rarity-weighted) at ~0.35, then a
-  **consumable** at ~0.20. If a species' theme pool lacks a category the
-  world generator borrows the cheapest one from the full catalogue, so
-  every monster can drop something to sell, something to wear, and
-  something to use.
+  a kill always pays and occasionally supplies you — a **guaranteed
+  sell/convert fodder** piece (a junk item, drop chance 1.0), a real
+  chance at a second (~0.35), then a **piece of gear** (weapon / armour /
+  ranged, rarity-weighted) at ~0.35, then a **consumable** at ~0.20. Every
+  kill leaves at least one thing on the body worth taking. If a species'
+  theme pool lacks a category the world generator borrows the cheapest one
+  from the full catalogue, so every monster can also drop something to
+  wear and something to use.
 - **Scaling**: an item's `tier` is derived from the **year** it was
   generated in (`TimeScale.TierForYear`, a continuous 1.0–9.0 across
   2000–5000); tier drives base stats, sell price, and Ion-conversion value
@@ -366,10 +367,14 @@ Since v1 has no network multiplayer, the world needs to feel alive:
   its year's store, hop a short way along the timeline — usually forward —
   if it can afford the Ion cost).
 - NPCs participate in the same kill-feed / **fray-band broadcast** channel
-  as the player `[SOURCE: cross-board telepathic messages]` — "X was slain
-  by Y," "Z reached level N," "W jumped downstream to 3200 A.D." — so the
-  leaderboard and the "who's doing what" feel of the original survives
-  without a live human population. (The rupture leaks a low signal every
+  as the player `[SOURCE: cross-board telepathic messages]` — "An Ashfall
+  Echo was slain by a Dune Stalker," "Fang reached level 12," "Static
+  jumped downstream to 3200 A.D." — so the leaderboard and the "who's
+  doing what" feel of the original survives without a live human
+  population. Feed names are cleaned up: a monster (common noun) reads
+  "a/an <name>", capitalised at the start of the line; a named Traveler
+  (proper noun) stays bare; the internal NPC instance suffix (" 2") is
+  dropped. (The rupture leaks a low signal every
   Traveler's rig can pick up; that's the in-fiction reason you hear it.)
   Every broadcast is tagged with the **year** it happened in. The console
   shows only events in the player's *own* year inline after a command
