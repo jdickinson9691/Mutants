@@ -45,7 +45,7 @@ confirmed vs. not), playtest feedback once a build exists.
   file changes, never as direct code edits.
 
 **Must not:** implement code directly. Design changes land in JSON content
-files (`src/Mutants.Content/`) reviewed by the Systems Agent, or as GDD prose
+files (`src/ChronTravelers.Content/`) reviewed by the Systems Agent, or as GDD prose
 for anything that isn't yet data-driven.
 
 **Hands off to:** Systems/Engine Agent (implementation), Documentation Agent
@@ -55,7 +55,7 @@ for anything that isn't yet data-driven.
 
 ## 3. Systems / Engine Agent
 
-**Owns:** `src/Mutants.Core/` and `src/Mutants.Engine/` — the domain model,
+**Owns:** `src/ChronTravelers.Core/` and `src/ChronTravelers.Engine/` — the domain model,
 combat resolution, Ion economy, NPC AI, tick loop, persistence layer.
 
 **Inputs:** `docs/GDD.md`, `docs/TECH_STACK.md`, issues from Project
@@ -76,7 +76,7 @@ Agent (verification).
 
 ## 4. Console / UI Agent
 
-**Owns:** `src/Mutants.Console/` — the Spectre.Console front end: rendering,
+**Owns:** `src/ChronTravelers.Console/` — the Spectre.Console front end: rendering,
 input parsing/commands, the start screen (including the leaderboard display
 requirement), status panel.
 
@@ -95,7 +95,7 @@ they stay unit-testable without a console attached.
 
 ## 5. Content Agent
 
-**Owns:** the actual JSON content in `src/Mutants.Content/` (specific
+**Owns:** the actual JSON content in `src/ChronTravelers.Content/` (specific
 monster stats, item definitions, level layouts/room text, store inventories)
 — i.e., turning the Design Agent's numbers/tables into loadable data files.
 

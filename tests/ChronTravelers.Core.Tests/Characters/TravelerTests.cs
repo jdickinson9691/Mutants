@@ -374,7 +374,7 @@ public class TravelerTests
         var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // flat value 20
         traveler.AddToInventory(item);
 
-        var gained = traveler.Sell(item, riblets: 7);
+        var gained = traveler.Sell(item, credits: 7);
 
         Assert.Equal(7, gained);
         Assert.Equal(7, traveler.Credits);
@@ -595,7 +595,7 @@ public class TravelerTests
         var stats = new StatBlock(20, 15, 10, 12);
         var traveler = Traveler.Restore(
             "Rook", CharacterClass.Soldier, level: 7, xp: 555, stats,
-            currentHp: 40, maxHp: 60, currentIons: 5, maxIons: 30, riblets: 250,
+            currentHp: 40, maxHp: 60, currentIons: 5, maxIons: 30, credits: 250,
             currentYear: 2900, furthestYearReached: 3200, position: new Coordinate(2, -1),
             defeatedWardenYears: [2412, 3187]);
 

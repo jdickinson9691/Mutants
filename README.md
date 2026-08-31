@@ -1,9 +1,18 @@
-# Chronomutants (working title)
+# ChronTravelers
 
-A standalone, text-based Windows RPG inspired by the classic Major BBS door
-game **Mutants!**. Single-player for v1, with all other "players" in the
-world simulated as full NPC Mutants running the same rules, classes, and
-restrictions as the human player.
+A standalone, text-based Windows RPG. Its mechanical skeleton is inherited
+from the classic Major BBS door game **Mutants!**; the setting is an
+original sci-fi / time-travel reskin. Single-player for v1, with all other
+"players" in the world simulated as full NPC Travelers running the same
+rules, classes, and restrictions as the human player.
+
+You are a **Chron Traveler** — crew from Project Meridian, a classified
+government temporal-tunnel program (in the spirit of the old *Time Tunnel*
+TV show). On its first full-power run the tunnel tore a standing rupture
+that "frayed" the downstream timeline and swept the gantry crew loose.
+You surface at some year between 2000 and 5000 A.D. with no way to steer
+and no way home. Ride the Ion surges, go as deep downstream as you can,
+and level up — the surface team is still looking.
 
 ## Status
 
@@ -16,35 +25,35 @@ The world is a **continuous 2000–5000 A.D. timeline** (not discrete
 levels): you `travel` to any year for an Ion cost proportional to the
 distance, and monsters, loot, maps, and stores all scale smoothly by
 year. Each year's map is generated deterministically from a per-save
-world seed. "Gatekeeper" years — placed by the seed every random 50–100
-years — hold a tough optional boss guarding a Legendary trophy, but gate
-nothing. In the year you're standing in, monsters occupy rooms, roam
-between them, fight each other (loot drops on the floor — `take` it), and
-heal from their own Ion pool. **Ranged weapons** (wands, bows, later guns)
-sit in their own equip slot: `wield` one, then `point`/`shoot <dir>` to
-hit a monster in the next room. Each has a finite built-in magazine that
-persists in the save; once spent it only converts or sells, at a reduced
-value. Content is a set of tier-free catalogs in
-`src/Mutants.Content/*.json` (`monster-species`, `item-archetypes`,
-`eras`, `store-templates`), loaded by
-`Mutants.Engine.Content.ContentLoader.LoadTimeWorld` into a
-`Mutants.Core.Time.TimeWorld`; see `docs/CONTENT_PLAN.md` for the shape
-and what's still open (tuning and polish only).
+world seed. "Warden" years — placed by the seed every random 50–100
+years — station an automated temporal-defense construct guarding a
+Legendary trophy from a pre-collapse tech cache, but gate nothing. In the
+year you're standing in, monsters occupy rooms, roam between them, fight
+each other (loot drops on the floor — `take` it), and heal from their own
+Ion pool. **Ranged weapons** (wands, bows, later guns) sit in their own
+equip slot: `wield` one, then `point`/`shoot <dir>` to hit a monster in
+the next room. Each has a finite built-in magazine that persists in the
+save; once spent it only converts or sells, at a reduced value. Content
+is a set of tier-free catalogs in `src/ChronTravelers.Content/*.json`
+(`monster-species`, `item-archetypes`, `eras`, `store-templates`), loaded
+by `ChronTravelers.Engine.Content.ContentLoader.LoadTimeWorld` into a
+`ChronTravelers.Core.Time.TimeWorld`; see `docs/CONTENT_PLAN.md` for the
+shape and what's still open (tuning and polish only).
 
 ## Building & running
 
 ```
-dotnet build Mutants.sln
-dotnet test Mutants.sln
-dotnet run --project src/Mutants.Console
+dotnet build ChronTravelers.sln
+dotnet test ChronTravelers.sln
+dotnet run --project src/ChronTravelers.Console
 ```
 
 To produce the distributable Windows build locally (requires
 [Inno Setup 6](https://jrsoftware.org/isinfo.php)):
 
 ```
-dotnet publish src/Mutants.Console -c Release -r win-x64 -o publish/win-x64
-iscc installer/Chronomutants.iss
+dotnet publish src/ChronTravelers.Console -c Release -r win-x64 -o publish/win-x64
+iscc installer/ChronTravelers.iss
 ```
 
 The installer lands in `installer/Output/`. Pushing a `v*` tag (e.g.
@@ -65,11 +74,11 @@ attaches the installer to a GitHub Release automatically — see
 - [`docs/AGENTS.md`](docs/AGENTS.md) — the project's agent/role contracts
   (planning, design, engine, UI, content, QA, packaging, docs), so work can
   be picked up consistently across sessions and contributors.
-- [`src/Mutants.Console/Program.cs`](src/Mutants.Console/Program.cs) — the
+- [`src/ChronTravelers.Console/Program.cs`](src/ChronTravelers.Console/Program.cs) — the
   playable console app; its file header notes exactly what's real vs.
   still simplified at any given point.
 - [`docs/CONTENT_PLAN.md`](docs/CONTENT_PLAN.md) — what's actually in
-  `src/Mutants.Content/*.json` today, and what's still open.
+  `src/ChronTravelers.Content/*.json` today, and what's still open.
 
 ## Roadmap (see `docs/TECH_STACK.md` for detail)
 
@@ -77,7 +86,7 @@ attaches the installer to a GitHub Release automatically — see
 2. ✅ Grid movement
 3. ✅ Combat, loot drops, convert/sell/wield (+ spatial monsters, ranged weapons)
 4. ✅ NPC simulation loop
-5. ✅ Stores (government + player-owned) and the Riblet economy
+5. ✅ Stores (supply depots + player-owned) and the Credit economy
 6. ✅ Time travel with scaling — reworked from 8 discrete levels into the
    continuous 2000–5000 A.D. timeline described above
 7. ✅ Leaderboards + start screen + save/load

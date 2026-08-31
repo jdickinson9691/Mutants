@@ -190,7 +190,7 @@ public class CharacterMapperTests
 
         var slot = world.GetYear(year).StoreSlots.Single(s => s.IsAvailableForPurchase);
         var store = slot.Purchase(player, startingCapital: 100);
-        var ribletsAfterPurchase = player.Credits;
+        var creditsAfterPurchase = player.Credits;
 
         var listedItem = Item.Create("Layered Plating", ItemType.Armor, 5, Rarity.Rare);
         player.AddToInventory(listedItem);
@@ -207,7 +207,7 @@ public class CharacterMapperTests
         // Fresh session: rebuild the world from the same seed, restore the character, re-attach stores.
         var reloadedWorld = TestTimeWorld.Build(seed: 4242);
         var reloaded = CharacterMapper.FromSaveData(save);
-        var ribletsOnReload = reloaded.Credits;
+        var creditsOnReload = reloaded.Credits;
         CharacterMapper.ApplyOwnedStores(save, reloaded, reloadedWorld);
 
         var reloadedSlot = reloadedWorld.GetYear(year).StoreSlots.Single(s => s.Store?.Owner == reloaded);
@@ -218,8 +218,8 @@ public class CharacterMapperTests
         Assert.Equal(250, reloadedListing.AskingPrice);
 
         // Re-attaching does not charge the purchase cost again.
-        Assert.Equal(ribletsOnReload, reloaded.Credits);
-        Assert.Equal(ribletsAfterPurchase, ribletsOnReload);
+        Assert.Equal(creditsOnReload, reloaded.Credits);
+        Assert.Equal(creditsAfterPurchase, creditsOnReload);
     }
 
     [Fact]

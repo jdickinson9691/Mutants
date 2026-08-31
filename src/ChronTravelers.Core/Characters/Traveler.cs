@@ -135,7 +135,7 @@ public sealed class Traveler
     /// <summary>Reconstructs a Traveler directly from a full state snapshot, bypassing normal gameplay mutation (GainXp/LevelUp/etc.) — for save/load. Inventory (and re-wielding equipped items) is the caller's job afterward via AddToInventory/Wield.</summary>
     private Traveler(
         string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
-        int currentHp, int maxHp, int currentIons, int maxIons, int riblets,
+        int currentHp, int maxHp, int currentIons, int maxIons, int credits,
         int currentYear, int furthestYearReached, Coordinate position,
         IEnumerable<int> defeatedWardenYears)
     {
@@ -147,7 +147,7 @@ public sealed class Traveler
         Stats = stats;
         Health = new HealthPool(maxHp, currentHp);
         Ions = new IonPool(maxIons, currentIons);
-        Credits = riblets;
+        Credits = credits;
         CurrentYear = Math.Clamp(currentYear, TimeScale.MinYear, TimeScale.MaxYear);
         FurthestYearReached = Math.Clamp(furthestYearReached, TimeScale.MinYear, TimeScale.MaxYear);
         Position = position;
@@ -157,7 +157,7 @@ public sealed class Traveler
     /// <summary>See the private snapshot constructor above — this is its public entry point, used by ChronTravelers.Engine.Persistence when loading a save.</summary>
     public static Traveler Restore(
         string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
-        int currentHp, int maxHp, int currentIons, int maxIons, int riblets,
+        int currentHp, int maxHp, int currentIons, int maxIons, int credits,
         int currentYear, int furthestYearReached, Coordinate position,
         IEnumerable<int> defeatedWardenYears)
     {
@@ -168,7 +168,7 @@ public sealed class Traveler
 
         return new Traveler(
             name, characterClass, level, xp, stats,
-            currentHp, maxHp, currentIons, maxIons, riblets,
+            currentHp, maxHp, currentIons, maxIons, credits,
             currentYear, furthestYearReached, position, defeatedWardenYears);
     }
 
@@ -434,14 +434,14 @@ public sealed class Traveler
     /// <summary>
     /// Sells an item from inventory for Credits — docs/GDD.md §5/§6.
     /// Unequips the item first if it was wielded. Pass
-    /// <paramref name="riblets"/> for a store-negotiated price (see
+    /// <paramref name="credits"/> for a store-negotiated price (see
     /// ChronTravelers.Core.Economy.Store.BuyFromTraveler); omitted, it falls back
     /// to <see cref="Item.SellValue"/>'s flat rate.
     /// </summary>
-    public int Sell(Item item, int? riblets = null)
+    public int Sell(Item item, int? credits = null)
     {
         RemoveFromInventoryOrThrow(item);
-        var amount = riblets ?? item.SellValue();
+        var amount = credits ?? item.SellValue();
         AddCredits(amount);
         return amount;
     }

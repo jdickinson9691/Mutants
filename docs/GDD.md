@@ -1,26 +1,58 @@
-# Game Design Document — "Chronomutants" (working title)
+# Game Design Document — "ChronTravelers"
 
-A standalone, single-player-capable, text-based RPG inspired by the Major BBS
-door game *Mutants!*. Version 1 simulates all other "players" as NPCs with the
-same classes, rules, and restrictions as the human player, so the world feels
-populated even with nobody else connected. Multiplayer/network play is an
-explicit non-goal for v1 and a likely v2+ direction (see §11).
+A standalone, single-player-capable, text-based RPG. Its mechanical skeleton
+is inherited from the Major BBS door game *Mutants!* (the `[SOURCE]` marks
+below); the setting, lore, classes, content, and naming are an original
+sci-fi / time-travel reskin. Version 1 simulates all other "players" as NPCs
+with the same classes, rules, and restrictions as the human player, so the
+world feels populated even with nobody else connected. Multiplayer/network
+play is an explicit non-goal for v1 and a likely v2+ direction (see §11).
 
 Everything here is original design **except** where marked `[SOURCE]`, which
-means it's a confirmed mechanic from `research/ORIGINAL_MUTANTS_RESEARCH.md`.
-Anything not marked that way fills a documented gap in the historical record.
+means it's a confirmed mechanic from `research/ORIGINAL_MUTANTS_RESEARCH.md`
+(the historical record of the door game whose rules this borrows). Anything
+not marked that way fills a documented gap in that record or is part of the
+ChronTravelers reskin.
 
 ---
 
 ## 1. High concept
 
-You are a Mutant starting in the year 2000 A.D., clawing your way to being
-the most powerful, richest being on the planet `[SOURCE]`. You explore a
-grid-based city and wasteland, fight monsters for loot, convert junk into
-Ions to survive and travel, buy and run stores, and burn Ions to `travel`
-anywhere on the 2000–5000 A.D. timeline — later years are richer and far
-more dangerous. Every other Mutant you meet in the world — friendly,
-hostile, or running a shop — is an NPC governed by the same rules you are.
+You are a **Chron Traveler** — crew from Project Meridian, a classified
+government temporal-tunnel program (think the *Time Tunnel* of the old TV
+show). On its first full-power run the tunnel tore a **standing rupture**
+that "frayed" the downstream timeline; the personnel on the gantry were
+swept loose and now surface at random years between **2000 and 5000 A.D.**,
+unable to steer. You explore a grid-based city and wasteland, fight the
+things the fray left behind for loot, convert salvage into **Ions**
+(tunnel-charge) to survive and to ride surges through time, buy and run
+stores, and burn Ions to `travel` anywhere on the 2000–5000 A.D. timeline —
+later years are richer and far more dangerous. Every other Traveler you meet
+— friendly, hostile, or running a shop — is an NPC governed by the same
+rules you are. The goal (and the board): push deepest downstream and level
+up. The surface team never stops looking; it just can't pull you back.
+
+### 1.1 Background & lore (ChronTravelers reskin)
+
+- **Project Meridian** built the tunnel underground, on government money, to
+  observe (not touch) the past. The first activation at full power held for
+  about eight seconds and never fully closed — leaving a rupture that bleeds
+  "downstream," so the further into the future you go the more *frayed*
+  reality is (§3.2's era bands run from a barely-touched near future to a
+  timeline that has come apart entirely).
+- **Chron Travelers** are the gantry crew, scattered 2000–5000 A.D. They
+  move by riding **Ion surges** — the tunnel-charge that leaks from the
+  rupture — and the cost scales with how far they jump (§2, §3.2).
+- **Echoes** (the monster tag, was "undead") are fray-recordings: the
+  timeline replaying dead people and events on a loop. The Doctor's
+  resonance tools are especially good at collapsing them.
+- **Wardens** (was "Gatekeepers") are automated temporal-defense
+  constructs the program seeded along the timeline to guard **pre-collapse
+  technology caches**. They still stand watch, decades apart, over a
+  guaranteed high-end trophy. They gate nothing — you can travel straight
+  past one.
+- **Credits** (was "Riblets") are post-collapse scrip — the currency every
+  surviving settlement and salvage store runs on.
 
 ## 2. Core resource: Ions `[SOURCE]`
 
@@ -49,7 +81,7 @@ it** `[SOURCE]`.
   net-drains you. Added after playtesting showed the drain-only model made
   the early game an unrecoverable attrition spiral.
 - Item→Ion conversion value = `base_item_value * 0.4`, rounded down, with a
-  minimum of 1. This keeps converting strictly worse than selling in Riblets
+  minimum of 1. This keeps converting strictly worse than selling for Credits
   when a store is reachable, but better than nothing when it isn't — replicating
   the "quasi semi-flawed but usable" economy the original was known for,
   without the parts that made it exploitable.
@@ -96,16 +128,16 @@ stretch goal, not in the original).
   5000 at tier 9.0, on a **piecewise curve that's steeper early** — one
   tier per 250 years through 2000–3000 (reaching tier 5), then one per 500
   years after — so a short early hop actually changes the fight instead of
-  the first ~600 years all playing the same (`Mutants.Core.Time.TimeScale`).
+  the first ~600 years all playing the same (`ChronTravelers.Core.Time.TimeScale`).
 - **Each year has its own grid map**, generated deterministically from a
   per-save **world seed** plus the year — the same year always produces the
   same layout, so it can be a pure function of the save with nothing about
   the geometry stored. Room descriptions are drawn from ~15 authored
-  **era bands** (Ruined City → … → The Final Instant) that tile the 3000
-  years; a year takes its theme and monster/loot pools from its band.
+  **era bands** (The Fallout Belt → … → The Final Instant) that tile the
+  3000 years; a year takes its theme and monster/loot pools from its band.
 - Command: `travel <year>` (any year 2000–5000), `travel +N` / `travel -N`
   (relative), or `travel next` / `travel prev` (the next/previous
-  Gatekeeper year).
+  Warden year).
 - Cost: `ceil(0.04 * |target_year - current_year|)` Ions, minimum 1,
   deducted on success (coefficient lowered 0.2 → 0.1 → 0.04 across
   playtests so mid-range hops are affordable from low level — a one-tier
@@ -123,31 +155,36 @@ stretch goal, not in the original).
   a high-risk raid for a shot at better equipment. The console flags such
   a jump ("2450 A.D. is around tier 3 — scales to ~level 30, you're level
   1") and asks to confirm, but never forbids it.
-- **Gatekeepers** are still here, but as tough optional encounters rather
+- **Wardens** are still here, but as tough optional encounters rather
   than gates. The world seed places one every random 50–100 years across
-  the timeline; a Gatekeeper year holds a bullet-sponge boss (~3× a regular
-  monster's HP for that year) guarding a guaranteed year-scaled **Legendary
-  weapon trophy**, present until you beat it once. It blocks nothing —
-  travelling past a Gatekeeper year was never restricted.
+  the timeline; a Warden year stations an automated temporal-defense
+  construct (~3× a regular monster's HP for that year) guarding a
+  guaranteed year-scaled **Legendary trophy** from a pre-collapse tech
+  cache, present until you beat it once. It blocks nothing — travelling
+  past a Warden year was never restricted.
 - **Persistence**: map layouts are regenerated from the seed, not stored.
   What the save keeps per character is the world seed, the current and
-  furthest-reached year, the set of cleared Gatekeeper years, and every
-  store the player owns (which year, its Riblet capital, and its
+  furthest-reached year, the set of cleared Warden years, and every
+  store the player owns (which year, its Credit capital, and its
   listings — re-attached to the regenerated world on load).
 
 ### 3.3 Death & recall
 - Dying drops a portion of unconverted inventory at the death location (loot
-  becomes lootable by other NPCs/players) and returns the character to the
-  present with an Ion penalty. No source material describes death handling,
-  so this is original, tuned to punish but not erase progress.
+  becomes lootable by other NPCs/Travelers) and snaps the character back
+  upstream to the year 2000 A.D. with an Ion penalty. No source material
+  describes death handling, so this is original, tuned to punish but not
+  erase progress.
 
 ## 4. Character classes
 
-`[SOURCE: five classes confirmed — Thief, Priest, Wizard, Warrior, Mage,
-per the MBBSEmu wiki; "Barbarian/Cleric" appear in a second, looser source
-and are treated as the same archetypes under different version-era names.]`
-All ability names, numbers, and level-gates below are original design filling
-a documented gap.
+The five classes are the **crew roles of a Project Meridian research
+station**. Their *mechanical* shapes descend from the door game's five
+confirmed classes `[SOURCE: Thief, Priest, Wizard, Warrior, Mage, per the
+MBBSEmu wiki; "Barbarian/Cleric" appear in a second, looser source and are
+treated as the same archetypes under different version-era names.]` — the
+mapping is Warrior→**Soldier**, Thief→**Spy**, Priest→**Doctor**,
+Mage→**Scientist**, Wizard→**Engineer**. All names, ability names, numbers,
+lore, and level-gates below are original design filling a documented gap.
 
 Every class shares: HP, Ions, a primary attack, an inventory, and access to
 `convert`/`wield`/`sell`. Classes differ in HP/Ion scaling, their unlocked
@@ -155,15 +192,15 @@ ability tree, and which loot they can equip.
 
 | Class | Role | Primary stat | Flavor |
 |---|---|---|---|
-| Warrior | Melee tank/damage | Strength | Front-line brawler, best HP, heaviest weapons/armor |
-| Thief | Skirmisher/utility | Agility | Stealth, critical strikes, lockpicking/store discounts |
-| Priest | Support/healer | Faith | Group heals, buffs, undead-effective damage |
-| Mage | Arcane blaster | Intellect | High burst Ion-cost spells, area damage, weak melee |
-| Wizard* | Arcane utility | Intellect | Control/debuff spells, teleport-lite movement tricks |
+| Soldier | Melee tank/damage | Strength | Station security — best HP, heaviest gear, cheapest Ion drain |
+| Spy | Skirmisher/utility | Agility | Recon and infiltration — evasion, opening-strike crits, store contacts |
+| Doctor | Support/healer | Resolve | Trauma medicine — group heals, combat stims, resonance vs. echoes |
+| Scientist | Ion blaster | Intellect | Tunnel theory — high burst Ion-cost abilities, area damage, weak melee |
+| Engineer | Systems utility | Intellect | Power and hardware — control/sabotage, rigged micro-jumps |
 
-\* Kept as a distinct 5th class (rather than merging with Mage) to honor the
-wiki's explicit 5-name list; differentiated by role (control/utility vs.
-blaster) so the two arcane classes don't overlap mechanically.
+\* Scientist and Engineer are kept as two distinct Intellect classes (rather
+than one) to honor the wiki's explicit 5-name list; differentiated by role
+(control/utility vs. blaster) so they don't overlap mechanically.
 
 ### 4.1 Leveling
 - XP from monster kills, scaled by monster level relative to the killer.
@@ -176,33 +213,33 @@ blaster) so the two arcane classes don't overlap mechanically.
 
 ### 4.2 Ability trees (original design, 6 tiers per class = levels 5/10/15/20/25/30)
 
-Example — **Warrior**:
-1. Lv5 — *Cleave*: hit up to 2 additional adjacent enemies.
-2. Lv10 — *Second Wind*: once per fight, heal 20% max HP for free (no Ions).
-3. Lv15 — *Guard Break*: bypass a portion of target's armor.
-4. Lv20 — *Rally*: nearby NPC allies gain a temporary damage buff.
-5. Lv25 — *Juggernaut*: temporary damage reduction stance.
-6. Lv30 — *Executioner*: bonus damage vs. targets below 25% HP.
+Example — **Soldier**:
+1. Lv5 — *Suppressing Sweep*: rake fire across the target and up to 2 others crowding it.
+2. Lv10 — *Field Patch*: once per fight, a trauma seal for 20% max HP — no Ions.
+3. Lv15 — *Armor-Piercing Rounds*: sabot loads punch through part of the target's plating.
+4. Lv20 — *Fire Discipline*: call the shots — nearby allies hit harder for a while.
+5. Lv25 — *Breach Stance*: set behind the shield — incoming damage drops.
+6. Lv30 — *Confirmed Kill*: heavy bonus damage vs. targets below 25% HP.
 
-Example — **Priest**:
-1. Lv5 — *Mend*: single-target heal (Ion cost).
-2. Lv10 — *Bless*: temporary to-hit/damage buff for self or target.
-3. Lv15 — *Turn Undead*: strong bonus damage + fear vs. undead monster tag.
-4. Lv20 — *Circle Heal*: heal self + adjacent party/NPC allies.
-5. Lv25 — *Resurrect Lite*: revive a fallen ally NPC with partial HP (rare, long cooldown).
-6. Lv30 — *Sanctuary*: brief immunity window.
+Example — **Doctor**:
+1. Lv5 — *Triage*: focused single-target heal (Ion cost).
+2. Lv10 — *Combat Stim*: your strikes land harder for a while.
+3. Lv15 — *Purge Echo*: a resonance burst — devastating to `echo`-tagged monsters.
+4. Lv20 — *Broad-Spectrum*: field-treat yourself and every ally in the room.
+5. Lv25 — *Crash Cart*: bring a downed ally NPC back on partial vitals (rare, long cooldown).
+6. Lv30 — *Iso Field*: a sterile bubble — a brief window of total immunity.
 
-(Thief, Mage, Wizard get parallel 6-tier trees — full tables live in
+(Spy, Scientist, Engineer get parallel 6-tier trees — full tables live in
 `docs/CONTENT_PLAN.md` so this GDD stays a living-but-stable reference; the
 pattern — 6 tiers, one per 5 levels, escalating from single-target to
 area/group to a capstone — is the standard every class follows.)
 
 ### 4.3 Restrictions (apply identically to player and NPCs)
-- Weapon/armor equip requirescl ass-tagged gear (a Mage can't wield the
-  Warrior's two-handed axe at full effectiveness — non-class gear works at a
+- Weapon/armor equip requires class-tagged gear (a Scientist can't wield the
+  Soldier's breaching maul at full effectiveness — non-class gear works at a
   penalty rather than being hard-blocked, to keep loot from feeling wasted).
-- Ion pools and drain rates differ per class (Mage/Wizard drain faster from
-  spell use; Warrior/Thief drain slowest, lean harder on raw HP).
+- Ion pools and drain rates differ per class (Scientist/Engineer drain
+  faster from ability use; Soldier/Spy drain slowest, lean harder on raw HP).
 
 ## 5. Loot system `[SOURCE: wield/sell/convert]`
 
@@ -271,26 +308,27 @@ area/group to a capstone — is the standard every class follows.)
     ×0.25), so a relic-class weapon is a genuine rare/unique find rather
     than just a different colour. Government depots stock a dependable
     mid-grade (Uncommon) piece; the extremes are loot only. A
-    Gatekeeper's guaranteed trophy sits deep in the Legendary band.
+    Warden's guaranteed trophy sits deep in the Legendary band.
   - Consumables and junk keep an authored rarity (a potion's strength
     isn't a damage number).
 
-## 6. Stores & economy `[SOURCE: purchasable NPC-run stores + Riblets]`
+## 6. Stores & economy `[SOURCE: purchasable NPC-run stores + currency]`
 
-### 6.1 NPC government stores
-- Every year has a government store, placed deterministically by the world
-  seed `[SOURCE]`. These are the baseline places to sell loot for
-  **Riblets** and buy consumables/basic gear; each stocks the same staple
-  kinds (a heal item, an attack potion, a defense potion, a weapon, an
-  armour piece), pulled from the year's era themes.
+### 6.1 NPC supply stores
+- Every year has a supply store — a Meridian-era government depot still
+  running on automation, or the settlement that grew up around one — placed
+  deterministically by the world seed `[SOURCE]`. These are the baseline
+  places to sell loot for **Credits** and buy consumables/basic gear; each
+  stocks the same staple kinds (a heal item, an attack booster, a defense
+  booster, a weapon, an armour piece), pulled from the year's era themes.
 - Prices scale with the **year** (a year-4000 store deals in year-4000-tier
   goods and pays/charges accordingly) — this is how "an economy based on
   the time travel level" gets implemented against the timeline.
 
-### 6.2 Player-owned stores `[SOURCE: players can buy government stores]`
-- A player (human or NPC) can purchase an available government-built store
-  slot in a year for a Riblet cost scaled to that year's tier. A human
-  player's owned stores persist across sessions (§3.2).
+### 6.2 Player-owned stores `[SOURCE: players can buy the NPC stores]`
+- A Traveler (human or NPC) can purchase an available depot store slot in a
+  year for a Credit cost scaled to that year's tier. A human player's owned
+  stores persist across sessions (§3.2).
 - Once owned, the player stocks it manually (deposit items from inventory,
   set an asking price per item, within store-level-appropriate bounds to
   prevent trivial arbitrage).
@@ -300,22 +338,22 @@ area/group to a capstone — is the standard every class follows.)
   NPC over-encumbered with junk will sell to a store with open capital) —
   this is the "NPCs will sometimes visit and buy and sell from the player
   stores" requirement, made concrete.
-- Store owners collect Riblets from NPC sales automatically (idle-income
+- Store owners collect Credits from NPC sales automatically (idle-income
   loop) and can visit in person to restock/collect/adjust prices.
 
 ### 6.3 Economy safeguards (original, informed by the source's known flaw)
 The original economy was described by a contemporary player as "quasi
 semi-flawed." To avoid reproducing that: NPC store customers have a budget
 cap per visit, sale prices are clamped to a level-appropriate band (no
-selling level-1 junk into a level-10 store for level-10 money), and Riblet
-sinks exist (store purchase cost, restocking government store inventory,
-repair costs) so currency doesn't purely inflate.
+selling level-1 junk into a level-10 store for level-10 money), and Credit
+sinks exist (store purchase cost, restocking depot inventory, repair costs)
+so currency doesn't purely inflate.
 
 ## 7. NPC simulation ("simulated players")
 
 Since v1 has no network multiplayer, the world needs to feel alive:
 
-- A configurable population of NPC "Mutants" is scattered across the whole
+- A configurable population of NPC Travelers is scattered across the whole
   timeline (a single `totalCount`, each spawned in a random year and
   fast-levelled into that year's soft-cap band), each a full character with
   class, level, inventory, and Ion pool — built on the *exact same
@@ -327,10 +365,12 @@ Since v1 has no network multiplayer, the world needs to feel alive:
   otherwise pursue its current goal (grind monsters in its year, trade at
   its year's store, hop a short way along the timeline — usually forward —
   if it can afford the Ion cost).
-- NPCs participate in the same kill-feed / **telepathic broadcast** channel
-  as the player `[SOURCE]` — "X was slain by Y," "Z reached level N," "W time
-  traveled to 3200 A.D." — so the leaderboard and the "who's doing what"
-  feel of the original survives without a live human population.
+- NPCs participate in the same kill-feed / **fray-band broadcast** channel
+  as the player `[SOURCE: cross-board telepathic messages]` — "X was slain
+  by Y," "Z reached level N," "W jumped downstream to 3200 A.D." — so the
+  leaderboard and the "who's doing what" feel of the original survives
+  without a live human population. (The rupture leaks a low signal every
+  Traveler's rig can pick up; that's the in-fiction reason you hear it.)
 - NPC decision-making is intentionally simple and rule-based for v1 (finite
   state machine, not full pathfinding AI/ML) to keep it debuggable and cheap
   to simulate at scale; an upgrade path to smarter behavior is a documented
@@ -338,7 +378,7 @@ Since v1 has no network multiplayer, the world needs to feel alive:
 
 ### 7.1 Spatial monsters
 The year the player is standing in also runs a live monster population
-(`Mutants.Core.Time.YearPopulation`, seeded deterministically from the
+(`ChronTravelers.Core.Time.YearPopulation`, seeded deterministically from the
 world seed on first entry, kept alive in the session's year memo — not
 saved):
 - Monsters occupy specific rooms and, each tick, **patrol** through exits,
@@ -351,12 +391,12 @@ saved):
   where it's going and cut it off.
 - **Movement is narrated** relative to you, in the source game's style —
   a monster **first coming within one room** ("you hear something to the
-  north," with varied phrasing), **entering** your room ("a Rubble Brute
-  comes in from the south"), or **leaving** it ("the Alley Runner slips
+  north," with varied phrasing), **entering** your room ("a Rubble Hulk
+  comes in from the south"), or **leaving** it ("the Feral Runner slips
   away east"). `look` also lists what's stirring in each adjacent room.
 - Monsters do **not** automatically pursue or attack anyone who walks
   past. Each carries an **earned aggro meter** toward the player
-  (`Mutants.Core.Monsters.AggroModel`), raised by:
+  (`ChronTravelers.Core.Monsters.AggroModel`), raised by:
   - **stepping onto its tile** — the big one; do it over and over (pacing
     a chokepoint, farming a spot) and it stacks faster than it decays;
   - **lingering** on or next to it (a small trickle per tick);
@@ -381,7 +421,7 @@ saved):
 - A slow **respawn trickle** keeps an emptied year refilling toward a soft
   cap (~a third of its rooms) without ever overflowing.
 - Only the player's current year is simulated; every other year holds its
-  monsters frozen where they were placed until visited. NPC-Mutants still
+  monsters frozen where they were placed until visited. NPC Travelers still
   grind abstractly against their year's roster (spatial NPC↔monster
   interaction is a follow-up).
 
@@ -413,16 +453,16 @@ yours) using NPCs instead of real concurrent users.
   (status red, exits green, ambient text default) — matches the one surviving
   screenshot's visual language.
 - Windows console/terminal application; a scrollable log pane and a fixed
-  status bar (HP/Ions/Riblets/Level/Location) are a modernization, not a
+  status bar (HP/Ions/Credits/Level/Location) are a modernization, not a
   historical requirement, and are recommended for playability.
 
 ## 11. Explicit non-goals for v1
 
 - Live network multiplayer (real concurrent human players) — architecture
   should not preclude it later, but it is not built now.
-- PvP combat between humans — original game supported it per the "who kills
-  who" telepathic messages; v1 can allow player-vs-NPC-Mutant combat (since
-  NPCs are full Mutants) which covers the spirit of it without needing a
+- PvP combat between humans — the door game supported it per the "who kills
+  who" broadcast messages; v1 can allow player-vs-NPC-Traveler combat (since
+  NPCs are full Travelers) which covers the spirit of it without needing a
   netcode layer.
 - Mobile/console ports.
 

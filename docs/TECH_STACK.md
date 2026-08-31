@@ -44,17 +44,17 @@
 ### Suggested repo layout (see also `docs/AGENTS.md`)
 
 ```
-Mutants/
+ChronTravelers/
   docs/                  GDD, tech stack doc, agent contracts, content plan
   research/              Source-material research
   src/
-    Mutants.Core/        Domain model: classes, abilities, items, monsters, levels, economy
-    Mutants.Engine/      Tick loop, NPC AI, combat resolution, persistence
-    Mutants.Console/     Spectre.Console front end / the actual playable app
-    Mutants.Content/     JSON content data (classes.json, monsters.json, items.json, levels/*.json)
+    ChronTravelers.Core/        Domain model: classes, abilities, items, monsters, levels, economy
+    ChronTravelers.Engine/      Tick loop, NPC AI, combat resolution, persistence
+    ChronTravelers.Console/     Spectre.Console front end / the actual playable app
+    ChronTravelers.Content/     JSON content data (classes.json, monsters.json, items.json, levels/*.json)
   tests/
-    Mutants.Core.Tests/
-    Mutants.Engine.Tests/
+    ChronTravelers.Core.Tests/
+    ChronTravelers.Engine.Tests/
   installer/             Inno Setup script + assets
   .github/workflows/     CI pipeline
 ```
@@ -65,7 +65,7 @@ Mutants/
 2. Grid/movement + a single hardcoded level, playable via console.
 3. Combat + loot drops + convert/sell/wield.
 4. NPC simulation loop (reuses the same domain model).
-5. Stores (government + player-owned) + Riblet economy.
+5. Stores (supply depots + player-owned) + Credit economy.
 6. Time travel between multiple levels, scaling.
 7. Leaderboards + start-screen display + save/load.
 8. Installer packaging + first internal Windows build.
