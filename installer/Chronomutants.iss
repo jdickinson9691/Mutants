@@ -4,12 +4,12 @@
 ; app, not the reverse."
 ;
 ; This script packages the self-contained single-file build produced by:
-;   dotnet publish src\Mutants.Console -c Release -r win-x64 -o publish\win-x64
-; (see src\Mutants.Console\Mutants.Console.csproj for the publish
+;   dotnet publish src\ChronTravelers.Console -c Release -r win-x64 -o publish\win-x64
+; (see src\ChronTravelers.Console\ChronTravelers.Console.csproj for the publish
 ; properties — SelfContained/PublishSingleFile/etc.)
 ;
 ; Build locally (from the repo root, with Inno Setup 6 installed):
-;   dotnet publish src\Mutants.Console -c Release -r win-x64 -o publish\win-x64
+;   dotnet publish src\ChronTravelers.Console -c Release -r win-x64 -o publish\win-x64
 ;   iscc installer\Chronomutants.iss
 ; The finished installer lands in installer\Output\.
 ;
@@ -41,7 +41,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 ; Per-user install with no admin prompt - appropriate for a single-player
-; game with a per-user save file (see Mutants.Console's %APPDATA% save
+; game with a per-user save file (see ChronTravelers.Console's %APPDATA% save
 ; path), and keeps the installer usable without elevation.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog

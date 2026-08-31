@@ -33,13 +33,13 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Restore
-        run: dotnet restore Mutants.sln
+        run: dotnet restore ChronTravelers.sln
 
       - name: Test
-        run: dotnet test Mutants.sln -c Release
+        run: dotnet test ChronTravelers.sln -c Release
 
       - name: Publish self-contained win-x64 build
-        run: dotnet publish src/Mutants.Console/Mutants.Console.csproj -c Release -r win-x64 -o publish/win-x64 -p:Version=${{ steps.version.outputs.version }}
+        run: dotnet publish src/ChronTravelers.Console/ChronTravelers.Console.csproj -c Release -r win-x64 -o publish/win-x64 -p:Version=${{ steps.version.outputs.version }}
 
       - name: Ensure Inno Setup is available
         shell: pwsh

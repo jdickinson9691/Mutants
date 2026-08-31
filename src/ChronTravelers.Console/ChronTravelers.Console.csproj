@@ -1,0 +1,57 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Player-facing app identity (installer/Chronomutants.iss, exe file properties). -->
+    <AssemblyName>Chronomutants</AssemblyName>
+    <Product>Chronomutants</Product>
+    <Version>0.1.0</Version>
+    <Authors>Chronomutants Project</Authors>
+
+    <!--
+      Publish settings for the packaged Windows build — docs/TECH_STACK.md:
+      "dotnet publish produces a self-contained single-file EXE." These are
+      inert for plain `dotnet build`/`dotnet test`; they only take effect
+      with `dotnet publish -r win-x64`, e.g.:
+        dotnet publish src/ChronTravelers.Console -c Release -r win-x64 -o publish/win-x64
+      (see installer/Chronomutants.iss, which packages that output).
+    -->
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishReadyToRun>false</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" Version="0.57.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChronTravelers.Core\ChronTravelers.Core.csproj" />
+    <ProjectReference Include="..\ChronTravelers.Engine\ChronTravelers.Engine.csproj" />
+    <ProjectReference Include="..\ChronTravelers.Content\ChronTravelers.Content.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      ChronTravelers.Content has no compiled output to reference, so its JSON
+      files don't flow through the ProjectReference above — copy them
+      directly into our own output under Content\, where
+      ChronTravelers.Engine.Content.ContentLoader expects to find them (see
+      Program.cs) and where the published single-file exe needs them
+      alongside it (CopyToPublishDirectory) since they can't be bundled
+      into the exe itself.
+    -->
+    <Content Include="..\ChronTravelers.Content\*.json">
+      <Link>Content\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    This project holds only JSON content data (docs/TECH_STACK.md's
+    repo layout; docs/AGENTS.md's Content Agent: "the actual JSON content
+    ... turning the Design Agent's numbers/tables into loadable data
+    files"). No C# code lives here — it exists so the content has a
+    dedicated home in the solution and ships as ordinary files.
+    ChronTravelers.Console copies these files directly into its own output (see
+    its .csproj); ChronTravelers.Engine.Content.ContentLoader reads them from
+    wherever the caller points it, decoupled from this project's location.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Deliberately no CopyToOutputDirectory here: SDK projects propagate
+      such items transitively to referencing projects' output, which
+      collided with ChronTravelers.Console's own explicit copy of these same
+      files (see its .csproj) - these are just tracked for Solution
+      Explorer visibility, not copied by this project itself.
+    -->
+    <None Include="**\*.json" />
+  </ItemGroup>
+
+</Project>
