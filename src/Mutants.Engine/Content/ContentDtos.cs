@@ -145,3 +145,57 @@ public sealed class NpcPopulationData
     public int MinLevel { get; set; } = 1;
     public int MaxLevel { get; set; } = 1;
 }
+
+// ---------------------------------------------------------------------------
+// Continuous-timeline content (Mutants.Core.Time): tier-free catalogs the
+// year-based world generator scales on the fly. See ContentLoader.LoadTimeWorld.
+// ---------------------------------------------------------------------------
+
+/// <summary>A monster species — <c>monster-species.json</c>. No stats/tier: <see cref="Archetype"/> + the encounter year produce them.</summary>
+public sealed class MonsterSpeciesData
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public List<string> Tags { get; set; } = [];
+
+    /// <summary>One of Mutants.Core.Time.MonsterArchetype's names: "Baseline", "Caster", "Bruiser", "Skirmisher".</summary>
+    public string Archetype { get; set; } = "";
+
+    /// <summary>Item theme tags this species can drop — matched against <see cref="ItemArchetypeData.ThemeTags"/>.</summary>
+    public List<string> LootThemeTags { get; set; } = [];
+}
+
+/// <summary>An item archetype — <c>item-archetypes.json</c>. No tier: value/bonuses come from the year it drops in.</summary>
+public sealed class ItemArchetypeData
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Type { get; set; } = "";
+    public string Rarity { get; set; } = "";
+    public string? RestrictedClass { get; set; }
+
+    /// <summary>One of Mutants.Core.Items.ConsumableEffectType's names; defaults to "None".</summary>
+    public string Effect { get; set; } = "None";
+
+    public double EffectMagnitude { get; set; }
+    public int EffectDurationTicks { get; set; }
+
+    public List<string> ThemeTags { get; set; } = [];
+}
+
+/// <summary>One era band of the timeline — <c>eras.json</c>. Ordered by <see cref="FromYear"/>; the first must be 2000.</summary>
+public sealed class EraData
+{
+    public int FromYear { get; set; }
+    public string Name { get; set; } = "";
+    public List<string> RoomText { get; set; } = [];
+    public List<string> SpeciesIds { get; set; } = [];
+    public List<string> ItemThemeTags { get; set; } = [];
+}
+
+/// <summary>Store tuning — <c>store-templates.json</c>. Optional; sensible defaults if the file is absent.</summary>
+public sealed class StoreTemplateData
+{
+    public int PlayerSlotBaseCost { get; set; } = 100;
+    public int PlayerSlotCostPerTier { get; set; } = 110;
+}

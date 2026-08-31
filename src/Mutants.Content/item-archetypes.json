@@ -1,0 +1,43 @@
+[
+  { "id": "salvaged-blade",   "name": "Salvaged Blade",   "type": "Weapon", "rarity": "Common",   "themeTags": ["common"] },
+  { "id": "layered-plating",  "name": "Layered Plating",  "type": "Armor",  "rarity": "Common",   "themeTags": ["common"] },
+  { "id": "salvage-shard",    "name": "Salvage Shard",    "type": "Junk",   "rarity": "Common",   "themeTags": ["common"] },
+  { "id": "sealed-ration",    "name": "Sealed Ration",    "type": "Consumable", "rarity": "Common",   "effect": "Heal",       "effectMagnitude": 14, "themeTags": ["common"] },
+  { "id": "combat-stim",      "name": "Combat Stim",      "type": "Consumable", "rarity": "Uncommon", "effect": "BuffAttack", "effectMagnitude": 5, "effectDurationTicks": 15, "themeTags": ["common"] },
+  { "id": "ward-draught",     "name": "Ward Draught",     "type": "Consumable", "rarity": "Uncommon", "effect": "BuffDefense","effectMagnitude": 5, "effectDurationTicks": 15, "themeTags": ["common"] },
+
+  { "id": "warrior-maul",     "name": "Breacher's Maul",  "type": "Weapon", "rarity": "Uncommon", "restrictedClass": "Warrior", "themeTags": ["common"] },
+  { "id": "thief-fang",       "name": "Backalley Fang",   "type": "Weapon", "rarity": "Uncommon", "restrictedClass": "Thief",   "themeTags": ["common"] },
+  { "id": "priest-censer",    "name": "Ashwood Censer",   "type": "Weapon", "rarity": "Uncommon", "restrictedClass": "Priest",  "themeTags": ["common"] },
+  { "id": "mage-focus",       "name": "Signal Focus",     "type": "Weapon", "rarity": "Uncommon", "restrictedClass": "Mage",    "themeTags": ["common"] },
+  { "id": "wizard-wand",      "name": "Null Wand",        "type": "Weapon", "rarity": "Uncommon", "restrictedClass": "Wizard",  "themeTags": ["common"] },
+
+  { "id": "scrap-cleaver",    "name": "Scrap Cleaver",    "type": "Weapon", "rarity": "Common",   "themeTags": ["scrap"] },
+  { "id": "hardplate-harness","name": "Hardplate Harness","type": "Armor",  "rarity": "Uncommon", "themeTags": ["scrap"] },
+  { "id": "copper-wiring",    "name": "Copper Wiring",    "type": "Junk",   "rarity": "Uncommon", "themeTags": ["scrap"] },
+
+  { "id": "arc-cleaver",      "name": "Arc Cleaver",      "type": "Weapon", "rarity": "Uncommon", "themeTags": ["neon"] },
+  { "id": "neon-carapace",    "name": "Neon Carapace",    "type": "Armor",  "rarity": "Rare",     "themeTags": ["neon"] },
+  { "id": "holo-emitter",     "name": "Broken Holo-Emitter","type": "Junk", "rarity": "Uncommon", "themeTags": ["neon"] },
+
+  { "id": "cinderforged-mail","name": "Cinderforged Mail","type": "Armor",  "rarity": "Rare",     "themeTags": ["ash"] },
+  { "id": "fused-glass-bead", "name": "Fused Glass Bead", "type": "Junk",   "rarity": "Uncommon", "themeTags": ["ash"] },
+
+  { "id": "abyssal-plate",    "name": "Abyssal Plate",    "type": "Armor",  "rarity": "Epic",     "themeTags": ["drowned"] },
+  { "id": "waterlogged-ledger","name": "Waterlogged Ledger","type": "Junk", "rarity": "Uncommon", "themeTags": ["drowned"] },
+
+  { "id": "sovereign-aegis",  "name": "Sovereign Aegis",  "type": "Armor",  "rarity": "Epic",     "themeTags": ["deep"] },
+  { "id": "reliquary-fragment","name": "Reliquary Fragment","type": "Junk", "rarity": "Rare",     "themeTags": ["deep"] },
+
+  { "id": "glacial-bulwark",  "name": "Glacial Bulwark",  "type": "Armor",  "rarity": "Epic",     "themeTags": ["frost"] },
+  { "id": "frozen-vault-key", "name": "Frozen Vault Key", "type": "Junk",   "rarity": "Rare",     "themeTags": ["frost"] },
+  { "id": "icicle-lance",     "name": "Icicle Lance",     "type": "Weapon", "rarity": "Rare",     "themeTags": ["frost"] },
+
+  { "id": "voidsteel-carapace","name": "Voidsteel Carapace","type": "Armor","rarity": "Epic",     "themeTags": ["orbital"] },
+  { "id": "cracked-nav-core", "name": "Cracked Nav Core", "type": "Junk",   "rarity": "Rare",     "themeTags": ["orbital"] },
+  { "id": "railgun-shard",    "name": "Railgun Shard",    "type": "Weapon", "rarity": "Rare",     "themeTags": ["orbital"] },
+
+  { "id": "paradox-bulwark",  "name": "Paradox Bulwark",  "type": "Armor",  "rarity": "Epic",     "themeTags": ["paradox"] },
+  { "id": "splintered-hourglass","name": "Splintered Hourglass","type": "Junk","rarity": "Epic",  "themeTags": ["paradox"] },
+  { "id": "causality-blade",  "name": "Causality Blade",  "type": "Weapon", "rarity": "Rare",     "themeTags": ["paradox"] }
+]

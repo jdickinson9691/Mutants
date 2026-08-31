@@ -1,0 +1,34 @@
+[
+  { "id": "scavenger",        "name": "Scavenger",        "tags": [],         "archetype": "Baseline",   "lootThemeTags": ["scrap", "common"] },
+  { "id": "rubble-brute",     "name": "Rubble Brute",      "tags": [],         "archetype": "Bruiser",    "lootThemeTags": ["scrap", "common"] },
+  { "id": "scrapyard-wraith", "name": "Scrapyard Wraith",  "tags": ["undead"], "archetype": "Caster",     "lootThemeTags": ["scrap"] },
+  { "id": "alley-runner",     "name": "Alley Runner",      "tags": [],         "archetype": "Skirmisher", "lootThemeTags": ["scrap", "common"] },
+
+  { "id": "circuit-wraith",   "name": "Circuit Wraith",    "tags": ["undead"], "archetype": "Caster",     "lootThemeTags": ["neon"] },
+  { "id": "riot-drone",       "name": "Riot Drone",        "tags": [],         "archetype": "Bruiser",    "lootThemeTags": ["neon", "common"] },
+  { "id": "wire-skulker",     "name": "Wire Skulker",      "tags": [],         "archetype": "Skirmisher", "lootThemeTags": ["neon", "common"] },
+
+  { "id": "dune-stalker",     "name": "Dune Stalker",      "tags": [],         "archetype": "Skirmisher", "lootThemeTags": ["ash", "common"] },
+  { "id": "ash-wraith",       "name": "Ash Wraith",        "tags": ["undead"], "archetype": "Caster",     "lootThemeTags": ["ash"] },
+  { "id": "ashfall-behemoth", "name": "Ashfall Behemoth",  "tags": [],         "archetype": "Bruiser",    "lootThemeTags": ["ash", "common"] },
+
+  { "id": "drowned-archivist","name": "Drowned Archivist", "tags": ["undead"], "archetype": "Caster",     "lootThemeTags": ["drowned"] },
+  { "id": "flood-serpent",    "name": "Flood Serpent",     "tags": [],         "archetype": "Baseline",   "lootThemeTags": ["drowned", "common"] },
+  { "id": "bulk-diver",       "name": "Bulk Diver",        "tags": [],         "archetype": "Bruiser",    "lootThemeTags": ["drowned", "common"] },
+
+  { "id": "deep-warden",      "name": "Deep Warden",       "tags": [],         "archetype": "Bruiser",    "lootThemeTags": ["deep", "common"] },
+  { "id": "bone-choir",       "name": "Bone Choir",        "tags": ["undead"], "archetype": "Caster",     "lootThemeTags": ["deep"] },
+  { "id": "undercroft-eel",   "name": "Undercroft Eel",    "tags": [],         "archetype": "Skirmisher", "lootThemeTags": ["deep", "common"] },
+
+  { "id": "rime-stalker",     "name": "Rime Stalker",      "tags": [],         "archetype": "Skirmisher", "lootThemeTags": ["frost", "common"] },
+  { "id": "cryo-revenant",    "name": "Cryo Revenant",     "tags": ["undead"], "archetype": "Caster",     "lootThemeTags": ["frost"] },
+  { "id": "vault-sentinel",   "name": "Vault Sentinel",    "tags": [],         "archetype": "Bruiser",    "lootThemeTags": ["frost", "common"] },
+
+  { "id": "void-drifter",     "name": "Void Drifter",      "tags": [],         "archetype": "Skirmisher", "lootThemeTags": ["orbital", "common"] },
+  { "id": "vacuum-wraith",    "name": "Vacuum Wraith",     "tags": ["undead"], "archetype": "Caster",     "lootThemeTags": ["orbital"] },
+  { "id": "hull-breacher",    "name": "Hull Breacher",     "tags": [],         "archetype": "Bruiser",    "lootThemeTags": ["orbital", "common"] },
+
+  { "id": "fracture-wisp",    "name": "Fracture Wisp",     "tags": [],         "archetype": "Skirmisher", "lootThemeTags": ["paradox", "common"] },
+  { "id": "paradox-wraith",   "name": "Paradox Wraith",    "tags": ["undead"], "archetype": "Caster",     "lootThemeTags": ["paradox"] },
+  { "id": "bulwark-construct","name": "Bulwark Construct", "tags": [],         "archetype": "Bruiser",    "lootThemeTags": ["paradox", "common"] }
+]
