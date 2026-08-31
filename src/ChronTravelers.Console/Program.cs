@@ -179,6 +179,12 @@ while (running)
         continue;
     }
 
+    // `look` and a successful move render the room *after* this turn's
+    // world tick (see the end of the loop), so "a Scavenger is here" still
+    // holds when your next command runs — rendering before the tick showed
+    // a monster that had already wandered off by the time you typed fight.
+    var renderRoomAfterTick = false;
+
     switch (input.ToLowerInvariant())
     {
         case "quit" or "exit":
@@ -190,7 +196,7 @@ while (running)
             break;
 
         case "look" or "l":
-            RenderRoom(traveler, world);
+            renderRoomAfterTick = true;
             break;
 
         case "status" or "stat":
@@ -317,7 +323,7 @@ while (running)
                 break;
             }
 
-            HandleMove(traveler, world, direction.Value);
+            renderRoomAfterTick = HandleMove(traveler, world, direction.Value);
             break;
     }
 
@@ -337,6 +343,10 @@ while (running)
             // A monster sharing the room struck the killing blow this tick (see MonsterController's ambush).
             AnsiConsole.MarkupLine("[red]You're struck down where you stand.[/]");
             running = false;
+        }
+        else if (renderRoomAfterTick)
+        {
+            RenderRoom(traveler, world);
         }
     }
 }
@@ -1743,18 +1753,19 @@ static void RenderInventory(Traveler traveler)
     AnsiConsole.Write(table);
 }
 
-static void HandleMove(Traveler traveler, TimeWorld world, Direction direction)
+/// <summary>Moves the player one room. Returns true on a successful move — the caller renders the room after the world tick, so what you see (monsters here / nearby) matches what the next command will act on.</summary>
+static bool HandleMove(Traveler traveler, TimeWorld world, Direction direction)
 {
     var map = world.GetYear(traveler.CurrentYear).Map;
     var result = map.TryMove(traveler.Position, direction);
     if (!result.Success)
     {
         AnsiConsole.MarkupLine("[red]You can't go that way.[/]");
-        return;
+        return false;
     }
 
     traveler.MoveTo(result.Destination!.Value);
-    RenderRoom(traveler, world);
+    return true;
 }
 
 static void RenderRoom(Traveler traveler, TimeWorld world)
