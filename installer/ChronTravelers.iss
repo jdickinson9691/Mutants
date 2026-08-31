@@ -64,6 +64,12 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#MyPublishDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; The tier-free content catalogs (eras, species, item archetypes, ...) can't
+; be bundled into the single-file exe, so `dotnet publish` drops them next
+; to it under Content\ (see ChronTravelers.Console.csproj). ChronTravelers.Engine's
+; ContentLoader loads them from AppContext.BaseDirectory\Content at startup;
+; without them the game silently falls back to a tiny 3-era sandbox.
+Source: "{#MyPublishDir}\Content\*"; DestDir: "{app}\Content"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
 
 [Icons]
