@@ -105,5 +105,14 @@ public sealed class WorldSimulation
                 Broadcast.Publish(GameEvent.LevelReached(npc.Name, npc.Level));
             }
         }
+
+        // Only the year the player is standing in runs live spatial monster
+        // simulation (movement, infighting, healing); other years' monsters
+        // stay frozen where they were placed until visited.
+        if (Mutants.Core.Time.TimeScale.IsValidYear(player.CurrentYear))
+        {
+            var here = World.GetYear(player.CurrentYear);
+            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, _random, Broadcast);
+        }
     }
 }

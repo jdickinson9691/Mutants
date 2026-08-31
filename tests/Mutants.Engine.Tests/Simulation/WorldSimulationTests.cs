@@ -144,4 +144,25 @@ public class WorldSimulationTests
         Assert.Contains(simulation.Broadcast.Events, e => e.Message.Contains("Vex"));
         Assert.Contains(simulation.Broadcast.Events, e => e.Message.Contains("Corrode"));
     }
+
+    [Fact]
+    public void Tick_RunsTheCurrentYearsMonsterPopulation_InfightKillBroadcasts()
+    {
+        var world = World();
+        var player = NewMutant("Player", world, 2000);
+        var pop = world.GetYear(player.CurrentYear).Population;
+
+        // Force two of the year's monsters into the same room so an infight is possible.
+        var spot = pop.Monsters[0].Position;
+        pop.Monsters[1].PlaceAt(spot);
+        var before = pop.Monsters.Count;
+
+        // Fixed(0.0): every monster wanders (all picking the same exit index, so the
+        // co-located pair stays together), and the infight roll passes.
+        var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.0));
+        simulation.Tick(player);
+
+        Assert.True(pop.Monsters.Count < before, "An infight should have removed a monster from the current year's population.");
+        Assert.Contains(simulation.Broadcast.Events, e => e.Message.Contains("was slain by"));
+    }
 }
