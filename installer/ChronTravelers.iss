@@ -26,7 +26,7 @@
 #ifndef MyAppVersion
   #define MyAppVersion "0.1.0"
 #endif
-#define MyAppPublisher "ChronTravelers Project"
+#define MyAppPublisher "Lüdinn Entertainment"
 #define MyAppURL "https://github.com/jdickinson9691/Mutants"
 #define MyAppExeName "ChronTravelers.exe"
 #define MyPublishDir "..\publish\win-x64"

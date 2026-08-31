@@ -10,7 +10,8 @@
     <AssemblyName>ChronTravelers</AssemblyName>
     <Product>ChronTravelers</Product>
     <Version>0.1.0</Version>
-    <Authors>ChronTravelers Project</Authors>
+    <Authors>Lüdinn Entertainment</Authors>
+    <Company>Lüdinn Entertainment</Company>
 
     <!--
       Publish settings for the packaged Windows build — docs/TECH_STACK.md:
