@@ -47,7 +47,7 @@ jobs:
 
       - name: Build installer
         shell: cmd
-        run: '"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=${{ steps.version.outputs.version }} installer\Chronomutants.iss'
+        run: '"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=${{ steps.version.outputs.version }} installer\ChronTravelers.iss'
 
       - name: Upload installer to GitHub Release
         uses: softprops/action-gh-release@v2

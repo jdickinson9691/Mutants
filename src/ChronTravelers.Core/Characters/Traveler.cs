@@ -40,11 +40,11 @@ public sealed class Traveler
     public IReadOnlyCollection<int> DefeatedGatekeeperYears => _defeatedGatekeepers;
 
     /// <summary>
-    /// Riblets on hand — docs/GDD.md §6's store currency. Full store
+    /// Credits on hand — docs/GDD.md §6's store currency. Full store
     /// buy/sell logic is future work (milestone 5); this is just the
     /// balance, needed now for the console status bar (§10).
     /// </summary>
-    public int Riblets { get; private set; }
+    public int Credits { get; private set; }
 
     private int _ticksSinceIonDrain;
     private int _ticksSinceIonRegen;
@@ -147,7 +147,7 @@ public sealed class Traveler
         Stats = stats;
         Health = new HealthPool(maxHp, currentHp);
         Ions = new IonPool(maxIons, currentIons);
-        Riblets = riblets;
+        Credits = riblets;
         CurrentYear = Math.Clamp(currentYear, TimeScale.MinYear, TimeScale.MaxYear);
         FurthestYearReached = Math.Clamp(furthestYearReached, TimeScale.MinYear, TimeScale.MaxYear);
         Position = position;
@@ -328,29 +328,29 @@ public sealed class Traveler
     /// <summary>Moves the Traveler to an adjacent coordinate. Legality (is there really an exit there?) is the caller's job — see <see cref="LevelMap.TryMove"/>.</summary>
     public void MoveTo(Coordinate coordinate) => Position = coordinate;
 
-    public void AddRiblets(int amount)
+    public void AddCredits(int amount)
     {
         if (amount < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(amount), amount, "Amount cannot be negative.");
         }
 
-        Riblets += amount;
+        Credits += amount;
     }
 
-    public void SpendRiblets(int amount)
+    public void SpendCredits(int amount)
     {
         if (amount < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(amount), amount, "Amount cannot be negative.");
         }
 
-        if (amount > Riblets)
+        if (amount > Credits)
         {
-            throw new InvalidOperationException($"Cannot spend {amount} Riblets with only {Riblets} available.");
+            throw new InvalidOperationException($"Cannot spend {amount} Credits with only {Credits} available.");
         }
 
-        Riblets -= amount;
+        Credits -= amount;
     }
 
     public void AddToInventory(Item item) => _inventory.Add(item);
@@ -432,7 +432,7 @@ public sealed class Traveler
     }
 
     /// <summary>
-    /// Sells an item from inventory for Riblets — docs/GDD.md §5/§6.
+    /// Sells an item from inventory for Credits — docs/GDD.md §5/§6.
     /// Unequips the item first if it was wielded. Pass
     /// <paramref name="riblets"/> for a store-negotiated price (see
     /// ChronTravelers.Core.Economy.Store.BuyFromTraveler); omitted, it falls back
@@ -442,7 +442,7 @@ public sealed class Traveler
     {
         RemoveFromInventoryOrThrow(item);
         var amount = riblets ?? item.SellValue();
-        AddRiblets(amount);
+        AddCredits(amount);
         return amount;
     }
 

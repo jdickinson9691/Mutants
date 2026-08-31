@@ -25,15 +25,15 @@ public class StoreSlotTests
     }
 
     [Fact]
-    public void Purchase_SpendsRibletsAndCreatesAnOwnedStore()
+    public void Purchase_SpendsCreditsAndCreatesAnOwnedStore()
     {
         var slot = new StoreSlot("Gutted Storefront", Coordinate.Origin, homeLevel: 1, purchaseCost: 150);
         var buyer = new Traveler("Rook", CharacterClass.Soldier);
-        buyer.AddRiblets(200);
+        buyer.AddCredits(200);
 
         var store = slot.Purchase(buyer);
 
-        Assert.Equal(50, buyer.Riblets);
+        Assert.Equal(50, buyer.Credits);
         Assert.Same(store, slot.Store);
         Assert.Equal(buyer, store.Owner);
         Assert.False(slot.IsAvailableForPurchase);
@@ -44,11 +44,11 @@ public class StoreSlotTests
     {
         var slot = new StoreSlot("Gutted Storefront", Coordinate.Origin, homeLevel: 1, purchaseCost: 150);
         var firstBuyer = new Traveler("Rook", CharacterClass.Soldier);
-        firstBuyer.AddRiblets(200);
+        firstBuyer.AddCredits(200);
         slot.Purchase(firstBuyer);
 
         var secondBuyer = new Traveler("Zeta", CharacterClass.Scientist);
-        secondBuyer.AddRiblets(200);
+        secondBuyer.AddCredits(200);
 
         Assert.Throws<InvalidOperationException>(() => slot.Purchase(secondBuyer));
     }
@@ -57,23 +57,23 @@ public class StoreSlotTests
     public void Purchase_ThrowsIfBuyerCannotAffordIt()
     {
         var slot = new StoreSlot("Gutted Storefront", Coordinate.Origin, homeLevel: 1, purchaseCost: 150);
-        var buyer = new Traveler("Rook", CharacterClass.Soldier); // 0 Riblets
+        var buyer = new Traveler("Rook", CharacterClass.Soldier); // 0 Credits
 
         Assert.Throws<InvalidOperationException>(() => slot.Purchase(buyer));
     }
 
     [Fact]
-    public void RestoreOwnership_ReattachesAStoreWithNoRibletChargeAndKeepsTheCapital()
+    public void RestoreOwnership_ReattachesAStoreWithNoCreditChargeAndKeepsTheCapital()
     {
         var slot = new StoreSlot("Vacant Storefront", Coordinate.Origin, homeLevel: 2600, purchaseCost: 400);
-        var owner = new Traveler("Rook", CharacterClass.Soldier); // 0 Riblets — Purchase would throw
+        var owner = new Traveler("Rook", CharacterClass.Soldier); // 0 Credits — Purchase would throw
 
         var store = slot.RestoreOwnership(owner, capital: 375);
 
         Assert.Same(store, slot.Store);
         Assert.Equal(owner, store.Owner);
         Assert.Equal(375, store.Capital);
-        Assert.Equal(0, owner.Riblets); // never charged
+        Assert.Equal(0, owner.Credits); // never charged
         Assert.False(slot.IsAvailableForPurchase);
     }
 

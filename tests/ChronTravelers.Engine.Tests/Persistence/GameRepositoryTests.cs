@@ -18,7 +18,7 @@ public class GameRepositoryTests
         MaxHp = 42,
         CurrentIons = 20,
         MaxIons = 24,
-        Riblets = 15,
+        Credits = 15,
         UnlockedTimeLevel = 1,
         CurrentTimeLevel = 1,
         PositionEast = 0,

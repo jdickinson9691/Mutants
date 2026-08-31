@@ -113,15 +113,15 @@ public class NpcControllerTests
 
         Assert.Equal(NpcGoal.Trade, result.Goal);
         Assert.Equal(3, npc.Inventory.Count(i => i.Type == ItemType.Junk));
-        Assert.True(npc.Riblets > 0);
+        Assert.True(npc.Credits > 0);
         Assert.Single(store.Listings);
     }
 
     [Fact]
-    public void Act_UnarmedWithRiblets_BuysAndWieldsAnAffordableWeapon()
+    public void Act_UnarmedWithCredits_BuysAndWieldsAnAffordableWeapon()
     {
         var npc = FreshNpc();
-        npc.AddRiblets(100);
+        npc.AddCredits(100);
         var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
         var weapon = Item.Create("Cracked Shiv", ItemType.Weapon, 1, Rarity.Common);
         store.Stock(weapon, askingPrice: 50);
@@ -130,7 +130,7 @@ public class NpcControllerTests
 
         Assert.Equal(NpcGoal.Trade, result.Goal);
         Assert.Equal(weapon, npc.EquippedWeapon);
-        Assert.Equal(50, npc.Riblets);
+        Assert.Equal(50, npc.Credits);
     }
 
     [Fact]

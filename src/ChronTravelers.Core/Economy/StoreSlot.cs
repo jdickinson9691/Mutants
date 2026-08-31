@@ -46,10 +46,10 @@ public sealed class StoreSlot
 
     /// <summary>
     /// Buys this slot for <paramref name="buyer"/> — docs/GDD.md §6.2.
-    /// Spends <see cref="PurchaseCost"/> Riblets and seeds the new store
+    /// Spends <see cref="PurchaseCost"/> Credits and seeds the new store
     /// with <paramref name="startingCapital"/> (an original placeholder —
     /// the GDD doesn't specify how a fresh player store is capitalized;
-    /// depositing more Riblets into an existing store isn't modeled yet).
+    /// depositing more Credits into an existing store isn't modeled yet).
     /// Throws if the slot is already occupied.
     /// </summary>
     public Store Purchase(Traveler buyer, int startingCapital = 100)
@@ -59,14 +59,14 @@ public sealed class StoreSlot
             throw new InvalidOperationException($"'{Name}' is already occupied.");
         }
 
-        buyer.SpendRiblets(PurchaseCost);
+        buyer.SpendCredits(PurchaseCost);
         Store = new Store($"{buyer.Name}'s Store", HomeLevel, startingCapital, buyer);
         return Store;
     }
 
     /// <summary>
     /// Re-attaches a store <paramref name="owner"/> bought in a previous
-    /// session — no Riblet charge, capital restored as-is. Persistence
+    /// session — no Credit charge, capital restored as-is. Persistence
     /// only (see ChronTravelers.Engine.Persistence.CharacterMapper); players buy
     /// in through <see cref="Purchase"/>. The caller re-stocks listings
     /// via <see cref="Store.Stock"/> afterward. Throws if the slot is

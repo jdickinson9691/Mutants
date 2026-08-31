@@ -60,10 +60,10 @@ public sealed class Store
     public void Stock(Item item, int askingPrice) => _listings.Add(new StoreListing(item, askingPrice));
 
     /// <summary>
-    /// The store buys an item from <paramref name="seller"/> for Riblets
+    /// The store buys an item from <paramref name="seller"/> for Credits
     /// (docs/GDD.md §5/§6), immediately re-listing it for resale. Returns
     /// null (and does nothing) if the store's Capital can't cover the
-    /// price — the §6.3 Riblet-sink safeguard in action; government
+    /// price — the §6.3 Credit-sink safeguard in action; government
     /// stores' huge Capital means this practically never happens to them.
     /// </summary>
     public int? BuyFromTraveler(Traveler seller, Item item)
@@ -80,7 +80,7 @@ public sealed class Store
         return price;
     }
 
-    /// <summary>A traveler buys a listed item from the store for Riblets.</summary>
+    /// <summary>A traveler buys a listed item from the store for Credits.</summary>
     public void SellToTraveler(Traveler buyer, StoreListing listing)
     {
         if (!_listings.Remove(listing))
@@ -88,7 +88,7 @@ public sealed class Store
             throw new InvalidOperationException($"'{listing.Item.Name}' is not for sale at {Name}.");
         }
 
-        buyer.SpendRiblets(listing.AskingPrice);
+        buyer.SpendCredits(listing.AskingPrice);
         buyer.AddToInventory(listing.Item);
         Capital += listing.AskingPrice;
     }
@@ -128,7 +128,7 @@ public sealed class Store
 
     /// <summary>
     /// Owner withdraws accumulated Capital (from NPC/player purchases)
-    /// into their personal Riblets — the "idle-income loop" of
+    /// into their personal Credits — the "idle-income loop" of
     /// docs/GDD.md §6.2. Owner-only.
     /// </summary>
     public int CollectCapital(Traveler owner, int amount)
@@ -140,7 +140,7 @@ public sealed class Store
         }
 
         Capital -= amount;
-        owner.AddRiblets(amount);
+        owner.AddCredits(amount);
         return amount;
     }
 

@@ -28,7 +28,7 @@ public sealed class CharacterSaveData
     public int MaxHp { get; set; }
     public int CurrentIons { get; set; }
     public int MaxIons { get; set; }
-    public int Riblets { get; set; }
+    public int Credits { get; set; }
 
     /// <summary>The per-save world seed — fixes the Gatekeeper schedule and every year's map/store layout (ChronTravelers.Core.Time.TimeWorld). 0 on a legacy (schema 1) blob.</summary>
     public long WorldSeed { get; set; }
@@ -69,7 +69,7 @@ public sealed class CharacterSaveData
     public DateTime SavedAtUtc { get; set; }
 }
 
-/// <summary>A player-owned store's persistent state: which year it's in, its accumulated Riblet capital, and its current listings.</summary>
+/// <summary>A player-owned store's persistent state: which year it's in, its accumulated Credit capital, and its current listings.</summary>
 public sealed class OwnedStoreSaveData
 {
     public int Year { get; set; }

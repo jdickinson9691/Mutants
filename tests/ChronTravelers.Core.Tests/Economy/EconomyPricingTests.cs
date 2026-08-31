@@ -27,10 +27,10 @@ public class EconomyPricingTests
     }
 
     [Fact]
-    public void Margins_CreateARiblettSinkAcrossABuyThenResellCycle()
+    public void Margins_CreateACredittSinkAcrossABuyThenResellCycle()
     {
         // A store buying then reselling the same item should net a
-        // surplus for the store (a Riblet sink from the seller's
+        // surplus for the store (a Credit sink from the seller's
         // perspective) - docs/GDD.md §6.3.
         var item = Item.Create("Scrap", ItemType.Junk, tier: 3, Rarity.Common);
         Assert.True(EconomyPricing.DefaultAskingPrice(item) > EconomyPricing.BuyPrice(item));

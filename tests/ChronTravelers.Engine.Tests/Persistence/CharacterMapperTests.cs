@@ -16,7 +16,7 @@ public class CharacterMapperTests
     {
         var original = new Traveler("Rook", CharacterClass.Soldier);
         original.GainXp(150);
-        original.AddRiblets(42);
+        original.AddCredits(42);
         original.SetCurrentYear(3400);
         original.SetCurrentYear(2600); // current moves back; furthest stays at 3400
         original.RecordGatekeeperDefeat(3187);
@@ -36,7 +36,7 @@ public class CharacterMapperTests
         Assert.Equal(original.Health.Max, restored.Health.Max);
         Assert.Equal(original.Ions.Current, restored.Ions.Current);
         Assert.Equal(original.Ions.Max, restored.Ions.Max);
-        Assert.Equal(original.Riblets, restored.Riblets);
+        Assert.Equal(original.Credits, restored.Credits);
         Assert.Equal(2600, restored.CurrentYear);
         Assert.Equal(3400, restored.FurthestYearReached);
         Assert.Equal(original.Position, restored.Position);
@@ -61,7 +61,7 @@ public class CharacterMapperTests
             MaxHp = 80,
             CurrentIons = 15,
             MaxIons = 60,
-            Riblets = 700,
+            Credits = 700,
             UnlockedTimeLevel = 5,
             CurrentTimeLevel = 4,
             DefeatedGatekeepers = [2, 3, 4], // old level numbers — discarded by the migration
@@ -71,7 +71,7 @@ public class CharacterMapperTests
 
         Assert.Equal("Legacy", restored.Name);
         Assert.Equal(22, restored.Level);
-        Assert.Equal(700, restored.Riblets);
+        Assert.Equal(700, restored.Credits);
         // old level 4 -> 2000 + 3*375 = 3125; furthest from old level 5 -> 3500.
         Assert.Equal(3125, restored.CurrentYear);
         Assert.Equal(3500, restored.FurthestYearReached);
@@ -185,12 +185,12 @@ public class CharacterMapperTests
         var year = 2600;
 
         var player = new Traveler("Rook", CharacterClass.Soldier, startingYear: year);
-        player.AddRiblets(5000);
+        player.AddCredits(5000);
         player.PlaceAt(world.GetYear(year).Map.Start);
 
         var slot = world.GetYear(year).StoreSlots.Single(s => s.IsAvailableForPurchase);
         var store = slot.Purchase(player, startingCapital: 100);
-        var ribletsAfterPurchase = player.Riblets;
+        var ribletsAfterPurchase = player.Credits;
 
         var listedItem = Item.Create("Layered Plating", ItemType.Armor, 5, Rarity.Rare);
         player.AddToInventory(listedItem);
@@ -207,7 +207,7 @@ public class CharacterMapperTests
         // Fresh session: rebuild the world from the same seed, restore the character, re-attach stores.
         var reloadedWorld = TestTimeWorld.Build(seed: 4242);
         var reloaded = CharacterMapper.FromSaveData(save);
-        var ribletsOnReload = reloaded.Riblets;
+        var ribletsOnReload = reloaded.Credits;
         CharacterMapper.ApplyOwnedStores(save, reloaded, reloadedWorld);
 
         var reloadedSlot = reloadedWorld.GetYear(year).StoreSlots.Single(s => s.Store?.Owner == reloaded);
@@ -218,7 +218,7 @@ public class CharacterMapperTests
         Assert.Equal(250, reloadedListing.AskingPrice);
 
         // Re-attaching does not charge the purchase cost again.
-        Assert.Equal(ribletsOnReload, reloaded.Riblets);
+        Assert.Equal(ribletsOnReload, reloaded.Credits);
         Assert.Equal(ribletsAfterPurchase, ribletsOnReload);
     }
 

@@ -116,7 +116,7 @@ public sealed record Item(
     public int ConvertValue() => IonEconomy.ConvertValue(EffectiveValue);
 
     /// <summary>
-    /// Riblets gained by selling this item. docs/GDD.md §6 ties real sell
+    /// Credits gained by selling this item. docs/GDD.md §6 ties real sell
     /// price to the store (level, negotiation) — that store-pricing system
     /// is future work. This flat 1:1-with-Value placeholder is scaled by
     /// <see cref="ValueFraction"/> for spent ranged weapons.

@@ -1,4 +1,4 @@
-; Chronomutants Windows installer script (Inno Setup 6).
+; ChronTravelers Windows installer script (Inno Setup 6).
 ; docs/AGENTS.md's Packaging/Release Agent owns this file: "Must not
 ; change game code to 'make packaging easier' — packaging adapts to the
 ; app, not the reverse."
@@ -10,20 +10,20 @@
 ;
 ; Build locally (from the repo root, with Inno Setup 6 installed):
 ;   dotnet publish src\ChronTravelers.Console -c Release -r win-x64 -o publish\win-x64
-;   iscc installer\Chronomutants.iss
+;   iscc installer\ChronTravelers.iss
 ; The finished installer lands in installer\Output\.
 ;
 ; MyAppVersion can be overridden from the command line (the release CI
 ; workflow does this from the pushed git tag):
-;   iscc /DMyAppVersion=1.2.3 installer\Chronomutants.iss
+;   iscc /DMyAppVersion=1.2.3 installer\ChronTravelers.iss
 
-#define MyAppName "Chronomutants"
+#define MyAppName "ChronTravelers"
 #ifndef MyAppVersion
   #define MyAppVersion "0.1.0"
 #endif
-#define MyAppPublisher "Chronomutants Project"
+#define MyAppPublisher "ChronTravelers Project"
 #define MyAppURL "https://github.com/jdickinson9691/Mutants"
-#define MyAppExeName "Chronomutants.exe"
+#define MyAppExeName "ChronTravelers.exe"
 #define MyPublishDir "..\publish\win-x64"
 
 [Setup]
@@ -46,7 +46,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=Output
-OutputBaseFilename=ChronomutantsSetup-{#MyAppVersion}
+OutputBaseFilename=ChronTravelersSetup-{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

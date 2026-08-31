@@ -332,29 +332,29 @@ public class TravelerTests
     }
 
     [Fact]
-    public void Riblets_AddAndSpendTrackBalance()
+    public void Credits_AddAndSpendTrackBalance()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);
-        Assert.Equal(0, traveler.Riblets);
+        Assert.Equal(0, traveler.Credits);
 
-        traveler.AddRiblets(50);
-        Assert.Equal(50, traveler.Riblets);
+        traveler.AddCredits(50);
+        Assert.Equal(50, traveler.Credits);
 
-        traveler.SpendRiblets(20);
-        Assert.Equal(30, traveler.Riblets);
+        traveler.SpendCredits(20);
+        Assert.Equal(30, traveler.Credits);
     }
 
     [Fact]
-    public void SpendRiblets_ThrowsWhenUnaffordable()
+    public void SpendCredits_ThrowsWhenUnaffordable()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);
-        traveler.AddRiblets(10);
+        traveler.AddCredits(10);
 
-        Assert.Throws<InvalidOperationException>(() => traveler.SpendRiblets(11));
+        Assert.Throws<InvalidOperationException>(() => traveler.SpendCredits(11));
     }
 
     [Fact]
-    public void Sell_RemovesItemAndAddsRiblets()
+    public void Sell_RemovesItemAndAddsCredits()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);
         var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // value 34
@@ -364,7 +364,7 @@ public class TravelerTests
 
         Assert.Equal(34, gained);
         Assert.DoesNotContain(item, traveler.Inventory);
-        Assert.Equal(34, traveler.Riblets);
+        Assert.Equal(34, traveler.Credits);
     }
 
     [Fact]
@@ -377,7 +377,7 @@ public class TravelerTests
         var gained = traveler.Sell(item, riblets: 7);
 
         Assert.Equal(7, gained);
-        Assert.Equal(7, traveler.Riblets);
+        Assert.Equal(7, traveler.Credits);
     }
 
     [Fact]
@@ -391,7 +391,7 @@ public class TravelerTests
         traveler.RemoveFromInventory(item);
 
         Assert.DoesNotContain(item, traveler.Inventory);
-        Assert.Equal(0, traveler.Riblets);
+        Assert.Equal(0, traveler.Credits);
         Assert.Equal(startingIons, traveler.Ions.Current); // no side effect on Ions either
     }
 
@@ -608,7 +608,7 @@ public class TravelerTests
         Assert.Equal(60, traveler.Health.Max);
         Assert.Equal(5, traveler.Ions.Current);
         Assert.Equal(30, traveler.Ions.Max);
-        Assert.Equal(250, traveler.Riblets);
+        Assert.Equal(250, traveler.Credits);
         Assert.Equal(3200, traveler.FurthestYearReached);
         Assert.Equal(2900, traveler.CurrentYear);
         Assert.Equal(new Coordinate(2, -1), traveler.Position);

@@ -159,7 +159,7 @@ public static class NpcController
     {
         var junkCount = npc.Inventory.Count(i => i.Type == ItemType.Junk);
         var wantsToSell = junkCount > ExcessJunkThreshold;
-        var wantsToBuyWeapon = npc.EquippedWeapon is null && npc.Riblets > 0;
+        var wantsToBuyWeapon = npc.EquippedWeapon is null && npc.Credits > 0;
 
         if (!wantsToSell && !wantsToBuyWeapon)
         {
@@ -174,14 +174,14 @@ public static class NpcController
             var price = store.BuyFromTraveler(npc, junk);
             if (price is not null)
             {
-                return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"sold {junk.Name} to {store.Name} for {price} Riblets");
+                return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"sold {junk.Name} to {store.Name} for {price} Credits");
             }
         }
 
         if (wantsToBuyWeapon)
         {
             var affordable = store.Listings
-                .Where(l => l.Item.Type == ItemType.Weapon && l.AskingPrice <= npc.Riblets)
+                .Where(l => l.Item.Type == ItemType.Weapon && l.AskingPrice <= npc.Credits)
                 .OrderBy(l => l.AskingPrice)
                 .FirstOrDefault();
 

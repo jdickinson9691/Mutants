@@ -15,7 +15,7 @@ public sealed record StoreStockTemplate(
 {
     public static StoreStockTemplate Default { get; } = new(PlayerSlotBaseCost: 100, PlayerSlotCostPerTier: 110);
 
-    /// <summary>Riblet cost of buying an empty player store slot in a year of the given whole-number tier.</summary>
+    /// <summary>Credit cost of buying an empty player store slot in a year of the given whole-number tier.</summary>
     public int PlayerSlotCostForTier(int tier) =>
         PlayerSlotBaseCost + PlayerSlotCostPerTier * Math.Max(0, tier - 1);
 }

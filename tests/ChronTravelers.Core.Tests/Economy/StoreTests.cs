@@ -42,7 +42,7 @@ public class StoreTests
         var price = store.BuyFromTraveler(seller, item);
 
         Assert.NotNull(price);
-        Assert.Equal(price, seller.Riblets);
+        Assert.Equal(price, seller.Credits);
         Assert.DoesNotContain(item, seller.Inventory);
         Assert.Contains(store.Listings, l => l.Item == item);
     }
@@ -58,24 +58,24 @@ public class StoreTests
         var price = store.BuyFromTraveler(seller, item);
 
         Assert.Null(price);
-        Assert.Equal(0, seller.Riblets);
+        Assert.Equal(0, seller.Credits);
         Assert.Contains(item, seller.Inventory);
         Assert.Empty(store.Listings);
     }
 
     [Fact]
-    public void SellToTraveler_TransfersItemAndChargesRiblets()
+    public void SellToTraveler_TransfersItemAndChargesCredits()
     {
         var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
         var item = Item.Create("Patch Kit", ItemType.Consumable, 1, Rarity.Common);
         store.Stock(item, askingPrice: 15);
         var buyer = NewTraveler();
-        buyer.AddRiblets(20);
+        buyer.AddCredits(20);
         var capitalBefore = store.Capital;
 
         store.SellToTraveler(buyer, store.Listings[0]);
 
-        Assert.Equal(5, buyer.Riblets);
+        Assert.Equal(5, buyer.Credits);
         Assert.Contains(item, buyer.Inventory);
         Assert.Empty(store.Listings);
         Assert.Equal(capitalBefore + 15, store.Capital);
@@ -87,7 +87,7 @@ public class StoreTests
         var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
         var phantomListing = new StoreListing(Item.Create("Ghost", ItemType.Junk, 1, Rarity.Common), 5);
         var buyer = NewTraveler();
-        buyer.AddRiblets(10);
+        buyer.AddCredits(10);
 
         Assert.Throws<InvalidOperationException>(() => store.SellToTraveler(buyer, phantomListing));
     }
@@ -178,7 +178,7 @@ public class StoreTests
     }
 
     [Fact]
-    public void CollectCapital_MovesStoreCapitalToOwnerRiblets()
+    public void CollectCapital_MovesStoreCapitalToOwnerCredits()
     {
         var owner = NewTraveler("Owner");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
@@ -186,7 +186,7 @@ public class StoreTests
         var collected = store.CollectCapital(owner, 40);
 
         Assert.Equal(40, collected);
-        Assert.Equal(40, owner.Riblets);
+        Assert.Equal(40, owner.Credits);
         Assert.Equal(60, store.Capital);
     }
 

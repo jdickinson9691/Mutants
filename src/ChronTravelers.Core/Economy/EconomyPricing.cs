@@ -6,8 +6,8 @@ namespace ChronTravelers.Core.Economy;
 /// Store buy/sell margins. docs/GDD.md §6 confirms sell price is
 /// "store-and-negotiation-dependent" but gives no formula — these margins
 /// are original tuning pending Design Agent sign-off. A store buys below
-/// an item's value and resells above it, so Riblets are destroyed as
-/// goods cycle through a store — one of the docs/GDD.md §6.3 "Riblet
+/// an item's value and resells above it, so Credits are destroyed as
+/// goods cycle through a store — one of the docs/GDD.md §6.3 "Credit
 /// sinks" the economy needs so currency doesn't purely inflate.
 /// </summary>
 public static class EconomyPricing

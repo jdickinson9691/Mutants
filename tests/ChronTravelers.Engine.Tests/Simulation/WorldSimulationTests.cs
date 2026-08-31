@@ -122,7 +122,7 @@ public class WorldSimulationTests
 
         // Sold at least one junk item to the year's government store.
         Assert.True(npc.Inventory.Count(i => i.Type == ItemType.Junk) < 4);
-        Assert.True(npc.Riblets > 0);
+        Assert.True(npc.Credits > 0);
     }
 
     [Fact]

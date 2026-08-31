@@ -50,7 +50,7 @@ public static class CharacterMapper
             MaxHp = traveler.Health.Max,
             CurrentIons = traveler.Ions.Current,
             MaxIons = traveler.Ions.Max,
-            Riblets = traveler.Riblets,
+            Credits = traveler.Credits,
             WorldSeed = worldSeed,
             CurrentYear = traveler.CurrentYear,
             FurthestYearReached = traveler.FurthestYearReached,
@@ -80,7 +80,7 @@ public static class CharacterMapper
     /// Re-attaches the player's saved stores onto the freshly built
     /// world, after <see cref="FromSaveData"/> has restored the character.
     /// For each saved store, finds the (vacant) player slot in that year
-    /// and restores it with the saved capital and listings — no Riblet
+    /// and restores it with the saved capital and listings — no Credit
     /// charge. A saved year whose player slot isn't vacant (or doesn't
     /// exist) is skipped. Schema-1 blobs carry no <c>OwnedStores</c>, so
     /// this is a no-op for them.
@@ -136,7 +136,7 @@ public static class CharacterMapper
 
         var traveler = Traveler.Restore(
             data.Name, characterClass, data.Level, data.Xp, stats,
-            data.CurrentHp, data.MaxHp, data.CurrentIons, data.MaxIons, data.Riblets,
+            data.CurrentHp, data.MaxHp, data.CurrentIons, data.MaxIons, data.Credits,
             currentYear, furthestYear,
             new Coordinate(data.PositionEast, data.PositionNorth),
             defeatedGatekeeperYears);

@@ -72,20 +72,20 @@ using Spectre.Console;
 // which also carries the world seed) - NPCs are re-simulated fresh each
 // session, scattered across the whole timeline, and only contribute their
 // personal bests to the leaderboard. The save/leaderboard DB lives at
-// %APPDATA%\Chronotravelers\travelers.db, and carries the world seed, the
+// %APPDATA%\ChronTravelers\chrontravelers.db, and carries the world seed, the
 // current/furthest year, the cleared Gatekeeper years, and every store
 // the player owns (year + capital + listings, re-attached on load).
 
-AnsiConsole.Write(new FigletText("Chronotravelers").Color(Color.Green));
+AnsiConsole.Write(new FigletText("ChronTravelers").Color(Color.Green));
 AnsiConsole.MarkupLine("[grey](pre-release build — the continuous 2000–5000 A.D. timeline)[/]");
 AnsiConsole.WriteLine();
 
 var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 var savesDirectory = string.IsNullOrEmpty(appDataFolder)
     ? "saves"
-    : Path.Combine(appDataFolder, "Chronotravelers");
+    : Path.Combine(appDataFolder, "ChronTravelers");
 Directory.CreateDirectory(savesDirectory);
-var savePath = Path.Combine(savesDirectory, "travelers.db");
+var savePath = Path.Combine(savesDirectory, "chrontravelers.db");
 using var repository = new GameRepository(savePath);
 
 RenderLeaderboards(repository);
@@ -743,14 +743,14 @@ static void HandleBuyFromStore(Traveler traveler, TimeWorld world, string argume
         return;
     }
 
-    if (traveler.Riblets < listing.AskingPrice)
+    if (traveler.Credits < listing.AskingPrice)
     {
-        AnsiConsole.MarkupLine($"[red]You can't afford {Markup.Escape(listing.Item.Name)} ({listing.AskingPrice} Riblets; you have {traveler.Riblets}).[/]");
+        AnsiConsole.MarkupLine($"[red]You can't afford {Markup.Escape(listing.Item.Name)} ({listing.AskingPrice} Credits; you have {traveler.Credits}).[/]");
         return;
     }
 
     store.SellToTraveler(traveler, listing);
-    AnsiConsole.MarkupLine($"[green]Bought {Markup.Escape(listing.Item.Name)} for {listing.AskingPrice} Riblets.[/]");
+    AnsiConsole.MarkupLine($"[green]Bought {Markup.Escape(listing.Item.Name)} for {listing.AskingPrice} Credits.[/]");
 }
 
 static void HandleSellToStore(Traveler traveler, TimeWorld world, string argument)
@@ -788,7 +788,7 @@ static void HandleSellToStore(Traveler traveler, TimeWorld world, string argumen
             count++;
         }
 
-        AnsiConsole.MarkupLine($"[yellow]Sold {count} junk item(s) to {Markup.Escape(store.Name)} for {total} Riblets.[/]");
+        AnsiConsole.MarkupLine($"[yellow]Sold {count} junk item(s) to {Markup.Escape(store.Name)} for {total} Credits.[/]");
         return;
     }
 
@@ -808,7 +808,7 @@ static void HandleSellToStore(Traveler traveler, TimeWorld world, string argumen
         return;
     }
 
-    AnsiConsole.MarkupLine($"[yellow]Sold {Markup.Escape(item.Name)} to {Markup.Escape(store.Name)} for {price} Riblets.[/]");
+    AnsiConsole.MarkupLine($"[yellow]Sold {Markup.Escape(item.Name)} to {Markup.Escape(store.Name)} for {price} Credits.[/]");
 }
 
 static void HandleBuyStore(Traveler traveler, TimeWorld world)
@@ -827,9 +827,9 @@ static void HandleBuyStore(Traveler traveler, TimeWorld world)
         return;
     }
 
-    if (traveler.Riblets < slot.PurchaseCost)
+    if (traveler.Credits < slot.PurchaseCost)
     {
-        AnsiConsole.MarkupLine($"[red]You need {slot.PurchaseCost} Riblets to buy this slot; you have {traveler.Riblets}.[/]");
+        AnsiConsole.MarkupLine($"[red]You need {slot.PurchaseCost} Credits to buy this slot; you have {traveler.Credits}.[/]");
         return;
     }
 
@@ -862,7 +862,7 @@ static void HandleCollect(Traveler traveler, TimeWorld world)
     }
 
     AnsiConsole.MarkupLine(totalCollected > 0
-        ? $"[yellow]Collected {totalCollected} Riblets from your store(s).[/]"
+        ? $"[yellow]Collected {totalCollected} Credits from your store(s).[/]"
         : "[grey]Nothing to collect yet.[/]");
 }
 
@@ -927,7 +927,7 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
             }
 
             store.Deposit(traveler, item, price);
-            AnsiConsole.MarkupLine($"[green]Listed {Markup.Escape(item.Name)} at {Markup.Escape(store.Name)} for {price} Riblets.[/]");
+            AnsiConsole.MarkupLine($"[green]Listed {Markup.Escape(item.Name)} at {Markup.Escape(store.Name)} for {price} Credits.[/]");
             break;
         }
 
@@ -949,7 +949,7 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
             }
 
             store.AdjustPrice(traveler, listingToReprice, price);
-            AnsiConsole.MarkupLine($"[green]{Markup.Escape(listingToReprice.Item.Name)} is now {price} Riblets.[/]");
+            AnsiConsole.MarkupLine($"[green]{Markup.Escape(listingToReprice.Item.Name)} is now {price} Credits.[/]");
             break;
         }
     }
@@ -1588,7 +1588,7 @@ static void RenderStores(IReadOnlyList<StoreSlot> storeSlots)
             var s => Markup.Escape(s.Owner!.Name),
         };
         var items = slot.Store?.Listings.Count.ToString() ?? "-";
-        var status = slot.IsAvailableForPurchase ? $"[yellow]for sale ({slot.PurchaseCost} Riblets)[/]" : "occupied";
+        var status = slot.IsAvailableForPurchase ? $"[yellow]for sale ({slot.PurchaseCost} Credits)[/]" : "occupied";
 
         table.AddRow(Markup.Escape(slot.Name), Markup.Escape(slot.Location.ToString()), owner, items, status);
     }
@@ -1598,7 +1598,7 @@ static void RenderStores(IReadOnlyList<StoreSlot> storeSlots)
 
 static void RenderShop(Store store)
 {
-    AnsiConsole.MarkupLine($"[cyan]{Markup.Escape(store.Name)}[/] — Capital: {store.Capital} Riblets");
+    AnsiConsole.MarkupLine($"[cyan]{Markup.Escape(store.Name)}[/] — Capital: {store.Capital} Credits");
 
     if (store.Listings.Count == 0)
     {
@@ -1762,7 +1762,7 @@ static void RenderRoom(Traveler traveler, TimeWorld world)
     {
         AnsiConsole.MarkupLine(slot.Store switch
         {
-            null => $"[cyan]There's an empty storefront here — '{Markup.Escape("buy-store")}' to claim it for {slot.PurchaseCost} Riblets.[/]",
+            null => $"[cyan]There's an empty storefront here — '{Markup.Escape("buy-store")}' to claim it for {slot.PurchaseCost} Credits.[/]",
             { IsGovernmentRun: true } => $"[cyan]There's a store here: {Markup.Escape(slot.Store.Name)}. Type 'shop' to browse.[/]",
             _ => $"[cyan]There's a player-owned store here: {Markup.Escape(slot.Store.Name)} (owned by {Markup.Escape(slot.Store.Owner!.Name)}). Type 'shop' to browse.[/]",
         });
@@ -1776,7 +1776,7 @@ static void RenderStatusBar(Traveler traveler, TimeWorld world)
     var yearContent = world.GetYear(traveler.CurrentYear);
     var status = $"[red]HP {traveler.Health.Current}/{traveler.Health.Max}[/]  " +
                  $"[blue]Ions {traveler.Ions.Current}/{traveler.Ions.Max}[/]  " +
-                 $"[yellow]Riblets {traveler.Riblets}[/]  " +
+                 $"[yellow]Credits {traveler.Credits}[/]  " +
                  $"Char Level {traveler.Level}  " +
                  $"Year {traveler.CurrentYear} A.D.  " +
                  $"Furthest {traveler.FurthestYearReached}  " +
@@ -1835,7 +1835,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]deposit <item> <price>[/] - list your own item for sale at your store");
     AnsiConsole.MarkupLine("  [green]withdraw <item>[/]    - pull a listing back into your inventory");
     AnsiConsole.MarkupLine("  [green]reprice <item> <price>[/] - change a listing's asking price");
-    AnsiConsole.MarkupLine("  [green]collect[/]             - withdraw your store's earnings into your Riblets");
+    AnsiConsole.MarkupLine("  [green]collect[/]             - withdraw your store's earnings into your Credits");
     AnsiConsole.MarkupLine("  [green]save[/]                - save your character now");
     AnsiConsole.MarkupLine("  [green]leaderboard[/] (or board) - show the leaderboards, your best highlighted");
     AnsiConsole.MarkupLine("  [green]status[/]              - show the status bar");
