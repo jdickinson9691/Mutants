@@ -108,7 +108,7 @@ public class MonsterControllerTests
     }
 
     [Fact]
-    public void Tick_ARoamingMonsterSettlesInPlaceForAStretchAfterMoving()
+    public void Tick_ARoamingMonsterPausesBrieflyAfterMoving()
     {
         var map = FourRoomMap();
         var pop = EmptyPopulation(map);
@@ -117,18 +117,46 @@ public class MonsterControllerTests
         pop.AddMonster(monster);
         var player = OffMapPlayer();
 
-        // Fixed(0.0): it wanders this tick, then rolls into a rest.
+        // Fixed(0.0): it steps this tick, then rolls into a short pause.
         Tick(pop, map, player, StubRandomSource.Fixed(0.0));
-        var settledAt = monster.Position;
-        Assert.NotEqual(Coordinate.Origin, settledAt);
-        Assert.True(monster.RestTicks > 0, "it should have settled after moving");
+        var pausedAt = monster.Position;
+        Assert.NotEqual(Coordinate.Origin, pausedAt);
+        var rest = monster.RestTicks;
+        Assert.True(rest > 0, "it should pause after moving");
 
-        // While resting it holds position even though it 'would' wander.
-        for (var i = 0; i < 3; i++)
+        // It holds position for the length of the pause.
+        for (var i = 0; i < rest; i++)
         {
             Tick(pop, map, player, StubRandomSource.Fixed(0.0));
-            Assert.Equal(settledAt, monster.Position);
+            Assert.Equal(pausedAt, monster.Position);
         }
+    }
+
+    [Fact]
+    public void Tick_ARoamingMonsterKeepsHeadingTheSameWaySoItsPathIsReadable()
+    {
+        // Long corridor so a monster can hold a heading for a while.
+        var map = CorridorMap(8);
+        var pop = EmptyPopulation(map);
+        var monster = Monster.Create("Patroller", tier: 1);
+        monster.PlaceAt(new Coordinate(1, 0));
+        pop.AddMonster(monster);
+        var player = OffMapPlayer();
+
+        // 0.1 -> always wanders, never turns (KeepHeadingChance), never pauses.
+        var seen = new List<Coordinate>();
+        for (var i = 0; i < 5; i++)
+        {
+            Tick(pop, map, player, StubRandomSource.Fixed(0.1));
+            seen.Add(monster.Position);
+        }
+
+        // Every actual step went the same direction (pauses aside).
+        Assert.NotNull(monster.Heading);
+        var eastings = seen.Select(c => c.East).ToList();
+        var steps = eastings.Zip(eastings.Skip(1), (a, b) => b - a).Where(d => d != 0).ToList();
+        Assert.NotEmpty(steps);
+        Assert.True(steps.All(d => d == steps[0]), $"path {string.Join(",", seen)} should be a straight patrol");
     }
 
     [Fact]

@@ -1425,7 +1425,10 @@ static void RenderMonsters(Mutant mutant, TimeWorld world)
 
     foreach (var m in living.OrderBy(m => m.Position.Equals(mutant.Position) ? 0 : 1).ThenBy(m => m.Position.North).ThenBy(m => m.Position.East))
     {
-        var loc = Markup.Escape(m.Position.ToString()) + (m.Position.Equals(mutant.Position) ? " [green](here)[/]" : "");
+        var loc = Markup.Escape(m.Position.ToString())
+            + (m.Position.Equals(mutant.Position) ? " [green](here)[/]"
+               : m.Heading is { } hd ? $" [grey]heading {hd.Name()}[/]"
+               : "");
         var mood = AggroModel.MoodFor(m.Aggro) switch
         {
             AggroMood.Hostile => "[red]hostile[/]",

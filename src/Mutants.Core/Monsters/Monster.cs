@@ -55,12 +55,20 @@ public sealed class Monster
     public void DecayAggro(double amount) => Aggro = Math.Max(0, Aggro - Math.Max(0, amount));
 
     /// <summary>
-    /// Ticks left in a "settle" — a roaming monster periodically stops for
-    /// a stretch instead of drifting every turn, so it's actually findable.
-    /// Set/decremented by Mutants.Engine.Npc.MonsterController; not used
-    /// while the monster is pursuing the player. Session state — not saved.
+    /// Ticks left in a brief "settle" — a roaming monster occasionally
+    /// pauses for a couple of turns. Set/decremented by
+    /// Mutants.Engine.Npc.MonsterController; not used while pursuing.
+    /// Session state — not saved.
     /// </summary>
     public int RestTicks { get; set; }
+
+    /// <summary>
+    /// The direction a roaming monster is currently patrolling. It keeps
+    /// heading this way each move (rather than random-walking) until it's
+    /// blocked or picks a new one — so you can read the <c>monsters</c>
+    /// list, see where one is going, and cut it off. Session state.
+    /// </summary>
+    public Direction? Heading { get; set; }
 
     private readonly List<Item> _inventory = [];
 

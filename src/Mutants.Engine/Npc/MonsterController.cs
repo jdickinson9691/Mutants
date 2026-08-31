@@ -31,18 +31,23 @@ namespace Mutants.Engine.Npc;
 /// </summary>
 public static class MonsterController
 {
-    private const double WanderChance = 0.25;
+    /// <summary>Per-tick chance a roaming monster takes a step — high enough that it covers ground so the <c>monsters</c> list stays live.</summary>
+    private const double WanderChance = 0.6;
+
     private const double InfightChance = 0.20;
     private const double HealHpThreshold = 0.40;
     private const int RespawnCheckInterval = 12;
     private const double RespawnChance = 0.25;
     private const int DuelRoundCap = 200;
 
-    /// <summary>After a roaming monster takes a step, the chance it then settles in place for a while (see <see cref="Monster.RestTicks"/>) instead of drifting every turn — so you can actually track one down.</summary>
-    private const double RestAfterWanderChance = 0.55;
+    /// <summary>Chance a roaming monster keeps its current heading rather than turning — makes its path readable so you can intercept it.</summary>
+    private const double KeepHeadingChance = 0.8;
 
-    private const int RestTicksMin = 4;
-    private const int RestTicksMax = 9;
+    /// <summary>After a step, the chance a roaming monster pauses briefly (a look-around, not a long freeze).</summary>
+    private const double RestAfterWanderChance = 0.3;
+
+    private const int RestTicksMin = 2;
+    private const int RestTicksMax = 4;
 
     /// <summary>Minimum ticks between ambush hits on the player, so a quick <c>status</c> + <c>monsters</c> check near a hostile monster costs one hit, not three.</summary>
     private const int AmbushCooldownTicks = 2;
@@ -181,6 +186,11 @@ public static class MonsterController
     private static bool IsBlocked(IReadOnlySet<Coordinate>? safeRooms, Coordinate room) =>
         safeRooms is not null && safeRooms.Contains(room);
 
+    /// <summary>
+    /// Patrol movement: a roaming monster keeps heading the same way most
+    /// turns (so its path is legible on the <c>monsters</c> list and you
+    /// can intercept it), turning only when blocked or on a random whim.
+    /// </summary>
     private static void Wander(LevelMap map, Monster monster, IRandomSource random, IReadOnlySet<Coordinate>? safeRooms)
     {
         var exits = map.GetRoom(monster.Position).ExitDescriptions.Keys.ToList();
@@ -189,10 +199,37 @@ public static class MonsterController
             return;
         }
 
-        var move = map.TryMove(monster.Position, exits[(int)(random.NextDouble() * exits.Count)]);
-        if (move.Success && !IsBlocked(safeRooms, move.Destination!.Value))
+        bool Usable(Direction dir)
         {
-            monster.MoveTo(move.Destination.Value);
+            if (!exits.Contains(dir))
+            {
+                return false;
+            }
+
+            var step = map.TryMove(monster.Position, dir);
+            return step.Success && !IsBlocked(safeRooms, step.Destination!.Value);
+        }
+
+        Direction? heading = monster.Heading is { } h && Usable(h) && random.NextDouble() < KeepHeadingChance
+            ? h
+            : null;
+
+        if (heading is null)
+        {
+            var options = exits.Where(Usable).ToList();
+            if (options.Count == 0)
+            {
+                return;
+            }
+
+            heading = options[(int)(random.NextDouble() * options.Count)];
+        }
+
+        monster.Heading = heading;
+        var move = map.TryMove(monster.Position, heading.Value);
+        if (move.Success)
+        {
+            monster.MoveTo(move.Destination!.Value);
         }
     }
 

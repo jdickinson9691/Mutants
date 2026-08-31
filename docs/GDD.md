@@ -341,13 +341,14 @@ The year the player is standing in also runs a live monster population
 (`Mutants.Core.Time.YearPopulation`, seeded deterministically from the
 world seed on first entry, kept alive in the session's year memo — not
 saved):
-- Monsters occupy specific rooms and, each tick, **wander** through exits,
+- Monsters occupy specific rooms and, each tick, **patrol** through exits,
   **grab loot** off their room's floor, or — if hurt — **heal** from their
   own Ion pool, first **converting** a scavenged item if they're out of
   Ions (the same `heal` / `convert` the player uses). A roaming monster
-  doesn't drift every turn — after a step it often **settles** in place
-  for a stretch, so you can actually track one down instead of chasing a
-  ghost around the map.
+  keeps **heading the same direction** most turns rather than random-
+  walking (with the odd short pause), so it covers ground and its path is
+  legible: the `monsters` list shows each one's heading, and you can read
+  where it's going and cut it off.
 - Monsters do **not** automatically pursue or attack anyone who walks
   past. Each carries an **earned aggro meter** toward the player
   (`Mutants.Core.Monsters.AggroModel`), raised by:
