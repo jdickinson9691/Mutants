@@ -49,6 +49,44 @@ public class ContentLoaderTests
     }
 
     [Fact]
+    public void LoadItemCatalog_ParsesConsumableEffectFields()
+    {
+        using var dir = new TempContentDirectory();
+        var path = dir.WriteFile("items.json", """
+            [{ "id": "ration", "name": "Ration Pack", "type": "Consumable", "tier": 1, "rarity": "Common",
+               "effect": "Heal", "effectMagnitude": 12, "effectDurationTicks": 0 }]
+            """);
+
+        var catalog = ContentLoader.LoadItemCatalog(path);
+
+        var item = catalog["ration"];
+        Assert.Equal(ConsumableEffectType.Heal, item.ConsumableEffect);
+        Assert.Equal(12, item.EffectMagnitude);
+        Assert.True(item.IsUsable);
+    }
+
+    [Fact]
+    public void LoadItemCatalog_DefaultsEffectToNoneWhenOmitted()
+    {
+        using var dir = new TempContentDirectory();
+        var path = dir.WriteFile("items.json", OneItemJson);
+
+        var catalog = ContentLoader.LoadItemCatalog(path);
+
+        Assert.Equal(ConsumableEffectType.None, catalog["rusty-shiv"].ConsumableEffect);
+        Assert.False(catalog["rusty-shiv"].IsUsable);
+    }
+
+    [Fact]
+    public void LoadItemCatalog_ThrowsOnUnknownEffect()
+    {
+        using var dir = new TempContentDirectory();
+        var path = dir.WriteFile("items.json", """[{ "id": "x", "name": "X", "type": "Consumable", "tier": 1, "rarity": "Common", "effect": "Nonsense" }]""");
+
+        Assert.Throws<ContentException>(() => ContentLoader.LoadItemCatalog(path));
+    }
+
+    [Fact]
     public void LoadItemCatalog_ThrowsOnUnknownType()
     {
         using var dir = new TempContentDirectory();

@@ -42,12 +42,12 @@ public sealed class WorldSimulation
     }
 
     /// <summary>
-    /// Advances the world by one tick: passive Ion drain for every living
-    /// mutant (all NPCs plus <paramref name="player"/>), then one AI
-    /// action per living NPC on its own current level (which may trade,
-    /// travel, or fight — see <see cref="Npc.NpcController"/>), publishing
-    /// kill/level-up/time-travel events to <see cref="Broadcast"/> along
-    /// the way.
+    /// Advances the world by one tick: passive Ion drain and potion-buff
+    /// expiry for every living mutant (all NPCs plus
+    /// <paramref name="player"/>), then one AI action per living NPC on
+    /// its own current level (which may trade, travel, or fight — see
+    /// <see cref="Npc.NpcController"/>), publishing kill/level-up/
+    /// time-travel events to <see cref="Broadcast"/> along the way.
     /// </summary>
     public void Tick(Mutant player)
     {
@@ -60,6 +60,7 @@ public sealed class WorldSimulation
 
             var ticksPerDrain = IonEconomy.TicksPerIonDrain(mutant.UnlockedTimeLevel, mutant.ClassDefinition.IonDrainMultiplier);
             mutant.AdvanceIonDrainTick(ticksPerDrain);
+            mutant.AdvanceEffectTicks();
         }
 
         foreach (var npc in Npcs)

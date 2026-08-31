@@ -38,6 +38,14 @@ using Spectre.Console;
 // Well) have no 1v1 combat translation and are refused at cast time with
 // no Ion cost - see AbilityEffectType.None's doc comment.
 //
+// Two separate ways to recover HP: "heal" spends Ions directly (§2/§2.1,
+// usable any time, no item needed), and "use"/"eat"/"drink <item>"
+// consumes a food/potion item for an instant flat heal or a temporary
+// attack/defense buff (Item.ConsumableEffect) - both go through the same
+// per-tick expiry (Mutant.AdvanceEffectTicks, called from
+// WorldSimulation.Tick) so a potion's buff persists into the player's next
+// fight, not just the command that drank it.
+//
 // Only the player's own character is saved/loaded as a full character
 // (see Persistence.CharacterSaveData) - NPCs are re-simulated fresh each
 // session (docs/GDD.md doesn't ask for NPC persistence, only for the
@@ -544,7 +552,7 @@ static (string Command, string Argument) SplitCommand(string input)
 /// <summary>Handles "convert/wield &lt;item&gt;" commands. Returns false if <paramref name="command"/> isn't one of those verbs. ("sell" now requires a store — see HandleSellToStore.)</summary>
 static bool TryHandleItemCommand(Mutant mutant, string command, string argument)
 {
-    if (command is not ("convert" or "wield"))
+    if (command is not ("convert" or "wield" or "use" or "eat" or "drink"))
     {
         return false;
     }
@@ -575,6 +583,27 @@ static bool TryHandleItemCommand(Mutant mutant, string command, string argument)
             mutant.Wield(item);
             var penalty = item.IsClassCompatible(mutant.Class) ? "" : " [red](off-class - reduced effectiveness)[/]";
             AnsiConsole.MarkupLine($"[green]Wielded {Markup.Escape(item.Name)}.[/]{penalty}");
+            break;
+
+        case "use" or "eat" or "drink":
+            if (!item.IsUsable)
+            {
+                AnsiConsole.MarkupLine($"[red]{Markup.Escape(item.Name)} can't be used.[/]");
+                break;
+            }
+
+            var effect = item.ConsumableEffect;
+            var healed = mutant.Consume(item);
+            AnsiConsole.MarkupLine(effect switch
+            {
+                ConsumableEffectType.Heal =>
+                    $"[green]You use {Markup.Escape(item.Name)} and heal for {healed} HP.[/] ({mutant.Health.Current}/{mutant.Health.Max} HP)",
+                ConsumableEffectType.BuffAttack =>
+                    $"[green]You use {Markup.Escape(item.Name)}. Your attack is bolstered for {item.EffectDurationTicks} ticks.[/]",
+                ConsumableEffectType.BuffDefense =>
+                    $"[green]You use {Markup.Escape(item.Name)}. Your defenses are bolstered for {item.EffectDurationTicks} ticks.[/]",
+                _ => $"[green]You use {Markup.Escape(item.Name)}.[/]",
+            });
             break;
     }
 
@@ -1196,12 +1225,20 @@ static void RenderInventory(Mutant mutant)
     table.AddColumn("Tier");
     table.AddColumn("Rarity");
     table.AddColumn("Value");
+    table.AddColumn("Effect");
     table.AddColumn("Equipped");
 
     for (var i = 0; i < mutant.Inventory.Count; i++)
     {
         var item = mutant.Inventory[i];
         var equipped = item == mutant.EquippedWeapon || item == mutant.EquippedArmor ? "yes" : "";
+        var effect = item.ConsumableEffect switch
+        {
+            ConsumableEffectType.Heal => $"heals {item.EffectMagnitude:0} HP",
+            ConsumableEffectType.BuffAttack => $"+{item.EffectMagnitude:0} attack ({item.EffectDurationTicks} ticks)",
+            ConsumableEffectType.BuffDefense => $"+{item.EffectMagnitude:0} defense ({item.EffectDurationTicks} ticks)",
+            _ => "",
+        };
         table.AddRow(
             (i + 1).ToString(),
             Markup.Escape(item.Name),
@@ -1209,6 +1246,7 @@ static void RenderInventory(Mutant mutant)
             item.Tier.ToString(),
             item.Rarity.ToString(),
             item.Value.ToString(),
+            effect,
             equipped);
     }
 
@@ -1277,6 +1315,17 @@ static void RenderStatusBar(Mutant mutant, GameWorld world)
                  $"Time Level {mutant.CurrentTimeLevel}/{mutant.UnlockedTimeLevel} unlocked  " +
                  $"Location {Markup.Escape(mutant.Position.ToString())}";
 
+    if (mutant.ActiveEffects.Count > 0)
+    {
+        var effects = mutant.ActiveEffects.Select(e => e.Type switch
+        {
+            ConsumableEffectType.BuffAttack => $"+{e.Magnitude:0} attack ({e.TicksRemaining} ticks left)",
+            ConsumableEffectType.BuffDefense => $"+{e.Magnitude:0} defense ({e.TicksRemaining} ticks left)",
+            _ => e.Type.ToString(),
+        });
+        status += $"\n[green]Active: {string.Join(", ", effects)}[/]";
+    }
+
     AnsiConsole.Write(new Panel(status)
         .Header($"[bold]{Markup.Escape(mutant.Name)}[/] — {Markup.Escape(levelDefinition.Map.Name)}")
         .Expand());
@@ -1297,6 +1346,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]news[/] (or broadcast) - show recent kill-feed events");
     AnsiConsole.MarkupLine("  [green]convert <item>[/]     - destroy an item for Ions");
     AnsiConsole.MarkupLine("  [green]wield <item>[/]       - equip a weapon or armor item");
+    AnsiConsole.MarkupLine("  [green]use[/]/[green]eat[/]/[green]drink <item>[/] - consume a potion or food item");
     AnsiConsole.MarkupLine("    ('<item>' is either its inventory number or its name)");
     AnsiConsole.MarkupLine("  [green]stores[/]              - list every store on this level");
     AnsiConsole.MarkupLine("  [green]shop[/]                - browse the store in your current room");

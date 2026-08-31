@@ -101,4 +101,16 @@ public class ItemTests
         var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // value 20
         Assert.Equal(item.Value, item.SellValue());
     }
+
+    [Fact]
+    public void IsUsable_TrueOnlyForAConsumableWithARealEffect()
+    {
+        var foodWithEffect = Item.Create("Ration Pack", ItemType.Consumable, 1, Rarity.Common, consumableEffect: ConsumableEffectType.Heal, effectMagnitude: 10);
+        var flavorOnlyConsumable = Item.Create("Trinket", ItemType.Consumable, 1, Rarity.Common); // no effect specified - defaults to None
+        var weaponWithNoEffect = Item.Create("Sword", ItemType.Weapon, 1, Rarity.Common);
+
+        Assert.True(foodWithEffect.IsUsable);
+        Assert.False(flavorOnlyConsumable.IsUsable);
+        Assert.False(weaponWithNoEffect.IsUsable);
+    }
 }

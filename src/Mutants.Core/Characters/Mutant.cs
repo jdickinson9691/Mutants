@@ -43,6 +43,10 @@ public sealed class Mutant
 
     private int _ticksSinceIonDrain;
 
+    /// <summary>Temporary stat buffs from consumed potions — see <see cref="Consume"/> and <see cref="AdvanceEffectTicks"/>.</summary>
+    private readonly List<ActiveEffect> _activeEffects = [];
+    public IReadOnlyList<ActiveEffect> ActiveEffects => _activeEffects;
+
     private readonly List<Item> _inventory = [];
     public IReadOnlyList<Item> Inventory => _inventory;
 
@@ -55,11 +59,18 @@ public sealed class Mutant
     /// </summary>
     public int Speed => Stats.Agility;
 
+    /// <summary>Sum of any active BuffAttack potions' magnitude — see <see cref="Consume"/>.</summary>
+    private int TemporaryAttackBonus => (int)Math.Round(_activeEffects.Where(e => e.Type == ConsumableEffectType.BuffAttack).Sum(e => e.Magnitude));
+
+    /// <summary>Sum of any active BuffDefense potions' magnitude — see <see cref="Consume"/>.</summary>
+    private int TemporaryDefenseBonus => (int)Math.Round(_activeEffects.Where(e => e.Type == ConsumableEffectType.BuffDefense).Sum(e => e.Magnitude));
+
     /// <summary>
     /// Combat attack power: primary stat + equipped weapon's AttackBonus,
     /// scaled by <see cref="Item.WieldEffectiveness"/> (so off-class
-    /// weapons contribute less, per docs/GDD.md §4.3). Original design —
-    /// the GDD confirms "a primary attack" per class but not its formula.
+    /// weapons contribute less, per docs/GDD.md §4.3), plus any active
+    /// BuffAttack potion. Original design — the GDD confirms "a primary
+    /// attack" per class but not its formula.
     /// </summary>
     public int EffectiveAttackPower
     {
@@ -70,11 +81,11 @@ public sealed class Mutant
                 ? 0
                 : (int)Math.Round(EquippedWeapon.AttackBonus * EquippedWeapon.WieldEffectiveness(Class));
 
-            return basePower + weaponBonus;
+            return basePower + weaponBonus + TemporaryAttackBonus;
         }
     }
 
-    /// <summary>Combat defense: half of Agility + equipped armor's DefenseBonus (scaled by wield effectiveness). Original design.</summary>
+    /// <summary>Combat defense: half of Agility + equipped armor's DefenseBonus (scaled by wield effectiveness) + any active BuffDefense potion. Original design.</summary>
     public int EffectiveDefense
     {
         get
@@ -84,7 +95,7 @@ public sealed class Mutant
                 ? 0
                 : (int)Math.Round(EquippedArmor.DefenseBonus * EquippedArmor.WieldEffectiveness(Class));
 
-            return baseDefense + armorBonus;
+            return baseDefense + armorBonus + TemporaryDefenseBonus;
         }
     }
 
@@ -249,6 +260,34 @@ public sealed class Mutant
         return true;
     }
 
+    /// <summary>
+    /// Ticks down every active potion buff by one world tick, dropping any
+    /// that just expired — called once per tick alongside
+    /// <see cref="AdvanceIonDrainTick"/> (see WorldSimulation.Tick), for
+    /// NPCs and the player alike, regardless of whether either can
+    /// currently drink potions themselves.
+    /// </summary>
+    public void AdvanceEffectTicks()
+    {
+        if (_activeEffects.Count == 0)
+        {
+            return;
+        }
+
+        for (var i = _activeEffects.Count - 1; i >= 0; i--)
+        {
+            var remaining = _activeEffects[i].TicksRemaining - 1;
+            if (remaining <= 0)
+            {
+                _activeEffects.RemoveAt(i);
+            }
+            else
+            {
+                _activeEffects[i] = _activeEffects[i] with { TicksRemaining = remaining };
+            }
+        }
+    }
+
     /// <summary>Places the Mutant at a specific grid position — e.g. spawning them at a level's start room.</summary>
     public void PlaceAt(Coordinate coordinate) => Position = coordinate;
 
@@ -292,6 +331,41 @@ public sealed class Mutant
     {
         RemoveFromInventoryOrThrow(item);
         return Ions.Add(item.ConvertValue());
+    }
+
+    /// <summary>
+    /// Uses/eats/drinks a Consumable item from inventory — a fourth
+    /// disposition verb alongside wield/sell/convert, for items whose
+    /// <see cref="Item.IsUsable"/> is true. The item is consumed either
+    /// way once this is called; validating it's actually usable is the
+    /// caller's job (see <see cref="Item.IsUsable"/>), same as Wield
+    /// leaves <see cref="Item.IsWieldable"/> to its caller. Returns the HP
+    /// actually restored for a Heal effect (0 for a buff, which instead
+    /// adds a timed <see cref="ActiveEffect"/> — see
+    /// <see cref="AdvanceEffectTicks"/> for how those expire).
+    /// </summary>
+    public int Consume(Item item)
+    {
+        if (!item.IsUsable)
+        {
+            throw new InvalidOperationException($"'{item.Name}' cannot be used.");
+        }
+
+        RemoveFromInventoryOrThrow(item);
+
+        switch (item.ConsumableEffect)
+        {
+            case ConsumableEffectType.Heal:
+                return Health.Heal((int)Math.Round(item.EffectMagnitude));
+
+            case ConsumableEffectType.BuffAttack:
+            case ConsumableEffectType.BuffDefense:
+                _activeEffects.Add(new ActiveEffect(item.ConsumableEffect, item.EffectMagnitude, item.EffectDurationTicks));
+                return 0;
+
+            default:
+                return 0;
+        }
     }
 
     /// <summary>

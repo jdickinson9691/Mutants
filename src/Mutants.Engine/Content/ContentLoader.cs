@@ -49,7 +49,12 @@ public static class ContentLoader
                 restrictedClass = parsed;
             }
 
-            var item = Item.Create(template.Name, type, template.Tier, rarity, restrictedClass);
+            if (!Enum.TryParse<ConsumableEffectType>(template.Effect, ignoreCase: true, out var effect))
+            {
+                throw new ContentException($"Item '{template.Id}': unknown effect '{template.Effect}'.");
+            }
+
+            var item = Item.Create(template.Name, type, template.Tier, rarity, restrictedClass, effect, template.EffectMagnitude, template.EffectDurationTicks);
             if (!catalog.TryAdd(template.Id, item))
             {
                 throw new ContentException($"Duplicate item id '{template.Id}'.");

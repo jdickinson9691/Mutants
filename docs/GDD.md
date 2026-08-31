@@ -173,7 +173,15 @@ area/group to a capstone — is the standard every class follows.)
 - **Disposition**: every lootable item supports the same three verbs as the
   original — `wield` (equip if class-compatible), `sell <item>` (at any
   store, price is store-and-negotiation-dependent, see §6), `convert <item>`
-  (destroy for Ions, value per §2.1).
+  (destroy for Ions, value per §2.1). `sell`/`convert` work on any item
+  regardless of type; `wield` only makes sense for Weapon/Armor.
+- **Consumables** (original addition — not in the source material) get a
+  fourth verb instead of `wield`: `use`/`eat`/`drink <item>`, which
+  triggers the item's effect and destroys it — an instant flat HP heal for
+  "food," or a temporary attack/defense buff (lasting a set number of
+  world ticks) for a "potion." This is separate from — and doesn't cost
+  Ions like — the `heal` command in §2/§2.1; a potion/food item is a
+  one-time consumable you have to loot or buy first.
 - Rarity bands (Common/Uncommon/Rare/Epic/Legendary) modulate stat rolls
   within a tier — original addition, since the source material never
   specifies a rarity system, but is a near-universal expectation in a modern

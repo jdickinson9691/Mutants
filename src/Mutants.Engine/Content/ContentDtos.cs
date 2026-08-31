@@ -20,6 +20,15 @@ public sealed class ItemTemplateData
     public int Tier { get; set; }
     public string Rarity { get; set; } = "";
     public string? RestrictedClass { get; set; }
+
+    /// <summary>One of Mutants.Core.Items.ConsumableEffectType's names ("None", "Heal", "BuffAttack", "BuffDefense") — only meaningful for a Consumable item; defaults to "None" (flavor-only) if omitted.</summary>
+    public string Effect { get; set; } = "None";
+
+    /// <summary>Meaning depends on Effect: flat HP for Heal, a flat stat bonus for BuffAttack/BuffDefense.</summary>
+    public double EffectMagnitude { get; set; }
+
+    /// <summary>How many world ticks a BuffAttack/BuffDefense effect lasts. Unused (and should stay 0) for Heal, which is instant.</summary>
+    public int EffectDurationTicks { get; set; }
 }
 
 public sealed class LootEntryData

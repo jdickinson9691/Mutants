@@ -22,9 +22,20 @@ not launch content.
       (matches docs/GDD.md §4.2's Priest "Turn Undead" ability, which
       checks this tag in combat).
 - [x] Item catalog per tier/rarity (weapons, armor, consumables, "junk"/convertible items)
-      — `items.json`: ~52 items across tiers 1–8, including a few
+      — `items.json`: ~60 items across tiers 1–8, including a few
       class-restricted pieces per tier (rotating through all 5 classes)
-      and a guaranteed Legendary "trophy" per gatekeeper.
+      and a guaranteed Legendary "trophy" per gatekeeper. Every item is
+      convertible/sellable regardless of type, and value (so Ion/Riblet
+      payout) always scales by the item's own tier and rarity via
+      `Mutants.Core.Items.LootScaling` — there's no type-based
+      restriction anywhere in `Mutant.Convert`/`Sell` or `Store`.
+      **Consumables are now usable**: every tier has one food item
+      (`effect: "Heal"`, flat HP, no duration) and one potion
+      (`BuffAttack` or `BuffDefense`, a temporary stat bonus lasting 15
+      world ticks) — `use`/`eat`/`drink <item>` in the console, backed by
+      `Mutant.Consume`/`AdvanceEffectTicks`. A Consumable with no `effect`
+      data is flavor-only (still sellable/convertible, but "use" refuses
+      it) — none currently ship that way, but the schema supports it.
 - [x] Level themes, names, and room-text banks
       — `levels/level-1.json` .. `level-8.json`. All 8 levels of the GDD's
       "5–8 levels for v1 launch" range now shipped: Ruined City, Neon

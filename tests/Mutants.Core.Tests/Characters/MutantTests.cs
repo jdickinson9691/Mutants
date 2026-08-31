@@ -102,6 +102,93 @@ public class MutantTests
     }
 
     [Fact]
+    public void Consume_HealEffect_RemovesItemAndRestoresFlatHp()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        mutant.Health.Damage(15);
+        var ration = Item.Create("Ration Pack", ItemType.Consumable, 1, Rarity.Common, consumableEffect: ConsumableEffectType.Heal, effectMagnitude: 10);
+        mutant.AddToInventory(ration);
+
+        var healed = mutant.Consume(ration);
+
+        Assert.Equal(10, healed);
+        Assert.DoesNotContain(ration, mutant.Inventory);
+        Assert.Equal(mutant.Health.Max - 5, mutant.Health.Current);
+    }
+
+    [Fact]
+    public void Consume_HealEffect_NeverOverheals()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        mutant.Health.Damage(2);
+        var ration = Item.Create("Ration Pack", ItemType.Consumable, 1, Rarity.Common, consumableEffect: ConsumableEffectType.Heal, effectMagnitude: 50);
+        mutant.AddToInventory(ration);
+
+        var healed = mutant.Consume(ration);
+
+        Assert.Equal(2, healed); // only the 2 missing HP, not the full 50
+        Assert.Equal(mutant.Health.Max, mutant.Health.Current);
+    }
+
+    [Fact]
+    public void Consume_BuffAttackEffect_AddsATimedActiveEffectAndBoostsEffectiveAttack()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var attackBefore = mutant.EffectiveAttackPower;
+        var potion = Item.Create("Adrenal Stim", ItemType.Consumable, 2, Rarity.Uncommon, consumableEffect: ConsumableEffectType.BuffAttack, effectMagnitude: 4, effectDurationTicks: 15);
+        mutant.AddToInventory(potion);
+
+        mutant.Consume(potion);
+
+        Assert.Equal(attackBefore + 4, mutant.EffectiveAttackPower);
+        Assert.Single(mutant.ActiveEffects);
+        Assert.Equal(15, mutant.ActiveEffects[0].TicksRemaining);
+    }
+
+    [Fact]
+    public void Consume_BuffDefenseEffect_BoostsEffectiveDefense()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var defenseBefore = mutant.EffectiveDefense;
+        var potion = Item.Create("Patch Kit", ItemType.Consumable, 1, Rarity.Common, consumableEffect: ConsumableEffectType.BuffDefense, effectMagnitude: 3, effectDurationTicks: 15);
+        mutant.AddToInventory(potion);
+
+        mutant.Consume(potion);
+
+        Assert.Equal(defenseBefore + 3, mutant.EffectiveDefense);
+    }
+
+    [Fact]
+    public void Consume_ThrowsForAnItemThatIsNotUsable()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var junk = Item.Create("Scrap Metal", ItemType.Junk, 1, Rarity.Common);
+        mutant.AddToInventory(junk);
+
+        Assert.Throws<InvalidOperationException>(() => mutant.Consume(junk));
+        Assert.Contains(junk, mutant.Inventory); // untouched - nothing consumed
+    }
+
+    [Fact]
+    public void AdvanceEffectTicks_CountsDownAndRemovesExpiredEffects()
+    {
+        var mutant = new Mutant("Rook", CharacterClass.Warrior);
+        var potion = Item.Create("Adrenal Stim", ItemType.Consumable, 2, Rarity.Uncommon, consumableEffect: ConsumableEffectType.BuffAttack, effectMagnitude: 4, effectDurationTicks: 2);
+        mutant.AddToInventory(potion);
+        mutant.Consume(potion);
+        var attackWhileActive = mutant.EffectiveAttackPower;
+
+        mutant.AdvanceEffectTicks();
+        Assert.Single(mutant.ActiveEffects);
+        Assert.Equal(1, mutant.ActiveEffects[0].TicksRemaining);
+        Assert.Equal(attackWhileActive, mutant.EffectiveAttackPower); // still active
+
+        mutant.AdvanceEffectTicks();
+        Assert.Empty(mutant.ActiveEffects);
+        Assert.True(mutant.EffectiveAttackPower < attackWhileActive); // expired
+    }
+
+    [Fact]
     public void Heal_AlreadyAtFullHealth_DoesNothingAndSpendsNoIons()
     {
         var mutant = new Mutant("Rook", CharacterClass.Warrior);
