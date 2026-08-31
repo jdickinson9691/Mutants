@@ -254,7 +254,12 @@ while (running)
         default:
             var (command, argument) = SplitCommand(input);
 
-            if (command is "fight" or "f")
+            // "attack"/"atk"/"a" are the in-combat verbs; accepting them out
+            // here as a `fight` alias means the extra lines a player (or a
+            // piped script) mashes during a fight land harmlessly once it
+            // ends — re-engaging if something's still in the room, or a plain
+            // "nothing here" — instead of an "Unrecognized command" error.
+            if (command is "fight" or "f" or "attack" or "atk" or "a")
             {
                 if (!HandleFight(traveler, world, random, simulation.Broadcast, abilities, argument))
                 {
@@ -1879,7 +1884,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("[yellow]Commands:[/]");
     AnsiConsole.MarkupLine("  [green]n[/]/[green]s[/]/[green]e[/]/[green]w[/] (or north/south/east/west) - move");
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room (monsters here / nearby, ground loot)");
-    AnsiConsole.MarkupLine("  [green]fight[/] (or f) [green]<name>[/] - fight a monster in this room (or the Warden at the year's start)");
+    AnsiConsole.MarkupLine("  [green]fight[/] (or f, attack, a) [green]<name>[/] - fight a monster in this room (or the Warden at the year's start)");
     AnsiConsole.MarkupLine("    (each round, type [green]attack[/] or [green]cast <ability>[/])");
     AnsiConsole.MarkupLine("  [green]shoot[/]/[green]point <dir>[/] - fire your readied ranged weapon one room away (finite built-in ammo)");
     AnsiConsole.MarkupLine("  [green]take[/] (or grab) [green]<item>[/] - pick up loot off the ground here ('take all' works)");
