@@ -30,16 +30,25 @@ file I/O.
       tick. No per-year placement content — it's all derived from the
       species roster + the world seed.
 
-- [x] **Item archetypes** — `item-archetypes.json`. ~32 archetypes: `{ id,
+- [x] **Item archetypes** — `item-archetypes.json`. ~35 archetypes: `{ id,
       name, type, rarity, restrictedClass?, effect?, effectMagnitude?,
-      effectDurationTicks?, themeTags }`, no tier. `TimelineContentFactory.
+      effectDurationTicks?, rangedKind?, ammoCapacity?, rangedEffect?,
+      themeTags }`, no tier. `TimelineContentFactory.
       ForArchetype(archetype, year)` produces a concrete `Item` whose
       Value / AttackBonus / DefenseBonus come from `LootScaling` at that
       year. Includes a generic staple set (weapon / armour / junk / a
-      Heal food / a BuffAttack potion / a BuffDefense potion), one
-      class-restricted weapon per class, and per-theme flavour armour and
-      junk for eight themes (scrap, neon, ash, drowned, deep, frost,
-      orbital, paradox).
+      Heal food / a BuffAttack potion / a BuffDefense potion / a ranged
+      weapon), one class-restricted weapon per class, and per-theme flavour
+      armour and junk for eight themes (scrap, neon, ash, drowned, deep,
+      frost, orbital, paradox).
+  - **Ranged weapons** (`type: "Ranged"`, GDD §5): a `rangedKind` of
+    `Wand`/`Bow`/`Gun` plus an `ammoCapacity` (the built-in shot count —
+    no separate ammo item) and an optional `rangedEffect` (`Weaken`).
+    `EffectMagnitude` doubles as the damage multiplier / Weaken amount.
+    v1 ships three: Hexbolt Wand (`common`, Weaken, 5), Recurve Bow
+    (`scrap`/`ash`, 10), Slug Carbine (`orbital`/`paradox`, 8). A full
+    per-era spread (slings → longbows → muskets → rifles → railguns) is a
+    later content pass.
 
 - [x] **Era bands** — `eras.json`. 14 bands from year 2000 to 4950,
       `fromYear` ascending (the first must be 2000). Each: `{ fromYear,
@@ -102,3 +111,6 @@ Not new plumbing — tuning and polish:
 - **More / finer era bands** for tighter thematic progression.
 - **Config-driven NPC class distribution** instead of uniform-random.
 - **Denser rosters / catalogs** if the game wants more variety per year.
+- **A full per-era ranged-weapon spread** (slings → longbows → muskets →
+  rifles → railguns, with era-appropriate `rangedEffect`s) — v1 ships only
+  three sample archetypes.

@@ -35,6 +35,15 @@ using Spectre.Console;
 // WorldSimulation.Tick), other years hold frozen monsters until visited,
 // and none of this is written to the save (a fresh session re-seeds).
 //
+// Ranged weapons (Mutants.Core.Items.Item / RangedKind - wands, bows,
+// later guns) reach one room away: `wield` one into its own slot, then
+// `point <dir>` (wands) or `shoot <dir>` (bows/guns) down an exit to hit
+// the first monster there via Mutants.Engine.Combat.RangedResolver. Each
+// carries a finite built-in magazine (AmmoRemaining/AmmoCapacity) that
+// round-trips through the save; once spent the weapon can't fire and is
+// worth only a fraction on `convert`/`sell`. A Weaken wand leaves the
+// target fighting at reduced defence for its next `fight`.
+//
 // Content is data-driven (Mutants.Content/*.json - monster-species,
 // item-archetypes, eras, store-templates - loaded by
 // Mutants.Engine.Content.ContentLoader.LoadTimeWorld), falling back to
@@ -220,6 +229,12 @@ while (running)
             if (command is "take" or "grab" or "pickup" or "get")
             {
                 HandleTake(mutant, world, argument);
+                break;
+            }
+
+            if (command is "shoot" or "point" or "fire")
+            {
+                HandleShoot(mutant, world, random, simulation.Broadcast, command, argument);
                 break;
             }
 
@@ -1015,6 +1030,111 @@ static void PrintNewLogLines(CombatSession session, ref int loggedSoFar)
     loggedSoFar = session.Log.Count;
 }
 
+/// <summary>
+/// Fires the readied ranged weapon (Mutant.EquippedRanged) one room away
+/// in an exit direction — 'point &lt;dir&gt;' for a Wand, 'shoot &lt;dir&gt;'
+/// for a Bow/Gun — hitting the first living monster there (or that room's
+/// stationed Gatekeeper). A hit spends one round of the weapon's built-in
+/// ammo via Mutants.Engine.Combat.RangedResolver; no target or no exit that
+/// way spends nothing. On a kill, XP and loot are awarded here — the loot
+/// lands on the target room's floor, since the player never walked in.
+/// Softening a monster with a Weaken wand carries into the next 'fight'
+/// (CombatSession consumes Monster.PendingDefensePenalty once).
+/// </summary>
+static void HandleShoot(Mutant mutant, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, string verb, string argument)
+{
+    var weapon = mutant.EquippedRanged;
+    if (weapon is null)
+    {
+        AnsiConsole.MarkupLine("[red]You have no ranged weapon readied.[/] [yellow]wield[/] a wand, bow, or gun first.");
+        return;
+    }
+
+    if (weapon.IsDepleted)
+    {
+        AnsiConsole.MarkupLine($"[red]Your {Markup.Escape(weapon.Name)} is spent — [yellow]convert[/] or [yellow]sell[/] it.[/]");
+        return;
+    }
+
+    var direction = DirectionExtensions.Parse(argument.Trim());
+    if (direction is null)
+    {
+        AnsiConsole.MarkupLine($"[red]{verb} which way?[/] Try '{verb} north'.");
+        return;
+    }
+
+    var yearContent = world.GetYear(mutant.CurrentYear);
+    if (!yearContent.Map.GetRoom(mutant.Position).ExitDescriptions.ContainsKey(direction.Value))
+    {
+        AnsiConsole.MarkupLine("[red]You can't shoot through a wall.[/] There's no exit that way.");
+        return;
+    }
+
+    var targetRoom = mutant.Position.Move(direction.Value);
+    var population = yearContent.Population;
+
+    var target = population.MonstersAt(targetRoom).FirstOrDefault(m => !m.Health.IsDead);
+    var gatekeeper = population.Gatekeeper;
+    var targetIsGatekeeper = false;
+    if (target is null
+        && gatekeeper is not null && !gatekeeper.Health.IsDead
+        && !mutant.HasDefeatedGatekeeper(mutant.CurrentYear)
+        && gatekeeper.Position.Equals(targetRoom))
+    {
+        target = gatekeeper;
+        targetIsGatekeeper = true;
+    }
+
+    if (target is null)
+    {
+        AnsiConsole.MarkupLine($"[grey]Nothing to {verb} that way.[/] (no shot spent)");
+        return;
+    }
+
+    var levelBefore = mutant.Level;
+    var result = RangedResolver.Fire(mutant, target, weapon, random);
+    AnsiConsole.MarkupLine($"[blue]{Markup.Escape(result.Message)}[/]");
+    AnsiConsole.MarkupLine($"[grey]{Markup.Escape(weapon.Name)}: {weapon.AmmoRemaining}/{weapon.AmmoCapacity} shots left.[/]");
+
+    if (!result.Killed)
+    {
+        return;
+    }
+
+    broadcast.Publish(GameEvent.Slain(target.Name, mutant.Name));
+    mutant.GainXp(target.XpReward);
+
+    var drops = LootDropRoller.Roll(target.LootTable, random).Concat(target.Inventory).ToList();
+
+    if (targetIsGatekeeper)
+    {
+        mutant.RecordGatekeeperDefeat(mutant.CurrentYear);
+        foreach (var drop in drops)
+        {
+            population.AddGroundLoot(targetRoom, drop);
+        }
+
+        AnsiConsole.MarkupLine($"[bold yellow]You drop the Gatekeeper of {mutant.CurrentYear} from a room away — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{target.XpReward} XP.");
+    }
+    else
+    {
+        population.RemoveMonster(target);
+        foreach (var drop in drops)
+        {
+            population.AddGroundLoot(targetRoom, drop);
+        }
+
+        AnsiConsole.MarkupLine(drops.Count > 0
+            ? $"[green]The {Markup.Escape(target.Name)} drops. +{target.XpReward} XP. Its loot is on the floor to the {direction.Value.Name()} — walk in and [yellow]take[/] it.[/]"
+            : $"[green]The {Markup.Escape(target.Name)} drops. +{target.XpReward} XP.[/]");
+    }
+
+    if (mutant.Level > levelBefore)
+    {
+        broadcast.Publish(GameEvent.LevelReached(mutant.Name, mutant.Level));
+    }
+}
+
 /// <summary>Lists the player's class's abilities - locked ones greyed, the handful with no combat effect flagged.</summary>
 static void RenderAbilities(Mutant mutant, IReadOnlyList<AbilityData> abilities)
 {
@@ -1393,13 +1513,17 @@ static void RenderInventory(Mutant mutant)
     for (var i = 0; i < mutant.Inventory.Count; i++)
     {
         var item = mutant.Inventory[i];
-        var equipped = item == mutant.EquippedWeapon || item == mutant.EquippedArmor ? "yes" : "";
+        var equipped = item == mutant.EquippedWeapon || item == mutant.EquippedArmor || ReferenceEquals(item, mutant.EquippedRanged) ? "yes" : "";
         var effect = item.ConsumableEffect switch
         {
             ConsumableEffectType.Heal => $"heals {item.EffectMagnitude:0} HP",
             ConsumableEffectType.BuffAttack => $"+{item.EffectMagnitude:0} attack ({item.EffectDurationTicks} ticks)",
             ConsumableEffectType.BuffDefense => $"+{item.EffectMagnitude:0} defense ({item.EffectDurationTicks} ticks)",
-            _ => "",
+            _ => item.IsRanged
+                ? (item.IsDepleted
+                    ? $"{item.RangedKind} — spent (convert/sell only)"
+                    : $"{item.RangedKind} — {item.AmmoRemaining}/{item.AmmoCapacity} shots" + (item.RangedEffect != RangedEffectType.None ? $", {item.RangedEffect}" : ""))
+                : "",
         };
         table.AddRow(
             (i + 1).ToString(),
@@ -1510,6 +1634,13 @@ static void RenderStatusBar(Mutant mutant, TimeWorld world)
                  $"Furthest {mutant.FurthestYearReached}  " +
                  $"Location {Markup.Escape(mutant.Position.ToString())}";
 
+    if (mutant.EquippedRanged is { } ranged)
+    {
+        status += ranged.IsDepleted
+            ? $"\n[grey]Ranged: {Markup.Escape(ranged.Name)} (spent)[/]"
+            : $"\n[blue]Ranged: {Markup.Escape(ranged.Name)} — {ranged.AmmoRemaining}/{ranged.AmmoCapacity} shots[/]";
+    }
+
     if (mutant.ActiveEffects.Count > 0)
     {
         var effects = mutant.ActiveEffects.Select(e => e.Type switch
@@ -1533,6 +1664,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room (monsters here / nearby, ground loot)");
     AnsiConsole.MarkupLine("  [green]fight[/] (or f) [green]<name>[/] - fight a monster in this room (or the Gatekeeper at the year's start)");
     AnsiConsole.MarkupLine("    (each round, type [green]attack[/] or [green]cast <ability>[/])");
+    AnsiConsole.MarkupLine("  [green]shoot[/]/[green]point <dir>[/] - fire your readied ranged weapon one room away (finite built-in ammo)");
     AnsiConsole.MarkupLine("  [green]take[/] (or grab) [green]<item>[/] - pick up loot off the ground here ('take all' works)");
     AnsiConsole.MarkupLine("  [green]monsters[/] (or mobs)  - list the monsters roaming this year");
     AnsiConsole.MarkupLine("  [green]heal[/]                - spend Ions to recover HP (usable any time)");
@@ -1543,8 +1675,8 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]inventory[/] (or i)    - list what you're carrying");
     AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Mutants out in the timeline");
     AnsiConsole.MarkupLine("  [green]news[/] (or broadcast) - show recent kill-feed events");
-    AnsiConsole.MarkupLine("  [green]convert <item>[/]     - destroy an item for Ions");
-    AnsiConsole.MarkupLine("  [green]wield <item>[/]       - equip a weapon or armor item");
+    AnsiConsole.MarkupLine("  [green]convert <item>[/]     - destroy an item for Ions (a spent ranged weapon is worth a fraction)");
+    AnsiConsole.MarkupLine("  [green]wield <item>[/]       - equip a weapon, armor, or ranged (wand/bow/gun) item");
     AnsiConsole.MarkupLine("  [green]use[/]/[green]eat[/]/[green]drink <item>[/] - consume a potion or food item");
     AnsiConsole.MarkupLine("    ('<item>' is either its inventory number or its name)");
     AnsiConsole.MarkupLine("  [green]stores[/]              - list every store this year");

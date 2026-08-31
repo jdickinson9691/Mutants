@@ -213,7 +213,22 @@ area/group to a capstone — is the standard every class follows.)
   original — `wield` (equip if class-compatible), `sell <item>` (at any
   store, price is store-and-negotiation-dependent, see §6), `convert <item>`
   (destroy for Ions, value per §2.1). `sell`/`convert` work on any item
-  regardless of type; `wield` only makes sense for Weapon/Armor.
+  regardless of type; `wield` makes sense for Weapon/Armor/Ranged.
+- **Ranged weapons** (original addition, enabled by §7.1's spatial
+  monsters): wands, bows, and — in later years — guns occupy their own
+  equip slot alongside the melee weapon. `wield` one, then `point <dir>`
+  (wands) or `shoot <dir>` (bows/guns) fires it down an exit at the first
+  monster in the **adjacent** room — an out-of-combat action for softening
+  or finishing a target before it reaches you; the shot has no direction
+  inside a locked 1v1, so it isn't a combat-round option. Each ranged
+  weapon carries a **finite built-in magazine** (no separate ammo item);
+  every shot spends one round and the count persists in the save. A wand
+  may also carry an effect — `Weaken` leaves the target fighting at
+  reduced defence for its next `fight`. Once empty the weapon can't fire
+  and is worth only a fraction (down to 25%, scaling with rounds spent) on
+  `convert`/`sell`. Damage-wise wands and guns pierce armour; bows don't.
+  A kill from range drops the loot on the target's floor — walk in and
+  `take` it.
 - **Consumables** (original addition — not in the source material) get a
   fourth verb instead of `wield`: `use`/`eat`/`drink <item>`, which
   triggers the item's effect and destroys it — an instant flat HP heal for
