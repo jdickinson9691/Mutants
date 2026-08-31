@@ -218,6 +218,68 @@ public class MonsterControllerTests
     }
 
     [Fact]
+    public void Tick_NoAmbushOrPursuitWhenThePlayerIsInASafeRoom()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var haven = Coordinate.Origin;
+
+        var player = new Mutant("Prey", CharacterClass.Warrior);
+        player.PlaceAt(haven);
+        var fullHp = player.Health.Current;
+
+        var lurker = new Monster("Lurker", 1, maxHp: 30, attackPower: 12, defense: 2, speed: 8, xpReward: 40);
+        lurker.PlaceAt(haven);                 // already on the tile
+        pop.AddMonster(lurker);
+
+        var adjacent = new Monster("Chaser", 1, maxHp: 30, attackPower: 8, defense: 2, speed: 8, xpReward: 40);
+        adjacent.PlaceAt(new Coordinate(1, 0)); // one room away — would normally close in
+        pop.AddMonster(adjacent);
+
+        MonsterController.Tick(pop, map, [], player, playerLingered: true, StubRandomSource.Fixed(0.99),
+            new BroadcastChannel(), safeRooms: new HashSet<Coordinate> { haven });
+
+        Assert.Equal(fullHp, player.Health.Current);       // no ambush in the haven
+        Assert.NotEqual(haven, adjacent.Position);         // nothing steps into it
+    }
+
+    [Fact]
+    public void Tick_AChaserGivesUpAndWandersAfterItHasFollowedTooLong()
+    {
+        // A long corridor so a stalker can actually keep closing.
+        var map = GridLevelBuilder.Build("Hall", Coordinate.Origin,
+            Enumerable.Range(0, 8).ToDictionary(x => new Coordinate(x, 0), x => $"room {x}."));
+        var pop = EmptyPopulation(map);
+
+        var player = new Mutant("Prey", CharacterClass.Warrior);
+        player.PlaceAt(new Coordinate(4, 0));
+
+        var stalker = Monster.Create("Stalker", tier: 1);
+        stalker.PlaceAt(new Coordinate(3, 0)); // one west of the player
+        pop.AddMonster(stalker);
+
+        // The player never fights and never leaves — a stalker that closes
+        // in should eventually stop hounding the tile and drift off.
+        var reachedThePlayer = false;
+        var thenBrokeAway = false;
+        for (var i = 0; i < 12; i++)
+        {
+            MonsterController.Tick(pop, map, [], player, playerLingered: false, StubRandomSource.Fixed(0.0), new BroadcastChannel());
+            if (stalker.Position.Equals(player.Position))
+            {
+                reachedThePlayer = true;
+            }
+            else if (reachedThePlayer)
+            {
+                thenBrokeAway = true;
+            }
+        }
+
+        Assert.True(reachedThePlayer, "the stalker closed to the player");
+        Assert.True(thenBrokeAway, "...then lost interest and wandered off");
+    }
+
+    [Fact]
     public void Tick_RespawnTrickleRefillsTowardSoftCapButNeverPastIt()
     {
         var world = TestTimeWorld.Build(seed: 314);

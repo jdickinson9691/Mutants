@@ -35,9 +35,12 @@ using Spectre.Console;
 // WorldSimulation.Tick), other years hold frozen monsters until visited,
 // and none of this is written to the save (a fresh session re-seeds). A
 // monster within one room of you closes in instead of wandering; one
-// sharing your room holds position and, if you linger there (don't move
-// or travel), lands an ambush hit. The inline kill-feed after each
-// command is capped and drops NPC time-hops - `news` still shows the lot.
+// sharing your room holds position and, on a turn you spend idle (look /
+// status / wait / inventory / ...), lands one ambush hit - acting (move,
+// fight, heal, shop, wield) is safe, and a store room is a haven nothing
+// pursues or ambushes into. Keep moving and a chaser loses your trail
+// after ~4 rooms. The inline kill-feed after each command is capped and
+// drops NPC time-hops - `news` still shows the lot.
 //
 // Ranged weapons (Mutants.Core.Items.Item / RangedKind - wands, bows,
 // later guns) reach one room away: `wield` one into its own slot, then
@@ -167,6 +170,10 @@ while (running)
             RenderStatusBar(mutant, world);
             break;
 
+        case "wait" or "z":
+            AnsiConsole.MarkupLine("[grey]You wait a moment.[/] (a monster in the room may get a hit in — see [yellow]help[/])");
+            break;
+
         case "heal":
             HandleHeal(mutant);
             break;
@@ -284,7 +291,7 @@ while (running)
 
     if (running && !mutant.Health.IsDead)
     {
-        simulation.Tick(mutant);
+        simulation.Tick(mutant, playerActedIdly: IsIdleCommand(input));
         shownBroadcastCount = RenderNewBroadcastEvents(simulation.Broadcast, shownBroadcastCount);
 
         if (mutant.Health.IsDead)
@@ -568,6 +575,19 @@ static (string Command, string Argument) SplitCommand(string input)
         _ => (parts[0].ToLowerInvariant(), parts[1]),
     };
 }
+
+/// <summary>
+/// True if <paramref name="input"/> is an informational no-op — checking
+/// the room, your sheet, the map, the feed. Only on such a turn can a
+/// monster in your room ambush you (see Mutants.Engine.Npc.MonsterController):
+/// anything that actually does something (move, fight, shoot, heal, shop,
+/// wield, travel, take, …) is safe, as is an unrecognised command.
+/// </summary>
+static bool IsIdleCommand(string input) => SplitCommand(input).Command is
+    "look" or "l" or "status" or "stat" or "wait" or "z" or "help" or "?"
+    or "inventory" or "i" or "abilities" or "spells" or "npcs" or "who"
+    or "monsters" or "mobs" or "news" or "broadcast" or "stores"
+    or "leaderboard" or "board";
 
 /// <summary>Handles "convert/wield/use/eat/drink &lt;item&gt;" commands. Returns false if <paramref name="command"/> isn't one of those verbs.</summary>
 static bool TryHandleItemCommand(Mutant mutant, string command, string argument)
@@ -1747,6 +1767,10 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]save[/]                - save your character now");
     AnsiConsole.MarkupLine("  [green]leaderboard[/] (or board) - show the leaderboards, your best highlighted");
     AnsiConsole.MarkupLine("  [green]status[/]              - show the status bar");
+    AnsiConsole.MarkupLine("  [green]wait[/] (or z)         - pass a turn (a monster in the room may get a hit in)");
     AnsiConsole.MarkupLine("  [green]help[/] (or ?)         - show this list");
     AnsiConsole.MarkupLine("  [green]quit[/] (or exit)      - leave the game (auto-saves unless you died)");
+    AnsiConsole.MarkupLine("[grey]  A monster sharing your room only hits you on an idle turn (look/status/wait/…).[/]");
+    AnsiConsole.MarkupLine("[grey]  Acting — moving, fighting, healing, shopping — is safe, and a store room is a haven.[/]");
+    AnsiConsole.MarkupLine("[grey]  Keep moving and a chasing monster loses your trail after a few rooms.[/]");
 }

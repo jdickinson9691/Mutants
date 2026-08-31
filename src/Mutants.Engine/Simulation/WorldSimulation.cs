@@ -54,7 +54,13 @@ public sealed class WorldSimulation
     /// <see cref="Npc.NpcController"/>), publishing kill/level-up/
     /// time-travel events to <see cref="Broadcast"/> along the way.
     /// </summary>
-    public void Tick(Mutant player)
+    /// <param name="playerActedIdly">
+    /// True if the turn the player just took was an informational no-op
+    /// (look / status / inventory / …) rather than a real action. Only then
+    /// — and only if they also held position — can a co-located monster
+    /// ambush them. Defaults to false so non-console callers never ambush.
+    /// </param>
+    public void Tick(Mutant player, bool playerActedIdly = false)
     {
         foreach (var mutant in Npcs.Append(player))
         {
@@ -116,9 +122,12 @@ public sealed class WorldSimulation
         // stay frozen where they were placed until visited.
         if (Mutants.Core.Time.TimeScale.IsValidYear(player.CurrentYear))
         {
-            var lingered = _lastPlayerYear == player.CurrentYear && _lastPlayerPosition.Equals(player.Position);
+            var lingered = playerActedIdly
+                && _lastPlayerYear == player.CurrentYear
+                && _lastPlayerPosition.Equals(player.Position);
             var here = World.GetYear(player.CurrentYear);
-            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player, lingered, _random, Broadcast);
+            var safeRooms = here.StoreSlots.Select(slot => slot.Location).ToHashSet();
+            MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player, lingered, _random, Broadcast, safeRooms);
         }
 
         _lastPlayerYear = player.CurrentYear;

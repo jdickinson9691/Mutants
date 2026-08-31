@@ -18,8 +18,15 @@ namespace Mutants.Engine.Npc;
 /// random exit); monsters sharing a room may fight each other, the loser
 /// dropping its carried items plus a loot-table roll where it fell; a slow
 /// trickle respawns the population back toward its soft cap; and finally a
-/// monster standing in the player's room lands one ambush hit — so
-/// lingering next to a monster instead of fighting or fleeing costs HP.
+/// monster standing in the player's room lands one ambush hit — so an
+/// <em>idle</em> turn next to a monster costs HP.
+///
+/// Three concessions keep the pressure from being oppressive: a monster
+/// that has chased the player for <see cref="ChaseGiveUpTicks"/> ticks
+/// without a fight loses interest and wanders (so you can shake a tail);
+/// nothing pursues, wanders, or ambushes into a <c>safeRoom</c> (a store);
+/// and the ambush only fires on a turn the player spent doing nothing (the
+/// console passes <c>playerLingered</c> only for informational commands).
 /// Everything is thresholds/chances — original tuning, not GDD-specified.
 /// </summary>
 public static class MonsterController
@@ -43,10 +50,18 @@ public static class MonsterController
     /// </summary>
     private const int AggroRange = 1;
 
+    /// <summary>After this many consecutive ticks chasing the player without a fight, a monster gives up and wanders — so moving off actually shakes it.</summary>
+    private const int ChaseGiveUpTicks = 4;
+
     /// <param name="playerLingered">
-    /// True if the player neither moved nor changed year since the last
-    /// tick. Only a lingering player gets ambushed — arriving in a room (or
-    /// travelling into a year) always buys one free turn to size it up.
+    /// True only if the player spent this turn doing nothing (an
+    /// informational command) and neither moved nor changed year. Only then
+    /// can a co-located monster ambush — acting (fighting, healing,
+    /// shopping, moving) is always safe.
+    /// </param>
+    /// <param name="safeRooms">
+    /// Rooms nothing will pursue, wander, or ambush into — the year's store
+    /// tiles. A depot is a haven to shop and heal in.
     /// </param>
     public static void Tick(
         YearPopulation population,
@@ -55,9 +70,11 @@ public static class MonsterController
         Mutant player,
         bool playerLingered,
         IRandomSource random,
-        BroadcastChannel broadcast)
+        BroadcastChannel broadcast,
+        IReadOnlySet<Coordinate>? safeRooms = null)
     {
         var playerHere = TimeScale.IsValidYear(player.CurrentYear);
+        var playerSafe = playerHere && safeRooms is not null && safeRooms.Contains(player.Position);
 
         foreach (var monster in population.Monsters.Where(m => !m.Health.IsDead).ToList())
         {
@@ -65,17 +82,35 @@ public static class MonsterController
             {
                 var distance = playerHere ? ManhattanDistance(monster.Position, player.Position) : int.MaxValue;
 
-                if (distance == 0)
+                if (distance > AggroRange || playerSafe)
                 {
-                    // Toe to toe with the player — hold, don't wander off.
+                    // Out of aggro range (or the player's tucked into a
+                    // store) — the monster isn't tracking anyone.
+                    monster.ChaseTicks = 0;
+                    if (random.NextDouble() < WanderChance)
+                    {
+                        Wander(map, monster, random, safeRooms);
+                    }
                 }
-                else if (distance <= AggroRange)
+                else
                 {
-                    StepToward(map, monster, player.Position, random);
-                }
-                else if (random.NextDouble() < WanderChance)
-                {
-                    Wander(map, monster, random);
+                    monster.ChaseTicks++;
+                    var winded = monster.ChaseTicks > ChaseGiveUpTicks;
+
+                    if (winded)
+                    {
+                        // Lost interest — drift off (this is how the player
+                        // shakes a tail: keep moving and it eventually stops).
+                        if (random.NextDouble() < WanderChance)
+                        {
+                            Wander(map, monster, random, safeRooms);
+                        }
+                    }
+                    else if (distance > 0)
+                    {
+                        StepToward(map, monster, player.Position, random, safeRooms);
+                    }
+                    // distance == 0 && !winded: hold, toe to toe.
                 }
             }
 
@@ -85,7 +120,7 @@ public static class MonsterController
         ResolveInfighting(population, random, broadcast);
         MaybeRespawn(population, map, roster, random);
 
-        if (playerHere && playerLingered && population.TicksSinceAmbush >= AmbushCooldownTicks
+        if (playerHere && playerLingered && !playerSafe && population.TicksSinceAmbush >= AmbushCooldownTicks
             && ResolveAmbush(population, player, random, broadcast))
         {
             population.TicksSinceAmbush = 0;
@@ -122,7 +157,10 @@ public static class MonsterController
         return true;
     }
 
-    private static void Wander(LevelMap map, Monster monster, IRandomSource random)
+    private static bool IsBlocked(IReadOnlySet<Coordinate>? safeRooms, Coordinate room) =>
+        safeRooms is not null && safeRooms.Contains(room);
+
+    private static void Wander(LevelMap map, Monster monster, IRandomSource random, IReadOnlySet<Coordinate>? safeRooms)
     {
         var exits = map.GetRoom(monster.Position).ExitDescriptions.Keys.ToList();
         if (exits.Count == 0)
@@ -131,14 +169,14 @@ public static class MonsterController
         }
 
         var move = map.TryMove(monster.Position, exits[(int)(random.NextDouble() * exits.Count)]);
-        if (move.Success)
+        if (move.Success && !IsBlocked(safeRooms, move.Destination!.Value))
         {
-            monster.MoveTo(move.Destination!.Value);
+            monster.MoveTo(move.Destination.Value);
         }
     }
 
-    /// <summary>Steps one room along whichever exit most reduces the Manhattan distance to <paramref name="target"/>; holds if none does.</summary>
-    private static void StepToward(LevelMap map, Monster monster, Coordinate target, IRandomSource random)
+    /// <summary>Steps one room along whichever exit most reduces the Manhattan distance to <paramref name="target"/> (never into a <paramref name="safeRooms"/> tile); holds if none does.</summary>
+    private static void StepToward(LevelMap map, Monster monster, Coordinate target, IRandomSource random, IReadOnlySet<Coordinate>? safeRooms)
     {
         var exits = map.GetRoom(monster.Position).ExitDescriptions.Keys
             .OrderBy(_ => random.NextDouble()) // break ties without always favouring one axis
@@ -150,12 +188,12 @@ public static class MonsterController
         foreach (var dir in exits)
         {
             var move = map.TryMove(monster.Position, dir);
-            if (!move.Success)
+            if (!move.Success || IsBlocked(safeRooms, move.Destination!.Value))
             {
                 continue;
             }
 
-            var distance = ManhattanDistance(move.Destination!.Value, target);
+            var distance = ManhattanDistance(move.Destination.Value, target);
             if (distance < bestDistance)
             {
                 bestDistance = distance;

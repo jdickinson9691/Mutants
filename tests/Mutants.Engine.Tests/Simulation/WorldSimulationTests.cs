@@ -138,6 +138,31 @@ public class WorldSimulationTests
     }
 
     [Fact]
+    public void Tick_OnlyAmbushesThePlayerOnAnIdleTurn()
+    {
+        var world = World();
+        var year = 2000;
+        var player = NewMutant("Player", world, year);
+
+        // Stand the player on a monster's tile that isn't a store haven.
+        var content = world.GetYear(year);
+        var storeTiles = content.StoreSlots.Select(s => s.Location).ToHashSet();
+        var monster = content.Population.Monsters.First(m => !m.Health.IsDead && !storeTiles.Contains(m.Position));
+        player.PlaceAt(monster.Position);
+
+        var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.4));
+
+        var beforeActive = player.Health.Current;
+        simulation.Tick(player, playerActedIdly: false); // seed last-position
+        simulation.Tick(player, playerActedIdly: false); // acting → safe
+        Assert.Equal(beforeActive, player.Health.Current);
+
+        var beforeIdle = player.Health.Current;
+        simulation.Tick(player, playerActedIdly: true);  // idle + held position → ambush
+        Assert.True(player.Health.Current < beforeIdle);
+    }
+
+    [Fact]
     public void Tick_ResolvesEachNpcAgainstItsOwnYear_NotOneSharedYear()
     {
         var world = World();
