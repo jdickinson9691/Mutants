@@ -929,7 +929,17 @@ static bool TryHandleItemCommand(Traveler traveler, string command, string argum
         return false;
     }
 
-    var item = FindInventoryItem(traveler, argument);
+    // When a substring matches several items, steer to one the command can
+    // actually act on — so `wield shard` grabs the "Time Shard" weapon, not
+    // the "Salvage Shard" junk sitting next to it in the pack.
+    Func<Item, bool>? prefer = command switch
+    {
+        "wield" => static i => i.IsWieldable,
+        "use" or "eat" or "drink" => static i => i.IsUsable,
+        _ => null,
+    };
+
+    var item = FindInventoryItem(traveler, argument, prefer);
     if (item is null)
     {
         AnsiConsole.MarkupLine(argument.Length == 0
@@ -988,7 +998,7 @@ static bool TryHandleItemCommand(Traveler traveler, string command, string argum
     return true;
 }
 
-static Item? FindInventoryItem(Traveler traveler, string argument)
+static Item? FindInventoryItem(Traveler traveler, string argument, Func<Item, bool>? prefer = null)
 {
     if (argument.Length == 0)
     {
@@ -1003,8 +1013,25 @@ static Item? FindInventoryItem(Traveler traveler, string argument)
     // Exact name wins; otherwise any item whose name contains the text
     // (so `wield marshal` finds "Marshal's Repeater" — names wrap in the
     // inventory table and carry apostrophes, so exact-only is a trap).
-    return traveler.Inventory.FirstOrDefault(i => string.Equals(i.Name, argument, StringComparison.OrdinalIgnoreCase))
-        ?? traveler.Inventory.FirstOrDefault(i => i.Name.Contains(argument, StringComparison.OrdinalIgnoreCase));
+    // When several contain it, `prefer` breaks the tie toward one the
+    // caller can use (e.g. a wieldable "Time Shard" over junk "Salvage Shard").
+    var exact = traveler.Inventory.FirstOrDefault(i => string.Equals(i.Name, argument, StringComparison.OrdinalIgnoreCase));
+    if (exact is not null)
+    {
+        return exact;
+    }
+
+    var matches = traveler.Inventory.Where(i => i.Name.Contains(argument, StringComparison.OrdinalIgnoreCase)).ToList();
+    if (prefer is not null)
+    {
+        var preferred = matches.FirstOrDefault(prefer);
+        if (preferred is not null)
+        {
+            return preferred;
+        }
+    }
+
+    return matches.FirstOrDefault();
 }
 
 static StoreListing? FindListing(Store store, string argument)

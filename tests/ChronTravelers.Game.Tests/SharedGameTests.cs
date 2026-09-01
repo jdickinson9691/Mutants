@@ -148,6 +148,26 @@ public class SharedGameTests
     }
 
     [Fact]
+    public void Wield_PrefersTheWieldableMatch_WhenASubstringHitsSeveralItems()
+    {
+        var game = NewGame(out _);
+        var rec = new Recorder();
+        var player = NewSoldier();
+        var junk = Item.Create("Salvage Shard", ItemType.Junk, 1, Rarity.Common);
+        var shard = Item.Create("Time Shard", ItemType.Weapon, 1, Rarity.Legendary);
+        player.AddToInventory(junk);
+        player.AddToInventory(shard);
+        var session = game.Join("acct", player, rec);
+        rec.Clear();
+
+        game.Execute(session, "wield shard");
+
+        Assert.Same(shard, player.EquippedWeapon);
+        Assert.True(rec.Any("Wielded Time Shard"));
+        Assert.False(rec.Any("can't be wielded"));
+    }
+
+    [Fact]
     public void Leave_DropsTheOnlineCountAndTellsTheOthers()
     {
         var game = NewGame(out _);

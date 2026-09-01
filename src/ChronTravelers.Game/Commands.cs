@@ -284,7 +284,9 @@ internal static class Commands
 
     private static void Wield(Session session, string arg)
     {
-        var item = FindItem(session, arg);
+        // Prefer a wieldable match so `wield shard` grabs the "Time Shard"
+        // weapon, not junk "Salvage Shard" that also contains the word.
+        var item = FindItem(session, arg, static i => i.IsWieldable);
         if (item is null)
         {
             session.Send($"No item matching '{arg}' in your inventory.");
@@ -407,7 +409,7 @@ internal static class Commands
         session.Send("Fights auto-resolve; loot drops on the floor — 'take' it. Type 'quit' to disconnect.");
     }
 
-    private static Item? FindItem(Session session, string arg)
+    private static Item? FindItem(Session session, string arg, Func<Item, bool>? prefer = null)
     {
         if (arg.Length == 0)
         {
@@ -420,8 +422,14 @@ internal static class Commands
             return inv[n - 1];
         }
 
-        return inv.FirstOrDefault(i => string.Equals(i.Name, arg, StringComparison.OrdinalIgnoreCase))
-            ?? inv.FirstOrDefault(i => i.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
+        var exact = inv.FirstOrDefault(i => string.Equals(i.Name, arg, StringComparison.OrdinalIgnoreCase));
+        if (exact is not null)
+        {
+            return exact;
+        }
+
+        var matches = inv.Where(i => i.Name.Contains(arg, StringComparison.OrdinalIgnoreCase)).ToList();
+        return (prefer is not null ? matches.FirstOrDefault(prefer) : null) ?? matches.FirstOrDefault();
     }
 
     private static Direction Opposite(Direction d) => d switch
