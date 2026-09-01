@@ -18,7 +18,13 @@ namespace ChronTravelers.Core.Monsters;
 /// </summary>
 public static class MonsterScaling
 {
-    public static double BaseHp(double tier) => Require(tier, 20 + 8 * tier);
+    // Superlinear (was the flat 20 + 8·tier): a level-cap character's
+    // attack one-shot a deep regular monster, so no matter how hard the
+    // monster hit it only ever landed a single swing. 20 + 8·tier + tier²
+    // is near-flat early (tier 1: 29, tier 2: 40) and pulls up steeply
+    // late (tier 9: 173 vs the old 92) so a far-future fight is a real
+    // two-plus-round exchange (playtest feedback).
+    public static double BaseHp(double tier) => Require(tier, 20 + 8 * tier + tier * tier);
 
     // Superlinear (was 3 + 2·tier, then 3 + 2.5·tier): the linear slope
     // stayed under armour's DefenseBonus growth (~4.4·tier), so a

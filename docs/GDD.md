@@ -439,11 +439,16 @@ saved):
   list is still near where it was when you get there, rather than a
   same-speed target you can never catch. The `monsters` list shows each
   one's exact room (and the way it last stepped).
-- **Monster hits stay relevant.** Three linked knobs, tuned so a
-  same-tier fight costs real HP without the early game getting harsh:
+- **Monster fights stay relevant** — four linked knobs (with the HP-per-
+  level taper in §4.1), tuned so a same-tier fight costs real HP without
+  the early game getting harsh:
   - `MonsterScaling.BaseAttackPower` is **superlinear**,
     `3 + 2·tier + 0.3·tier²` — near-identical to the old `3 + 2·tier` at
     the low end, ramping hard late (tier 9 ≈ 45 vs the old 21).
+  - `MonsterScaling.BaseHp` is **superlinear** too, `20 + 8·tier + tier²`
+    (tier 9 ≈ 173 vs the old 92). A level-cap character's attack used to
+    one-shot a deep regular monster, so however hard it hit it only ever
+    landed one swing; now a far-future fight is a two-plus-round exchange.
   - `CombatResolver.RollDamage` applies an **armour-penetration floor**: a
     hit always lands ≥ 30% of the attacker's power before variance, so
     heavy armour steeply reduces damage but can't zero it. Only bites
@@ -453,8 +458,10 @@ saved):
     `MaybeStarterWeapon`): from tier 4 up, a monster has a rising chance
     (~15% → ~85%) of spawning already wielding a modest weapon — adds to
     its `EffectiveAttackPower`, drops as loot on death, deterministic per
-    species/year. An armed tier-9 monster hits for ~20-25% of a
-    level-appropriate pool a swing.
+    species/year.
+  - Net: an armed tier-9 regular is a ~2-round fight that costs ~45% of a
+    level-appropriate HP pool; unarmed ~18%. Apex / Warden HP scale with
+    the new curve (tier-9 apex ≈ 415, Warden ≈ 520) into longer fights.
 - A few years also seed one or two **apex** monsters (`Monster.IsApex`,
   named "Frayed &lt;species&gt;"): much tougher (~2.4× HP, harder hits,
   ~3.5× XP, a loot table that reliably yields real gear biased to the

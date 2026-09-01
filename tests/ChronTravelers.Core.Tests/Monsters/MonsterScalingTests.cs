@@ -61,12 +61,27 @@ public class MonsterScalingTests
     [Fact]
     public void DoubleOverload_IsContinuousBetweenWholeTiers()
     {
-        var atTwo = MonsterScaling.BaseHp(2.0);
-        var atHalf = MonsterScaling.BaseHp(2.5);
-        var atThree = MonsterScaling.BaseHp(3.0);
+        // BaseDefense is linear, so a half tier is exactly the midpoint.
+        var defTwo = MonsterScaling.BaseDefense(2.0);
+        var defHalf = MonsterScaling.BaseDefense(2.5);
+        var defThree = MonsterScaling.BaseDefense(3.0);
+        Assert.True(defHalf > defTwo && defHalf < defThree);
+        Assert.Equal((defTwo + defThree) / 2, defHalf, precision: 6);
 
-        Assert.True(atHalf > atTwo && atHalf < atThree);
-        Assert.Equal((atTwo + atThree) / 2, atHalf, precision: 6);
+        // BaseHp / BaseAttackPower are superlinear (convex): still smoothly
+        // increasing between whole tiers, but a half tier sits *below* the
+        // straight-line midpoint.
+        var convex = new Func<double, double>[]
+        {
+            t => MonsterScaling.BaseHp(t),
+            t => MonsterScaling.BaseAttackPower(t),
+        };
+        foreach (var f in convex)
+        {
+            double lo = f(2.0), mid = f(2.5), hi = f(3.0);
+            Assert.True(mid > lo && mid < hi, "still monotonically increasing between tiers");
+            Assert.True(mid < (lo + hi) / 2, "convex — a half tier is below the linear midpoint");
+        }
     }
 
     [Fact]
