@@ -643,10 +643,28 @@ static void RenderTitle()
         @"   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝",
     ];
 
+    // The wordmark takes a different colour every time the title screen
+    // loads — one hue for the whole banner, picked at random from a set of
+    // hues that all read clearly on a dark terminal.
+    string[] wordmarkColours =
+    [
+        "#5fd75f", // green (the long-standing default)
+        "#5fd7ff", // sky
+        "#ff5fd7", // magenta
+        "#ffd75f", // amber
+        "#ff875f", // coral
+        "#87ff5f", // lime
+        "#5f87ff", // periwinkle
+        "#d75fff", // violet
+        "#ff5f5f", // red
+        "#5fffd7", // mint
+    ];
+    var wordmarkColour = wordmarkColours[Random.Shared.Next(wordmarkColours.Length)];
+
     AnsiConsole.WriteLine();
     foreach (var line in banner)
     {
-        AnsiConsole.MarkupLine($"[green]{line}[/]");
+        AnsiConsole.MarkupLine($"[{wordmarkColour}]{line}[/]");
     }
 
     AnsiConsole.WriteLine();
