@@ -243,6 +243,17 @@ public static class MonsterController
     private const double ScavengeForIonsBelow = 0.5;
 
     /// <summary>
+    /// A monster won't pick up a floor weapon whose <see cref="Item.AttackBonus"/>
+    /// exceeds this multiple of its own base <see cref="Monster.AttackPower"/>.
+    /// It can arm up — a scavenged weapon still meaningfully raises its
+    /// hits — but it can't turn a common tier-1 roamer into something that
+    /// one-shots a fresh Traveler by grabbing a Rare/Legendary blade off
+    /// the ground (playtest feedback). Scales with tier for free, since the
+    /// base attack does.
+    /// </summary>
+    private const double ScavengeWeaponAttackCap = 1.4;
+
+    /// <summary>
     /// A monster only takes loot off the floor for a reason (docs/GDD.md
     /// §7.1): one item to burn for Ions when it's running low, or a single
     /// weapon that beats what it's wielding. Otherwise it steps over the
@@ -270,10 +281,14 @@ public static class MonsterController
         }
 
         // (b) A ground weapon better than what it's wielding → upgrade,
-        // dropping the old one back for someone else.
+        // dropping the old one back for someone else. Capped at
+        // ScavengeWeaponAttackCap× its base attack so it can't grab
+        // something far above its weight class.
         var currentBonus = monster.EquippedWeapon?.AttackBonus ?? 0;
+        var scavengeCeiling = (int)Math.Round(monster.AttackPower * ScavengeWeaponAttackCap);
         var upgrade = population.TakeGroundLoot(monster.Position,
-            i => !i.IsTimeShard && i.Type == ItemType.Weapon && i.AttackBonus > currentBonus);
+            i => !i.IsTimeShard && i.Type == ItemType.Weapon
+                 && i.AttackBonus > currentBonus && i.AttackBonus <= scavengeCeiling);
         if (upgrade is not null)
         {
             if (monster.EquippedWeapon is { } old)

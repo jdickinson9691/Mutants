@@ -237,6 +237,14 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
 
 ### 4.2 Ability trees (original design, 6 tiers per class = levels 5/10/15/20/25/30)
 
+> **Engineer exception:** its tree unlocks on an accelerated schedule —
+> **levels 2 / 5 / 9 / 13 / 17 / 21** — because the Engineer is the
+> frailest melee class (18 HP, Intellect-primary) and had no answer to a
+> bad early fight before its kit came online. Dampener (slow the target so
+> you strike first) at level 2 and Sabotage (cut incoming damage) at 9 are
+> the survival tools it needs early (playtest feedback). See
+> `src/ChronTravelers.Content/abilities.json`.
+
 Example — **Soldier**:
 1. Lv5 — *Suppressing Sweep*: rake fire across the target and up to 2 others crowding it.
 2. Lv10 — *Field Patch*: once per fight, a trauma seal for 20% max HP — no Ions.

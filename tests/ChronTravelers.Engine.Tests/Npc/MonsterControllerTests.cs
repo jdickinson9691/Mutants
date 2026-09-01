@@ -177,14 +177,35 @@ public class MonsterControllerTests
         var baseAttack = monster.EffectiveAttackPower;
         monster.PlaceAt(Coordinate.Origin);
         pop.AddMonster(monster);
-        var goodWeapon = Item.Create("Prime Blade", ItemType.Weapon, 5, Rarity.Epic); // large AttackBonus
-        pop.AddGroundLoot(Coordinate.Origin, goodWeapon);
+        // Within its weight class (a tier-1 Uncommon bonus ~= its base attack).
+        var weapon = Item.Create("Bent Rebar", ItemType.Weapon, 1, Rarity.Uncommon);
+        Assert.True(weapon.AttackBonus is > 0 and <= 7); // > current (0), <= 1.4x base attack (5)
+        pop.AddGroundLoot(Coordinate.Origin, weapon);
 
         Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99));
 
-        Assert.Same(goodWeapon, monster.EquippedWeapon);
+        Assert.Same(weapon, monster.EquippedWeapon);
         Assert.True(monster.EffectiveAttackPower > baseAttack);
         Assert.Empty(pop.LootAt(Coordinate.Origin));
+    }
+
+    [Fact]
+    public void Tick_AMonsterIgnoresAGroundWeaponFarAboveItsWeightClass()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var monster = Monster.Create("Brute", tier: 1);
+        monster.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(monster);
+        // AttackBonus well past 1.4x the tier-1 base attack -> left on the floor.
+        var relic = Item.Create("Prime Blade", ItemType.Weapon, 9, Rarity.Legendary);
+        Assert.True(relic.AttackBonus > 7);
+        pop.AddGroundLoot(Coordinate.Origin, relic);
+
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99));
+
+        Assert.Null(monster.EquippedWeapon);
+        Assert.Contains(relic, pop.LootAt(Coordinate.Origin)); // still there for the player
     }
 
     [Fact]
