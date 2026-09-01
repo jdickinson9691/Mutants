@@ -15,6 +15,12 @@ jobs:
   build-installer:
     runs-on: windows-latest
 
+    # softprops/action-gh-release needs to create the Release and upload the
+    # installer asset — the default GITHUB_TOKEN is read-only otherwise (403
+    # "Resource not accessible by integration").
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
