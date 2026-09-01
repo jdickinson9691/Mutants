@@ -45,13 +45,17 @@ public sealed record ClassDefinition(
 
             // Doctor/Scientist BaseHp nudged up (22→24, 18→21) — playtests
             // had both wiping in the first year to a single bad opening
-            // exchange. HpPerLevel is unchanged, so the boost is a
-            // front-loaded ~1 extra hit of margin at low level and fades
-            // to noise by the mid-game.
+            // exchange. Doctor's HpPerLevel also bumped (4→5, matching
+            // Spy) — the BaseHp bump alone still left it losing early
+            // fights it should've had the margin for; growing the whole
+            // curve fits its "keeps you and allies standing" identity
+            // better than a one-time early buffer that fades by mid-game.
+            // Scientist's HpPerLevel is untouched — it's meant to stay the
+            // squishiest caster past the opening.
             [CharacterClass.Doctor] = new(
                 CharacterClass.Doctor, PrimaryStat.Resolve,
                 BaseStats: new StatBlock(Strength: 9, Agility: 8, Resolve: 15, Intellect: 10),
-                BaseHp: 24, HpPerLevel: 4,
+                BaseHp: 24, HpPerLevel: 5,
                 BaseIons: 30, IonsPerLevel: 4,
                 IonDrainMultiplier: 1.0),
 
