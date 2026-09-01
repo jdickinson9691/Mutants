@@ -285,4 +285,33 @@ public class TimelineContentFactoryTests
         Assert.Equal(Rarity.Legendary, trophy.Rarity);
         Assert.True(trophy.AttackBonus > standard.AttackBonus * 2);
     }
+
+    [Fact]
+    public void ForSpecies_DeepTierMonstersSpawnArmed_EarlyOnesNever()
+    {
+        // Early years (tier < 4): a monster's hit is always just its base.
+        for (var seed = 1; seed <= 40; seed++)
+        {
+            var m = TimelineContentFactory.ForSpecies(seed, Baseline, 2100, Pool)();
+            Assert.Null(m.EquippedWeapon);
+            Assert.Equal(m.AttackPower, m.EffectiveAttackPower);
+        }
+
+        // Deep years (tier 9): a good share spawn wielding a weapon that
+        // adds to their hit and will drop as loot.
+        var armed = 0;
+        for (var seed = 1; seed <= 40; seed++)
+        {
+            var m = TimelineContentFactory.ForSpecies(seed, Baseline, 5000, Pool)();
+            if (m.EquippedWeapon is not null)
+            {
+                armed++;
+                Assert.Equal(ItemType.Weapon, m.EquippedWeapon.Type);
+                Assert.True(m.EffectiveAttackPower > m.AttackPower);
+                Assert.Contains(m.EquippedWeapon, m.Inventory); // drops on death
+            }
+        }
+
+        Assert.InRange(armed, 15, 40); // ~85% chance at tier 9
+    }
 }

@@ -225,6 +225,11 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
   power and depth loosely paired without hard-blocking grinding.
 - Every level grants a stat increase; every **5th level** grants a new class
   ability (see §4.2), rewarding both steady growth and periodic power spikes.
+- **HP growth tapers.** Full `HpPerLevel` through level 15
+  (`ClassDefinition.HpGrowthKneeLevel`), then half rate to the cap — a
+  flat-linear pool ran away from what any deep-future monster could
+  threaten (a level-cap Soldier had ~10× base HP). Early/mid game is
+  unchanged; a level-30 Soldier is ~160 HP instead of ~200.
 
 ### 4.2 Ability trees (original design, 6 tiers per class = levels 5/10/15/20/25/30)
 
@@ -434,15 +439,22 @@ saved):
   list is still near where it was when you get there, rather than a
   same-speed target you can never catch. The `monsters` list shows each
   one's exact room (and the way it last stepped).
-- **Monster hits stay relevant.** `MonsterScaling.BaseAttackPower` is
-  `3 + 2.5·tier` (steeper than the old `3 + 2·tier`, which tier-matched
-  armour absorbed to a 1-damage ping), and `CombatResolver.RollDamage`
-  applies an **armour-penetration floor** — a hit always lands at least
-  30% of the attacker's power before variance, so heavy armour steeply
-  reduces damage but can't zero it. Net effect: a same-tier fight costs
-  real HP (you heal every fight or two) without the early game getting
-  harsh, and it only touches hits against a well-armoured defender —
-  monster-vs-monster and player-vs-monster are unchanged.
+- **Monster hits stay relevant.** Three linked knobs, tuned so a
+  same-tier fight costs real HP without the early game getting harsh:
+  - `MonsterScaling.BaseAttackPower` is **superlinear**,
+    `3 + 2·tier + 0.3·tier²` — near-identical to the old `3 + 2·tier` at
+    the low end, ramping hard late (tier 9 ≈ 45 vs the old 21).
+  - `CombatResolver.RollDamage` applies an **armour-penetration floor**: a
+    hit always lands ≥ 30% of the attacker's power before variance, so
+    heavy armour steeply reduces damage but can't zero it. Only bites
+    against a well-armoured defender (i.e. the player); monster-vs-monster
+    and player-vs-monster are unchanged.
+  - **Deep-tier starter weapons** (`TimelineContentFactory`,
+    `MaybeStarterWeapon`): from tier 4 up, a monster has a rising chance
+    (~15% → ~85%) of spawning already wielding a modest weapon — adds to
+    its `EffectiveAttackPower`, drops as loot on death, deterministic per
+    species/year. An armed tier-9 monster hits for ~20-25% of a
+    level-appropriate pool a swing.
 - A few years also seed one or two **apex** monsters (`Monster.IsApex`,
   named "Frayed &lt;species&gt;"): much tougher (~2.4× HP, harder hits,
   ~3.5× XP, a loot table that reliably yields real gear biased to the

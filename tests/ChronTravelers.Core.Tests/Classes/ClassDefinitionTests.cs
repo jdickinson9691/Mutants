@@ -57,12 +57,20 @@ public class ClassDefinitionTests
     }
 
     [Fact]
-    public void MaxHpAtLevel_GrowsLinearlyFromBase()
+    public void MaxHpAtLevel_FullRateToTheKnee_ThenHalfRate()
     {
         var def = ClassDefinition.For(CharacterClass.Soldier);
+        var knee = ClassDefinition.HpGrowthKneeLevel;
 
         Assert.Equal(def.BaseHp, def.MaxHpAtLevel(1));
-        Assert.Equal(def.BaseHp + def.HpPerLevel * 4, def.MaxHpAtLevel(5));
+        Assert.Equal(def.BaseHp + def.HpPerLevel * 4, def.MaxHpAtLevel(5)); // full rate below the knee
+
+        var atKnee = def.BaseHp + def.HpPerLevel * (knee - 1);
+        Assert.Equal(atKnee, def.MaxHpAtLevel(knee));
+        // 10 levels past the knee add only half the usual HP.
+        Assert.Equal(atKnee + def.HpPerLevel * 10 / 2, def.MaxHpAtLevel(knee + 10));
+        Assert.True(def.MaxHpAtLevel(30) < def.BaseHp + def.HpPerLevel * 29,
+            "past the knee the pool grows slower than the old flat-linear curve");
     }
 
     [Fact]

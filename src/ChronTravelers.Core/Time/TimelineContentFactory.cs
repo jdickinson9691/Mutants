@@ -62,8 +62,60 @@ public static class TimelineContentFactory
         var name = species.Name;
 
         var loot = BuildLootTable(worldSeed, year, species.Id, lootPool);
+        var starterWeapon = MaybeStarterWeapon(worldSeed, year, species.Id, tier, displayTier);
 
-        return () => new Monster(name, displayTier, hp, attack, defense, speed, xp, loot, tags, maxIons: ions);
+        return () =>
+        {
+            var monster = new Monster(name, displayTier, hp, attack, defense, speed, xp, loot, tags, maxIons: ions);
+            if (starterWeapon is not null)
+            {
+                monster.EquipWeapon(starterWeapon); // adds its bonus to EffectiveAttackPower; drops on death
+            }
+
+            return monster;
+        };
+    }
+
+    /// <summary>Tier at/above which a regular monster may spawn already armed (year ≈ 2750+).</summary>
+    private const double ArmedTierThreshold = 4.0;
+
+    private static readonly string[] ArmNouns =
+        ["Cleaver", "Spike", "Rebar", "Shiv", "Maul", "Cutter", "Prod", "Hook", "Lash", "Bar"];
+
+    /// <summary>
+    /// A deterministic starter weapon for a deep-tier monster, or null.
+    /// Below <see cref="ArmedTierThreshold"/> always null (early/mid game
+    /// is untouched); above it the chance ramps from ~15% to ~85% with
+    /// tier, and the weapon is a modest one (mostly Common/Uncommon power)
+    /// that lands as loot when the monster dies. Keyed on
+    /// <paramref name="worldSeed"/>/<paramref name="year"/>/<paramref name="speciesId"/>
+    /// so every spawn of that species in that year is armed the same way.
+    /// </summary>
+    private static Item? MaybeStarterWeapon(long worldSeed, int year, string speciesId, double tier, int displayTier)
+    {
+        if (tier < ArmedTierThreshold)
+        {
+            return null;
+        }
+
+        var rng = DeterministicRandom.For(worldSeed, year, $"arms:{speciesId}");
+        var chance = Math.Clamp(0.15 * (tier - 3), 0.15, 0.85);
+        if (rng.NextDouble() >= chance)
+        {
+            return null;
+        }
+
+        var power = 0.55 + rng.NextDouble() * 0.7; // 0.55–1.25 → Common..low-Rare
+        var rarity = RarityExtensions.ForPower(power);
+        var noun = ArmNouns[rng.Next(ArmNouns.Length)];
+
+        return new Item(
+            $"Scavenged {noun}",
+            ItemType.Weapon,
+            displayTier,
+            rarity,
+            Value: (int)Math.Round(LootScaling.ValueFor(tier, rarity)),
+            AttackBonus: (int)Math.Round(LootScaling.EquipBonusFor(tier, power)));
     }
 
     /// <summary>

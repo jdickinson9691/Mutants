@@ -16,6 +16,18 @@ public class MonsterScalingTests
     }
 
     [Fact]
+    public void BaseAttackPower_IsSuperlinear_RampingHarderAtHighTiers()
+    {
+        var lowStep = MonsterScaling.BaseAttackPower(2) - MonsterScaling.BaseAttackPower(1);
+        var highStep = MonsterScaling.BaseAttackPower(9) - MonsterScaling.BaseAttackPower(8);
+
+        Assert.True(highStep > lowStep * 2,
+            $"a tier-8→9 step ({highStep}) should dwarf a tier-1→2 step ({lowStep})");
+        // still tame at the low end (near the old 3 + 2·tier)
+        Assert.True(MonsterScaling.BaseAttackPower(1) < 6);
+    }
+
+    [Fact]
     public void BaseIons_IsSmallerThanBaseHp_AndHasBothOverloads()
     {
         Assert.True(MonsterScaling.BaseIons(3) < MonsterScaling.BaseHp(3), "A monster's Ion pool should be well under its HP.");

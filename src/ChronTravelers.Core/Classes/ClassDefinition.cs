@@ -67,7 +67,23 @@ public sealed record ClassDefinition(
 
     public static ClassDefinition For(CharacterClass characterClass) => All[characterClass];
 
-    public int MaxHpAtLevel(int level) => BaseHp + HpPerLevel * (level - 1);
+    /// <summary>
+    /// Level at which HP growth halves. Below it each level adds the full
+    /// <see cref="HpPerLevel"/>; at and above it, half (rounded down). A
+    /// flat-linear pool ran away from what a deep-future monster could ever
+    /// threaten — by the level cap a Soldier had ~10× base HP — so the far
+    /// end tapers while the early/mid game (≤ this level) is untouched
+    /// (playtest feedback).
+    /// </summary>
+    public const int HpGrowthKneeLevel = 15;
+
+    public int MaxHpAtLevel(int level)
+    {
+        var levelsAbove1 = Math.Max(0, level - 1);
+        var atFullRate = Math.Min(levelsAbove1, HpGrowthKneeLevel - 1);
+        var atHalfRate = levelsAbove1 - atFullRate;
+        return BaseHp + HpPerLevel * atFullRate + HpPerLevel * atHalfRate / 2;
+    }
 
     public int MaxIonsAtLevel(int level) => BaseIons + IonsPerLevel * (level - 1);
 }
