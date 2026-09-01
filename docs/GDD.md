@@ -43,6 +43,7 @@ up. The surface team never stops looking; it just can't pull you back.
 - **Chrono Travelers** are the gantry crew, scattered 2000–5000 A.D. They
   move by riding **Tachyon surges** — the tunnel-charge that leaks from the
   rupture — and the cost scales with how far they jump (§2, §3.2).
+  (**Tachyons** are this reskin's name for the original game's "ions".)
 - **Echoes** (the monster tag, was "undead") are fray-recordings: the
   timeline replaying dead people and events on a loop. The Doctor's
   resonance tools are especially good at collapsing them.
