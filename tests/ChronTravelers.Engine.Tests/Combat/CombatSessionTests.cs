@@ -1,5 +1,7 @@
 using ChronTravelers.Core.Characters;
 using ChronTravelers.Core.Classes;
+using ChronTravelers.Core.Items;
+using ChronTravelers.Core.Monsters;
 using ChronTravelers.Engine.Combat;
 using ChronTravelers.Engine.Content;
 
@@ -151,6 +153,24 @@ public class CombatSessionTests
     }
 
     [Fact]
+    public void Attack_ArmourPenFloor_HeavyArmourStillTakesRealDamage()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        var plate = Item.Create("Bulwark Plate", ItemType.Armor, tier: 6, Rarity.Rare, CharacterClass.Soldier);
+        traveler.AddToInventory(plate);
+        traveler.Wield(plate);
+        Assert.True(traveler.EffectiveDefense > 30); // far above the monster's attack — pre-floor this was a 1-damage hit
+
+        var monster = new Monster("Sledge", tier: 1, maxHp: 500, attackPower: 30, defense: 0, speed: 1, xpReward: 10);
+        var hpBefore = traveler.Health.Current;
+
+        new CombatSession(traveler, monster, NeutralRandom()).Attack(); // one round incl. the monster's counter
+
+        var taken = hpBefore - traveler.Health.Current;
+        Assert.True(taken >= 7, $"armour-pen floor should land ~0.30 × 30 ≈ 9, not 1; took {taken}");
+    }
+
+    [Fact]
     public void Cast_Heal_RestoresFractionOfMaxHp()
     {
         var traveler = Soldier();
@@ -162,8 +182,10 @@ public class CombatSessionTests
         session.Cast(ability);
 
         // Casting a Heal still uses the round: the monster gets its own
-        // counter-attack afterward, at least 1 damage by design.
-        Assert.Equal(10 + (int)Math.Round(30 * 0.20) - 1, traveler.Health.Current);
+        // counter-attack afterward. TankMonster attack 5 vs Soldier
+        // defense 5 → raw 0, but the armour-pen floor (0.35 × 5 ≈ 2) lands
+        // it for 2.
+        Assert.Equal(10 + (int)Math.Round(30 * 0.20) - 2, traveler.Health.Current);
     }
 
     [Fact]

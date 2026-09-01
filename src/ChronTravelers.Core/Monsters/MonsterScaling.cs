@@ -20,7 +20,15 @@ public static class MonsterScaling
 {
     public static double BaseHp(double tier) => Require(tier, 20 + 8 * tier);
 
-    public static double BaseAttackPower(double tier) => Require(tier, 3 + 2 * tier);
+    // Steeper than the original 3 + 2·tier: at the old slope a monster's
+    // hit was fully absorbed by any tier-matched armour (armour's
+    // DefenseBonus grows ~4.4·tier, more than twice as fast), so a
+    // keeping-pace martial character took 1 damage a swing all game. The
+    // 3 + 2.5·tier slope barely moves the early game (tier 1: 5.5 vs 5)
+    // but pulls meaningfully ahead by mid/late game, and together with the
+    // armour-pen floor in CombatResolver.RollDamage keeps a same-tier
+    // fight costing real HP (playtest feedback).
+    public static double BaseAttackPower(double tier) => Require(tier, 3 + 2.5 * tier);
 
     public static double BaseDefense(double tier) => Require(tier, 1 + tier);
 

@@ -434,6 +434,15 @@ saved):
   list is still near where it was when you get there, rather than a
   same-speed target you can never catch. The `monsters` list shows each
   one's exact room (and the way it last stepped).
+- **Monster hits stay relevant.** `MonsterScaling.BaseAttackPower` is
+  `3 + 2.5·tier` (steeper than the old `3 + 2·tier`, which tier-matched
+  armour absorbed to a 1-damage ping), and `CombatResolver.RollDamage`
+  applies an **armour-penetration floor** — a hit always lands at least
+  30% of the attacker's power before variance, so heavy armour steeply
+  reduces damage but can't zero it. Net effect: a same-tier fight costs
+  real HP (you heal every fight or two) without the early game getting
+  harsh, and it only touches hits against a well-armoured defender —
+  monster-vs-monster and player-vs-monster are unchanged.
 - A few years also seed one or two **apex** monsters (`Monster.IsApex`,
   named "Frayed &lt;species&gt;"): much tougher (~2.4× HP, harder hits,
   ~3.5× XP, a loot table that reliably yields real gear biased to the

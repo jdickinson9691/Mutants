@@ -29,6 +29,17 @@ public static class CombatResolver
     private const double DamageVariance = 0.15;
 
     /// <summary>
+    /// Armour-penetration floor: however much defence exceeds attack, a
+    /// hit still lands at least this fraction of the attacker's power
+    /// (before variance). Stops heavy armour from reducing every hit to 1
+    /// — mid/late fights against a well-armoured character now cost real
+    /// HP. Only bites when defence &gt; 0.70 × attack, i.e. essentially
+    /// only against an armoured player; monster-vs-monster and
+    /// player-vs-monster (low monster defence) are unaffected.
+    /// </summary>
+    private const double MinDamageFraction = 0.30;
+
+    /// <summary>
     /// Fights <paramref name="traveler"/> against <paramref name="monster"/>
     /// to a decisive result (or the round cap). On a Traveler win, awards XP
     /// and rolls/adds loot per docs/GDD.md §5. On a loss (or the round
@@ -115,7 +126,7 @@ public static class CombatResolver
     /// <summary>Rolls one attack's damage with the standard variance band — shared with CombatSession.</summary>
     internal static int RollDamage(int attackerPower, int defenderDefense, IRandomSource random)
     {
-        var raw = attackerPower - defenderDefense;
+        var raw = Math.Max(attackerPower - defenderDefense, attackerPower * MinDamageFraction);
         var varianceFactor = 1 - DamageVariance + random.NextDouble() * (2 * DamageVariance);
         return Math.Max(1, (int)Math.Round(raw * varianceFactor));
     }
