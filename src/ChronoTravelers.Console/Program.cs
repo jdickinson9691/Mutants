@@ -1051,9 +1051,17 @@ static bool IsIdleCommand(string input) => SplitCommand(input).Command is
     or "monsters" or "mobs" or "news" or "broadcast" or "stores"
     or "leaderboard" or "board";
 
-/// <summary>Handles "convert/wield/use/eat/drink &lt;item&gt;" commands. Returns false if <paramref name="command"/> isn't one of those verbs.</summary>
+/// <summary>Handles "convert/wield/use/eat/drink &lt;item&gt;" commands ("con" is short for "convert"). Returns false if <paramref name="command"/> isn't one of those verbs.</summary>
 static bool TryHandleItemCommand(Traveler traveler, string command, string argument)
 {
+    // `con` is an accepted short form of `convert` — normalise it up front
+    // so the switch, the prefer-filter, and the error hints all read as
+    // `convert` regardless of which the player typed.
+    if (command == "con")
+    {
+        command = "convert";
+    }
+
     if (command is not ("convert" or "wield" or "use" or "eat" or "drink"))
     {
         return false;
@@ -2424,7 +2432,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]inventory[/] (or inv, i, bag) - list what you're carrying");
     AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Travelers out in the timeline");
     AnsiConsole.MarkupLine("  [green]news[/] (or broadcast) - show recent kill-feed events");
-    AnsiConsole.MarkupLine("  [green]convert <item>[/]     - destroy an item for Tachyons (a spent ranged weapon is worth a fraction)");
+    AnsiConsole.MarkupLine("  [green]convert[/] (or con) [green]<item>[/] - destroy an item for Tachyons (a spent ranged weapon is worth a fraction)");
     AnsiConsole.MarkupLine("  [green]wield <item>[/]       - equip a weapon, armor, or ranged (wand/bow/gun) item");
     AnsiConsole.MarkupLine("  [green]use[/]/[green]eat[/]/[green]drink <item>[/] - consume a potion or food item");
     AnsiConsole.MarkupLine("    ('<item>' is either its inventory number or its name)");

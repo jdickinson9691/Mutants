@@ -55,7 +55,7 @@ classes that account hasn't played. Then you're in the shared world.
 ### Commands
 
 `look [dir]` · `n`/`s`/`e`/`w` · `monsters` · `status` · `inventory` ·
-`heal` · `take [all]` · `fight [name]` · `wield <item>` · `convert <item>` ·
+`heal` · `take [all]` · `fight [name]` · `wield <item>` · `convert`/`con` `<item>` ·
 `travel <year | +N | -N>` · `news` · `who` · `say <msg>` · `wait` · `quit`
 
 Fights **auto-resolve** (no round-by-round input over a line protocol) and

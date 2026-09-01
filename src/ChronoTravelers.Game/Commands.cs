@@ -103,7 +103,7 @@ internal static class Commands
                 Wield(session, arg);
                 break;
 
-            case "convert":
+            case "convert" or "con":
                 Convert(session, arg);
                 break;
 
@@ -405,7 +405,7 @@ internal static class Commands
     private static void Help(Session session)
     {
         session.Send("Commands: look [dir] · n/s/e/w · monsters · status · inventory · heal · take [all] · fight [name]");
-        session.Send("          wield <item> · convert <item> · travel <year|+N|-N> · news · who · say <msg> · wait · quit");
+        session.Send("          wield <item> · convert|con <item> · travel <year|+N|-N> · news · who · say <msg> · wait · quit");
         session.Send("Fights auto-resolve; loot drops on the floor — 'take' it. Type 'quit' to disconnect.");
     }
 

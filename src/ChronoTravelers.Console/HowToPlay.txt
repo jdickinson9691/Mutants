@@ -30,6 +30,7 @@ TACHYONS - your one resource
   Tachyons cover survival (a slow passive drain; at 0 it costs HP), healing
   (the "heal" command, 3 HP per Tachyon, any time), class abilities, and time
   travel. You top them up almost entirely by "convert"ing loot into Tachyons.
+    convert <item> / con <item>   break an item down into Tachyons
   Your Tachyon pool has NO cap - convert a pile of junk and stockpile for a
   long jump; nothing is ever wasted.
 
