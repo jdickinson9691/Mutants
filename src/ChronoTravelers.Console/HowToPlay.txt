@@ -1,0 +1,89 @@
+HOW TO PLAY CHRONO TRAVELERS
+===========================
+
+THE SITUATION
+  Project Meridian's temporal tunnel tore a standing rupture and "frayed"
+  the downstream timeline. You were on the gantry. Now you're a Chrono
+  Traveler, adrift somewhere between 2000 and 5000 A.D., riding Tachyon surges
+  and unable to steer. The surface team is still looking; it can't pull
+  you back.
+
+WHAT YOU'RE TRYING TO DO
+  Push as deep downstream (as far toward 5000 A.D.) as you can, and level
+  up doing it. Both are tracked on the leaderboards against every other
+  Traveler, past and present.
+
+THE TURN
+  Every command you type advances the world one tick. Tachyons drain a little,
+  monsters drift, other Travelers act, and years you've visited keep
+  simulating whether you're there or not. The world moves whether or not
+  you're typing.
+
+MOVING & LOOKING
+  n / s / e / w        move one room
+  look                 redescribe the room you're in (who's here, what's
+                       on the floor, what's stirring next door)
+  look <dir>           peek into the next room without stepping in
+  monsters             list every monster in the year, with its position
+
+TACHYONS - your one resource
+  Tachyons cover survival (a slow passive drain; at 0 it costs HP), healing
+  (the "heal" command, 3 HP per Tachyon, any time), class abilities, and time
+  travel. You top them up almost entirely by "convert"ing loot into Tachyons.
+  Your Tachyon pool has NO cap - convert a pile of junk and stockpile for a
+  long jump; nothing is ever wasted.
+
+FIGHTING
+  fight <name>          engage a monster in your room (attack / a also work)
+  in a fight, type      attack  - swing
+                        cast <ability>  - spend Tachyons on a class ability
+  Loot from a kill falls on the floor where it died - nothing lands in
+  your pack automatically. Pick it up with  take <item>  or  take all.
+  shoot <dir> / point <dir>   fire a readied ranged weapon one room away
+
+MONSTERS
+  Monsters ignore you until you provoke them - mostly by stepping onto
+  their tile again and again, lingering, or shooting them. That builds an
+  aggro meter: calm -> alert (it shadows you) -> hostile (it lands one
+  ambush hit, but only on an idle turn, never in a store room). Move a
+  couple of rooms off and it calms back down.
+  A few years hold an APEX ("Frayed <species>") - far tougher, far better
+  loot, and almost impossible to provoke. It's an optional fight: take it
+  on for the reward, or walk past. Name it to fight it.
+  Monsters scavenge the floor only when they need Tachyon fuel or a weapon
+  better than they're carrying - otherwise they step over loot.
+
+THE TIME SHARD
+  One per year, lying on the floor somewhere. A legendary melee weapon
+  that hits 25% harder than the best weapon that year has to offer, and
+  sells for a price that scales with how far downstream you found it.
+  Monsters and other Travelers can't touch it - it's yours to claim.
+
+TRAVELLING
+  travel <year>        jump anywhere from 2000 to 5000 A.D.
+  travel +N / -N       jump N years forward / back
+  travel next / prev   jump to the next / previous Warden year
+  Cost is about 1 Tachyon per 25 years, paid on arrival. Later years are
+  richer and far deadlier; the game warns you before an "overreach" jump
+  but never blocks it - a raid on a year above your level can pay off big.
+
+STORES
+  Every year has a supply depot. Sell loot there for Credits, buy staples
+  (heals, boosters, a weapon, armour, a ranged option). "sell all" dumps
+  every junk item at once. You can also buy an empty storefront and run
+  it - it earns Credits from NPC shoppers while you're away.
+
+WARDENS
+  Every 50-100 years a Warden stands watch over a pre-collapse tech cache
+  - an automated construct with a guaranteed Legendary trophy. It gates
+  nothing; beat it when you're ready. "travel next" hops between them.
+
+STAYING ALIVE
+  - Convert junk early and often; keep an Tachyon buffer for healing.
+  - Don't pace back and forth on a monster's tile unless you mean to
+    fight it.
+  - A store room is a safe haven - shop and heal there.
+  - Overreaching downstream is a gamble, not a mistake. Grab better gear
+    and jump back if it gets hot.
+
+Type  help  in game for the full command list.

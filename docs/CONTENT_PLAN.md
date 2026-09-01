@@ -2,13 +2,13 @@
 
 The world is a **continuous 2000–5000 A.D. timeline** (docs/GDD.md §3.2),
 not a fixed set of levels. Content is a set of **tier-free catalogs** in
-`src/ChronTravelers.Content/*.json`, loaded by
-`ChronTravelers.Engine.Content.ContentLoader.LoadTimeWorld(dir, worldSeed)` into a
-`ChronTravelers.Core.Time.TimeWorld`. `TimeWorld.GetYear(year)` builds a
+`src/ChronoTravelers.Content/*.json`, loaded by
+`ChronoTravelers.Engine.Content.ContentLoader.LoadTimeWorld(dir, worldSeed)` into a
+`ChronoTravelers.Core.Time.TimeWorld`. `TimeWorld.GetYear(year)` builds a
 `YearContent` on demand — map, era, monster roster, store slots,
 Warden — scaling every number from the year via
-`ChronTravelers.Core.Time.TimeScale` / `MonsterScaling` / `LootScaling`.
-`ChronTravelers.Core.Time.TestTimeWorld` is a 3-era hand-built fallback (used if
+`ChronoTravelers.Core.Time.TimeScale` / `MonsterScaling` / `LootScaling`.
+`ChronoTravelers.Core.Time.TestTimeWorld` is a 3-era hand-built fallback (used if
 the JSON is missing/malformed) and a fixture for tests that don't want
 file I/O.
 
@@ -17,9 +17,9 @@ file I/O.
 - [x] **Monster species** — `monster-species.json`. ~25 species: `{ id,
       name, tags, archetype, lootThemeTags }`, no numbers. `archetype` is
       one of `Baseline | Caster | Bruiser | Skirmisher`
-      (`ChronTravelers.Core.Time.MonsterArchetype`); `TimelineContentFactory`
-      turns it into concrete stats (incl. an Ion pool from
-      `MonsterScaling.BaseIons`) at the encounter year, as a fixed offset
+      (`ChronoTravelers.Core.Time.MonsterArchetype`); `TimelineContentFactory`
+      turns it into concrete stats (incl. an Tachyon pool from
+      `MonsterScaling.BaseTachyons`) at the encounter year, as a fixed offset
       from `MonsterScaling`'s baseline for that year. `"echo"` tags
       carry through to combat (Doctor "Purge Echo", GDD §4.2). Loot is
       rolled from item archetypes whose `themeTags` intersect the
@@ -90,15 +90,15 @@ file I/O.
 - [x] **Ability tables** — `abilities.json` (unchanged by the timeline
       rework). Soldier/Doctor are docs/GDD.md §4.2-sourced; Spy/Scientist/
       Engineer are original design (`source` field per entry). Mechanical
-      fields (`effect`, `magnitude`, `ionCost`, `condition`, `tag`,
-      `durationRounds`) drive `ChronTravelers.Engine.Combat.CombatSession`.
+      fields (`effect`, `magnitude`, `tachyonCost`, `condition`, `tag`,
+      `durationRounds`) drive `ChronoTravelers.Engine.Combat.CombatSession`.
       Three abilities with no honest 1v1 translation (Crash Cart, Black
       Market Contacts, Jump Rig) are `effect: "None"` and refused at cast
       time.
 
 ## Validation
 
-`ChronTravelers.Engine.Tests.Content.TimeWorldContentTests` loads the shipped
+`ChronoTravelers.Engine.Tests.Content.TimeWorldContentTests` loads the shipped
 catalogs and checks: every era/species/theme cross-reference resolves;
 sampled years across 2000–5000 generate well-formed, fully-connected maps;
 monster/loot power rises with the year; Warden years are 50–100 years
@@ -110,13 +110,13 @@ validation is surfaced as `ContentException` by the loader.
 
 Not new plumbing — tuning and polish:
 
-- **Travel throughput** (`IonEconomy.IonsPerYearTravelled = 0.04`, with an
-  `IonEconomy.MinTravelCost = 8` floor per jump): tuned across playtests
-  (0.2 → 0.1 → 0.04) alongside passive Ion regen, a 3:1 heal ratio, +1
-  IonsPerLevel on every class, and a steeper early tier curve — so an
+- **Travel throughput** (`TachyonEconomy.TachyonsPerYearTravelled = 0.04`, with an
+  `TachyonEconomy.MinTravelCost = 8` floor per jump): tuned across playtests
+  (0.2 → 0.1 → 0.04) alongside passive Tachyon regen, a 3:1 heal ratio, +1
+  TachyonsPerLevel on every class, and a steeper early tier curve — so an
   affordable early hop now lands in a meaningfully harder year. The `8`
   floor stops a near-free decade-creep that farmed every year on the way;
-  only a full cross-timeline leap is still an end-game Ion commit.
+  only a full cross-timeline leap is still an end-game Tachyon commit.
 - **More / finer era bands** for tighter thematic progression.
 - **Config-driven NPC class distribution** instead of uniform-random.
 - **Denser rosters / catalogs** if the game wants more variety per year.

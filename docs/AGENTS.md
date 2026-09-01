@@ -45,7 +45,7 @@ confirmed vs. not), playtest feedback once a build exists.
   file changes, never as direct code edits.
 
 **Must not:** implement code directly. Design changes land in JSON content
-files (`src/ChronTravelers.Content/`) reviewed by the Systems Agent, or as GDD prose
+files (`src/ChronoTravelers.Content/`) reviewed by the Systems Agent, or as GDD prose
 for anything that isn't yet data-driven.
 
 **Hands off to:** Systems/Engine Agent (implementation), Documentation Agent
@@ -55,14 +55,14 @@ for anything that isn't yet data-driven.
 
 ## 3. Systems / Engine Agent
 
-**Owns:** `src/ChronTravelers.Core/` and `src/ChronTravelers.Engine/` — the domain model,
-combat resolution, Ion economy, NPC AI, tick loop, persistence layer.
+**Owns:** `src/ChronoTravelers.Core/` and `src/ChronoTravelers.Engine/` — the domain model,
+combat resolution, Tachyon economy, NPC AI, tick loop, persistence layer.
 
 **Inputs:** `docs/GDD.md`, `docs/TECH_STACK.md`, issues from Project
 Planning.
 
 **Outputs:** working, tested C# code; unit tests in `tests/` for every
-system (combat math, leveling curve, Ion drain/conversion, store pricing,
+system (combat math, leveling curve, Tachyon drain/conversion, store pricing,
 NPC decision loop) before it's considered done.
 
 **Must not:** invent new mechanics not in the GDD without flagging the
@@ -76,7 +76,7 @@ Agent (verification).
 
 ## 4. Console / UI Agent
 
-**Owns:** `src/ChronTravelers.Console/` — the Spectre.Console front end: rendering,
+**Owns:** `src/ChronoTravelers.Console/` — the Spectre.Console front end: rendering,
 input parsing/commands, the start screen (including the leaderboard display
 requirement), status panel.
 
@@ -95,7 +95,7 @@ they stay unit-testable without a console attached.
 
 ## 5. Content Agent
 
-**Owns:** the actual JSON content in `src/ChronTravelers.Content/` (specific
+**Owns:** the actual JSON content in `src/ChronoTravelers.Content/` (specific
 monster stats, item definitions, level layouts/room text, store inventories)
 — i.e., turning the Design Agent's numbers/tables into loadable data files.
 

@@ -1,7 +1,7 @@
 # Platform Strategy: Standalone Single-Player & Multiplayer Options
 
 Reviewed against the live repo at `D:\Ludinn\Development\Mutants` (now named
-**ChronTravelers**) as of 2026-08-31. This reflects real inspection of the
+**Chrono Travelers**) as of 2026-08-31. This reflects real inspection of the
 current code, docs, tests, installer script, and CI/release workflows — not
 a restatement of the original planning docs.
 
@@ -23,22 +23,22 @@ roadmap milestones are marked complete in `README.md`:
 
 Architecture confirmed by reading the code directly:
 
-- **`ChronTravelers.Core`** — pure domain model (Characters, Classes,
-  Economy, Events, Ions, Items, Monsters, Stats, Time, World). No I/O, no
+- **`ChronoTravelers.Core`** — pure domain model (Characters, Classes,
+  Economy, Events, Tachyons, Items, Monsters, Stats, Time, World). No I/O, no
   console dependency, no persistence dependency. This is exactly the
   separation `docs/TECH_STACK.md` called for.
-- **`ChronTravelers.Engine`** — Combat resolution, NPC/monster AI
+- **`ChronoTravelers.Engine`** — Combat resolution, NPC/monster AI
   (`NpcController`, `MonsterController`), `WorldSimulation` (the tick
   loop), `Persistence` (LiteDB via `GameRepository`), Content loading.
   `WorldSimulation.Tick` takes explicit `Traveler`/NPC lists and a random
   source as parameters — it has no idea a console exists.
-- **`ChronTravelers.Console`** — the only layer that touches Spectre.Console
+- **`ChronoTravelers.Console`** — the only layer that touches Spectre.Console
   and stdin/stdout (`Program.cs`, ~76KB, self-documenting file header).
-- **`ChronTravelers.Content`** — data-driven JSON catalogs (monster
+- **`ChronoTravelers.Content`** — data-driven JSON catalogs (monster
   species, item archetypes, era bands, store templates, abilities),
   loaded through `ContentLoader` into a `TimeWorld`.
 - Test coverage is extensive: dedicated test projects for both Core and
-  Engine, with per-system test files (combat, economy, ions, items,
+  Engine, with per-system test files (combat, economy, tachyons, items,
   monsters, NPC behavior, persistence, time/world generation, content
   validation).
 - CI (`.github/workflows/ci.yml`) builds and runs the full test suite on
@@ -52,10 +52,10 @@ blocked), and I have no shell access to your computer — only file
 read/write through the device bridge. So I read the code and configuration
 directly, but I did not execute `dotnet build`/`dotnet test` myself. Treat
 a green run of `ci.yml` on GitHub (or running `dotnet test
-ChronTravelers.sln` yourself) as the real confirmation that everything
+ChronoTravelers.sln` yourself) as the real confirmation that everything
 still compiles and passes.
 
-Per `docs/CONTENT_PLAN.md`, everything still open is tuning/polish (Ion
+Per `docs/CONTENT_PLAN.md`, everything still open is tuning/polish (Tachyon
 travel-cost balance, finer era bands, config-driven NPC class
 distribution, a fuller ranged-weapon spread) — not missing plumbing.
 
@@ -74,7 +74,7 @@ plus leaderboard history.
 Pre-release punch list, in priority order:
 
 1. **Confirm green CI** on the current `main` (or run `dotnet test
-   ChronTravelers.sln` locally) — the one thing I couldn't verify myself.
+   ChronoTravelers.sln` locally) — the one thing I couldn't verify myself.
 2. **End-to-end playtest pass** using the QA checklist implied by
    `docs/AGENTS.md`'s QA/Verification Agent: movement, combat, economy,
    time travel, leaderboard display, NPC behavior sanity, save/load
@@ -127,10 +127,10 @@ version of "multiplayer" and is a near-exact spiritual match:
 
 ### Option B — Turn-based / asynchronous shared world (MUD-style — matches the genre's own roots)
 
-> **Status (2026-09-01): implemented.** `ChronTravelers.Game`
-> (shared-world layer) + `ChronTravelers.Server` (telnet **and** SignalR
+> **Status (2026-09-01): implemented.** `ChronoTravelers.Game`
+> (shared-world layer) + `ChronoTravelers.Server` (telnet **and** SignalR
 > hub, PBKDF2 accounts, LiteDB) + `WorldSimulation.TickMultiplayer` +
-> `ChronTravelers.Console --connect <url>` (the SignalR client). Clients on
+> `ChronoTravelers.Console --connect <url>` (the SignalR client). Clients on
 > either transport log in and play one shared ticking timeline alongside
 > the NPCs; verified live. See `docs/SERVER.md`. Remaining: command parity
 > with the single-player console (stores, abilities, ranged), Postgres,

@@ -27,13 +27,13 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore
-        run: dotnet restore ChronTravelers.sln
+        run: dotnet restore ChronoTravelers.sln
 
       - name: Build
-        run: dotnet build ChronTravelers.sln --no-restore -c Release
+        run: dotnet build ChronoTravelers.sln --no-restore -c Release
 
       - name: Test
-        run: dotnet test ChronTravelers.sln --no-build -c Release --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+        run: dotnet test ChronoTravelers.sln --no-build -c Release --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
 
       - name: Upload test results
         if: always()

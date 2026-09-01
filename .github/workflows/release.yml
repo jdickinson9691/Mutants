@@ -39,13 +39,13 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Restore
-        run: dotnet restore ChronTravelers.sln
+        run: dotnet restore ChronoTravelers.sln
 
       - name: Test
-        run: dotnet test ChronTravelers.sln -c Release
+        run: dotnet test ChronoTravelers.sln -c Release
 
       - name: Publish self-contained win-x64 build
-        run: dotnet publish src/ChronTravelers.Console/ChronTravelers.Console.csproj -c Release -r win-x64 -o publish/win-x64 -p:Version=${{ steps.version.outputs.version }}
+        run: dotnet publish src/ChronoTravelers.Console/ChronoTravelers.Console.csproj -c Release -r win-x64 -o publish/win-x64 -p:Version=${{ steps.version.outputs.version }}
 
       - name: Ensure Inno Setup is available
         shell: pwsh
@@ -53,7 +53,7 @@ jobs:
 
       - name: Build installer
         shell: cmd
-        run: '"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=${{ steps.version.outputs.version }} installer\ChronTravelers.iss'
+        run: '"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=${{ steps.version.outputs.version }} installer\ChronoTravelers.iss'
 
       - name: Upload installer to GitHub Release
         uses: softprops/action-gh-release@v2

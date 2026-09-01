@@ -1,4 +1,4 @@
-# ChronTravelers shared-world server
+# Chrono Travelers shared-world server
 
 `docs/PLATFORM_STRATEGY.md` Option B — one `TimeWorld` ticking on a real
 clock that any number of players connect into, with the NPC population
@@ -10,16 +10,16 @@ console yet (see *Not done yet* below).
 
 | Project | Role |
 |---|---|
-| `ChronTravelers.Game` | Transport-agnostic shared-world layer — `SharedGame` (owns the world + sessions + `WorldSimulation`, one lock), `Session`, `Commands` (the verb set), `Render` (plain-text output via `IGameOutput`). No networking. |
-| `ChronTravelers.Server` | The host: bootstraps a `SharedGame`, runs the tick loop, and serves **two** front ends onto it — raw **telnet** and a **SignalR hub** (`/game`). Both do account login (PBKDF2), character select/create, then a command stream. LiteDB `server.db` for accounts + characters. |
-| `ChronTravelers.Game.Tests` | xUnit coverage for the Game layer + `CharacterFactory`. |
+| `ChronoTravelers.Game` | Transport-agnostic shared-world layer — `SharedGame` (owns the world + sessions + `WorldSimulation`, one lock), `Session`, `Commands` (the verb set), `Render` (plain-text output via `IGameOutput`). No networking. |
+| `ChronoTravelers.Server` | The host: bootstraps a `SharedGame`, runs the tick loop, and serves **two** front ends onto it — raw **telnet** and a **SignalR hub** (`/game`). Both do account login (PBKDF2), character select/create, then a command stream. LiteDB `server.db` for accounts + characters. |
+| `ChronoTravelers.Game.Tests` | xUnit coverage for the Game layer + `CharacterFactory`. |
 
-`ChronTravelers.Console --connect <url>` is the SignalR client — the
+`ChronoTravelers.Console --connect <url>` is the SignalR client — the
 console's normal renderer, but every line comes from the server's
 `Receive` push and every command goes out via `Send`.
 
 `WorldSimulation.TickMultiplayer(IReadOnlyList<PlayerTickState>)` is the
-one Engine addition — the N-player counterpart to `Tick(player)`: Ion
+one Engine addition — the N-player counterpart to `Tick(player)`: Tachyon
 bookkeeping once per player *and* NPC, one NPC AI pass, then the spatial
 monster sim once per occupied year (anchored on a rotating player so
 ambush/narration are shared fairly), and an unattended pass elsewhere.
@@ -27,11 +27,11 @@ ambush/narration are shared fairly), and an unattended pass elsewhere.
 ## Run it
 
 ```
-dotnet run --project src/ChronTravelers.Server -- [--port N] [--http-port N] [--db PATH] [--tick-ms N] [--seed N]
+dotnet run --project src/ChronoTravelers.Server -- [--port N] [--http-port N] [--db PATH] [--tick-ms N] [--seed N]
 ```
 
-Defaults: telnet port `4000` (or `$CHRONTRAVELERS_PORT`), SignalR/HTTP port
-`5000` (or `$CHRONTRAVELERS_HTTP_PORT`), `%APPDATA%\ChronTravelers\server.db`,
+Defaults: telnet port `4000` (or `$CHRONOTRAVELERS_PORT`), SignalR/HTTP port
+`5000` (or `$CHRONOTRAVELERS_HTTP_PORT`), `%APPDATA%\ChronoTravelers\server.db`,
 2000 ms tick, a fresh random seed each start.
 
 ## Connect
@@ -39,7 +39,7 @@ Defaults: telnet port `4000` (or `$CHRONTRAVELERS_PORT`), SignalR/HTTP port
 **SignalR client (the console):**
 
 ```
-ChronTravelers.exe --connect http://<host>:5000
+ChronoTravelers.exe --connect http://<host>:5000
 ```
 
 **Telnet:**

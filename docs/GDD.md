@@ -1,4 +1,4 @@
-# Game Design Document — "ChronTravelers"
+# Game Design Document — "Chrono Travelers"
 
 A standalone, single-player-capable, text-based RPG. Its mechanical skeleton
 is inherited from the Major BBS door game *Mutants!* (the `[SOURCE]` marks
@@ -12,27 +12,27 @@ Everything here is original design **except** where marked `[SOURCE]`, which
 means it's a confirmed mechanic from `research/ORIGINAL_MUTANTS_RESEARCH.md`
 (the historical record of the door game whose rules this borrows). Anything
 not marked that way fills a documented gap in that record or is part of the
-ChronTravelers reskin.
+Chrono Travelers reskin.
 
 ---
 
 ## 1. High concept
 
-You are a **Chron Traveler** — crew from Project Meridian, a classified
+You are a **Chrono Traveler** — crew from Project Meridian, a classified
 government temporal-tunnel program (think the *Time Tunnel* of the old TV
 show). On its first full-power run the tunnel tore a **standing rupture**
 that "frayed" the downstream timeline; the personnel on the gantry were
 swept loose and now surface at random years between **2000 and 5000 A.D.**,
 unable to steer. You explore a grid-based city and wasteland, fight the
-things the fray left behind for loot, convert salvage into **Ions**
+things the fray left behind for loot, convert salvage into **Tachyons**
 (tunnel-charge) to survive and to ride surges through time, buy and run
-stores, and burn Ions to `travel` anywhere on the 2000–5000 A.D. timeline —
+stores, and burn Tachyons to `travel` anywhere on the 2000–5000 A.D. timeline —
 later years are richer and far more dangerous. Every other Traveler you meet
 — friendly, hostile, or running a shop — is an NPC governed by the same
 rules you are. The goal (and the board): push deepest downstream and level
 up. The surface team never stops looking; it just can't pull you back.
 
-### 1.1 Background & lore (ChronTravelers reskin)
+### 1.1 Background & lore (Chrono Travelers reskin)
 
 - **Project Meridian** built the tunnel underground, on government money, to
   observe (not touch) the past. The first activation at full power held for
@@ -40,8 +40,8 @@ up. The surface team never stops looking; it just can't pull you back.
   "downstream," so the further into the future you go the more *frayed*
   reality is (§3.2's era bands run from a barely-touched near future to a
   timeline that has come apart entirely).
-- **Chron Travelers** are the gantry crew, scattered 2000–5000 A.D. They
-  move by riding **Ion surges** — the tunnel-charge that leaks from the
+- **Chrono Travelers** are the gantry crew, scattered 2000–5000 A.D. They
+  move by riding **Tachyon surges** — the tunnel-charge that leaks from the
   rupture — and the cost scales with how far they jump (§2, §3.2).
 - **Echoes** (the monster tag, was "undead") are fray-recordings: the
   timeline replaying dead people and events on a loop. The Doctor's
@@ -54,55 +54,55 @@ up. The surface team never stops looking; it just can't pull you back.
 - **Credits** (was "Riblets") are post-collapse scrip — the currency every
   surviving settlement and salvage store runs on.
 
-## 2. Core resource: Ions `[SOURCE]`
+## 2. Core resource: Tachyons `[SOURCE]`
 
-Ions are the single unified resource for:
+Tachyons are the single unified resource for:
 - **Survival** — passive drain per turn/tick; hitting 0 starts costing HP.
-- **Healing** — the `heal` command spends Ions to heal wounds directly,
+- **Healing** — the `heal` command spends Tachyons to heal wounds directly,
   usable at any time (no location or combat requirement) and, like every
   other action, advances one tick `[SOURCE]`.
-- **Spellcasting** — arcane/divine classes spend Ions per ability.
-- **Time travel** — spend Ions proportional to how many years you jump
+- **Spellcasting** — arcane/divine classes spend Tachyons per ability.
+- **Time travel** — spend Tachyons proportional to how many years you jump
   (see §3.2) to move anywhere on the 2000–5000 A.D. timeline.
 
-Ions are generated almost entirely by **converting items** — `convert <item>`
-destroys the item and adds Ions based on the item's tier/value `[SOURCE
+Tachyons are generated almost entirely by **converting items** — `convert <item>`
+destroys the item and adds Tachyons based on the item's tier/value `[SOURCE
 mechanic, original value curve]`. This makes every piece of loot a three-way
 choice, mirrored exactly from the source game: **wield it, sell it, or burn
-it** `[SOURCE]`. The player's Ion pool has **no ceiling** (original change) —
+it** `[SOURCE]`. The player's Tachyon pool has **no ceiling** (original change) —
 converting loot never overflows or gets wasted, so a stockpile for a long
 downstream jump is always worth building. Level-up still raises a *nominal*
 pool size that scales a couple of abilities and the passive-regen cap; it's
 just not a hard limit on how much you can hold. (NPC and monster pools
 stay capped.)
 
-### 2.1 Ion economy tuning (original)
-- Passive drain: 1 Ion per N game-ticks, scaled slightly up further into
+### 2.1 Tachyon economy tuning (original)
+- Passive drain: 1 Tachyon per N game-ticks, scaled slightly up further into
   the future (later years are harsher survival environments) — the scaling
   key is the whole-number difficulty tier for the current year (see §3.2).
-- Passive **regen**: 1 Ion per M game-ticks out of combat, faster than the
+- Passive **regen**: 1 Tachyon per M game-ticks out of combat, faster than the
   drain in early years and slower in the far future. Net effect: the
   present is survivable (grind → heal → recover), the deep future
   net-drains you. Added after playtesting showed the drain-only model made
   the early game an unrecoverable attrition spiral. Regen alone tops out
   at the nominal pool size (you can't wait your way to an infinite pool);
   only converting loot pushes past it.
-- Item→Ion conversion value = `base_item_value * 0.4`, rounded down, with a
+- Item→Tachyon conversion value = `base_item_value * 0.4`, rounded down, with a
   minimum of 1. This keeps converting strictly worse than selling for Credits
   when a store is reachable, but better than nothing when it isn't — replicating
   the "quasi semi-flawed but usable" economy the original was known for,
   without the parts that made it exploitable.
 - Time travel cost = `max(8, ceil(0.04 * |target_year - current_year|))`
-  Ions, symmetric (retreating toward the present costs the same as
+  Tachyons, symmetric (retreating toward the present costs the same as
   advancing). Original tuning (0.2 → 0.1 → 0.04 across playtests; then an
-  `8`-Ion floor added so a cheap decade-creep can't farm every year for
+  `8`-Tachyon floor added so a cheap decade-creep can't farm every year for
   free — a short hop now costs about what the ~200-year jump it should
   have been does). At 0.04 a one-tier early hop (~250 yrs) is affordable from
   level 1; a full cross-timeline leap costs ~120. With the pool now
   uncapped, that leap is a matter of stockpiling conversions rather than
   something a small pool forbids outright.
-- `heal` restores HP at 3 HP per 1 Ion — no ratio survives in the
-  historical record; 3:1 keeps healing a real competitor for the Ion pool
+- `heal` restores HP at 3 HP per 1 Tachyon — no ratio survives in the
+  historical record; 3:1 keeps healing a real competitor for the Tachyon pool
   without making the early game an attrition death (playtested; was 1:1).
 - New characters start with a few `Field Ration` heal items so the first
   year isn't a pure attrition race before you can loot or buy any HP
@@ -130,7 +130,7 @@ stretch goal, not in the original).
   neighbours; `fight [name]` engages one where you stand; loot left on a
   room's floor is listed and picked up with `take`.
 
-### 3.2 The timeline & time travel `[SOURCE: confirmed mechanic + Ion cost]`
+### 3.2 The timeline & time travel `[SOURCE: confirmed mechanic + Tachyon cost]`
 - The world is a **continuous timeline** from year **2000 A.D.** (the
   "present" city, where every character starts) to **5000 A.D.**. There are
   no discrete levels: difficulty, monster stats, and loot value all scale
@@ -138,7 +138,7 @@ stretch goal, not in the original).
   5000 at tier 9.0, on a **piecewise curve that's steeper early** — one
   tier per 250 years through 2000–3000 (reaching tier 5), then one per 500
   years after — so a short early hop actually changes the fight instead of
-  the first ~600 years all playing the same (`ChronTravelers.Core.Time.TimeScale`).
+  the first ~600 years all playing the same (`ChronoTravelers.Core.Time.TimeScale`).
 - **Each year has its own grid map**, generated deterministically from a
   per-save **world seed** plus the year — the same year always produces the
   same layout, so it can be a pure function of the save with nothing about
@@ -148,17 +148,17 @@ stretch goal, not in the original).
 - Command: `travel <year>` (any year 2000–5000), `travel +N` / `travel -N`
   (relative), or `travel next` / `travel prev` (the next/previous
   Warden year).
-- Cost: `max(8, ceil(0.04 * |target_year - current_year|))` Ions,
+- Cost: `max(8, ceil(0.04 * |target_year - current_year|))` Tachyons,
   deducted on success (coefficient lowered 0.2 → 0.1 → 0.04 across
   playtests so mid-range hops are affordable from low level — a one-tier
-  early jump is ~10 Ions, a full cross-timeline leap still ~120 — then an
-  `8`-Ion floor so a short hop isn't nearly free and worth spamming).
+  early jump is ~10 Tachyons, a full cross-timeline leap still ~120 — then an
+  `8`-Tachyon floor so a short hop isn't nearly free and worth spamming).
   Symmetric — retreating toward the present costs the same as advancing
   (this supersedes the earlier "retreat is free" rule now that travel is
-  otherwise unrestricted). Insufficient Ions produces a warning and blocks
+  otherwise unrestricted). Insufficient Tachyons produces a warning and blocks
   the jump — the failure mode independently confirmed by a historical
   MBBSEmu bug report about a "warning when attempting to time travel
-  without enough ions."
+  without enough tachyons."
 - **Travel is otherwise unrestricted**: no unlock, no minimum character
   level, no gate. How hard the fights get is the only limiter — and
   **overreaching is a deliberate option**: jumping well past your level
@@ -182,7 +182,7 @@ stretch goal, not in the original).
 ### 3.3 Death & recall
 - Dying drops a portion of unconverted inventory at the death location (loot
   becomes lootable by other NPCs/Travelers) and snaps the character back
-  upstream to the year 2000 A.D. with an Ion penalty. No source material
+  upstream to the year 2000 A.D. with an Tachyon penalty. No source material
   describes death handling, so this is original, tuned to punish but not
   erase progress.
 
@@ -197,16 +197,16 @@ mapping is Warrior→**Soldier**, Thief→**Spy**, Priest→**Doctor**,
 Mage→**Scientist**, Wizard→**Engineer**. All names, ability names, numbers,
 lore, and level-gates below are original design filling a documented gap.
 
-Every class shares: HP, Ions, a primary attack, an inventory, and access to
-`convert`/`wield`/`sell`. Classes differ in HP/Ion scaling, their unlocked
+Every class shares: HP, Tachyons, a primary attack, an inventory, and access to
+`convert`/`wield`/`sell`. Classes differ in HP/Tachyon scaling, their unlocked
 ability tree, and which loot they can equip.
 
 | Class | Role | Primary stat | Flavor |
 |---|---|---|---|
-| Soldier | Melee tank/damage | Strength | Station security — best HP, heaviest gear, cheapest Ion drain |
+| Soldier | Melee tank/damage | Strength | Station security — best HP, heaviest gear, cheapest Tachyon drain |
 | Spy | Skirmisher/utility | Agility | Recon and infiltration — evasion, opening-strike crits, store contacts |
 | Doctor | Support/healer | Resolve | Trauma medicine — group heals, combat stims, resonance vs. echoes |
-| Scientist | Ion blaster | Intellect | Tunnel theory — high burst Ion-cost abilities, area damage, weak melee |
+| Scientist | Tachyon blaster | Intellect | Tunnel theory — high burst Tachyon-cost abilities, area damage, weak melee |
 | Engineer | Systems utility | Intellect | Power and hardware — control/sabotage, rigged micro-jumps |
 
 \* Scientist and Engineer are kept as two distinct Intellect classes (rather
@@ -243,18 +243,18 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
 > bad early fight before its kit came online. Dampener (slow the target so
 > you strike first) at level 2 and Sabotage (cut incoming damage) at 9 are
 > the survival tools it needs early (playtest feedback). See
-> `src/ChronTravelers.Content/abilities.json`.
+> `src/ChronoTravelers.Content/abilities.json`.
 
 Example — **Soldier**:
 1. Lv5 — *Suppressing Sweep*: rake fire across the target and up to 2 others crowding it.
-2. Lv10 — *Field Patch*: once per fight, a trauma seal for 20% max HP — no Ions.
+2. Lv10 — *Field Patch*: once per fight, a trauma seal for 20% max HP — no Tachyons.
 3. Lv15 — *Armor-Piercing Rounds*: sabot loads punch through part of the target's plating.
 4. Lv20 — *Fire Discipline*: call the shots — nearby allies hit harder for a while.
 5. Lv25 — *Breach Stance*: set behind the shield — incoming damage drops.
 6. Lv30 — *Confirmed Kill*: heavy bonus damage vs. targets below 25% HP.
 
 Example — **Doctor**:
-1. Lv5 — *Triage*: focused single-target heal (Ion cost).
+1. Lv5 — *Triage*: focused single-target heal (Tachyon cost).
 2. Lv10 — *Combat Stim*: your strikes land harder for a while.
 3. Lv15 — *Purge Echo*: a resonance burst — devastating to `echo`-tagged monsters.
 4. Lv20 — *Broad-Spectrum*: field-treat yourself and every ally in the room.
@@ -270,7 +270,7 @@ area/group to a capstone — is the standard every class follows.)
 - Weapon/armor equip requires class-tagged gear (a Scientist can't wield the
   Soldier's breaching maul at full effectiveness — non-class gear works at a
   penalty rather than being hard-blocked, to keep loot from feeling wasted).
-- Ion pools and drain rates differ per class (Scientist/Engineer drain
+- Tachyon pools and drain rates differ per class (Scientist/Engineer drain
   faster from ability use; Soldier/Spy drain slowest, lean harder on raw HP).
 
 ## 5. Loot system `[SOURCE: wield/sell/convert]`
@@ -304,7 +304,7 @@ area/group to a capstone — is the standard every class follows.)
   something to use.
 - **Scaling**: an item's `tier` is derived from the **year** it was
   generated in (`TimeScale.TierForYear`, a continuous 1.0–9.0 across
-  2000–5000); tier drives base stats, sell price, and Ion-conversion value
+  2000–5000); tier drives base stats, sell price, and Tachyon-conversion value
   via `LootScaling` (value baseline `12 * tier + 10` — the flat term is a
   playtest bump that roughly doubles tier-1 loot so an early grind funds a
   real purchase, tapering to ~1.3× by tier 9), so loot from year 4000 is
@@ -313,7 +313,7 @@ area/group to a capstone — is the standard every class follows.)
 - **Disposition**: every lootable item supports the same three verbs as the
   original — `wield` (equip if class-compatible), `sell <item>` (at any
   store, price is store-and-negotiation-dependent, see §6), `convert <item>`
-  (destroy for Ions, value per §2.1). `sell`/`convert` work on any item
+  (destroy for Tachyons, value per §2.1). `sell`/`convert` work on any item
   regardless of type; `wield` makes sense for Weapon/Armor/Ranged.
 - **Ranged weapons** (original addition, enabled by §7.1's spatial
   monsters): wands, bows, and — in later years — guns occupy their own
@@ -335,7 +335,7 @@ area/group to a capstone — is the standard every class follows.)
   triggers the item's effect and destroys it — an instant flat HP heal for
   "food," or a temporary attack/defense buff (lasting a set number of
   world ticks) for a "potion." This is separate from — and doesn't cost
-  Ions like — the `heal` command in §2/§2.1; a potion/food item is a
+  Tachyons like — the `heal` command in §2/§2.1; a potion/food item is a
   one-time consumable you have to loot or buy first.
 - Rarity bands (Common/Uncommon/Rare/Epic/Legendary) — original addition,
   since the source material never specifies a rarity system, but a
@@ -401,15 +401,15 @@ Since v1 has no network multiplayer, the world needs to feel alive:
 - A configurable population of NPC Travelers is scattered across the whole
   timeline (a single `totalCount`, each spawned in a random year and
   fast-levelled into that year's soft-cap band), each a full character with
-  class, level, inventory, and Ion pool — built on the *exact same
+  class, level, inventory, and Tachyon pool — built on the *exact same
   character/inventory/ability code path* as the human player, per the
   requirement that NPCs "play like players, with the same character classes
   and restrictions."
-- Each NPC runs a lightweight behavior loop each tick: assess Ion level (seek
+- Each NPC runs a lightweight behavior loop each tick: assess Tachyon level (seek
   conversion fodder or a store if low), assess HP (retreat/heal if low),
   otherwise pursue its current goal (grind monsters in its year, trade at
   its year's store, hop a short way along the timeline — usually forward —
-  if it can afford the Ion cost).
+  if it can afford the Tachyon cost).
 - NPCs participate in the same kill-feed / **fray-band broadcast** channel
   as the player `[SOURCE: cross-board telepathic messages]` — "An Ashfall
   Echo was slain by a Dune Stalker," "Fang reached level 12," "Static
@@ -432,19 +432,19 @@ Since v1 has no network multiplayer, the world needs to feel alive:
 
 ### 7.1 Spatial monsters
 The year the player is standing in also runs a live monster population
-(`ChronTravelers.Core.Time.YearPopulation`, seeded deterministically from the
+(`ChronoTravelers.Core.Time.YearPopulation`, seeded deterministically from the
 world seed on first entry, kept alive in the session's year memo — not
 saved):
 - Monsters occupy specific rooms and, each tick, **drift** through exits,
   **scavenge** off their room's floor, or — if hurt — **heal** from their
-  own Ion pool, first **converting** a carried item if they're out of Ions
+  own Tachyon pool, first **converting** a carried item if they're out of Tachyons
   (the same `heal` / `convert` the player uses). A monster only takes loot
-  for a reason: **one item to burn for Ions** when it's low (it prefers
+  for a reason: **one item to burn for Tachyons** when it's low (it prefers
   junk/consumables, leaving a good weapon for you), or **a single weapon
   that beats what it's wielding** — a scavenged weapon adds its bonus to
   the monster's hits (`Monster.EffectiveAttackPower`) and drops with it on
   death, and the weapon it replaced falls back to the floor. A calm,
-  full-Ion monster with a decent weapon walks straight over a pile. Drift
+  full-Tachyon monster with a decent weapon walks straight over a pile. Drift
   is deliberately
   **slow and random** — a low per-tick move chance, no fixed heading,
   frequent multi-tick pauses — so a monster you spotted on the `monsters`
@@ -488,7 +488,7 @@ saved):
   away east"). `look` also lists what's stirring in each adjacent room.
 - Monsters do **not** automatically pursue or attack anyone who walks
   past. Each carries an **earned aggro meter** toward the player
-  (`ChronTravelers.Core.Monsters.AggroModel`), raised by:
+  (`ChronoTravelers.Core.Monsters.AggroModel`), raised by:
   - **stepping onto its tile** — the big one; do it over and over (pacing
     a chokepoint, farming a spot) and it stacks faster than it decays;
   - **lingering** on or next to it (a small trickle per tick);
@@ -540,7 +540,7 @@ Displayed on the game's start/title screen, refreshed each session:
 Text MUD-style games from this era ran on either strict turns or a
 background tick clock shared by everyone online. Since v1 has no live
 concurrent humans, the simplest faithful-enough model is: **a background tick
-(e.g., every 2 real-time seconds) advances Ion drain, NPC actions, and store
+(e.g., every 2 real-time seconds) advances Tachyon drain, NPC actions, and store
 restocking, while the human player acts asynchronously between ticks** by
 typing commands — this reproduces the "the world moves whether you're
 typing or not" feel BBS door games had (other users' actions interleaved with
@@ -552,7 +552,7 @@ yours) using NPCs instead of real concurrent users.
   (status red, exits green, ambient text default) — matches the one surviving
   screenshot's visual language.
 - Windows console/terminal application; a scrollable log pane and a fixed
-  status bar (HP/Ions/Credits/Level/Location) are a modernization, not a
+  status bar (HP/Tachyons/Credits/Level/Location) are a modernization, not a
   historical requirement, and are recommended for playability.
 
 ## 11. Explicit non-goals for v1
@@ -569,12 +569,12 @@ yours) using NPCs instead of real concurrent users.
 
 - Number and boundaries of the era bands across 2000–5000 (currently ~15;
   more, finer bands would give tighter thematic progression).
-- Travel throughput: a jump is paid from the instantaneous Ion pool.
-  Playtest tuning (coefficient 0.2 → 0.04, +1 IonsPerLevel across all
+- Travel throughput: a jump is paid from the instantaneous Tachyon pool.
+  Playtest tuning (coefficient 0.2 → 0.04, +1 TachyonsPerLevel across all
   classes, a steeper early tier curve, and — most recently — **removing
-  the player's Ion pool ceiling** so a big jump is a stockpiling goal
+  the player's Tachyon pool ceiling** so a big jump is a stockpiling goal
   rather than a hard block) has made travel practical at every range. A
-  full cross-timeline leap is still a ~120-Ion commitment you build toward
+  full cross-timeline leap is still a ~120-Tachyon commitment you build toward
   by converting loot. If pacing later feels off, the remaining lever is a
   "charge a jump over several ticks" mechanic.
 - Whether NPC store ownership should be capped (to avoid NPCs monopolizing

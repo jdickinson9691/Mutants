@@ -11,7 +11,7 @@
 | A tick-driven world with many simulated NPCs | .NET's `Task`/`System.Threading.Timer` and async/await model background ticks cleanly; NPC AI loops (simple FSMs per §7 of the GDD) run fine single-threaded for hundreds of NPCs, and can be parallelized later with `Parallel.ForEach` if the population grows. |
 | Persistent saves, leaderboards, store inventories | **SQLite** via `Microsoft.Data.Sqlite` or **LiteDB** (pure C#, zero native deps, trivially embeds in a single-file EXE) — either is a perfect fit for a local single-player save file that also has to store leaderboard history. |
 | Data-driven content (classes, abilities, monsters, loot, level layouts) | JSON or YAML content files loaded at startup, deserialized with `System.Text.Json`. Keeps class/ability/monster tuning in `docs/CONTENT_PLAN.md`-adjacent data files instead of hardcoded in game logic — easy for a designer (or an "agent") to tune without touching engine code. |
-| Testability | `xUnit` for unit tests on game systems (combat math, Ion economy, leveling curves) decoupled from the console I/O layer. |
+| Testability | `xUnit` for unit tests on game systems (combat math, Tachyon economy, leveling curves) decoupled from the console I/O layer. |
 | CI/CD | GitHub Actions has first-class `dotnet` support; a workflow can build, test, and produce the installer artifact on every push/tag. |
 | Long-term maintainability | Strong typing, mature tooling (Visual Studio / Rider / VS Code + C# Dev Kit), huge ecosystem, and it's a skill that transfers directly if this ever grows into a networked multiplayer version later (ASP.NET Core / SignalR reuse the same language and much of the same domain model). |
 
@@ -44,24 +44,24 @@
 ### Suggested repo layout (see also `docs/AGENTS.md`)
 
 ```
-ChronTravelers/
+ChronoTravelers/
   docs/                  GDD, tech stack doc, agent contracts, content plan
   research/              Source-material research
   src/
-    ChronTravelers.Core/        Domain model: classes, abilities, items, monsters, levels, economy
-    ChronTravelers.Engine/      Tick loop, NPC AI, combat resolution, persistence
-    ChronTravelers.Console/     Spectre.Console front end / the actual playable app
-    ChronTravelers.Content/     JSON content data (classes.json, monsters.json, items.json, levels/*.json)
+    ChronoTravelers.Core/        Domain model: classes, abilities, items, monsters, levels, economy
+    ChronoTravelers.Engine/      Tick loop, NPC AI, combat resolution, persistence
+    ChronoTravelers.Console/     Spectre.Console front end / the actual playable app
+    ChronoTravelers.Content/     JSON content data (classes.json, monsters.json, items.json, levels/*.json)
   tests/
-    ChronTravelers.Core.Tests/
-    ChronTravelers.Engine.Tests/
+    ChronoTravelers.Core.Tests/
+    ChronoTravelers.Engine.Tests/
   installer/             Inno Setup script + assets
   .github/workflows/     CI pipeline
 ```
 
 ### Minimum viable milestone sequencing
 
-1. Core domain model + unit tests (classes, stats, Ions, items) — no UI yet.
+1. Core domain model + unit tests (classes, stats, Tachyons, items) — no UI yet.
 2. Grid/movement + a single hardcoded level, playable via console.
 3. Combat + loot drops + convert/sell/wield.
 4. NPC simulation loop (reuses the same domain model).
