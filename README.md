@@ -66,6 +66,17 @@ game hits an unhandled exception it writes a full report to
 `%APPDATA%\ChronTravelers\crashes\crash-<timestamp>.log` (and prints the
 path) before exiting — attach that when reporting a crash.
 
+### Shared-world server (experimental)
+
+`ChronTravelers.Server` hosts one timeline that multiple players connect
+into over telnet — `docs/PLATFORM_STRATEGY.md` Option B. Foundation only
+(see `docs/SERVER.md`):
+
+```
+dotnet run --project src/ChronTravelers.Server -- --port 4000
+telnet <host> 4000
+```
+
 ## Start here
 
 - [`research/ORIGINAL_MUTANTS_RESEARCH.md`](research/ORIGINAL_MUTANTS_RESEARCH.md) —
