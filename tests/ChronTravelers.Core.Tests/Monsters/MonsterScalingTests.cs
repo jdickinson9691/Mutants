@@ -63,4 +63,24 @@ public class MonsterScalingTests
         Assert.Throws<ArgumentOutOfRangeException>(() => MonsterScaling.BaseHp(0.9));
         Assert.Throws<ArgumentOutOfRangeException>(() => MonsterScaling.XpReward(0.0));
     }
+
+    [Theory]
+    [InlineData(1, 1, 100)]   // level 1 vs tier 1 — well within the band, full XP
+    [InlineData(1, 10, 100)]  // exactly at the tier-1 band cap — still full
+    [InlineData(1, 15, 60)]   // 5 levels past the cap — 8%/level off
+    [InlineData(1, 20, 20)]   // 10 past
+    [InlineData(1, 25, 10)]   // hit the 10% floor
+    [InlineData(1, 40, 10)]   // never below the floor
+    [InlineData(5, 40, 100)]  // level 40 vs tier 5 (cap 50) — still in-band, full
+    [InlineData(5, 60, 20)]   // 10 past the tier-5 cap
+    public void KillXp_FullWithinTheBand_ThenFallsOffPastTheCapToAFloor(int tier, int killerLevel, int expected)
+    {
+        Assert.Equal(expected, MonsterScaling.KillXp(baseXp: 100, monsterTier: tier, killerLevel: killerLevel));
+    }
+
+    [Fact]
+    public void KillXp_NeverReturnsZeroForARealReward()
+    {
+        Assert.Equal(1, MonsterScaling.KillXp(baseXp: 4, monsterTier: 1, killerLevel: 99));
+    }
 }

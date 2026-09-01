@@ -110,11 +110,13 @@ validation is surfaced as `ContentException` by the loader.
 
 Not new plumbing — tuning and polish:
 
-- **Travel throughput** (`IonEconomy.IonsPerYearTravelled = 0.04`): tuned
-  across playtests (0.2 → 0.1 → 0.04) alongside passive Ion regen, a 3:1
-  heal ratio, +1 IonsPerLevel on every class, and a steeper early tier
-  curve — so an affordable early hop now lands in a meaningfully harder
-  year. Only a full cross-timeline leap is still an end-game Ion commit.
+- **Travel throughput** (`IonEconomy.IonsPerYearTravelled = 0.04`, with an
+  `IonEconomy.MinTravelCost = 8` floor per jump): tuned across playtests
+  (0.2 → 0.1 → 0.04) alongside passive Ion regen, a 3:1 heal ratio, +1
+  IonsPerLevel on every class, and a steeper early tier curve — so an
+  affordable early hop now lands in a meaningfully harder year. The `8`
+  floor stops a near-free decade-creep that farmed every year on the way;
+  only a full cross-timeline leap is still an end-game Ion commit.
 - **More / finer era bands** for tighter thematic progression.
 - **Config-driven NPC class distribution** instead of uniform-random.
 - **Denser rosters / catalogs** if the game wants more variety per year.

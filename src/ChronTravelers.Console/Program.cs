@@ -1517,7 +1517,8 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
     }
 
     broadcast.Publish(GameEvent.Slain(target.Name, traveler.Name, traveler.CurrentYear, victimIsCreature: true));
-    traveler.GainXp(target.XpReward);
+    var xpAwarded = MonsterScaling.KillXp(target.XpReward, target.Tier, traveler.Level);
+    traveler.GainXp(xpAwarded);
 
     var drops = LootDropRoller.RollForKill(target, random).Concat(target.Inventory).ToList();
 
@@ -1529,7 +1530,7 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
             population.AddGroundLoot(targetRoom, drop);
         }
 
-        AnsiConsole.MarkupLine($"[bold yellow]You drop the Warden of {traveler.CurrentYear} from a room away — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{target.XpReward} XP.");
+        AnsiConsole.MarkupLine($"[bold yellow]You drop the Warden of {traveler.CurrentYear} from a room away — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{xpAwarded} XP.");
     }
     else
     {
@@ -1540,8 +1541,8 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
         }
 
         AnsiConsole.MarkupLine(drops.Count > 0
-            ? $"[green]The {Markup.Escape(target.Name)} drops. +{target.XpReward} XP. Its loot is on the floor to the {direction.Value.Name()} — walk in and [yellow]take[/] it.[/]"
-            : $"[green]The {Markup.Escape(target.Name)} drops. +{target.XpReward} XP.[/]");
+            ? $"[green]The {Markup.Escape(target.Name)} drops. +{xpAwarded} XP. Its loot is on the floor to the {direction.Value.Name()} — walk in and [yellow]take[/] it.[/]"
+            : $"[green]The {Markup.Escape(target.Name)} drops. +{xpAwarded} XP.[/]");
     }
 
     if (traveler.Level > levelBefore)

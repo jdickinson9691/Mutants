@@ -24,12 +24,13 @@ public class IonEconomyTests
 
     [Theory]
     [InlineData(2000, 2000, 0)]     // staying put is free
-    [InlineData(2000, 2100, 4)]     // ceil(0.04 * 100)
-    [InlineData(2000, 2500, 20)]
+    [InlineData(2000, 2005, 8)]     // ceil(0.04 * 5) = 1, floored to MinTravelCost
+    [InlineData(2000, 2100, 8)]     // ceil(0.04 * 100) = 4, floored to MinTravelCost
+    [InlineData(2000, 2200, 8)]     // ceil(0.04 * 200) = 8, exactly the floor
+    [InlineData(2000, 2500, 20)]    // above the floor — linear rate applies
     [InlineData(2500, 2000, 20)]    // symmetric — retreating costs the same
-    [InlineData(2000, 2005, 1)]     // ceil(0.04 * 5) = 1
     [InlineData(2000, 5000, 120)]
-    public void TimeTravelCost_IsCeilOfTheCoefficientTimesTheYearDistance(int fromYear, int toYear, int expectedCost)
+    public void TimeTravelCost_IsCeilOfTheCoefficientTimesDistance_FlooredAtMinTravelCost(int fromYear, int toYear, int expectedCost)
     {
         Assert.Equal(expectedCost, IonEconomy.TimeTravelCost(fromYear, toYear));
     }

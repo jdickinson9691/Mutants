@@ -75,22 +75,25 @@ public static class CombatResolver
             return new FightResult(TravelerWon: false, rounds, XpAwarded: 0, ItemsDropped: [], log);
         }
 
-        var loot = AwardVictory(traveler, monster, random, log);
-        return new FightResult(TravelerWon: true, rounds, XpAwarded: monster.XpReward, ItemsDropped: loot, log);
+        var loot = AwardVictory(traveler, monster, random, log, out var xpAwarded);
+        return new FightResult(TravelerWon: true, rounds, XpAwarded: xpAwarded, ItemsDropped: loot, log);
     }
 
     /// <summary>
     /// Grants XP and rolls loot for defeating <paramref name="monster"/> —
-    /// shared with CombatSession's interactive fights. When
-    /// <paramref name="addToInventory"/> is true (the abstract NPC path) the
-    /// loot goes straight into the winner's pack; when false (the player's
-    /// interactive fight) it's just returned, and the caller drops it on the
-    /// ground for the player to <c>take</c>.
+    /// shared with CombatSession's interactive fights. XP is the
+    /// outlevel-scaled amount (<see cref="MonsterScaling.KillXp"/>), surfaced
+    /// via <paramref name="xpAwarded"/> so callers report what was actually
+    /// granted. When <paramref name="addToInventory"/> is true (the abstract
+    /// NPC path) the loot goes straight into the winner's pack; when false
+    /// (the player's interactive fight) it's just returned, and the caller
+    /// drops it on the ground for the player to <c>take</c>.
     /// </summary>
     internal static IReadOnlyList<Core.Items.Item> AwardVictory(
-        Traveler traveler, Monster monster, IRandomSource random, List<string> log, bool addToInventory = true)
+        Traveler traveler, Monster monster, IRandomSource random, List<string> log, out int xpAwarded, bool addToInventory = true)
     {
-        var levelsGained = traveler.GainXp(monster.XpReward);
+        xpAwarded = MonsterScaling.KillXp(monster.XpReward, monster.Tier, traveler.Level);
+        var levelsGained = traveler.GainXp(xpAwarded);
         if (levelsGained > 0)
         {
             log.Add($"{traveler.Name} gained {levelsGained} level(s)!");

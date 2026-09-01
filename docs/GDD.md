@@ -92,10 +92,12 @@ stay capped.)
   when a store is reachable, but better than nothing when it isn't — replicating
   the "quasi semi-flawed but usable" economy the original was known for,
   without the parts that made it exploitable.
-- Time travel cost = `ceil(0.04 * |target_year - current_year|)` Ions,
-  minimum 1 for any real jump, symmetric (retreating toward the present
-  costs the same as advancing). Original tuning (0.2 → 0.1 → 0.04 across
-  playtests). At 0.04 a one-tier early hop (~250 yrs) is affordable from
+- Time travel cost = `max(8, ceil(0.04 * |target_year - current_year|))`
+  Ions, symmetric (retreating toward the present costs the same as
+  advancing). Original tuning (0.2 → 0.1 → 0.04 across playtests; then an
+  `8`-Ion floor added so a cheap decade-creep can't farm every year for
+  free — a short hop now costs about what the ~200-year jump it should
+  have been does). At 0.04 a one-tier early hop (~250 yrs) is affordable from
   level 1; a full cross-timeline leap costs ~120. With the pool now
   uncapped, that leap is a matter of stockpiling conversions rather than
   something a small pool forbids outright.
@@ -146,10 +148,11 @@ stretch goal, not in the original).
 - Command: `travel <year>` (any year 2000–5000), `travel +N` / `travel -N`
   (relative), or `travel next` / `travel prev` (the next/previous
   Warden year).
-- Cost: `ceil(0.04 * |target_year - current_year|)` Ions, minimum 1,
+- Cost: `max(8, ceil(0.04 * |target_year - current_year|))` Ions,
   deducted on success (coefficient lowered 0.2 → 0.1 → 0.04 across
   playtests so mid-range hops are affordable from low level — a one-tier
-  early jump is ~10 Ions, a full cross-timeline leap still ~120).
+  early jump is ~10 Ions, a full cross-timeline leap still ~120 — then an
+  `8`-Ion floor so a short hop isn't nearly free and worth spamming).
   Symmetric — retreating toward the present costs the same as advancing
   (this supersedes the earlier "retreat is free" rule now that travel is
   otherwise unrestricted). Insufficient Ions produces a warning and blocks
@@ -211,7 +214,11 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
 (control/utility vs. blaster) so they don't overlap mechanically.
 
 ### 4.1 Leveling
-- XP from monster kills, scaled by monster level relative to the killer.
+- XP from monster kills. Full value while the killer is within the band a
+  tier is meant for (up to `character_level ≈ 10 * tier`); past that cap it
+  falls off 8% per level over, down to a 10% floor
+  (`MonsterScaling.KillXp`). So grinding a year long after you've outgrown
+  it trickles — the XP is out where the fight is still real.
 - Soft level cap tied to progress: `character_level ≈ 10 * tier`, where
   `tier` is the scaling tier for the **furthest year the character has
   reached** (`TimeScale.SoftLevelCapForYear`, clamped to 10–30). Keeps

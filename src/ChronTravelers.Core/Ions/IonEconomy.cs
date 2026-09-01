@@ -43,12 +43,22 @@ public static class IonEconomy
     public const double IonsPerYearTravelled = 0.04;
 
     /// <summary>
+    /// Floor cost for <em>any</em> real jump, however short. At the 0.04
+    /// linear rate a ~50-year hop is only ~2 Ions, so you could creep
+    /// forward a decade at a time almost for free and farm every year on
+    /// the way. A flat floor makes a short hop cost about the same as the
+    /// ~200-year jump it should have been, so committing to a real jump is
+    /// the efficient move (playtest feedback).
+    /// </summary>
+    public const int MinTravelCost = 8;
+
+    /// <summary>
     /// Ion cost of travelling from <paramref name="fromYear"/> to
     /// <paramref name="toYear"/> — <c>ceil(<see cref="IonsPerYearTravelled"/>
-    /// × |Δyear|)</c>, minimum 1 for any real jump, 0 for staying put.
-    /// Symmetric: retreating toward the present costs the same as advancing
-    /// (this supersedes the old "retreat is free" rule now that travel is
-    /// otherwise unrestricted).
+    /// × |Δyear|)</c>, but never less than <see cref="MinTravelCost"/> for a
+    /// real jump; 0 for staying put. Symmetric: retreating toward the
+    /// present costs the same as advancing (this supersedes the old
+    /// "retreat is free" rule now that travel is otherwise unrestricted).
     /// </summary>
     public static int TimeTravelCost(int fromYear, int toYear)
     {
@@ -58,7 +68,7 @@ public static class IonEconomy
             return 0;
         }
 
-        return Math.Max(1, (int)Math.Ceiling(IonsPerYearTravelled * distance));
+        return Math.Max(MinTravelCost, (int)Math.Ceiling(IonsPerYearTravelled * distance));
     }
 
     /// <summary>

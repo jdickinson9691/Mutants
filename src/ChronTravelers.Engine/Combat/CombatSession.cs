@@ -163,10 +163,10 @@ public sealed class CombatSession
         if (IsOver && TravelerWon && !_rewardsGranted)
         {
             _rewardsGranted = true;
-            XpAwarded = Monster.XpReward;
             // The player's kills drop to the ground (the console grounds
             // ItemsDropped at the player's tile); nothing auto-enters the pack.
-            ItemsDropped = CombatResolver.AwardVictory(Traveler, Monster, _random, _log, addToInventory: false);
+            ItemsDropped = CombatResolver.AwardVictory(Traveler, Monster, _random, _log, out var xp, addToInventory: false);
+            XpAwarded = xp;
         }
     }
 
