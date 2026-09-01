@@ -43,17 +43,22 @@ public sealed record ClassDefinition(
                 BaseIons: 24, IonsPerLevel: 4,
                 IonDrainMultiplier: 0.9),
 
+            // Doctor/Scientist BaseHp nudged up (22→24, 18→21) — playtests
+            // had both wiping in the first year to a single bad opening
+            // exchange. HpPerLevel is unchanged, so the boost is a
+            // front-loaded ~1 extra hit of margin at low level and fades
+            // to noise by the mid-game.
             [CharacterClass.Doctor] = new(
                 CharacterClass.Doctor, PrimaryStat.Resolve,
                 BaseStats: new StatBlock(Strength: 9, Agility: 8, Resolve: 15, Intellect: 10),
-                BaseHp: 22, HpPerLevel: 4,
+                BaseHp: 24, HpPerLevel: 4,
                 BaseIons: 30, IonsPerLevel: 4,
                 IonDrainMultiplier: 1.0),
 
             [CharacterClass.Scientist] = new(
                 CharacterClass.Scientist, PrimaryStat.Intellect,
                 BaseStats: new StatBlock(Strength: 7, Agility: 9, Resolve: 8, Intellect: 16),
-                BaseHp: 18, HpPerLevel: 3,
+                BaseHp: 21, HpPerLevel: 3,
                 BaseIons: 34, IonsPerLevel: 5,
                 IonDrainMultiplier: 1.3),
 
