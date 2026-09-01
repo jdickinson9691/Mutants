@@ -8,9 +8,24 @@ namespace ChronoTravelers.Core.Stats;
 /// </summary>
 public static class Leveling
 {
-    public const int MaxCharacterLevel = 30;
+    /// <summary>
+    /// The character-level ceiling. Raised 30 → 60 so a Traveler keeps
+    /// growing across the whole 2000–5000 A.D. timeline instead of maxing
+    /// out at year ~2500 (see <see cref="Time.TimeScale.SoftLevelCapForYear"/>,
+    /// docs/GDD.md §4.1). Levels 31–60 grant stat + HP/Tachyon growth; the
+    /// ability trees still stop at their 6th tier (level 30 / Engineer 21)
+    /// until they're extended — docs/GDD.md §4.2.
+    /// </summary>
+    public const int MaxCharacterLevel = 60;
+
     public const int LevelsPerAbilityTier = 5;
     public const int AbilityTierCount = 6;
+
+    /// <summary>The last level that unlocks an ability tier — <see cref="AbilityTierCount"/> × <see cref="LevelsPerAbilityTier"/>. Levels past this grow stats but no new abilities (yet).</summary>
+    public const int TopAbilityLevel = AbilityTierCount * LevelsPerAbilityTier;
+
+    /// <summary>Where the XP-per-level cost stops rising and holds flat — so levels 26–60 are a reachable grind, not a quadratic wall. Levels 1–25 are unchanged from the pre-cap-60 curve.</summary>
+    public const int XpCurveKneeLevel = 25;
 
     /// <summary>Points added to the class's primary stat on each level-up.</summary>
     public const int PrimaryStatGainPerLevel = 2;
@@ -20,7 +35,11 @@ public static class Leveling
 
     /// <summary>
     /// Cumulative XP required to reach <paramref name="level"/> from level 1.
-    /// Quadratic curve (steepens with level) — original tuning.
+    /// Quadratic (each level costs <c>100 · (level-1)</c> more than the last)
+    /// through <see cref="XpCurveKneeLevel"/>, then a flat per-level cost of
+    /// <c>100 · (XpCurveKneeLevel-1)</c> after — so the raised cap doesn't
+    /// turn the deep game into a quadratic grind wall. Levels 1–25 are
+    /// identical to the pre-cap-60 curve. Original tuning.
     /// </summary>
     public static int CumulativeXpForLevel(int level)
     {
@@ -29,10 +48,18 @@ public static class Leveling
             throw new ArgumentOutOfRangeException(nameof(level), level, "Level must be at least 1.");
         }
 
-        // Level 1 requires 0 XP; each subsequent level costs 100 * (level - 1) more
-        // than a flat baseline, giving a smoothly increasing (triangular-number) curve.
-        var levelsAbove1 = level - 1;
-        return 100 * levelsAbove1 * (levelsAbove1 + 1) / 2;
+        // Triangular-number ramp: reaching level L costs sum(100·k) for k in 1..L-1.
+        static int Ramp(int lvl) => 100 * (lvl - 1) * lvl / 2;
+
+        if (level <= XpCurveKneeLevel)
+        {
+            return Ramp(level);
+        }
+
+        // Past the knee: the per-level cost stops rising and holds at what
+        // the next quadratic step (25→26) would have been — a smooth join.
+        var flatPerLevel = 100 * XpCurveKneeLevel;
+        return Ramp(XpCurveKneeLevel) + flatPerLevel * (level - XpCurveKneeLevel);
     }
 
     /// <summary>
@@ -51,9 +78,9 @@ public static class Leveling
         return Math.Min(MaxCharacterLevel, 10 * unlockedTimeLevel);
     }
 
-    /// <summary>True on levels 5, 10, 15, 20, 25, 30 — a new ability tier unlocks.</summary>
+    /// <summary>True on levels 5, 10, 15, 20, 25, 30 — a new ability tier unlocks. Levels past <see cref="TopAbilityLevel"/> grow stats only, so they return false even though they're valid levels.</summary>
     public static bool UnlocksAbilityTier(int level) =>
-        level > 0 && level <= MaxCharacterLevel && level % LevelsPerAbilityTier == 0;
+        level > 0 && level <= TopAbilityLevel && level % LevelsPerAbilityTier == 0;
 
     /// <summary>Which ability tier (1–6) a level unlocks, or null if it doesn't unlock one.</summary>
     public static int? AbilityTierUnlockedAt(int level) =>

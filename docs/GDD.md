@@ -222,8 +222,18 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
   it trickles — the XP is out where the fight is still real.
 - Soft level cap tied to progress: `character_level ≈ 10 * tier`, where
   `tier` is the scaling tier for the **furthest year the character has
-  reached** (`TimeScale.SoftLevelCapForYear`, clamped to 10–30). Keeps
+  reached** (`TimeScale.SoftLevelCapForYear`, clamped to 10–60). Keeps
   power and depth loosely paired without hard-blocking grinding.
+- **Hard level cap is 60** (`Leveling.MaxCharacterLevel`, raised 30 → 60).
+  At the old cap a Traveler stopped growing around year 2500 and rode the
+  back 5/6 of the timeline with frozen power; levels 31–60 keep the stat
+  and HP/Tachyon curves climbing so year 5000 is a reachable target. The
+  **ability trees are unchanged — still 6 tiers, topping out at level 30**
+  (`Leveling.TopAbilityLevel`); levels 31–60 grant no new abilities yet
+  (see §4.2). The XP curve is quadratic through level 25
+  (`Leveling.XpCurveKneeLevel`) then holds a flat per-level cost, so the
+  deep levels are a linear grind rather than a quadratic wall — levels
+  1–25 cost exactly what they did before the raise.
 - Every level grants a stat increase — **+2 to the class's primary stat,
   +1 to each of the other three** (`Leveling.PrimaryStatGainPerLevel` /
   `SecondaryStatGainPerLevel`). So a veteran's defence and speed (both
@@ -233,10 +243,19 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
 - **HP growth tapers.** Full `HpPerLevel` through level 15
   (`ClassDefinition.HpGrowthKneeLevel`), then half rate to the cap — a
   flat-linear pool ran away from what any deep-future monster could
-  threaten (a level-cap Soldier had ~10× base HP). Early/mid game is
-  unchanged; a level-30 Soldier is ~160 HP instead of ~200.
+  threaten (a level-30 Soldier had ~10× base HP under the old curve).
+  Early/mid game is unchanged; a level-30 Soldier is ~160 HP, and even at
+  the raised level-60 cap a Soldier is only ~249 HP — the half-rate tail
+  keeps the deep levels' pool bounded against the superlinear monster
+  scaling (§6).
 
 ### 4.2 Ability trees (original design, 6 tiers per class = levels 5/10/15/20/25/30)
+
+> **Level cap 60, ability trees still 6 tiers.** The hard level cap was
+> raised to 60 (§4.1) but the ability trees below were not extended — the
+> last tier still unlocks at level 30 (Engineer 21). Levels 31–60 are
+> stat/HP growth only. Extending the trees with survival-focused deep
+> tiers is a planned follow-up ("Reaching Year 5000" design plan, Step 2).
 
 > **Engineer exception:** its tree unlocks on an accelerated schedule —
 > **levels 2 / 5 / 9 / 13 / 17 / 21** — because the Engineer is the

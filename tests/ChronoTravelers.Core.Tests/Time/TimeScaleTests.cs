@@ -48,8 +48,9 @@ public class TimeScaleTests
     [Theory]
     [InlineData(2000, 10)]
     [InlineData(2250, 20)]
-    [InlineData(3000, 30)] // 10 * tier 5 -> clamped at the hard cap
-    [InlineData(5000, 30)]
+    [InlineData(3000, 50)] // 10 * tier 5 -> under the raised hard cap of 60
+    [InlineData(4000, 60)] // 10 * tier 7 -> clamped at the hard cap
+    [InlineData(5000, 60)] // 10 * tier 9 -> clamped at the hard cap
     public void SoftLevelCapForYear_TracksTheYearButNeverExceedsTheHardCap(int year, int expectedCap)
     {
         Assert.Equal(expectedCap, TimeScale.SoftLevelCapForYear(year));
