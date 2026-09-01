@@ -108,6 +108,11 @@ using Spectre.Console;
 AppDomain.CurrentDomain.UnhandledException += (_, e) => CrashHandler(e.ExceptionObject as Exception);
 System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) => CrashHandler(e.Exception);
 
+// Restore the persisted master volume before anything plays (the title
+// theme fires from the first RenderTitle() below). Adjusted any time with
+// +/- — see AudioManager.TryApplyVolumeCommand and docs/AUDIO.md.
+AudioManager.LoadSettings();
+
 // `--connect <url>` (or `connect <url>`) plays on a shared-world server
 // instead of the local single-player timeline (docs/SERVER.md).
 var connectUrl = ConnectTarget(args);
@@ -189,6 +194,15 @@ while (running)
     var input = rawInput.Trim();
     if (input.Length == 0)
     {
+        continue;
+    }
+
+    // Volume (+ / - / volume) is a session control, not a game action — it
+    // adjusts and persists master audio without advancing the world.
+    var volumeLevel = AudioManager.TryApplyVolumeCommand(input);
+    if (volumeLevel is not null)
+    {
+        AnsiConsole.MarkupLine($"[grey]Volume {volumeLevel}%[/]");
         continue;
     }
 
@@ -643,6 +657,11 @@ static void RenderTitle()
     AnsiConsole.MarkupLine("[grey]It frayed the future. The gantry crew fell downstream with it — you among them,[/]");
     AnsiConsole.MarkupLine("[grey]surfacing somewhere between 2000 and 5000 A.D. with no way to steer and no way home.[/]");
     AnsiConsole.MarkupLine("[grey]Ride the Tachyon surges. Go as far downstream as you can. The surface team is still looking.[/]");
+
+    // docs/AUDIO.md: the ~30s title theme, first time only this run — both
+    // entry points above call RenderTitle() exactly once, so this is where
+    // "only plays the first time the title screen loads for a session" lives.
+    AudioManager.PlayTitleThemeOnce();
 }
 
 /// <summary>
@@ -662,11 +681,21 @@ static (Traveler Traveler, long WorldSeed, CharacterSaveData? LoadedSave)? Handl
         AnsiConsole.MarkupLine("  [green]3[/]. How to play");
         AnsiConsole.MarkupLine("  [green]4[/]. Help");
         AnsiConsole.MarkupLine("  [green]5[/]. Quit");
+        AnsiConsole.MarkupLine($"  [grey]+ / − — volume ({AudioManager.VolumePercent}%)[/]");
 
         var input = ReadNonEmptyLine("> ");
         if (input is null)
         {
             return null;
+        }
+
+        // +/- adjust master volume from the menu just as they do in-game;
+        // stay on the menu afterwards rather than falling through.
+        var volumeLevel = AudioManager.TryApplyVolumeCommand(input);
+        if (volumeLevel is not null)
+        {
+            AnsiConsole.MarkupLine($"[grey]Volume {volumeLevel}%[/]");
+            continue;
         }
 
         switch (input.ToLowerInvariant())
@@ -1732,6 +1761,8 @@ static void HandleTravel(Traveler traveler, TimeWorld world, IRandomSource rando
         broadcast.Publish(GameEvent.LevelReached(traveler.Name, traveler.Level, targetYear));
     }
 
+    AudioManager.PlayTimeTravelSfx(); // docs/AUDIO.md: transporter-style cue on every successful jump.
+
     var arrival = world.GetYear(targetYear);
     AnsiConsole.MarkupLine($"[bold]You travel to {targetYear} A.D. — {Markup.Escape(arrival.Era.Name)}.[/] [grey]({result.TachyonsSpent} Tachyons)[/]");
     broadcast.Publish(GameEvent.TimeTraveled(traveler.Name, targetYear));
@@ -2086,6 +2117,7 @@ static bool HandleMove(Traveler traveler, TimeWorld world, Direction direction)
     }
 
     traveler.MoveTo(result.Destination!.Value);
+    AudioManager.MaybePlayMovementSfx(); // docs/AUDIO.md: random, not every step.
     return true;
 }
 
@@ -2307,6 +2339,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]save[/]                - save your character now");
     AnsiConsole.MarkupLine("  [green]leaderboard[/] (or board) - show the leaderboards, your best highlighted");
     AnsiConsole.MarkupLine("  [green]status[/]              - show the status bar");
+    AnsiConsole.MarkupLine("  [green]+[/] / [green]-[/] (or volume)   - turn master audio up / down (persists across sessions; costs no turn)");
     AnsiConsole.MarkupLine("  [green]wait[/] (or z)         - pass a turn (a monster in the room may get a hit in)");
     AnsiConsole.MarkupLine("  [green]help[/] (or ?)         - show this list");
     AnsiConsole.MarkupLine("  [green]quit[/] (or exit)      - leave the game (auto-saves unless you died)");

@@ -75,6 +75,12 @@ Source: "{#MyPublishDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversio
 ; ContentLoader loads them from AppContext.BaseDirectory\Content at startup;
 ; without them the game silently falls back to a tiny 3-era sandbox.
 Source: "{#MyPublishDir}\Content\*"; DestDir: "{app}\Content"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Sound assets (docs/AUDIO.md) - same story as Content\* above: WAV files
+; can't be bundled into the single-file exe, so `dotnet publish` drops them
+; next to it under Audio\, and AudioManager.cs reads them from
+; AppContext.BaseDirectory\Audio at startup. Missing files just mean no
+; sound (AudioManager never throws for it), not a broken install.
+Source: "{#MyPublishDir}\Audio\*"; DestDir: "{app}\Audio"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
 
 [Icons]

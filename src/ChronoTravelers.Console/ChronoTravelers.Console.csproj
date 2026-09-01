@@ -31,6 +31,8 @@
   <ItemGroup>
     <PackageReference Include="Spectre.Console" Version="0.57.2" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.11" />
+    <!-- Windows waveOut playback for AudioManager.cs (docs/AUDIO.md). -->
+    <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -57,6 +59,20 @@
     -->
     <Content Include="..\ChronoTravelers.Content\*.json">
       <Link>Content\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Sound assets (docs/AUDIO.md) - WAV files can't be embedded/bundled
+      into the single-file exe either, same reasoning as Content\*.json
+      above: they sit next to it under Audio\, and AudioManager.cs reads
+      them from AppContext.BaseDirectory\Audio at runtime. See
+      installer/ChronoTravelers.iss for the packaged-install side of this.
+    -->
+    <Content Include="Audio\*.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

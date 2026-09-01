@@ -77,6 +77,14 @@ dotnet run --project src/ChronoTravelers.Server -- --port 4000 --http-port 5000
 ChronoTravelers.exe --connect http://<host>:5000     # or:  telnet <host> 4000
 ```
 
+### Sound
+
+The Windows console app plays a short original title theme once per run and
+a few ambient sound effects while you play — see
+[`docs/AUDIO.md`](docs/AUDIO.md) for what plays when and how to swap in your
+own audio. Sound never plays for `ChronoTravelers.Server` (headless) or a
+raw telnet client.
+
 ## Start here
 
 - [`research/ORIGINAL_MUTANTS_RESEARCH.md`](research/ORIGINAL_MUTANTS_RESEARCH.md) —
