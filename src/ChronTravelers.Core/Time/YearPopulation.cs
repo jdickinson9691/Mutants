@@ -51,9 +51,12 @@ public sealed class YearPopulation
     private const double SecondApexChance = 0.20;
 
     /// <summary>
-    /// Places <c>max(2, roomCount / 3)</c> monsters (roster factories
+    /// Places <c>max(4, roomCount * 2/5)</c> monsters (roster factories
     /// picked at random) in distinct non-start rooms, deterministically
-    /// from <paramref name="worldSeed"/> + <paramref name="year"/>. If
+    /// from <paramref name="worldSeed"/> + <paramref name="year"/>. The
+    /// floor of 4 keeps the small (~9-room) maps from feeling deserted once
+    /// infighting thins them; the respawn trickle in
+    /// <c>MonsterController</c> tops back up toward this count. If
     /// <paramref name="apexRoster"/> is non-empty, 0–2 apex monsters
     /// (<see cref="Monster.IsApex"/>) are placed in further rooms alongside
     /// the regular population. If <paramref name="wardenFactory"/> is
@@ -89,7 +92,7 @@ public sealed class YearPopulation
 
         var count = roster.Count == 0
             ? 0
-            : Math.Min(rooms.Count, Math.Max(2, map.RoomCount / 3));
+            : Math.Min(rooms.Count, Math.Max(4, map.RoomCount * 2 / 5));
 
         var monsters = new List<Monster>(count);
         for (var i = 0; i < count; i++)

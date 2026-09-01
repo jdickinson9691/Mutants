@@ -167,6 +167,7 @@ else
 var npcs = SpawnNpcs(world, random);
 var simulation = new WorldSimulation(world, npcs, random);
 var shownBroadcastCount = 0;
+var elsewhereBacklog = 0;
 
 AnsiConsole.WriteLine();
 AnsiConsole.MarkupLine($"Welcome, [bold]{Markup.Escape(traveler.Name)}[/] the [bold]{traveler.Class}[/]. Type [yellow]help[/] for commands.");
@@ -242,6 +243,7 @@ while (running)
         case "news" or "broadcast":
             RenderBroadcast(simulation.Broadcast, count: 10);
             shownBroadcastCount = simulation.Broadcast.Events.Count;
+            elsewhereBacklog = 0;
             break;
 
         case "stores":
@@ -356,7 +358,7 @@ while (running)
             AnsiConsole.MarkupLine($"[grey italic]{Markup.Escape(line)}[/]");
         }
 
-        shownBroadcastCount = RenderNewBroadcastEvents(simulation.Broadcast, shownBroadcastCount, traveler.CurrentYear);
+        shownBroadcastCount = RenderNewBroadcastEvents(simulation.Broadcast, shownBroadcastCount, traveler.CurrentYear, ref elsewhereBacklog);
 
         if (traveler.Health.IsDead)
         {
@@ -1862,14 +1864,21 @@ static void RenderBroadcast(BroadcastChannel broadcast, int count)
 /// Prints broadcast events published since <paramref name="alreadyShownCount"/>,
 /// as an inline feed after a command. Only events in the player's own year
 /// (<paramref name="playerYear"/>) — plus any not tied to a year, and any
-/// ambush on the player — show inline; everything happening elsewhere in
-/// the timeline is the bulk of the channel and is noise here, summarised
-/// as a count and left for the full <c>news</c> view. Returns the new
-/// total (all events count as "seen" so they don't resurface later).
+/// ambush on the player — show inline. Everything happening elsewhere in
+/// the timeline is the bulk of the channel; it's left for the full
+/// <c>news</c> view and only surfaces here as an occasional one-line nudge
+/// once <paramref name="elsewhereBacklog"/> has piled up past a threshold —
+/// a per-turn "…and N more" line was just noise. Returns the new total (all
+/// events count as "seen" so they don't resurface later).
 /// </summary>
-static int RenderNewBroadcastEvents(BroadcastChannel broadcast, int alreadyShownCount, int playerYear)
+static int RenderNewBroadcastEvents(BroadcastChannel broadcast, int alreadyShownCount, int playerYear, ref int elsewhereBacklog)
 {
     const int InlineFeedCap = 6;
+    // The whole timeline is simulated every tick, so ~5-10 "elsewhere"
+    // events land per turn even when the player's year is quiet. Only nudge
+    // once a big pile has built up, so it reads as an occasional "you've
+    // missed a lot" rather than per-turn chatter.
+    const int ElsewhereNudgeThreshold = 100;
 
     var events = broadcast.Events;
     var fresh = new List<GameEvent>();
@@ -1907,10 +1916,19 @@ static int RenderNewBroadcastEvents(BroadcastChannel broadcast, int alreadyShown
         AnsiConsole.MarkupLine($"[{colour}]* {Markup.Escape(evt.Message)}[/]");
     }
 
-    var hidden = (fresh.Count - shown.Count) + elsewhere;
-    if (hidden > 0)
+    // Local events that overflowed the cap still belong "here" — mention them.
+    var localHidden = fresh.Count - shown.Count;
+    if (localHidden > 0)
     {
-        AnsiConsole.MarkupLine($"[grey]  …and {hidden} more across the timeline (see [yellow]news[/]).[/]");
+        AnsiConsole.MarkupLine($"[grey]  …and {localHidden} more here (see [yellow]news[/]).[/]");
+    }
+
+    // The rest of the timeline: accumulate quietly, nudge only now and then.
+    elsewhereBacklog += elsewhere;
+    if (elsewhereBacklog >= ElsewhereNudgeThreshold)
+    {
+        AnsiConsole.MarkupLine($"[grey]  The timeline's been busy — {elsewhereBacklog} events elsewhere since you last checked [yellow]news[/].[/]");
+        elsewhereBacklog = 0;
     }
 
     return events.Count;
@@ -2174,7 +2192,7 @@ static void RenderRoom(Traveler traveler, TimeWorld world)
         AnsiConsole.MarkupLine($"[yellow]On the ground:[/] {Markup.Escape(NameList(ground.Select(i => i.Name).ToList()))}. [grey](take <item>)[/]");
         if (ground.Any(i => i.IsTimeShard))
         {
-            AnsiConsole.MarkupLine("  [bold magenta]A Time Shard glints among it — this year's, and yours alone.[/]");
+            AnsiConsole.MarkupLine("  [bold magenta]A Time Shard glints here — this year's, and yours alone.[/]");
         }
     }
 

@@ -42,7 +42,16 @@ public static class MonsterController
 
     private const double InfightChance = 0.20;
     private const double HealHpThreshold = 0.40;
+
+    /// <summary>Idle top-up cadence when the year is within one of its soft cap — a slow trickle, rolled against <see cref="RespawnChance"/>.</summary>
     private const int RespawnCheckInterval = 12;
+
+    /// <summary>Catch-up cadence when the year is <see cref="RespawnCatchUpDeficit"/>+ monsters short (e.g. just after an infight die-off) — fires every check, no roll, so a thinned year refills in a handful of turns instead of a minute.</summary>
+    private const int RespawnCatchUpInterval = 4;
+
+    /// <summary>Deficit (soft cap − living regular monsters) at or above which the fast catch-up cadence kicks in.</summary>
+    private const int RespawnCatchUpDeficit = 2;
+
     private const double RespawnChance = 0.25;
     private const int DuelRoundCap = 200;
 
@@ -523,18 +532,31 @@ public static class MonsterController
         IRandomSource random)
     {
         population.TicksSinceRespawn++;
-        if (population.TicksSinceRespawn < RespawnCheckInterval)
+
+        // SoftCap counts the regular roster only — a seeded apex shouldn't
+        // starve the ordinary respawn trickle.
+        var livingRegular = population.Monsters.Count(m => !m.Health.IsDead && !m.IsApex);
+        var deficit = population.SoftCap - livingRegular;
+        if (roster.Count == 0 || deficit <= 0)
+        {
+            // At or over cap — nothing to do; don't let the timer run away so
+            // the next real die-off starts its countdown from zero.
+            population.TicksSinceRespawn = 0;
+            return;
+        }
+
+        // A big deficit (a die-off) refills fast and unconditionally; the
+        // last one or two trickle back on the slow rolled cadence.
+        var catchingUp = deficit >= RespawnCatchUpDeficit;
+        var interval = catchingUp ? RespawnCatchUpInterval : RespawnCheckInterval;
+        if (population.TicksSinceRespawn < interval)
         {
             return;
         }
 
         population.TicksSinceRespawn = 0;
 
-        // SoftCap counts the regular roster only — a seeded apex shouldn't
-        // starve the ordinary respawn trickle.
-        if (roster.Count == 0
-            || population.Monsters.Count(m => !m.Health.IsDead && !m.IsApex) >= population.SoftCap
-            || random.NextDouble() >= RespawnChance)
+        if (!catchingUp && random.NextDouble() >= RespawnChance)
         {
             return;
         }

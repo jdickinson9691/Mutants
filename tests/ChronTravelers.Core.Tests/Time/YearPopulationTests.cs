@@ -11,11 +11,12 @@ public class YearPopulationTests
         TestTimeWorld.Build(seed).GetYear(year).Population;
 
     [Fact]
-    public void Seed_PlacesMaxOfTwoOrAThirdOfTheRoomsInDistinctNonStartRooms()
+    public void Seed_PlacesMaxOfFourOrTwoFifthsOfTheRoomsInDistinctNonStartRooms()
     {
         var content = TestTimeWorld.Build(seed: 777).GetYear(2200);
         var pop = content.Population;
-        var expected = System.Math.Max(2, content.Map.RoomCount / 3);
+        var nonStartRooms = content.Map.RoomCount - 1;
+        var expected = System.Math.Min(nonStartRooms, System.Math.Max(4, content.Map.RoomCount * 2 / 5));
 
         // The regular roster is the soft cap; a year may also seed an apex
         // or two on top (Monster.IsApex), placed in further distinct rooms.
