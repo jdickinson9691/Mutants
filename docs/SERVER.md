@@ -11,8 +11,12 @@ console yet (see *Not done yet* below).
 | Project | Role |
 |---|---|
 | `ChronTravelers.Game` | Transport-agnostic shared-world layer — `SharedGame` (owns the world + sessions + `WorldSimulation`, one lock), `Session`, `Commands` (the verb set), `Render` (plain-text output via `IGameOutput`). No networking. |
-| `ChronTravelers.Server` | The host: bootstraps a `SharedGame`, runs the tick loop, and serves a **telnet** front end — account login (PBKDF2), character select/create, then a line REPL. LiteDB `server.db` for accounts + characters. |
-| `ChronTravelers.Game.Tests` | xUnit coverage for the Game layer. |
+| `ChronTravelers.Server` | The host: bootstraps a `SharedGame`, runs the tick loop, and serves **two** front ends onto it — raw **telnet** and a **SignalR hub** (`/game`). Both do account login (PBKDF2), character select/create, then a command stream. LiteDB `server.db` for accounts + characters. |
+| `ChronTravelers.Game.Tests` | xUnit coverage for the Game layer + `CharacterFactory`. |
+
+`ChronTravelers.Console --connect <url>` is the SignalR client — the
+console's normal renderer, but every line comes from the server's
+`Receive` push and every command goes out via `Send`.
 
 `WorldSimulation.TickMultiplayer(IReadOnlyList<PlayerTickState>)` is the
 one Engine addition — the N-player counterpart to `Tick(player)`: Ion
@@ -23,21 +27,30 @@ ambush/narration are shared fairly), and an unattended pass elsewhere.
 ## Run it
 
 ```
-dotnet run --project src/ChronTravelers.Server -- [--port N] [--db PATH] [--tick-ms N] [--seed N]
+dotnet run --project src/ChronTravelers.Server -- [--port N] [--http-port N] [--db PATH] [--tick-ms N] [--seed N]
 ```
 
-Defaults: port `4000` (or `$CHRONTRAVELERS_PORT`), `%APPDATA%\ChronTravelers\server.db`,
+Defaults: telnet port `4000` (or `$CHRONTRAVELERS_PORT`), SignalR/HTTP port
+`5000` (or `$CHRONTRAVELERS_HTTP_PORT`), `%APPDATA%\ChronTravelers\server.db`,
 2000 ms tick, a fresh random seed each start.
 
 ## Connect
+
+**SignalR client (the console):**
+
+```
+ChronTravelers.exe --connect http://<host>:5000
+```
+
+**Telnet:**
 
 ```
 telnet <host> 4000
 ```
 
-You'll be asked for an account name (new ones are created on the spot with
-a password), then to pick or create a Traveler — a new one is offered only
-the classes that account hasn't played. Then you're in the shared world.
+Either way: account name (new ones are created on the spot with a
+password), then pick or create a Traveler — a new one is offered only the
+classes that account hasn't played. Then you're in the shared world.
 
 ### Commands
 
@@ -51,8 +64,6 @@ at full health. Characters autosave on disconnect and every ~60 s.
 
 ## Not done yet
 
-- **Rich client.** Only telnet today. SignalR + a `ChronTravelers.Console --connect`
-  mode is the next transport (the doc's "real client").
 - **Command parity.** No stores/shopping, no interactive `cast`/abilities,
   no player-owned stores, no ranged `shoot`, no `look`-after-tick nicety.
   The console keeps its own fuller command loop for now; consolidating the

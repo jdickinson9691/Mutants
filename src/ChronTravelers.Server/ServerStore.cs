@@ -10,7 +10,7 @@ namespace ChronTravelers.Server;
 /// <see cref="CharacterSaveData"/> shape the console uses, just scoped to
 /// an account rather than living in a per-machine file.
 /// </summary>
-internal sealed class ServerStore : IDisposable
+public sealed class ServerStore : IDisposable
 {
     private readonly LiteDatabase _db;
     private readonly ILiteCollection<AccountRecord> _accounts;
@@ -83,7 +83,7 @@ internal sealed class ServerStore : IDisposable
 
     public void Dispose() => _db.Dispose();
 
-    internal sealed class AccountRecord
+    public sealed class AccountRecord
     {
         public ObjectId Id { get; set; } = ObjectId.NewObjectId();
         public string Key { get; set; } = "";
@@ -93,7 +93,7 @@ internal sealed class ServerStore : IDisposable
         public DateTime CreatedUtc { get; set; }
     }
 
-    internal sealed class CharacterRecord
+    public sealed class CharacterRecord
     {
         public ObjectId Id { get; set; } = ObjectId.NewObjectId();
         public string Account { get; set; } = "";

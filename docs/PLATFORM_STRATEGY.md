@@ -127,13 +127,14 @@ version of "multiplayer" and is a near-exact spiritual match:
 
 ### Option B — Turn-based / asynchronous shared world (MUD-style — matches the genre's own roots)
 
-> **Status (2026-08-31): foundation implemented.** `ChronTravelers.Game`
-> (shared-world layer) + `ChronTravelers.Server` (telnet host, PBKDF2
-> accounts, LiteDB) + `WorldSimulation.TickMultiplayer` are in the repo and
-> tested; two clients can log in and play alongside each other and the
-> NPCs. See `docs/SERVER.md`. The remaining work is the rich client
-> (SignalR), command parity with the console, and Postgres — not the core
-> hosting model.
+> **Status (2026-09-01): implemented.** `ChronTravelers.Game`
+> (shared-world layer) + `ChronTravelers.Server` (telnet **and** SignalR
+> hub, PBKDF2 accounts, LiteDB) + `WorldSimulation.TickMultiplayer` +
+> `ChronTravelers.Console --connect <url>` (the SignalR client). Clients on
+> either transport log in and play one shared ticking timeline alongside
+> the NPCs; verified live. See `docs/SERVER.md`. Remaining: command parity
+> with the single-player console (stores, abilities, ranged), Postgres,
+> and auth hardening — not the core hosting model.
 
 Medium effort, and — this is the important finding from actually reading
 the code — **the architecture is already most of the way there**:

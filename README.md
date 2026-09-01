@@ -69,12 +69,12 @@ path) before exiting — attach that when reporting a crash.
 ### Shared-world server (experimental)
 
 `ChronTravelers.Server` hosts one timeline that multiple players connect
-into over telnet — `docs/PLATFORM_STRATEGY.md` Option B. Foundation only
-(see `docs/SERVER.md`):
+into — over the **`--connect`** SignalR client or raw **telnet**
+(`docs/PLATFORM_STRATEGY.md` Option B; see `docs/SERVER.md`):
 
 ```
-dotnet run --project src/ChronTravelers.Server -- --port 4000
-telnet <host> 4000
+dotnet run --project src/ChronTravelers.Server -- --port 4000 --http-port 5000
+ChronTravelers.exe --connect http://<host>:5000     # or:  telnet <host> 4000
 ```
 
 ## Start here

@@ -6,15 +6,22 @@ using ChronTravelers.Engine.Content;
 using ChronTravelers.Engine.Npc;
 using ChronTravelers.Game;
 using ChronTravelers.Server;
+using ChronTravelers.Server.Hub;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 // ChronTravelers shared-world server (docs/PLATFORM_STRATEGY.md Option B).
-// One TimeWorld ticks on a real clock; telnet clients log into an account,
-// pick or make a Traveler, and play alongside each other and the NPCs.
+// One TimeWorld ticks on a real clock; players connect over telnet OR the
+// SignalR hub (the ChronTravelers.Console --connect client). Both front
+// ends share the one SharedGame.
 //
-// Usage: ChronTravelers.Server [--port N] [--db PATH] [--tick-ms N] [--seed N]
+// Usage: ChronTravelers.Server [--port N] [--http-port N] [--db PATH] [--tick-ms N] [--seed N]
 
 var opts = ParseArgs(args);
-var port = opts.GetInt("--port", EnvInt("CHRONTRAVELERS_PORT", 4000));
+var telnetPort = opts.GetInt("--port", EnvInt("CHRONTRAVELERS_PORT", 4000));
+var httpPort = opts.GetInt("--http-port", EnvInt("CHRONTRAVELERS_HTTP_PORT", 5000));
 var tickMs = opts.GetInt("--tick-ms", 2000);
 var dbPath = opts.Get("--db") ?? DefaultDbPath();
 var seed = opts.GetLong("--seed", DateTime.UtcNow.Ticks);
@@ -23,7 +30,7 @@ Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(dbPath))!);
 
 void Log(string m) => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {m}");
 
-Log($"ChronTravelers server starting — seed {seed}, tick {tickMs}ms, db {dbPath}");
+Log($"ChronTravelers server starting — seed {seed}, tick {tickMs}ms, telnet :{telnetPort}, signalr :{httpPort}, db {dbPath}");
 
 var contentDir = Path.Combine(AppContext.BaseDirectory, "Content");
 TimeWorld world;
@@ -51,7 +58,25 @@ var game = new SharedGame(world, npcs, random);
 using var shutdown = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; Log("Shutdown requested."); shutdown.Cancel(); };
 
-// World tick loop.
+// --- SignalR host --------------------------------------------------------
+
+var builder = WebApplication.CreateBuilder();
+builder.Logging.ClearProviders();
+builder.Logging.AddSimpleConsole(o => o.SingleLine = true).SetMinimumLevel(LogLevel.Warning);
+builder.WebHost.UseUrls($"http://0.0.0.0:{httpPort}");
+builder.Services.AddSignalR();
+builder.Services.AddSingleton(game);
+builder.Services.AddSingleton(store);
+builder.Services.AddSingleton(new WorldSeed(seed));
+builder.Services.AddSingleton<HubSessions>();
+
+var app = builder.Build();
+app.MapHub<GameHub>("/game");
+await app.StartAsync(shutdown.Token).ConfigureAwait(false);
+Log($"SignalR hub at http://<host>:{httpPort}/game  —  console: `--connect http://<host>:{httpPort}`");
+
+// --- world tick loop ---------------------------------------------------
+
 var tickLoop = Task.Run(async () =>
 {
     using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(tickMs));
@@ -77,9 +102,11 @@ var tickLoop = Task.Run(async () =>
     }
 });
 
-var listener = new TcpListener(IPAddress.Any, port);
+// --- telnet listener -------------------------------------------------
+
+var listener = new TcpListener(IPAddress.Any, telnetPort);
 listener.Start();
-Log($"Listening on port {port}. `telnet <host> {port}` to connect.  Ctrl+C to stop.");
+Log($"Telnet on :{telnetPort} — `telnet <host> {telnetPort}`.  Ctrl+C to stop.");
 
 try
 {
@@ -102,6 +129,7 @@ finally
 {
     listener.Stop();
     try { await tickLoop.ConfigureAwait(false); } catch (OperationCanceledException) { }
+    await app.StopAsync().ConfigureAwait(false);
 
     foreach (var s in game.SnapshotSessions())
     {

@@ -108,6 +108,16 @@ using Spectre.Console;
 AppDomain.CurrentDomain.UnhandledException += (_, e) => CrashHandler(e.ExceptionObject as Exception);
 System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) => CrashHandler(e.Exception);
 
+// `--connect <url>` (or `connect <url>`) plays on a shared-world server
+// instead of the local single-player timeline (docs/SERVER.md).
+var connectUrl = ConnectTarget(args);
+if (connectUrl is not null)
+{
+    RenderTitle();
+    await ServerClient.RunAsync(connectUrl);
+    return;
+}
+
 RenderTitle();
 
 var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -582,6 +592,20 @@ static List<Traveler> SpawnNpcs(TimeWorld world, IRandomSource random)
     }
 
     return NpcPopulation.Spawn(count, world, random).ToList();
+}
+
+/// <summary>Returns the server URL from `--connect &lt;url&gt;` or `connect &lt;url&gt;`, or null for the normal local game.</summary>
+static string? ConnectTarget(string[] argv)
+{
+    for (var i = 0; i < argv.Length - 1; i++)
+    {
+        if (argv[i] is "--connect" or "connect")
+        {
+            return argv[i + 1];
+        }
+    }
+
+    return null;
 }
 
 /// <summary>The custom ChronTravelers wordmark shown once at launch (a hand-set banner, not Spectre's Figlet), with a timeline motif and the intro flavour.</summary>

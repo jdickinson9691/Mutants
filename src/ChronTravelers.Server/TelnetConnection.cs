@@ -1,8 +1,6 @@
 using System.Net.Sockets;
 using System.Text;
 using ChronTravelers.Core.Characters;
-using ChronTravelers.Core.Classes;
-using ChronTravelers.Core.Items;
 using ChronTravelers.Engine.Persistence;
 using ChronTravelers.Game;
 
@@ -257,14 +255,7 @@ internal sealed class TelnetConnection
             break;
         }
 
-        var played = saved
-            .Select(c => Enum.TryParse<CharacterClass>(c.Class, true, out var cc) ? cc : (CharacterClass?)null)
-            .Where(c => c is not null).Select(c => c!.Value).ToHashSet();
-        var offered = Enum.GetValues<CharacterClass>().Where(c => !played.Contains(c)).ToList();
-        if (offered.Count == 0)
-        {
-            offered = Enum.GetValues<CharacterClass>().ToList();
-        }
+        var offered = CharacterFactory.OfferedClasses(saved);
 
         _out.Line("Choose your role:");
         for (var i = 0; i < offered.Count; i++)
@@ -282,13 +273,7 @@ internal sealed class TelnetConnection
 
             if (int.TryParse(pick.Trim(), out var n) && n >= 1 && n <= offered.Count)
             {
-                var traveler = new Traveler(name, offered[n - 1]);
-                for (var i = 0; i < 3; i++)
-                {
-                    traveler.AddToInventory(Item.Create("Field Ration", ItemType.Consumable, 1, Rarity.Common,
-                        consumableEffect: ConsumableEffectType.Heal, effectMagnitude: 12));
-                }
-
+                var traveler = CharacterFactory.NewTraveler(name, offered[n - 1]);
                 _out.Line($"You're the {traveler.Class} now. Downstream is the only direction that means anything.");
                 return traveler;
             }
