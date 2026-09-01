@@ -27,4 +27,16 @@ public readonly record struct StatBlock(int Strength, int Agility, int Resolve, 
         PrimaryStat.Intellect => this with { Intellect = Intellect + amount },
         _ => throw new ArgumentOutOfRangeException(nameof(stat), stat, null),
     };
+
+    /// <summary>
+    /// The per-level-up bump (docs/GDD.md §4.1): <paramref name="primaryGain"/>
+    /// to <paramref name="primary"/>, <paramref name="otherGain"/> to each
+    /// of the other three. Every stat grows every level, just faster for
+    /// the class's primary.
+    /// </summary>
+    public StatBlock LevelUp(PrimaryStat primary, int primaryGain, int otherGain) => new(
+        Strength + (primary == PrimaryStat.Strength ? primaryGain : otherGain),
+        Agility + (primary == PrimaryStat.Agility ? primaryGain : otherGain),
+        Resolve + (primary == PrimaryStat.Resolve ? primaryGain : otherGain),
+        Intellect + (primary == PrimaryStat.Intellect ? primaryGain : otherGain));
 }

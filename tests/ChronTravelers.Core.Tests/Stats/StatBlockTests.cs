@@ -36,4 +36,18 @@ public class StatBlockTests
 
         Assert.Equal(10, original.Strength);
     }
+
+    [Fact]
+    public void LevelUp_BumpsThePrimaryFaster_AndEveryOtherStatToo()
+    {
+        var stats = new StatBlock(Strength: 10, Agility: 10, Resolve: 10, Intellect: 10);
+
+        var next = stats.LevelUp(PrimaryStat.Agility, primaryGain: 5, otherGain: 2);
+
+        Assert.Equal(15, next.Agility);      // primary
+        Assert.Equal(12, next.Strength);     // secondary
+        Assert.Equal(12, next.Resolve);
+        Assert.Equal(12, next.Intellect);
+        Assert.Equal(10, stats.Agility);     // original untouched
+    }
 }

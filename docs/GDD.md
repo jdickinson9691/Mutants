@@ -223,8 +223,12 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
   `tier` is the scaling tier for the **furthest year the character has
   reached** (`TimeScale.SoftLevelCapForYear`, clamped to 10–30). Keeps
   power and depth loosely paired without hard-blocking grinding.
-- Every level grants a stat increase; every **5th level** grants a new class
-  ability (see §4.2), rewarding both steady growth and periodic power spikes.
+- Every level grants a stat increase — **+5 to the class's primary stat,
+  +2 to each of the other three** (`Leveling.PrimaryStatGainPerLevel` /
+  `SecondaryStatGainPerLevel`). So a veteran's defence and speed (both
+  Agility-derived) keep pace with the deep-future curve instead of
+  staying frozen at the class base. Every **5th level** also grants a new
+  class ability (see §4.2).
 - **HP growth tapers.** Full `HpPerLevel` through level 15
   (`ClassDefinition.HpGrowthKneeLevel`), then half rate to the cap — a
   flat-linear pool ran away from what any deep-future monster could

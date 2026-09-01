@@ -27,17 +27,20 @@ public class TravelerTests
     }
 
     [Fact]
-    public void LevelUp_IncreasesPrimaryStatAndMaxPools()
+    public void LevelUp_GrowsEveryStat_PrimaryFaster_AndMaxPools()
     {
-        var traveler = new Traveler("Rook", CharacterClass.Scientist);
-        var startingIntellect = traveler.Stats.Intellect;
+        var traveler = new Traveler("Rook", CharacterClass.Scientist); // primary: Intellect
+        var before = traveler.Stats;
         var startingMaxHp = traveler.Health.Max;
         var startingMaxIons = traveler.Ions.Max;
 
         traveler.LevelUp();
 
         Assert.Equal(2, traveler.Level);
-        Assert.Equal(startingIntellect + 1, traveler.Stats.Intellect);
+        Assert.Equal(before.Intellect + Leveling.PrimaryStatGainPerLevel, traveler.Stats.Intellect);
+        Assert.Equal(before.Strength + Leveling.SecondaryStatGainPerLevel, traveler.Stats.Strength);
+        Assert.Equal(before.Agility + Leveling.SecondaryStatGainPerLevel, traveler.Stats.Agility);
+        Assert.Equal(before.Resolve + Leveling.SecondaryStatGainPerLevel, traveler.Stats.Resolve);
         Assert.True(traveler.Health.Max > startingMaxHp);
         Assert.True(traveler.Ions.Max > startingMaxIons);
     }

@@ -361,7 +361,7 @@ public class CombatSessionTests
     [Fact]
     public void ConditionalDamage_TagCondition_OnlyBonusesTaggedMonsters()
     {
-        var undead = TankMonster(tags: ["undead"]);
+        var undead = TankMonster(tags: ["undead"], hp: 5000); // big pool so a level-15 caster's 2.5x hit doesn't just kill it
         var turnUndead = MakeAbility("Doctor", 15, "Turn Undead", "Damage", 2.5, ionCost: 16, condition: "TargetTagged", tag: "undead");
         var priest = new Traveler("Faye", CharacterClass.Doctor);
         priest.LevelUp(); priest.LevelUp(); priest.LevelUp(); priest.LevelUp();
@@ -372,7 +372,7 @@ public class CombatSessionTests
         priestSession.Cast(turnUndead);
 
         var priestAttack = priest.EffectiveAttackPower - undead.Defense;
-        Assert.Equal(200 - (int)Math.Round(priestAttack * 2.5), undead.Health.Current);
+        Assert.Equal(5000 - (int)Math.Round(priestAttack * 2.5), undead.Health.Current);
     }
 
     [Fact]

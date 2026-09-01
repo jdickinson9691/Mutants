@@ -201,15 +201,20 @@ public sealed class Traveler
     }
 
     /// <summary>
-    /// Raises Level by 1, grows the primary stat, and recalculates
-    /// Max HP/Ions per docs/GDD.md §4.1 ("Every level grants a stat
-    /// increase"). Does not enforce the soft cap itself — callers
-    /// (GainXp, or explicit debug/testing use) decide whether to call it.
+    /// Raises Level by 1, grows every stat (the primary by
+    /// <see cref="Leveling.PrimaryStatGainPerLevel"/>, the rest by
+    /// <see cref="Leveling.SecondaryStatGainPerLevel"/> — docs/GDD.md §4.1),
+    /// and recalculates Max HP/Ions. Does not enforce the soft cap itself —
+    /// callers (GainXp, or explicit debug/testing use) decide whether to
+    /// call it.
     /// </summary>
     public void LevelUp()
     {
         Level++;
-        Stats = Stats.Increase(ClassDefinition.PrimaryStat);
+        Stats = Stats.LevelUp(
+            ClassDefinition.PrimaryStat,
+            Leveling.PrimaryStatGainPerLevel,
+            Leveling.SecondaryStatGainPerLevel);
         Health.SetMax(ClassDefinition.MaxHpAtLevel(Level));
         Ions.SetMax(ClassDefinition.MaxIonsAtLevel(Level));
     }
