@@ -28,6 +28,18 @@ immediately, including on a clip that's already playing (the title theme
 fading under the menu): `AudioManager` keeps each active clip's
 `AudioFileReader` in `ActivePlayers` and rewrites its `Volume` in place.
 
+On the **start menu specifically**, `+`/`=`/`-`/`_` apply the instant
+they're pressed — no Enter needed — via `Program.ReadMenuLine`, which reads
+key by key instead of a full line and special-cases those four keys before
+they ever reach the buffer. Everything else typed there (`1`–`5`, `play`,
+...) still needs Enter same as always. That live-key handling needs an
+actual interactive console, so it falls back to the old Enter-terminated
+`ReadNonEmptyLine` when stdin is redirected (piped input / automation) —
+the word forms (`volume`/`vol`) still work either way. The in-game prompt
+is unchanged: it already reads full commands a line at a time, so `+`/`-`
+there are typed and submitted like any other command, just without
+costing a turn.
+
 The level is persisted to `%APPDATA%\ChronoTravelers\settings.json`
 (`{ "volume": 0.0–1.0 }`) — loaded once at startup by
 `AudioManager.LoadSettings()` **before** the first `RenderTitle()`, saved

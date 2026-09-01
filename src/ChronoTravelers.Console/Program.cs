@@ -14,6 +14,7 @@ using ChronoTravelers.Engine.Npc;
 using ChronoTravelers.Engine.Persistence;
 using ChronoTravelers.Engine.Simulation;
 using Spectre.Console;
+using System.Text;
 
 // Lore (docs/GDD.md §1): Project Meridian's temporal tunnel - a
 // classified government machine, Time-Tunnel-inspired - tore a standing
@@ -515,6 +516,83 @@ static string? ReadNonEmptyLine(string prompt)
     }
 }
 
+/// <summary>
+/// Same contract as <see cref="ReadNonEmptyLine"/> (used for the start
+/// screen), except the volume hotkeys — <c>+</c>/<c>=</c>/<c>-</c>/<c>_</c> —
+/// apply immediately, key by key, with no Enter needed: matches how a
+/// volume knob should feel, and answers the "why do I have to press Enter
+/// just to turn the title theme down" question the plain Enter-terminated
+/// version has on that screen. Everything else the caller might type still
+/// needs Enter same as any other line. Falls back to
+/// <see cref="ReadNonEmptyLine"/> when stdin is redirected (piped input,
+/// automation) since <see cref="Console.ReadKey(bool)"/> requires an actual
+/// interactive console.
+/// </summary>
+static string? ReadMenuLine(string prompt)
+{
+    if (Console.IsInputRedirected)
+    {
+        return ReadNonEmptyLine(prompt);
+    }
+
+    while (true)
+    {
+        AnsiConsole.Markup(Markup.Escape(prompt));
+        var buffer = new StringBuilder();
+
+        while (true)
+        {
+            var key = Console.ReadKey(intercept: true);
+
+            if (key.Key == ConsoleKey.Enter)
+            {
+                Console.WriteLine();
+                break;
+            }
+
+            if (key.KeyChar is '+' or '=' or '-' or '_')
+            {
+                var level = AudioManager.TryApplyVolumeCommand(key.KeyChar.ToString());
+                if (level is not null)
+                {
+                    Console.WriteLine();
+                    AnsiConsole.MarkupLine($"[grey]Volume {level}%[/]");
+                    AnsiConsole.Markup(Markup.Escape(prompt));
+                    if (buffer.Length > 0)
+                    {
+                        Console.Write(buffer.ToString());
+                    }
+
+                    continue;
+                }
+            }
+
+            if (key.Key == ConsoleKey.Backspace)
+            {
+                if (buffer.Length > 0)
+                {
+                    buffer.Length--;
+                    Console.Write("\b \b");
+                }
+
+                continue;
+            }
+
+            if (!char.IsControl(key.KeyChar))
+            {
+                buffer.Append(key.KeyChar);
+                Console.Write(key.KeyChar);
+            }
+        }
+
+        var trimmed = buffer.ToString().Trim();
+        if (trimmed.Length > 0)
+        {
+            return trimmed;
+        }
+    }
+}
+
 static CharacterClass? ReadClassChoice(IReadOnlyList<CharacterClass> classes)
 {
     AnsiConsole.MarkupLine("Choose your [green]Traveler[/] on the Meridian crew:");
@@ -701,14 +779,19 @@ static (Traveler Traveler, long WorldSeed, CharacterSaveData? LoadedSave)? Handl
         AnsiConsole.MarkupLine("  [green]5[/]. Quit");
         AnsiConsole.MarkupLine($"  [grey]+ / − — volume ({AudioManager.VolumePercent}%)[/]");
 
-        var input = ReadNonEmptyLine("> ");
+        // ReadMenuLine applies +/- the instant they're pressed (no Enter
+        // needed) so the volume hotkeys shown just above feel like a knob,
+        // not a command you have to submit. Anything else typed here still
+        // needs Enter, same as before.
+        var input = ReadMenuLine("> ");
         if (input is null)
         {
             return null;
         }
 
-        // +/- adjust master volume from the menu just as they do in-game;
-        // stay on the menu afterwards rather than falling through.
+        // A volume command can still arrive here if the caller typed the
+        // word form ("volume"/"vol") and pressed Enter, or came in via the
+        // ReadNonEmptyLine fallback for redirected stdin.
         var volumeLevel = AudioManager.TryApplyVolumeCommand(input);
         if (volumeLevel is not null)
         {
