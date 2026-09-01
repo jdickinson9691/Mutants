@@ -13,10 +13,10 @@ public static class Leveling
     public const int AbilityTierCount = 6;
 
     /// <summary>Points added to the class's primary stat on each level-up.</summary>
-    public const int PrimaryStatGainPerLevel = 5;
+    public const int PrimaryStatGainPerLevel = 2;
 
     /// <summary>Points added to each of the other three stats on each level-up.</summary>
-    public const int SecondaryStatGainPerLevel = 2;
+    public const int SecondaryStatGainPerLevel = 1;
 
     /// <summary>
     /// Cumulative XP required to reach <paramref name="level"/> from level 1.
