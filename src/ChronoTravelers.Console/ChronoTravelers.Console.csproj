@@ -78,4 +78,28 @@
     </Content>
   </ItemGroup>
 
+  <!--
+    Belt-and-braces for the packaged build. The .NET SDK's single-file
+    publish pipeline reproducibly drops one Audio\*.wav - title_theme.wav,
+    the largest by far - from its computed _ResolvedFileToPublish list, so
+    the file silently never reaches publish\...\Audio\ and the installed
+    game boots with no title theme. (The other six WAVs, all smaller, copy
+    fine.) Re-copy the whole folder ourselves once publish is done:
+    unconditional, idempotent, and independent of that flaky computed list.
+    See installer/ChronoTravelers.iss (packaging side) and docs/AUDIO.md.
+  -->
+  <Target Name="ForceCopyAudioToPublishDir"
+          AfterTargets="Publish"
+          Condition="'$(PublishDir)' != ''">
+    <ItemGroup>
+      <_AllAudioWav Include="$(MSBuildProjectDirectory)\Audio\*.wav" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AllAudioWav)"
+          DestinationFolder="$(PublishDir)Audio"
+          SkipUnchangedFiles="false"
+          OverwriteReadOnlyFiles="true" />
+    <Message Importance="high"
+             Text="ForceCopyAudioToPublishDir: ensured @(_AllAudioWav->Count()) Audio\*.wav file(s) in $(PublishDir)Audio" />
+  </Target>
+
 </Project>

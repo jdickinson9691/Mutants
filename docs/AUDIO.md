@@ -84,3 +84,11 @@ the single-file publish, so `dotnet publish` copies `Audio/*.wav` next to
 the exe (`ChronoTravelers.Console.csproj`), and
 `installer/ChronoTravelers.iss` bundles that `Audio\` folder into the
 installed app the same way it already does for `Content\`.
+
+The `Content Include="Audio\*.wav"` items handle the normal copy, but the
+SDK's single-file publish pipeline reproducibly drops `title_theme.wav`
+(the largest file) from its computed publish list, so the csproj also has
+a `ForceCopyAudioToPublishDir` target (`AfterTargets="Publish"`) that
+re-copies the whole `Audio\` folder into `$(PublishDir)Audio` afterwards,
+unconditionally. That's what makes a plain `dotnet publish` (local or the
+`release.yml` CI job) ship all seven WAVs with no manual step.
