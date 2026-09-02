@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Engine;
 using ChronoTravelers.Engine.Content;
@@ -49,11 +50,14 @@ var random = new SystemRandomSource();
 int npcCount;
 try { npcCount = ContentLoader.LoadNpcCount(Path.Combine(contentDir, "npc-population.json")); }
 catch (ContentException) { npcCount = 20; }
-var npcs = NpcPopulation.Spawn(npcCount, world, random);
+IReadOnlyDictionary<CharacterClass, double>? npcClassWeights;
+try { npcClassWeights = ContentLoader.LoadNpcClassWeights(Path.Combine(contentDir, "npc-population.json")); }
+catch (ContentException) { npcClassWeights = null; }
+var npcs = NpcPopulation.Spawn(npcCount, world, random, npcClassWeights);
 Log($"Spawned {npcs.Count} NPCs across the timeline.");
 
 using var store = new ServerStore(dbPath);
-var game = new SharedGame(world, npcs, random);
+var game = new SharedGame(world, npcs, random, npcClassWeights);
 
 using var shutdown = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; Log("Shutdown requested."); shutdown.Cancel(); };

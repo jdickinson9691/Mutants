@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Characters;
+using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Events;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Engine;
@@ -21,11 +22,18 @@ public sealed class SharedGame
     private readonly List<Traveler> _npcs;
     private readonly List<Session> _sessions = [];
 
-    public SharedGame(TimeWorld world, IEnumerable<Traveler> npcs, IRandomSource random)
+    /// <param name="npcClassWeights">
+    /// Optional per-class spawn weights (docs/CONTENT_PLAN.md's "config-driven
+    /// NPC class distribution") passed straight through to the
+    /// <see cref="WorldSimulation"/> this game owns, so a respawned NPC keeps
+    /// drawing from the same distribution the initial <paramref name="npcs"/>
+    /// population did. Null (the default) means uniform-random, unchanged.
+    /// </param>
+    public SharedGame(TimeWorld world, IEnumerable<Traveler> npcs, IRandomSource random, IReadOnlyDictionary<CharacterClass, double>? npcClassWeights = null)
     {
         World = world;
         _npcs = npcs.ToList();
-        _sim = new WorldSimulation(world, _npcs, random);
+        _sim = new WorldSimulation(world, _npcs, random, npcClassWeights: npcClassWeights);
     }
 
     public TimeWorld World { get; }

@@ -19,7 +19,11 @@ namespace ChronoTravelers.Engine.Npc;
 /// chatter are things the player actually encounters rather than
 /// statistically-almost-never; any slots beyond that keep the original
 /// whole-timeline scatter as background flavor. The name pool is sandbox
-/// content, not launch content.
+/// content, not launch content. Character class is uniform-random across
+/// <see cref="CharacterClass"/> by default, or drawn from optional
+/// content-authored weights (docs/CONTENT_PLAN.md's "config-driven NPC
+/// class distribution" — see <see cref="PickClass"/> and
+/// ChronoTravelers.Engine.Content.ContentLoader.LoadNpcClassWeights).
 /// </summary>
 public static class NpcPopulation
 {
@@ -52,7 +56,16 @@ public static class NpcPopulation
     /// <summary>How far from the anchor year a freshly (re)spawned local-pool NPC can land — a spread, not a pinpoint, so the local group doesn't all appear in the exact same room-adjacent state. <see cref="ChronoTravelers.Engine.Npc.NpcController"/>'s anchor-pull travel closes the rest of the gap over the next few ticks.</summary>
     public const int LocalSpawnSpreadYears = 60;
 
-    public static IReadOnlyList<Traveler> Spawn(int count, TimeWorld world, IRandomSource random)
+    /// <param name="classWeights">
+    /// Optional per-class spawn weights (docs/CONTENT_PLAN.md's "config-driven
+    /// NPC class distribution" backlog item, loaded via
+    /// ChronoTravelers.Engine.Content.ContentLoader.LoadNpcClassWeights) — a
+    /// class with a higher weight spawns proportionally more often; a class
+    /// missing from the table never spawns. Null or empty (the default)
+    /// keeps the original uniform-random pick across every
+    /// <see cref="CharacterClass"/>. See <see cref="PickClass"/>.
+    /// </param>
+    public static IReadOnlyList<Traveler> Spawn(int count, TimeWorld world, IRandomSource random, IReadOnlyDictionary<CharacterClass, double>? classWeights = null)
     {
         if (count < 0)
         {
@@ -65,7 +78,7 @@ public static class NpcPopulation
         for (var i = 0; i < count; i++)
         {
             var startYear = Math.Clamp(TimeScale.MinYear + (int)(random.NextDouble() * yearSpan), TimeScale.MinYear, TimeScale.MaxYear);
-            npcs.Add(Create(i, startYear, world, random));
+            npcs.Add(Create(i, startYear, world, random, classWeights));
         }
 
         return npcs;
@@ -80,20 +93,20 @@ public static class NpcPopulation
     /// than a fresh whole-timeline random draw that could land it 3000
     /// years away again.
     /// </summary>
-    public static Traveler RespawnNear(int index, int anchorYear, TimeWorld world, IRandomSource random)
+    public static Traveler RespawnNear(int index, int anchorYear, TimeWorld world, IRandomSource random, IReadOnlyDictionary<CharacterClass, double>? classWeights = null)
     {
         var low = Math.Max(TimeScale.MinYear, anchorYear - LocalSpawnSpreadYears);
         var high = Math.Min(TimeScale.MaxYear, anchorYear + LocalSpawnSpreadYears);
         var startYear = low + (int)(random.NextDouble() * (high - low + 1));
-        return Create(index, startYear, world, random);
+        return Create(index, startYear, world, random, classWeights);
     }
 
     /// <summary>One replacement NPC for population slot <paramref name="index"/>, drawn from the whole timeline exactly like the initial <see cref="Spawn"/> — for a dead background-pool member (index at or beyond <see cref="LocalPopulationTarget"/>).</summary>
-    public static Traveler RespawnScattered(int index, TimeWorld world, IRandomSource random)
+    public static Traveler RespawnScattered(int index, TimeWorld world, IRandomSource random, IReadOnlyDictionary<CharacterClass, double>? classWeights = null)
     {
         var yearSpan = TimeScale.MaxYear - TimeScale.MinYear;
         var startYear = Math.Clamp(TimeScale.MinYear + (int)(random.NextDouble() * yearSpan), TimeScale.MinYear, TimeScale.MaxYear);
-        return Create(index, startYear, world, random);
+        return Create(index, startYear, world, random, classWeights);
     }
 
     /// <summary>
@@ -105,13 +118,11 @@ public static class NpcPopulation
     /// behavior; only where the year comes from differs between the three
     /// public entry points above.
     /// </summary>
-    private static Traveler Create(int index, int startYear, TimeWorld world, IRandomSource random)
+    private static Traveler Create(int index, int startYear, TimeWorld world, IRandomSource random, IReadOnlyDictionary<CharacterClass, double>? classWeights)
     {
-        var classes = Enum.GetValues<CharacterClass>();
-
         // Unique per index so leaderboard personal-bests (keyed by name) never collide.
         var name = NamePool[index % NamePool.Length] + (index >= NamePool.Length ? $" {index / NamePool.Length + 1}" : "");
-        var characterClass = classes[(int)(random.NextDouble() * classes.Length)];
+        var characterClass = PickClass(classWeights, random);
 
         var npc = new Traveler(name, characterClass, startingYear: startYear);
         npc.PlaceAt(world.GetYear(startYear).Map.Start);
@@ -128,5 +139,52 @@ public static class NpcPopulation
         npc.Tachyons.Add(npc.Tachyons.Max, respectSoftCap: true); // top off to the nominal pool, not past it
 
         return npc;
+    }
+
+    /// <summary>
+    /// Rolls one <see cref="CharacterClass"/> for a new/respawned NPC.
+    /// Consumes exactly one <see cref="IRandomSource.NextDouble"/> call
+    /// either way, so callers threading a scripted random source don't need
+    /// to know whether <paramref name="weights"/> is set. A null/empty table,
+    /// or one whose weights are all zero/negative, falls back to the
+    /// original uniform pick across every class (a config that would let no
+    /// NPC ever spawn is treated as "not configured" rather than an error) —
+    /// otherwise each class's chance is its weight over the sum of all of
+    /// them, and a class simply absent from the table never spawns.
+    /// </summary>
+    private static CharacterClass PickClass(IReadOnlyDictionary<CharacterClass, double>? weights, IRandomSource random)
+    {
+        var classes = Enum.GetValues<CharacterClass>();
+
+        if (weights is null || weights.Count == 0)
+        {
+            return classes[(int)(random.NextDouble() * classes.Length)];
+        }
+
+        var total = 0.0;
+        foreach (var c in classes)
+        {
+            total += Math.Max(0.0, weights.GetValueOrDefault(c));
+        }
+
+        if (total <= 0.0)
+        {
+            return classes[(int)(random.NextDouble() * classes.Length)];
+        }
+
+        var roll = random.NextDouble() * total;
+        var cumulative = 0.0;
+        foreach (var c in classes)
+        {
+            cumulative += Math.Max(0.0, weights.GetValueOrDefault(c));
+            if (roll < cumulative)
+            {
+                return c;
+            }
+        }
+
+        // Floating-point edge case only (roll landed exactly on the total) —
+        // the last class with a positive weight.
+        return classes.Last(c => weights.GetValueOrDefault(c) > 0.0);
     }
 }

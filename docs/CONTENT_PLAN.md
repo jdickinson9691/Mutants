@@ -86,10 +86,18 @@ file I/O.
       guaranteed year-scaled Legendary weapon trophy
       (`Warden of <year>'s <noun>`). Gates nothing (GDD §3.2).
 
-- [x] **NPC count** — `npc-population.json`: `{ "totalCount": N }`.
-      `NpcPopulation.Spawn` scatters that many NPCs across the timeline,
-      each in a random year, fast-levelled into that year's soft-cap band.
-      Character class per NPC is still uniform-random, not config-driven.
+- [x] **NPC count & class distribution** — `npc-population.json`: `{
+      "totalCount": N, "classWeights"? }`. `NpcPopulation.Spawn` scatters
+      that many NPCs across the timeline, each in a random year,
+      fast-levelled into that year's soft-cap band. `classWeights` is an
+      optional map of `CharacterClass` name → weight (e.g. `{ "Soldier":
+      2, "Doctor": 1 }` spawns twice as many Soldiers as Doctors); a class
+      omitted from the map never spawns. Additive — a missing/empty map
+      falls back to the original uniform-random pick across every class
+      (`ContentLoader.LoadNpcClassWeights`, `NpcPopulation.PickClass`).
+      The same weights are threaded into `WorldSimulation`'s respawns
+      (`RespawnNear`/`RespawnScattered`) so a replaced NPC keeps drawing
+      from the same distribution the initial population did.
 
 - [x] **Ability tables** — `abilities.json` (unchanged by the timeline
       rework). Soldier/Doctor are docs/GDD.md §4.2-sourced; Spy/Scientist/
@@ -122,7 +130,6 @@ Not new plumbing — tuning and polish:
   floor stops a near-free decade-creep that farmed every year on the way;
   only a full cross-timeline leap is still an end-game Tachyon commit.
 - **More / finer era bands** for tighter thematic progression.
-- **Config-driven NPC class distribution** instead of uniform-random.
 - **Denser rosters / catalogs** if the game wants more variety per year.
 - **A full per-era ranged-weapon spread** (slings → longbows → muskets →
   rifles → railguns, with era-appropriate `rangedEffect`s) — v1 ships only

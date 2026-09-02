@@ -56,10 +56,22 @@ public sealed class AbilityData
     public string? Tag { get; set; }
 }
 
-/// <summary><c>npc-population.json</c> — a single total NPC count for the whole timeline (they're scattered across it, not bucketed per level any more).</summary>
+/// <summary><c>npc-population.json</c> — a single total NPC count for the whole timeline (they're scattered across it, not bucketed per level any more), plus an optional per-class spawn distribution.</summary>
 public sealed class NpcPopulationConfig
 {
     public int TotalCount { get; set; } = 12;
+
+    /// <summary>
+    /// Optional per-class spawn weights, e.g. <c>{ "Soldier": 2, "Doctor": 1 }</c>
+    /// makes a Soldier spawn twice as often as a Doctor — docs/CONTENT_PLAN.md's
+    /// "config-driven NPC class distribution" backlog item. Keys are
+    /// ChronoTravelers.Core.Classes.CharacterClass names (case-insensitive);
+    /// a class omitted from the map never spawns. Additive — old JSON
+    /// without this field, or an empty/all-zero map, loads as "not
+    /// configured" and falls back to the original uniform-random pick
+    /// across every class (see ChronoTravelers.Engine.Npc.NpcPopulation.PickClass).
+    /// </summary>
+    public Dictionary<string, double>? ClassWeights { get; set; }
 }
 
 // ---------------------------------------------------------------------------

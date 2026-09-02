@@ -1,3 +1,4 @@
+using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Engine.Npc;
 
@@ -121,5 +122,97 @@ public class NpcPopulationTests
 
         Assert.InRange(npc.CurrentYear, TimeScale.MinYear, TimeScale.MaxYear);
         Assert.Equal(world.GetYear(npc.CurrentYear).Map.Start, npc.Position);
+    }
+
+    [Fact]
+    public void Spawn_WithNullClassWeights_MatchesOriginalUniformPickExactly()
+    {
+        // Regression guard: PickClass must still consume exactly one
+        // NextDouble() call per NPC on the default (no classWeights) path,
+        // so every pre-existing scripted-random test elsewhere in this
+        // class keeps its exact assertions valid.
+        var world = World();
+        var sequence = new StubRandomSource(0.0, 0.25, 0.5, 0.75, 0.99, 0.1, 0.6);
+
+        var withExplicitNull = NpcPopulation.Spawn(4, world, new StubRandomSource(0.0, 0.25, 0.5, 0.75, 0.99, 0.1, 0.6), classWeights: null);
+        var withOmittedParam = NpcPopulation.Spawn(4, world, sequence);
+
+        Assert.Equal(withOmittedParam.Select(n => n.CurrentYear), withExplicitNull.Select(n => n.CurrentYear));
+        Assert.Equal(withOmittedParam.Select(n => n.Class), withExplicitNull.Select(n => n.Class));
+        Assert.Equal(withOmittedParam.Select(n => n.Level), withExplicitNull.Select(n => n.Level));
+    }
+
+    [Fact]
+    public void Spawn_WithASingleWeightedClass_AlwaysPicksThatClass()
+    {
+        var weights = new Dictionary<CharacterClass, double> { [CharacterClass.Doctor] = 3.0 };
+
+        var npcs = NpcPopulation.Spawn(20, World(), new StubRandomSource(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99), weights);
+
+        Assert.All(npcs, npc => Assert.Equal(CharacterClass.Doctor, npc.Class));
+    }
+
+    [Fact]
+    public void Spawn_WithAClassMissingFromTheWeightTable_NeverPicksThatClass()
+    {
+        // Every class but Engineer gets a weight; Engineer should never appear.
+        var weights = new Dictionary<CharacterClass, double>
+        {
+            [CharacterClass.Soldier] = 1,
+            [CharacterClass.Spy] = 1,
+            [CharacterClass.Doctor] = 1,
+            [CharacterClass.Scientist] = 1,
+        };
+
+        var npcs = NpcPopulation.Spawn(40, World(), new StubRandomSource(0.02, 0.11, 0.23, 0.37, 0.49, 0.58, 0.66, 0.74, 0.81, 0.93), weights);
+
+        Assert.DoesNotContain(npcs, npc => npc.Class == CharacterClass.Engineer);
+    }
+
+    [Fact]
+    public void Spawn_WithAnEmptyWeightTable_FallsBackToUniformPick()
+    {
+        var uniform = NpcPopulation.Spawn(5, World(), new StubRandomSource(0.1, 0.5, 0.9, 0.2, 0.6));
+        var withEmptyTable = NpcPopulation.Spawn(5, World(), new StubRandomSource(0.1, 0.5, 0.9, 0.2, 0.6), new Dictionary<CharacterClass, double>());
+
+        Assert.Equal(uniform.Select(n => n.Class), withEmptyTable.Select(n => n.Class));
+    }
+
+    [Fact]
+    public void Spawn_WithAnAllZeroWeightTable_FallsBackToUniformPick()
+    {
+        var allZero = new Dictionary<CharacterClass, double>
+        {
+            [CharacterClass.Soldier] = 0,
+            [CharacterClass.Spy] = 0,
+            [CharacterClass.Doctor] = 0,
+            [CharacterClass.Scientist] = 0,
+            [CharacterClass.Engineer] = 0,
+        };
+
+        var uniform = NpcPopulation.Spawn(5, World(), new StubRandomSource(0.1, 0.5, 0.9, 0.2, 0.6));
+        var withAllZero = NpcPopulation.Spawn(5, World(), new StubRandomSource(0.1, 0.5, 0.9, 0.2, 0.6), allZero);
+
+        Assert.Equal(uniform.Select(n => n.Class), withAllZero.Select(n => n.Class));
+    }
+
+    [Fact]
+    public void RespawnNear_ThreadsClassWeightsThrough()
+    {
+        var weights = new Dictionary<CharacterClass, double> { [CharacterClass.Scientist] = 1 };
+
+        var npc = NpcPopulation.RespawnNear(0, 3000, World(), new StubRandomSource(0.2, 0.4, 0.6), weights);
+
+        Assert.Equal(CharacterClass.Scientist, npc.Class);
+    }
+
+    [Fact]
+    public void RespawnScattered_ThreadsClassWeightsThrough()
+    {
+        var weights = new Dictionary<CharacterClass, double> { [CharacterClass.Spy] = 1 };
+
+        var npc = NpcPopulation.RespawnScattered(0, World(), new StubRandomSource(0.3, 0.5, 0.7), weights);
+
+        Assert.Equal(CharacterClass.Spy, npc.Class);
     }
 }

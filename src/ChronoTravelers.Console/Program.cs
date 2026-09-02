@@ -182,8 +182,9 @@ else
     }
 }
 
-var npcs = SpawnNpcs(world, random);
-var simulation = new WorldSimulation(world, npcs, random);
+var npcClassWeights = LoadNpcClassWeights();
+var npcs = SpawnNpcs(world, random, npcClassWeights);
+var simulation = new WorldSimulation(world, npcs, random, npcClassWeights: npcClassWeights);
 var shownBroadcastCount = 0;
 var elsewhereBacklog = 0;
 
@@ -772,7 +773,7 @@ static IReadOnlyList<AbilityData> LoadAbilities()
 }
 
 /// <summary>Spawns the whole NPC population (npc-population.json's totalCount), scattered across the timeline. Falls back to NpcPopulation.LocalPopulationTarget (5) if the config is missing/malformed.</summary>
-static List<Traveler> SpawnNpcs(TimeWorld world, IRandomSource random)
+static List<Traveler> SpawnNpcs(TimeWorld world, IRandomSource random, IReadOnlyDictionary<CharacterClass, double>? classWeights)
 {
     int count;
     try
@@ -784,7 +785,20 @@ static List<Traveler> SpawnNpcs(TimeWorld world, IRandomSource random)
         count = NpcPopulation.LocalPopulationTarget;
     }
 
-    return NpcPopulation.Spawn(count, world, random).ToList();
+    return NpcPopulation.Spawn(count, world, random, classWeights).ToList();
+}
+
+/// <summary>Loads npc-population.json's optional classWeights (docs/CONTENT_PLAN.md's "config-driven NPC class distribution"). Null (missing/empty/malformed config) means the original uniform-random class pick.</summary>
+static IReadOnlyDictionary<CharacterClass, double>? LoadNpcClassWeights()
+{
+    try
+    {
+        return ContentLoader.LoadNpcClassWeights(Path.Combine(ContentDirectory(), "npc-population.json"));
+    }
+    catch (ContentException)
+    {
+        return null;
+    }
 }
 
 /// <summary>Returns the server URL from `--connect &lt;url&gt;` or `connect &lt;url&gt;`, or null for the normal local game.</summary>

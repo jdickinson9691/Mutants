@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Characters;
+using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Events;
 using ChronoTravelers.Core.Tachyons;
@@ -46,22 +47,34 @@ public sealed class WorldSimulation
 
     private readonly IRandomSource _random;
     private readonly List<string> _narration = [];
+    private readonly IReadOnlyDictionary<CharacterClass, double>? _npcClassWeights;
 
     // Where the player was at the end of the previous tick — lets the
     // monster sim tell "stood still" (ambushable) from "just arrived".
     private int? _lastPlayerYear;
     private ChronoTravelers.Core.World.Coordinate _lastPlayerPosition;
 
+    /// <param name="npcClassWeights">
+    /// Optional per-class spawn weights (docs/CONTENT_PLAN.md's "config-driven
+    /// NPC class distribution") threaded into every respawn this simulation
+    /// performs (<see cref="RespawnDeadNpcs"/>), so a replaced NPC keeps
+    /// drawing from the same distribution the initial population did — see
+    /// ChronoTravelers.Engine.Content.ContentLoader.LoadNpcClassWeights. Null
+    /// (the default) means uniform-random across every class, unchanged from
+    /// the original behavior.
+    /// </param>
     public WorldSimulation(
         TimeWorld world,
         IList<Traveler> npcs,
         IRandomSource random,
-        BroadcastChannel? broadcast = null)
+        BroadcastChannel? broadcast = null,
+        IReadOnlyDictionary<CharacterClass, double>? npcClassWeights = null)
     {
         World = world;
         Npcs = npcs;
         _random = random;
         Broadcast = broadcast ?? new BroadcastChannel();
+        _npcClassWeights = npcClassWeights;
     }
 
     /// <summary>
@@ -84,8 +97,8 @@ public sealed class WorldSimulation
             }
 
             Npcs[i] = i < NpcPopulation.LocalPopulationTarget && anchorYear is { } anchor
-                ? NpcPopulation.RespawnNear(i, anchor, World, _random)
-                : NpcPopulation.RespawnScattered(i, World, _random);
+                ? NpcPopulation.RespawnNear(i, anchor, World, _random, _npcClassWeights)
+                : NpcPopulation.RespawnScattered(i, World, _random, _npcClassWeights);
         }
     }
 

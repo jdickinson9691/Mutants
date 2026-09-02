@@ -74,6 +74,38 @@ public static class ContentLoader
     /// <summary>Reads <c>npc-population.json</c> — a single <c>{ "totalCount": N }</c>. Returns the count, defaulting to 12 if the field is absent.</summary>
     public static int LoadNpcCount(string path) => Math.Max(0, ReadJson<NpcPopulationConfig>(path).TotalCount);
 
+    /// <summary>
+    /// Reads <c>npc-population.json</c>'s optional <c>classWeights</c> map
+    /// (docs/CONTENT_PLAN.md's "config-driven NPC class distribution")
+    /// into a <see cref="CharacterClass"/>-keyed table for
+    /// <see cref="ChronoTravelers.Engine.Npc.NpcPopulation"/>. Returns null
+    /// when the field is absent or empty, meaning "not configured" — callers
+    /// pass that straight through and get the original uniform-random pick.
+    /// Throws <see cref="ContentException"/> if a key isn't a recognized
+    /// <see cref="CharacterClass"/> name.
+    /// </summary>
+    public static IReadOnlyDictionary<CharacterClass, double>? LoadNpcClassWeights(string path)
+    {
+        var raw = ReadJson<NpcPopulationConfig>(path).ClassWeights;
+        if (raw is null || raw.Count == 0)
+        {
+            return null;
+        }
+
+        var weights = new Dictionary<CharacterClass, double>();
+        foreach (var (key, value) in raw)
+        {
+            if (!Enum.TryParse<CharacterClass>(key, ignoreCase: true, out var characterClass))
+            {
+                throw new ContentException($"npc-population.json: unknown class '{key}' in classWeights.");
+            }
+
+            weights[characterClass] = value;
+        }
+
+        return weights;
+    }
+
     private static SpeciesDefinition ToSpecies(MonsterSpeciesData data)
     {
         if (!Enum.TryParse<MonsterArchetype>(data.Archetype, ignoreCase: true, out var archetype))

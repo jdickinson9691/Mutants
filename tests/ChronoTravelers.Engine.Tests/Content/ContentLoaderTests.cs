@@ -1,3 +1,4 @@
+using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Engine.Content;
 
@@ -36,6 +37,51 @@ public class ContentLoaderTests
         var path = dir.WriteFile("npc-population.json", """{ "totalCount": -5 }""");
 
         Assert.Equal(0, ContentLoader.LoadNpcCount(path));
+    }
+
+    [Fact]
+    public void LoadNpcClassWeights_ReturnsNullWhenTheFieldIsAbsent()
+    {
+        using var dir = new TempContentDirectory();
+        var path = dir.WriteFile("npc-population.json", """{ "totalCount": 5 }""");
+
+        Assert.Null(ContentLoader.LoadNpcClassWeights(path));
+    }
+
+    [Fact]
+    public void LoadNpcClassWeights_ReturnsNullWhenTheMapIsEmpty()
+    {
+        using var dir = new TempContentDirectory();
+        var path = dir.WriteFile("npc-population.json", """{ "totalCount": 5, "classWeights": {} }""");
+
+        Assert.Null(ContentLoader.LoadNpcClassWeights(path));
+    }
+
+    [Fact]
+    public void LoadNpcClassWeights_ParsesEachClassNameCaseInsensitively()
+    {
+        using var dir = new TempContentDirectory();
+        var path = dir.WriteFile("npc-population.json", """
+            { "totalCount": 5, "classWeights": { "soldier": 2, "DOCTOR": 1 } }
+            """);
+
+        var weights = ContentLoader.LoadNpcClassWeights(path);
+
+        Assert.NotNull(weights);
+        Assert.Equal(2, weights!.Count);
+        Assert.Equal(2, weights[CharacterClass.Soldier]);
+        Assert.Equal(1, weights[CharacterClass.Doctor]);
+    }
+
+    [Fact]
+    public void LoadNpcClassWeights_ThrowsOnAnUnknownClassName()
+    {
+        using var dir = new TempContentDirectory();
+        var path = dir.WriteFile("npc-population.json", """
+            { "totalCount": 5, "classWeights": { "Wizard": 1 } }
+            """);
+
+        Assert.Throws<ContentException>(() => ContentLoader.LoadNpcClassWeights(path));
     }
 
     // --- LoadTimeWorld (continuous timeline) ---------------------------------

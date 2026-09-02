@@ -1,3 +1,10 @@
 {
-  "totalCount": 5
+  "totalCount": 5,
+  "classWeights": {
+    "Soldier": 2,
+    "Spy": 1,
+    "Doctor": 1,
+    "Scientist": 1,
+    "Engineer": 1
+  }
 }
