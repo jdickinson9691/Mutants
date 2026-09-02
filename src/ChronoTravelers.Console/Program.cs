@@ -95,10 +95,22 @@ using System.Text;
 // Only the player's own character is saved (Persistence.CharacterSaveData,
 // which also carries the world seed) - NPCs are re-simulated fresh each
 // session, scattered across the whole timeline, and only contribute their
-// personal bests to the leaderboard. The save/leaderboard DB lives at
+// personal bests to the leaderboard - recorded the moment they're spawned
+// (each one is already fast-levelled into its year's soft-cap band at
+// creation - see NpcPopulation.Create), so `leaderboard` reflects this
+// session's NPCs from the very first turn, not just after a `save`/quit.
+// The save/leaderboard DB lives at
 // %APPDATA%\ChronoTravelers\chronotravelers.db, and carries the world seed, the
 // current/furthest year, the cleared Warden years, and every store
 // the player owns (year + capital + listings, re-attached on load).
+//
+// The player's character is saved on a clean `quit`/`exit`, on Ctrl+C
+// (intercepted so the save actually completes before the process ends),
+// and best-effort via AppDomain.ProcessExit for other terminations this
+// build can observe (e.g. closing the console window) - see SaveOnExit
+// below. There's no way to guarantee a save survives every kind of forced
+// kill (task-killing the process, a power loss), but progress since the
+// last save is no longer silently lost on a normal Ctrl+C or window close.
 //
 // Any unhandled exception (main thread or otherwise) is written to a
 // crash report under %APPDATA%\ChronoTravelers\crashes\ before the process
@@ -175,12 +187,64 @@ var simulation = new WorldSimulation(world, npcs, random);
 var shownBroadcastCount = 0;
 var elsewhereBacklog = 0;
 
+// Every NPC is fast-levelled into its spawn year's soft-cap band the
+// instant it's created (NpcPopulation.Create), so record their personal
+// bests right away — otherwise `leaderboard` shows nothing for this
+// session's NPCs (or a stale row from a previous run) until the player
+// happens to type `save` or quit. Their names are stable per population
+// slot, so this just tops up existing rows, never duplicates.
+RecordNpcLeaderboardBests(npcs, repository);
+
 AnsiConsole.WriteLine();
 AnsiConsole.MarkupLine($"Welcome, [bold]{Markup.Escape(traveler.Name)}[/] the [bold]{traveler.Class}[/]. Type [yellow]help[/] for commands.");
 AnsiConsole.MarkupLine($"[grey]{npcs.Count} other Travelers are scattered across the centuries, fending for themselves.[/]");
 AnsiConsole.WriteLine();
 
 RenderRoom(traveler, world);
+
+// Best-effort save on an abrupt exit — closing the window or hitting
+// Ctrl+C previously skipped the end-of-loop save entirely, silently
+// losing any progress since the last explicit `save`/`quit`. `exitSaved`
+// guards against saving twice (once here, once via the normal end-of-loop
+// path below) and against saving a dead character (death intentionally
+// isn't persisted — see the end-of-loop comment).
+var exitSaved = false;
+void SaveOnExit()
+{
+    if (exitSaved || traveler.Health.IsDead)
+    {
+        return;
+    }
+
+    exitSaved = true;
+    try
+    {
+        HandleSave(traveler, repository, worldSeed, world);
+        RecordNpcLeaderboardBests(npcs, repository);
+    }
+    catch
+    {
+        // Best-effort — the process may already be tearing down.
+    }
+}
+
+// Ctrl+C: intercept it ourselves (Cancel = true stops the default hard
+// kill) so the save above actually gets to run before we exit.
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    SaveOnExit();
+    AnsiConsole.MarkupLine(traveler.Health.IsDead
+        ? "[grey]Game over.[/]"
+        : "[grey]Farewell, Traveler. Progress saved.[/]");
+    Environment.Exit(0);
+};
+
+// Closing the console window, a SIGTERM, or any other process-level
+// termination this build can actually observe — .NET raises ProcessExit
+// on a graceful shutdown; there's no way to guarantee it on every kind of
+// forced kill, but this catches meaningfully more than nothing did before.
+AppDomain.CurrentDomain.ProcessExit += (_, _) => SaveOnExit();
 
 var running = true;
 while (running)
@@ -388,12 +452,7 @@ while (running)
     }
 }
 
-if (!traveler.Health.IsDead)
-{
-    HandleSave(traveler, repository, worldSeed, world);
-}
-
-RecordNpcLeaderboardBests(npcs, repository);
+SaveOnExit();
 
 AnsiConsole.MarkupLine(traveler.Health.IsDead
     ? "[grey]Game over.[/]"
