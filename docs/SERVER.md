@@ -58,16 +58,25 @@ classes that account hasn't played. Then you're in the shared world.
 `heal` · `take [all]` · `fight [name]` · `wield <item>` · `convert`/`con` `<item>` ·
 `travel <year | +N | -N>` · `news` · `who` · `say <msg>` · `wait` · `quit`
 
+**Stores** (docs/GDD.md §6, full parity with the console): `stores` (list
+this year's slots) · `shop` (browse the one in your room) · `buy <item>` ·
+`sell <item>` / `sell all` (dump junk) · `buy-store` (claim a vacant slot)
+· `stock <item> <price>` · `withdraw <item>` · `reprice <item> <price>` ·
+`deposit <credits>` · `charge <tachyons>` · `collect` (owner-only verbs
+require standing at a store you own; `collect` alone reaches every store
+you own across every year the shared world has visited).
+
 Fights **auto-resolve** (no round-by-round input over a line protocol) and
 the loot drops on the floor — `take` it. Death snaps you back to 2000 A.D.
 at full health. Characters autosave on disconnect and every ~60 s.
 
 ## Not done yet
 
-- **Command parity.** No stores/shopping, no interactive `cast`/abilities,
-  no player-owned stores, no ranged `shoot`, no `look`-after-tick nicety.
-  The console keeps its own fuller command loop for now; consolidating the
-  two onto the Game layer is the follow-up refactor.
+- **Command parity.** Stores/shopping (including player-owned stores) are
+  now at parity with the console (see *Commands* above). Still missing:
+  interactive `cast`/abilities, ranged `shoot`, a `look`-after-tick
+  nicety. The console keeps its own fuller command loop for now;
+  consolidating the two onto the Game layer is the follow-up refactor.
 - **Persistence at scale.** LiteDB is fine for one server process; Postgres
   is the swap if multiple instances / cloud elasticity are ever needed.
 - **Auth hardening.** Passwords are PBKDF2-hashed but there's no rate

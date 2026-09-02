@@ -1,3 +1,4 @@
+using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Events;
 using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Items;
@@ -13,7 +14,10 @@ namespace ChronoTravelers.Game;
 /// transport-agnostic (everything goes through <see cref="IGameOutput"/>).
 /// Every call runs under the <see cref="SharedGame"/> lock. Interactive
 /// round-by-round combat is out of scope here: <c>fight</c> auto-resolves
-/// and drops the loot on the floor.
+/// and drops the loot on the floor. Store commands (docs/GDD.md §6) are at
+/// parity with the console: browsing/buying/selling at any store, and the
+/// owner-only slot purchase / stock / withdraw / reprice / deposit /
+/// charge / collect verbs for a player-owned one — see docs/SERVER.md.
 /// </summary>
 internal static class Commands
 {
@@ -111,6 +115,34 @@ internal static class Commands
                 Travel(game, session, arg);
                 break;
 
+            case "stores":
+                Stores(game, session);
+                break;
+
+            case "shop":
+                Shop(game, session);
+                break;
+
+            case "buy":
+                BuyFromStore(game, session, arg);
+                break;
+
+            case "sell":
+                SellToStore(game, session, arg);
+                break;
+
+            case "buy-store":
+                BuyStore(game, session);
+                break;
+
+            case "stock" or "charge" or "deposit" or "withdraw" or "reprice":
+                StoreManagement(game, session, verb, arg);
+                break;
+
+            case "collect":
+                Collect(game, session);
+                break;
+
             default:
                 session.Send($"Unknown command: '{verb}'. Type 'help'.");
                 break;
@@ -119,7 +151,8 @@ internal static class Commands
 
     private static bool IsIdle(string verb) => verb is
         "look" or "l" or "status" or "stat" or "inventory" or "inv" or "i" or "bag"
-        or "monsters" or "mobs" or "who" or "news" or "broadcast" or "help" or "?" or "wait" or "z";
+        or "monsters" or "mobs" or "who" or "news" or "broadcast" or "help" or "?" or "wait" or "z"
+        or "stores"; // "shop"/buying/selling/store management are doing-something, like the console (Program.cs's IsIdleCommand)
 
     private static void Move(SharedGame game, Session session, Direction dir)
     {
@@ -360,6 +393,325 @@ internal static class Commands
         Render.Room(game, session);
     }
 
+    /// <summary>Every store slot in the player's current year — docs/GDD.md §6, console parity (Program.cs's <c>stores</c>/<c>RenderStores</c>).</summary>
+    private static void Stores(SharedGame game, Session session)
+    {
+        var slots = game.World.GetYear(session.Player.CurrentYear).StoreSlots;
+        if (slots.Count == 0)
+        {
+            session.Send("No stores this year.");
+            return;
+        }
+
+        session.Send($"{slots.Count} store slot(s) this year:");
+        foreach (var slot in slots)
+        {
+            var owner = slot.Store switch
+            {
+                null => "vacant",
+                { IsGovernmentRun: true } => "government",
+                var s => s.Owner!.Name,
+            };
+            var items = slot.Store?.Listings.Count.ToString() ?? "-";
+            var status = slot.IsAvailableForPurchase
+                ? $"for sale ({slot.PurchaseCost} Credits{(slot.HasAbandonedInventory ? ", pre-stocked" : "")})"
+                : slot.Store!.IsGovernmentRun ? "occupied" : $"occupied ({slot.Store.TachyonReserve} Tachyon reserve)";
+            session.Send($"  {slot.Name} @ {slot.Location} — owner: {owner}, items: {items}, {status}");
+        }
+    }
+
+    /// <summary>Browses the store in the player's current room — console parity (Program.cs's <c>HandleShop</c>/<c>RenderShop</c>).</summary>
+    private static void Shop(SharedGame game, Session session)
+    {
+        var slot = StoreSlotHere(game, session);
+        if (slot?.Store is not { } store)
+        {
+            session.Send("There's no store here.");
+            return;
+        }
+
+        session.Send($"{store.Name} — Capital: {store.Capital} Credits");
+        if (store.Listings.Count == 0)
+        {
+            session.Send("Nothing for sale right now.");
+            return;
+        }
+
+        for (var i = 0; i < store.Listings.Count; i++)
+        {
+            var l = store.Listings[i];
+            session.Send($"  {i + 1}. {l.Item.Name} [{l.Item.Type}, {l.Item.Rarity}, tier {l.Item.Tier}] — {l.AskingPrice} Credits");
+        }
+    }
+
+    /// <summary>Buys a listed item from the store in the player's current room — console parity (Program.cs's <c>HandleBuyFromStore</c>).</summary>
+    private static void BuyFromStore(SharedGame game, Session session, string arg)
+    {
+        var slot = StoreSlotHere(game, session);
+        if (slot?.Store is not { } store)
+        {
+            session.Send("There's no store here to buy from.");
+            return;
+        }
+
+        var listing = FindListing(store, arg);
+        if (listing is null)
+        {
+            session.Send(arg.Length == 0
+                ? "Buy what? Type 'shop' to see what's for sale."
+                : $"'{arg}' isn't for sale here.");
+            return;
+        }
+
+        var p = session.Player;
+        if (p.Credits < listing.AskingPrice)
+        {
+            session.Send($"You can't afford {listing.Item.Name} ({listing.AskingPrice} Credits; you have {p.Credits}).");
+            return;
+        }
+
+        store.SellToTraveler(p, listing);
+        session.Send($"Bought {listing.Item.Name} for {listing.AskingPrice} Credits.");
+    }
+
+    /// <summary>Sells an item (or dumps junk) to the store in the player's current room — console parity (Program.cs's <c>HandleSellToStore</c>).</summary>
+    private static void SellToStore(SharedGame game, Session session, string arg)
+    {
+        var slot = StoreSlotHere(game, session);
+        if (slot?.Store is not { } store)
+        {
+            session.Send("You need to be at a store to sell. Try 'convert' to destroy an item for Tachyons instead, or 'stores' to find one.");
+            return;
+        }
+
+        var p = session.Player;
+
+        // 'sell all' / 'sell junk' — clears the vendor trash (Junk items
+        // only; gear and consumables you keep unless you name them).
+        if (arg.Trim() is "all" or "junk" or "*")
+        {
+            var junk = p.Inventory.Where(i => i.Type == ItemType.Junk).ToList();
+            if (junk.Count == 0)
+            {
+                session.Send("No junk to sell. Name an item to sell that instead.");
+                return;
+            }
+
+            var total = 0;
+            var count = 0;
+            foreach (var j in junk)
+            {
+                var got = store.BuyFromTraveler(p, j);
+                if (got is null)
+                {
+                    break;
+                }
+
+                total += got.Value;
+                count++;
+            }
+
+            session.Send($"Sold {count} junk item(s) to {store.Name} for {total} Credits.");
+            return;
+        }
+
+        var item = FindItem(session, arg);
+        if (item is null)
+        {
+            session.Send(arg.Length == 0
+                ? "Sell what? Type 'inventory' to see what you're carrying, or 'sell all' to dump junk."
+                : $"No item matching '{arg}' in your inventory.");
+            return;
+        }
+
+        var price = store.BuyFromTraveler(p, item);
+        if (price is null)
+        {
+            session.Send($"{store.Name} can't afford to buy that right now.");
+            return;
+        }
+
+        session.Send($"Sold {item.Name} to {store.Name} for {price} Credits.");
+    }
+
+    /// <summary>Purchases the empty store slot the player is standing in — console parity (Program.cs's <c>HandleBuyStore</c>).</summary>
+    private static void BuyStore(SharedGame game, Session session)
+    {
+        var slot = StoreSlotHere(game, session);
+        if (slot is null)
+        {
+            session.Send("There's no store slot here.");
+            return;
+        }
+
+        if (!slot.IsAvailableForPurchase)
+        {
+            session.Send($"{slot.Name} is already occupied.");
+            return;
+        }
+
+        var p = session.Player;
+        if (p.Credits < slot.PurchaseCost)
+        {
+            session.Send($"You need {slot.PurchaseCost} Credits to buy this slot; you have {p.Credits}.");
+            return;
+        }
+
+        var hadAbandonedInventory = slot.HasAbandonedInventory;
+        slot.Purchase(p);
+        session.Send($"You now own a store here: {slot.Store!.Name}! Use stock/withdraw/reprice to manage listings, deposit/charge/collect to move Credits/Tachyons in and out. It'll still be yours next session — but only if you keep charge-ing its Tachyon maintenance.");
+        if (hadAbandonedInventory)
+        {
+            session.Send($"The previous owner's old stock came with it — {slot.Store.Listings.Count} item(s) already for sale.");
+        }
+    }
+
+    /// <summary>
+    /// Collects from every store the player owns across every year the
+    /// shared world has visited — not just their current room (docs/GDD.md
+    /// §6.2's "idle-income loop"). Console parity (Program.cs's
+    /// <c>HandleCollect</c>), using the same shared <see cref="TimeWorld.VisitedYears"/>.
+    /// </summary>
+    private static void Collect(SharedGame game, Session session)
+    {
+        var p = session.Player;
+        var owned = game.World.VisitedYears
+            .SelectMany(y => game.World.GetYear(y).StoreSlots)
+            .Where(s => s.Store?.Owner == p)
+            .ToList();
+
+        if (owned.Count == 0)
+        {
+            session.Send("You don't own a store. Find an empty slot and use 'buy-store'.");
+            return;
+        }
+
+        var totalCollected = 0;
+        foreach (var slot in owned)
+        {
+            var capital = slot.Store!.Capital;
+            if (capital > 0)
+            {
+                totalCollected += slot.Store.CollectCapital(p, capital);
+            }
+        }
+
+        session.Send(totalCollected > 0
+            ? $"Collected {totalCollected} Credits from your store(s)."
+            : "Nothing to collect yet.");
+    }
+
+    /// <summary>Owner-only store upkeep verbs (stock/charge/deposit/withdraw/reprice) at the store in the player's current room — console parity (Program.cs's <c>HandleStoreManagement</c>).</summary>
+    private static void StoreManagement(SharedGame game, Session session, string command, string arg)
+    {
+        var slot = StoreSlotHere(game, session);
+        var p = session.Player;
+        if (slot?.Store is not { } store || store.Owner != p)
+        {
+            session.Send("You need to be at a store you own to do that.");
+            return;
+        }
+
+        switch (command)
+        {
+            case "withdraw":
+            {
+                var listing = FindListing(store, arg);
+                if (listing is null)
+                {
+                    session.Send($"No listing matching '{arg}' at {store.Name}.");
+                    return;
+                }
+
+                store.Withdraw(p, listing);
+                session.Send($"Withdrew {listing.Item.Name} back into your inventory.");
+                break;
+            }
+
+            case "deposit":
+            {
+                if (!int.TryParse(arg.Trim(), out var amount) || amount < 1)
+                {
+                    session.Send("Usage: deposit <credits> - funds your store's Capital, which pays for buying from other travelers.");
+                    return;
+                }
+
+                if (p.Credits < amount)
+                {
+                    session.Send($"You only have {p.Credits} Credits.");
+                    return;
+                }
+
+                store.Deposit(p, amount);
+                session.Send($"Deposited {amount} Credits into {store.Name}'s Capital (now {store.Capital}).");
+                break;
+            }
+
+            case "stock":
+            {
+                var split = SplitItemAndPrice(arg);
+                if (split is null)
+                {
+                    session.Send("Usage: stock <item> <price>");
+                    return;
+                }
+
+                var (itemArg, price) = split.Value;
+                var item = FindItem(session, itemArg);
+                if (item is null)
+                {
+                    session.Send($"No item matching '{itemArg}' in your inventory.");
+                    return;
+                }
+
+                store.Deposit(p, item, price);
+                session.Send($"Listed {item.Name} at {store.Name} for {price} Credits.");
+                break;
+            }
+
+            case "charge":
+            {
+                if (!int.TryParse(arg.Trim(), out var tachyons) || tachyons < 1)
+                {
+                    session.Send("Usage: charge <tachyons> - pays down your store's maintenance reserve so it isn't repossessed.");
+                    return;
+                }
+
+                if (!p.Tachyons.CanAfford(tachyons))
+                {
+                    session.Send($"You don't have {tachyons} Tachyons.");
+                    return;
+                }
+
+                store.Charge(p, tachyons);
+                session.Send($"Charged {tachyons} Tachyons to {store.Name}'s maintenance reserve (now {store.TachyonReserve}).");
+                break;
+            }
+
+            case "reprice":
+            {
+                var split = SplitItemAndPrice(arg);
+                if (split is null)
+                {
+                    session.Send("Usage: reprice <item> <new price>");
+                    return;
+                }
+
+                var (itemArg, price) = split.Value;
+                var listing = FindListing(store, itemArg);
+                if (listing is null)
+                {
+                    session.Send($"No listing matching '{itemArg}' at {store.Name}.");
+                    return;
+                }
+
+                store.AdjustPrice(p, listing, price);
+                session.Send($"{listing.Item.Name} is now {price} Credits.");
+                break;
+            }
+        }
+    }
+
     private static void Who(SharedGame game, Session session)
     {
         var sessions = game.AllSessions();
@@ -406,7 +758,41 @@ internal static class Commands
     {
         session.Send("Commands: look [dir] · n/s/e/w · monsters · status · inventory · heal · take [all] · fight [name]");
         session.Send("          wield <item> · convert|con <item> · travel <year|+N|-N> · news · who · say <msg> · wait · quit");
+        session.Send("Stores:   stores · shop · buy <item> · sell <item>|all · buy-store · stock <item> <price> · withdraw <item>");
+        session.Send("          reprice <item> <price> · deposit <credits> · charge <tachyons> · collect");
         session.Send("Fights auto-resolve; loot drops on the floor — 'take' it. Type 'quit' to disconnect.");
+    }
+
+    /// <summary>The store slot (if any) at the player's current position, in their current year.</summary>
+    private static StoreSlot? StoreSlotHere(SharedGame game, Session session) =>
+        game.World.GetYear(session.Player.CurrentYear).StoreSlots.FirstOrDefault(s => s.Location.Equals(session.Player.Position));
+
+    private static StoreListing? FindListing(Store store, string arg)
+    {
+        if (arg.Length == 0)
+        {
+            return null;
+        }
+
+        if (int.TryParse(arg, out var index) && index >= 1 && index <= store.Listings.Count)
+        {
+            return store.Listings[index - 1];
+        }
+
+        return store.Listings.FirstOrDefault(l => string.Equals(l.Item.Name, arg, StringComparison.OrdinalIgnoreCase))
+            ?? store.Listings.FirstOrDefault(l => l.Item.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Splits "&lt;item&gt; &lt;price&gt;" — the last whitespace token is the price, everything before it is the item name/index.</summary>
+    private static (string ItemArg, int Price)? SplitItemAndPrice(string arg)
+    {
+        var tokens = arg.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length < 2 || !int.TryParse(tokens[^1], out var price) || price < 1)
+        {
+            return null;
+        }
+
+        return (string.Join(' ', tokens[..^1]), price);
     }
 
     private static Item? FindItem(Session session, string arg, Func<Item, bool>? prefer = null)
