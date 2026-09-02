@@ -30,6 +30,18 @@ public static class NpcController
     private const double LowHealthThreshold = 0.30;
     private const int ExcessJunkThreshold = 3;
 
+    /// <summary>How often, per tick, an NPC that doesn't already own a store even considers buying an empty slot it can afford — kept low so NPCs don't snap up every vacancy the moment it appears. See <see cref="TryPurchaseStoreSlot"/>.</summary>
+    private const double StorePurchaseChance = 0.05;
+
+    /// <summary>How often, per tick, an NPC that already owns a store here tends it (pays maintenance, stocks surplus gear, or collects Capital) — docs/GDD.md §7's "occasionally visit/stock a store it owns."</summary>
+    private const double StoreTendChance = 0.5;
+
+    /// <summary>Tachyons an owner pays into its store's maintenance reserve in one tending action.</summary>
+    private const int MaintenanceTopUpTachyons = 30;
+
+    /// <summary>An owner tops up maintenance once the store's reserve dips below this many Tachyons.</summary>
+    private const int MaintenanceReserveTarget = 60;
+
     /// <summary>How often, per tick, a ready NPC not pulling toward an anchor (not low on Tachyons/HP, either background-pool or already at the anchor) even considers jumping to another year — kept low so a year's population doesn't churn every tick.</summary>
     private const double TravelAttemptChance = 0.10;
 
@@ -44,14 +56,17 @@ public static class NpcController
     /// Decides and executes one tick's action for <paramref name="npc"/>.
     /// A defeated NPC does nothing (<see cref="NpcGoal.Idle"/>) — callers
     /// should generally skip calling this for dead NPCs entirely, but it's
-    /// safe to call anyway. <paramref name="stores"/> may be omitted or
-    /// empty, in which case the NPC never trades (falls straight through
-    /// to grinding). <paramref name="monsterRoster"/> defaults to the
-    /// small sandbox Monsters.TestMonsters.All if omitted, for callers
-    /// (existing tests) that don't care about real content; production
-    /// callers should always pass the NPC's own level's real roster.
-    /// <paramref name="world"/> is only needed for time-travel attempts —
-    /// omit it (or leave null) to skip that behavior entirely.
+    /// safe to call anyway. <paramref name="storeSlots"/> may be omitted or
+    /// empty, in which case the NPC never trades or buys a store (falls
+    /// straight through to grinding) — pass every store slot in the NPC's
+    /// current year (occupied AND vacant) so it can both shop/tend an
+    /// owned store and consider buying an empty one (see
+    /// <see cref="TryStoreVisit"/>). <paramref name="monsterRoster"/>
+    /// defaults to the small sandbox Monsters.TestMonsters.All if omitted,
+    /// for callers (existing tests) that don't care about real content;
+    /// production callers should always pass the NPC's own level's real
+    /// roster. <paramref name="world"/> is only needed for time-travel
+    /// attempts — omit it (or leave null) to skip that behavior entirely.
     /// <paramref name="anchorYear"/> is the year to gravitate toward — the
     /// player's current year in single-player, or a rotating occupied year
     /// on the shared-world server; <paramref name="pullToAnchor"/> is true
@@ -63,7 +78,7 @@ public static class NpcController
         Traveler npc,
         LevelMap level,
         IRandomSource random,
-        IReadOnlyList<Store>? stores = null,
+        IReadOnlyList<StoreSlot>? storeSlots = null,
         IReadOnlyList<Func<Monster>>? monsterRoster = null,
         TimeWorld? world = null,
         int? anchorYear = null,
@@ -112,12 +127,12 @@ public static class NpcController
             return new NpcTickResult(npc.Name, NpcGoal.Upgrade, Detail: $"wielded {upgrade.Name}");
         }
 
-        if (stores is { Count: > 0 })
+        if (storeSlots is { Count: > 0 })
         {
-            var tradeResult = TryTrade(npc, stores, random);
-            if (tradeResult is not null)
+            var storeResult = TryStoreVisit(npc, storeSlots, random);
+            if (storeResult is not null)
             {
-                return tradeResult;
+                return storeResult;
             }
         }
 
@@ -253,6 +268,107 @@ public static class NpcController
     }
 
     /// <summary>
+    /// One store-related action per tick, in priority order: tend a store
+    /// this NPC already owns here (<see cref="TryTendOwnStore"/>), else
+    /// consider buying an empty slot (<see cref="TryPurchaseStoreSlot"/>),
+    /// else fall back to ordinary shopping at whatever's occupied
+    /// (<see cref="TryTrade"/>) — docs/GDD.md §7's "path to a store to
+    /// trade ... occasionally visit/stock a store it owns."
+    /// </summary>
+    private static NpcTickResult? TryStoreVisit(Traveler npc, IReadOnlyList<StoreSlot> storeSlots, IRandomSource random)
+    {
+        var ownedSlot = storeSlots.FirstOrDefault(s => s.Store?.Owner == npc);
+        if (ownedSlot is not null)
+        {
+            var tendResult = TryTendOwnStore(npc, ownedSlot, random);
+            if (tendResult is not null)
+            {
+                return tendResult;
+            }
+        }
+        else
+        {
+            var purchaseResult = TryPurchaseStoreSlot(npc, storeSlots, random);
+            if (purchaseResult is not null)
+            {
+                return purchaseResult;
+            }
+        }
+
+        var occupiedStores = storeSlots.Where(s => s.Store is not null).Select(s => s.Store!).ToList();
+        return occupiedStores.Count > 0 ? TryTrade(npc, occupiedStores, random) : null;
+    }
+
+    /// <summary>
+    /// Occasionally buys an empty store slot — docs/GDD.md §6.2/§7's "NPCs
+    /// buy and tend stores." Never takes the LAST vacant slot in a year:
+    /// at least one purchasable slot always stays open for the human
+    /// player (on top of the always-open government store), so this only
+    /// fires when 2 or more vacant slots remain here.
+    /// </summary>
+    private static NpcTickResult? TryPurchaseStoreSlot(Traveler npc, IReadOnlyList<StoreSlot> storeSlots, IRandomSource random)
+    {
+        var vacant = storeSlots.Where(s => s.IsAvailableForPurchase).ToList();
+        if (vacant.Count < 2 || random.NextDouble() >= StorePurchaseChance)
+        {
+            return null;
+        }
+
+        var slot = vacant[(int)(random.NextDouble() * vacant.Count)];
+        if (npc.Credits < slot.PurchaseCost)
+        {
+            return null;
+        }
+
+        slot.Purchase(npc);
+        return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"bought {slot.Name}");
+    }
+
+    /// <summary>
+    /// An NPC that already owns a store here occasionally pays down its
+    /// Tachyon maintenance (<see cref="Store.ApplyMaintenanceTick"/> is
+    /// what actually draws it down each world tick — this just tops the
+    /// reserve up so foreclosure doesn't creep closer), lists a piece of
+    /// surplus gear or junk for sale, or collects accumulated Capital into
+    /// Credits — docs/GDD.md §7's "occasionally visit/stock a store it
+    /// owns." At most one of the three per tick, same "one action" rule as
+    /// everywhere else; maintenance is checked first since an unpaid store
+    /// risks repossession.
+    /// </summary>
+    private static NpcTickResult? TryTendOwnStore(Traveler npc, StoreSlot ownedSlot, IRandomSource random)
+    {
+        if (random.NextDouble() >= StoreTendChance)
+        {
+            return null;
+        }
+
+        var store = ownedSlot.Store!;
+
+        if (store.TachyonReserve < MaintenanceReserveTarget && npc.Tachyons.CanAfford(MaintenanceTopUpTachyons))
+        {
+            store.Charge(npc, MaintenanceTopUpTachyons);
+            return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"paid maintenance at {store.Name}");
+        }
+
+        var surplus = npc.Inventory.FirstOrDefault(i => i.IsWieldable && !i.IsTimeShard && !IsEquipped(npc, i))
+            ?? npc.Inventory.FirstOrDefault(i => i.Type == ItemType.Junk);
+        if (surplus is not null)
+        {
+            var price = EconomyPricing.DefaultAskingPrice(surplus);
+            store.Deposit(npc, surplus, price);
+            return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"stocked {surplus.Name} at {store.Name} for {price} Credits");
+        }
+
+        if (store.Capital > 0)
+        {
+            var collected = store.CollectCapital(npc, store.Capital);
+            return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"collected {collected} Credits from {store.Name}");
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Sells one piece of surplus gear (a looted Weapon/Armor/Ranged item
     /// that isn't equipped — <see cref="Act"/> already claimed anything
     /// that would've been an upgrade, so what's left is genuine dead
@@ -260,7 +376,9 @@ public static class NpcController
     /// still unarmed — at most one action, at a randomly picked store.
     /// Selling gear is tried first: it's what actually makes a store worth
     /// browsing, junk is just Credit filler. Null if there was nothing
-    /// worth doing (falls through to grinding).
+    /// worth doing (falls through to grinding). Called by
+    /// <see cref="TryStoreVisit"/> with every occupied store here — this
+    /// itself has no notion of ownership/vacancy.
     /// </summary>
     private static NpcTickResult? TryTrade(Traveler npc, IReadOnlyList<Store> stores, IRandomSource random)
     {

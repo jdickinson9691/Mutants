@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Characters;
+using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Events;
 using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Time;
@@ -89,6 +90,43 @@ public sealed class WorldSimulation
     }
 
     /// <summary>
+    /// One world tick's Tachyon maintenance draw for every player/NPC-owned
+    /// store across every year visited this session — docs/GDD.md §6.2.
+    /// Independent of anyone's location (like passive Tachyon drain, unlike
+    /// the spatial monster sim): an owner off exploring still owes upkeep.
+    /// A store that racks up <see cref="Store.ForeclosureThreshold"/>
+    /// consecutive underfunded ticks is repossessed
+    /// (<see cref="StoreSlot.Repossess"/>) and a broadcast event goes out.
+    /// Shared by <see cref="Tick"/> and <see cref="TickMultiplayer"/>.
+    /// </summary>
+    private void ApplyStoreMaintenance()
+    {
+        foreach (var year in World.VisitedYears.ToList())
+        {
+            var content = World.GetYear(year);
+            var cost = EconomyPricing.MaintenanceCostPerTick(TimeScale.TierForYear(year));
+
+            foreach (var slot in content.StoreSlots)
+            {
+                if (slot.Store is not { IsGovernmentRun: false } store)
+                {
+                    continue;
+                }
+
+                if (!store.ApplyMaintenanceTick(cost))
+                {
+                    continue;
+                }
+
+                var ownerName = store.Owner!.Name;
+                var storeName = store.Name;
+                slot.Repossess();
+                Broadcast.Publish(GameEvent.StoreRepossessed(storeName, ownerName, year));
+            }
+        }
+    }
+
+    /// <summary>
     /// Advances the world by one tick: passive Tachyon drain and potion-buff
     /// expiry for every living traveler (all NPCs plus
     /// <paramref name="player"/>), then one AI action per living NPC on
@@ -120,6 +158,8 @@ public sealed class WorldSimulation
             traveler.AdvanceEffectTicks();
         }
 
+        ApplyStoreMaintenance();
+
         var playerAnchorYear = TimeScale.IsValidYear(player.CurrentYear) ? player.CurrentYear : (int?)null;
         RespawnDeadNpcs(playerAnchorYear);
 
@@ -139,15 +179,10 @@ public sealed class WorldSimulation
 
             var yearContent = World.GetYear(npc.CurrentYear);
 
-            var activeStores = yearContent.StoreSlots
-                .Where(slot => slot.Store is not null)
-                .Select(slot => slot.Store!)
-                .ToList();
-
             var levelBefore = npc.Level;
             var yearBefore = npc.CurrentYear;
             var pullToAnchor = i < NpcPopulation.LocalPopulationTarget;
-            var result = NpcController.Act(npc, yearContent.Map, _random, activeStores, yearContent.MonsterRoster, World, playerAnchorYear, pullToAnchor);
+            var result = NpcController.Act(npc, yearContent.Map, _random, yearContent.StoreSlots, yearContent.MonsterRoster, World, playerAnchorYear, pullToAnchor);
 
             if (result.Fight is { } fight)
             {
@@ -253,6 +288,7 @@ public sealed class WorldSimulation
             ? candidateYears[(int)(_mpTick % candidateYears.Count)]
             : (int?)null;
 
+        ApplyStoreMaintenance();
         RespawnDeadNpcs(mpAnchorYear);
 
         for (var i = 0; i < Npcs.Count; i++)
@@ -265,15 +301,11 @@ public sealed class WorldSimulation
             }
 
             var yearContent = World.GetYear(npc.CurrentYear);
-            var activeStores = yearContent.StoreSlots
-                .Where(slot => slot.Store is not null)
-                .Select(slot => slot.Store!)
-                .ToList();
 
             var levelBefore = npc.Level;
             var yearBefore = npc.CurrentYear;
             var pullToAnchor = i < NpcPopulation.LocalPopulationTarget;
-            var result = NpcController.Act(npc, yearContent.Map, _random, activeStores, yearContent.MonsterRoster, World, mpAnchorYear, pullToAnchor);
+            var result = NpcController.Act(npc, yearContent.Map, _random, yearContent.StoreSlots, yearContent.MonsterRoster, World, mpAnchorYear, pullToAnchor);
 
             if (result.Fight is { } fight)
             {

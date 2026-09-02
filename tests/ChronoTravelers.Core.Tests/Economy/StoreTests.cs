@@ -207,4 +207,127 @@ public class StoreTests
 
         Assert.Throws<InvalidOperationException>(() => store.CollectCapital(owner, 1));
     }
+
+    [Fact]
+    public void DepositCredits_RequiresOwnership()
+    {
+        var owner = NewTraveler("Owner");
+        var stranger = NewTraveler("Stranger");
+        stranger.AddCredits(50);
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
+
+        Assert.Throws<InvalidOperationException>(() => store.Deposit(stranger, 10));
+    }
+
+    [Fact]
+    public void DepositCredits_MovesOwnerCreditsIntoStoreCapital()
+    {
+        var owner = NewTraveler("Owner");
+        owner.AddCredits(50);
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
+
+        store.Deposit(owner, 30);
+
+        Assert.Equal(20, owner.Credits);
+        Assert.Equal(130, store.Capital);
+    }
+
+    [Fact]
+    public void DepositCredits_RejectsANonPositiveAmount()
+    {
+        var owner = NewTraveler("Owner");
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.Deposit(owner, 0));
+    }
+
+    [Fact]
+    public void Charge_RequiresOwnership()
+    {
+        var owner = NewTraveler("Owner");
+        var stranger = NewTraveler("Stranger");
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
+
+        Assert.Throws<InvalidOperationException>(() => store.Charge(stranger, 10));
+    }
+
+    [Fact]
+    public void Charge_MovesOwnerTachyonsIntoTheMaintenanceReserve()
+    {
+        var owner = NewTraveler("Owner");
+        var tachyonsBefore = owner.Tachyons.Current;
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
+
+        store.Charge(owner, 5);
+
+        Assert.Equal(tachyonsBefore - 5, owner.Tachyons.Current);
+        Assert.Equal(5, store.TachyonReserve);
+    }
+
+    [Fact]
+    public void Charge_ThrowsIfOwnerCantAffordIt()
+    {
+        var owner = NewTraveler("Owner");
+        owner.Tachyons.Spend(owner.Tachyons.Current);
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
+
+        Assert.Throws<InvalidOperationException>(() => store.Charge(owner, 1));
+    }
+
+    [Fact]
+    public void ApplyMaintenanceTick_GovernmentStore_IsAlwaysANoOp()
+    {
+        var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
+
+        var foreclosed = store.ApplyMaintenanceTick(1_000_000);
+
+        Assert.False(foreclosed);
+        Assert.Equal(0, store.MissedMaintenanceTicks);
+    }
+
+    [Fact]
+    public void ApplyMaintenanceTick_SufficientReserve_DrawsTheCostAndResetsTheMissStreak()
+    {
+        var owner = NewTraveler("Owner");
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner, startingTachyonReserve: 10);
+        store.ApplyMaintenanceTick(3); // one miss first, to prove a paid tick resets it
+        var underfunded = new Store("Underfunded", homeLevel: 1, startingCapital: 0, owner, startingTachyonReserve: 0);
+        underfunded.ApplyMaintenanceTick(1);
+        Assert.Equal(1, underfunded.MissedMaintenanceTicks);
+
+        var foreclosed = store.ApplyMaintenanceTick(3);
+
+        Assert.False(foreclosed);
+        Assert.Equal(4, store.TachyonReserve);
+        Assert.Equal(0, store.MissedMaintenanceTicks);
+    }
+
+    [Fact]
+    public void ApplyMaintenanceTick_InsufficientReserve_DrainsItAndRecordsAMiss()
+    {
+        var owner = NewTraveler("Owner");
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner, startingTachyonReserve: 2);
+
+        var foreclosed = store.ApplyMaintenanceTick(5);
+
+        Assert.False(foreclosed);
+        Assert.Equal(0, store.TachyonReserve);
+        Assert.Equal(1, store.MissedMaintenanceTicks);
+    }
+
+    [Fact]
+    public void ApplyMaintenanceTick_ReachingTheForeclosureThreshold_ReturnsTrue()
+    {
+        var owner = NewTraveler("Owner");
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner, startingTachyonReserve: 0);
+
+        var foreclosed = false;
+        for (var i = 0; i < Store.ForeclosureThreshold; i++)
+        {
+            foreclosed = store.ApplyMaintenanceTick(1);
+        }
+
+        Assert.True(foreclosed);
+        Assert.Equal(Store.ForeclosureThreshold, store.MissedMaintenanceTicks);
+    }
 }

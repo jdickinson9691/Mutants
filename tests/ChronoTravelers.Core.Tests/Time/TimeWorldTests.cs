@@ -87,7 +87,7 @@ public class TimeWorldTests
     }
 
     [Fact]
-    public void GetYear_YieldsAGovernmentStoreAndAVacantPlayerSlot()
+    public void GetYear_YieldsAGovernmentStoreAndUpToThreeVacantPlayerSlots()
     {
         var content = World().GetYear(2600);
 
@@ -95,9 +95,26 @@ public class TimeWorldTests
         var vacant = content.StoreSlots.Where(s => s.IsAvailableForPurchase).ToList();
 
         Assert.Single(government);
-        Assert.Single(vacant);
+        Assert.NotEmpty(vacant);
+        Assert.True(vacant.Count <= 3);
         Assert.NotEmpty(government[0].Store!.Listings);
-        Assert.True(vacant[0].PurchaseCost > 0);
+        Assert.All(vacant, s => Assert.True(s.PurchaseCost > 0));
+
+        // No two slots (government included) ever share a room.
+        var locations = content.StoreSlots.Select(s => s.Location).ToList();
+        Assert.Equal(locations.Count, locations.Distinct().Count());
+    }
+
+    [Fact]
+    public void GetYear_ARoomyMapYieldsAllThreePurchasableSlots()
+    {
+        // 3500 A.D. maps are generously sized in TestTimeWorld's default
+        // catalog, so there's always room for the government store plus
+        // all 3 purchasable slots.
+        var content = World().GetYear(3500);
+        var vacant = content.StoreSlots.Where(s => s.IsAvailableForPurchase).ToList();
+
+        Assert.Equal(3, vacant.Count);
     }
 
     [Fact]

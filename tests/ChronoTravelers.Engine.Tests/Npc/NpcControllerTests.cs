@@ -20,6 +20,10 @@ public class NpcControllerTests
         return npc;
     }
 
+    /// <summary>Wraps an already-occupied <see cref="Store"/> in a <see cref="StoreSlot"/> — most of these tests only care about trading at a store that's already there, not slot purchase/vacancy mechanics.</summary>
+    private static StoreSlot OccupiedSlot(Store store) =>
+        new(store.Name, Coordinate.Origin, homeLevel: store.HomeLevel, purchaseCost: 0, store);
+
     /// <summary>A Soldier levelled far enough (and topped off) that its Tachyon pool can afford a year-hop.</summary>
     private static Traveler ReadyToTravelNpc(int year = 2000)
     {
@@ -109,7 +113,7 @@ public class NpcControllerTests
 
         var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
 
-        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [store]);
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(store)]);
 
         Assert.Equal(NpcGoal.Trade, result.Goal);
         Assert.Equal(3, npc.Inventory.Count(i => i.Type == ItemType.Junk));
@@ -126,7 +130,7 @@ public class NpcControllerTests
         var weapon = Item.Create("Cracked Shiv", ItemType.Weapon, 1, Rarity.Common);
         store.Stock(weapon, askingPrice: 50);
 
-        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [store]);
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(store)]);
 
         Assert.Equal(NpcGoal.Trade, result.Goal);
         Assert.Equal(weapon, npc.EquippedWeapon);
@@ -139,7 +143,7 @@ public class NpcControllerTests
         var npc = FreshNpc();
         var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
 
-        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [store]);
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(store)]);
 
         Assert.Equal(NpcGoal.Grind, result.Goal);
     }
@@ -302,6 +306,72 @@ public class NpcControllerTests
     }
 
     [Fact]
+    public void Act_NoStoreOwnedAndTwoOrMoreVacantSlots_OccasionallyBuysOne()
+    {
+        var npc = FreshNpc();
+        npc.AddCredits(500);
+        var vacantA = new StoreSlot("Vacant A", Coordinate.Origin, homeLevel: 1, purchaseCost: 100);
+        var vacantB = new StoreSlot("Vacant B", new Coordinate(1, 0), homeLevel: 1, purchaseCost: 100);
+
+        // 0.01 passes StorePurchaseChance (0.05) and, reused as the pick
+        // index over 2 vacant slots, selects index 0 (Vacant A).
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [vacantA, vacantB]);
+
+        Assert.Equal(NpcGoal.OwnStore, result.Goal);
+        Assert.False(vacantA.IsAvailableForPurchase);
+        Assert.Equal(npc, vacantA.Store!.Owner);
+        Assert.True(vacantB.IsAvailableForPurchase);
+        Assert.Equal(400, npc.Credits);
+    }
+
+    [Fact]
+    public void Act_OnlyOneVacantSlotInTheYear_NeverBuysIt_ReservedForThePlayer()
+    {
+        var npc = FreshNpc();
+        npc.AddCredits(500);
+        var onlyVacant = new StoreSlot("Last Vacancy", Coordinate.Origin, homeLevel: 1, purchaseCost: 100);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [onlyVacant]);
+
+        Assert.NotEqual(NpcGoal.OwnStore, result.Goal);
+        Assert.True(onlyVacant.IsAvailableForPurchase);
+        Assert.Equal(500, npc.Credits);
+    }
+
+    [Fact]
+    public void Act_OwnsAStoreWithALowReserve_PaysMaintenanceBeforeStocking()
+    {
+        var npc = FreshNpc();
+        var junk = Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common);
+        npc.AddToInventory(junk);
+        var slot = new StoreSlot("Vex's Store", Coordinate.Origin, homeLevel: 1, purchaseCost: 0,
+            new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingTachyonReserve: 0));
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [slot]);
+
+        Assert.Equal(NpcGoal.OwnStore, result.Goal);
+        Assert.Equal(30, slot.Store!.TachyonReserve);
+        Assert.Contains(junk, npc.Inventory); // untouched - maintenance was paid instead
+    }
+
+    [Fact]
+    public void Act_OwnsAStoreWithAFullReserve_StocksSurplusJunkInstead()
+    {
+        var npc = FreshNpc();
+        var junk = Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common);
+        npc.AddToInventory(junk);
+        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingTachyonReserve: 100);
+        var slot = new StoreSlot("Vex's Store", Coordinate.Origin, homeLevel: 1, purchaseCost: 0, store);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [slot]);
+
+        Assert.Equal(NpcGoal.OwnStore, result.Goal);
+        Assert.Equal(100, store.TachyonReserve); // unchanged - reserve was already at target
+        Assert.DoesNotContain(junk, npc.Inventory);
+        Assert.Contains(store.Listings, l => l.Item == junk);
+    }
+
+    [Fact]
     public void Act_SurplusGearAndExcessJunkBothPresent_SellsTheGearFirst()
     {
         var npc = FreshNpc();
@@ -317,7 +387,7 @@ public class NpcControllerTests
 
         var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
 
-        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [store]);
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(store)]);
 
         Assert.Equal(NpcGoal.Trade, result.Goal);
         Assert.DoesNotContain(surplusWeapon, npc.Inventory);

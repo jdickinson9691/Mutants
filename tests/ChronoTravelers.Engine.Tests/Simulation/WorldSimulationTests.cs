@@ -1,5 +1,6 @@
 using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
+using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Engine.Npc;
@@ -257,6 +258,61 @@ public class WorldSimulationTests
         var respawned = simulation.Npcs[0];
         Assert.False(respawned.Health.IsDead);
         Assert.InRange(respawned.CurrentYear, 3000 - NpcPopulation.LocalSpawnSpreadYears, 3000 + NpcPopulation.LocalSpawnSpreadYears);
+    }
+
+    [Fact]
+    public void Tick_DrawsMaintenanceFromAnOwnedStoresReserve()
+    {
+        var world = World();
+        var player = OffGridPlayer("Player", world, 2000);
+        var npc = NewTraveler("Vex", world, 2000);
+        var slot = world.GetYear(2000).StoreSlots.First(s => s.IsAvailableForPurchase);
+        var store = slot.RestoreOwnership(npc, capital: 0, tachyonReserve: 50);
+
+        // 0.99 misses every optional NPC roll (travel/purchase/tend), so this
+        // isolates the maintenance pass itself from any NPC store-tending action.
+        var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.99));
+
+        simulation.Tick(player);
+
+        Assert.True(store.TachyonReserve < 50);
+        Assert.Equal(0, store.MissedMaintenanceTicks);
+    }
+
+    [Fact]
+    public void Tick_NeverDrawsMaintenanceFromTheGovernmentStore()
+    {
+        var world = World();
+        var player = OffGridPlayer("Player", world, 2000);
+        var government = world.GetYear(2000).StoreSlots.Single(s => s.Store is { IsGovernmentRun: true }).Store!;
+        var capitalBefore = government.Capital;
+
+        var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.99));
+        simulation.Tick(player);
+
+        Assert.Equal(0, government.TachyonReserve);
+        Assert.Equal(capitalBefore, government.Capital);
+    }
+
+    [Fact]
+    public void Tick_RepossessesAnOwnedStoreAfterTooManyMissedMaintenanceTicks_AndBroadcastsIt()
+    {
+        var world = World();
+        var player = OffGridPlayer("Player", world, 2000);
+        var npc = NewTraveler("Vex", world, 2000);
+        npc.Tachyons.Spend(npc.Tachyons.Current); // can't self-fund maintenance either
+        var slot = world.GetYear(2000).StoreSlots.First(s => s.IsAvailableForPurchase);
+        slot.RestoreOwnership(npc, capital: 0, tachyonReserve: 0);
+
+        var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.99));
+
+        for (var i = 0; i < Store.ForeclosureThreshold; i++)
+        {
+            simulation.Tick(player);
+        }
+
+        Assert.True(slot.IsAvailableForPurchase);
+        Assert.Contains(simulation.Broadcast.Events, e => e.Message.Contains("repossessed") && e.Year == 2000);
     }
 
     [Fact]

@@ -342,7 +342,7 @@ while (running)
                 break;
             }
 
-            if (command is "deposit" or "withdraw" or "reprice")
+            if (command is "deposit" or "withdraw" or "reprice" or "stock" or "charge")
             {
                 HandleStoreManagement(traveler, world, command, argument);
                 break;
@@ -1392,8 +1392,13 @@ static void HandleBuyStore(Traveler traveler, TimeWorld world)
         return;
     }
 
+    var hadAbandonedInventory = slot.HasAbandonedInventory;
     slot.Purchase(traveler);
-    AnsiConsole.MarkupLine($"[green]You now own a store here: {Markup.Escape(slot.Store!.Name)}![/] Use [yellow]deposit[/]/[yellow]withdraw[/]/[yellow]reprice[/]/[yellow]collect[/] to run it. It'll still be yours next session.");
+    AnsiConsole.MarkupLine($"[green]You now own a store here: {Markup.Escape(slot.Store!.Name)}![/] Use [yellow]stock[/]/[yellow]withdraw[/]/[yellow]reprice[/] to manage listings, [yellow]deposit[/]/[yellow]charge[/]/[yellow]collect[/] to move Credits/Tachyons in and out. It'll still be yours next session — but only if you keep [yellow]charge[/]-ing its Tachyon maintenance.");
+    if (hadAbandonedInventory)
+    {
+        AnsiConsole.MarkupLine($"[cyan]The previous owner's old stock came with it — {slot.Store.Listings.Count} item(s) already for sale.[/]");
+    }
 }
 
 /// <summary>Collects from every store the Traveler owns across every year visited this session — an owner needn't be standing there (docs/GDD.md §6.2's "idle-income loop").</summary>
@@ -1475,10 +1480,29 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
 
         case "deposit":
         {
+            if (!int.TryParse(argument.Trim(), out var amount) || amount < 1)
+            {
+                AnsiConsole.MarkupLine("[red]Usage: deposit <credits>[/] - funds your store's Capital, which pays for buying from other travelers.");
+                return;
+            }
+
+            if (traveler.Credits < amount)
+            {
+                AnsiConsole.MarkupLine($"[red]You only have {traveler.Credits} Credits.[/]");
+                return;
+            }
+
+            store.Deposit(traveler, amount);
+            AnsiConsole.MarkupLine($"[green]Deposited {amount} Credits into {Markup.Escape(store.Name)}'s Capital (now {store.Capital}).[/]");
+            break;
+        }
+
+        case "stock":
+        {
             var split = SplitItemAndPrice(argument);
             if (split is null)
             {
-                AnsiConsole.MarkupLine("[red]Usage: deposit <item> <price>[/]");
+                AnsiConsole.MarkupLine("[red]Usage: stock <item> <price>[/]");
                 return;
             }
 
@@ -1492,6 +1516,25 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
 
             store.Deposit(traveler, item, price);
             AnsiConsole.MarkupLine($"[green]Listed {Markup.Escape(item.Name)} at {Markup.Escape(store.Name)} for {price} Credits.[/]");
+            break;
+        }
+
+        case "charge":
+        {
+            if (!int.TryParse(argument.Trim(), out var tachyons) || tachyons < 1)
+            {
+                AnsiConsole.MarkupLine("[red]Usage: charge <tachyons>[/] - pays down your store's maintenance reserve so it isn't repossessed.");
+                return;
+            }
+
+            if (!traveler.Tachyons.CanAfford(tachyons))
+            {
+                AnsiConsole.MarkupLine($"[red]You don't have {tachyons} Tachyons ({Markup.Escape(TachyonText(traveler))}).[/]");
+                return;
+            }
+
+            store.Charge(traveler, tachyons);
+            AnsiConsole.MarkupLine($"[green]Charged {tachyons} Tachyons to {Markup.Escape(store.Name)}'s maintenance reserve (now {store.TachyonReserve}).[/]");
             break;
         }
 
@@ -2193,7 +2236,9 @@ static void RenderStores(IReadOnlyList<StoreSlot> storeSlots)
             var s => Markup.Escape(s.Owner!.Name),
         };
         var items = slot.Store?.Listings.Count.ToString() ?? "-";
-        var status = slot.IsAvailableForPurchase ? $"[yellow]for sale ({slot.PurchaseCost} Credits)[/]" : "occupied";
+        var status = slot.IsAvailableForPurchase
+            ? $"[yellow]for sale ({slot.PurchaseCost} Credits{(slot.HasAbandonedInventory ? ", pre-stocked" : "")})[/]"
+            : slot.Store!.IsGovernmentRun ? "occupied" : $"occupied ({slot.Store.TachyonReserve} Tachyon reserve)";
 
         table.AddRow(Markup.Escape(slot.Name), Markup.Escape(slot.Location.ToString()), owner, items, status);
     }
@@ -2441,6 +2486,8 @@ static void RenderRoom(Traveler traveler, TimeWorld world)
     {
         AnsiConsole.MarkupLine(slot.Store switch
         {
+            null when slot.HasAbandonedInventory =>
+                $"[cyan]There's an abandoned storefront here, its old stock still on the shelves — '{Markup.Escape("buy-store")}' to claim it for {slot.PurchaseCost} Credits.[/]",
             null => $"[cyan]There's an empty storefront here — '{Markup.Escape("buy-store")}' to claim it for {slot.PurchaseCost} Credits.[/]",
             { IsGovernmentRun: true } => $"[cyan]There's a store here: {Markup.Escape(slot.Store.Name)}. Type 'shop' to browse.[/]",
             _ => $"[cyan]There's a player-owned store here: {Markup.Escape(slot.Store.Name)} (owned by {Markup.Escape(slot.Store.Owner!.Name)}). Type 'shop' to browse.[/]",
@@ -2512,9 +2559,11 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]buy <item>[/]         - buy a listed item (must be at a store)");
     AnsiConsole.MarkupLine("  [green]sell <item>[/] / [green]sell all[/] - sell one item, or dump all junk, to the store here");
     AnsiConsole.MarkupLine("  [green]buy-store[/]           - purchase an empty store slot you're standing in");
-    AnsiConsole.MarkupLine("  [green]deposit <item> <price>[/] - list your own item for sale at your store");
+    AnsiConsole.MarkupLine("  [green]stock <item> <price>[/] - list your own item for sale at your store");
     AnsiConsole.MarkupLine("  [green]withdraw <item>[/]    - pull a listing back into your inventory");
     AnsiConsole.MarkupLine("  [green]reprice <item> <price>[/] - change a listing's asking price");
+    AnsiConsole.MarkupLine("  [green]deposit <credits>[/]  - fund your store's Capital from your own Credits");
+    AnsiConsole.MarkupLine("  [green]charge <tachyons>[/]  - pay your store's Tachyon maintenance so it isn't repossessed");
     AnsiConsole.MarkupLine("  [green]collect[/]             - withdraw your store's earnings into your Credits");
     AnsiConsole.MarkupLine("  [green]save[/]                - save your character now");
     AnsiConsole.MarkupLine("  [green]leaderboard[/] (or board) - show the leaderboards, your best highlighted");
@@ -2532,4 +2581,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("[grey]  leaving your room, with its direction; [yellow]monsters[/] shows each one's position.[/]");
     AnsiConsole.MarkupLine("[grey]  A few years hold an [red](apex)[/] — much tougher, barely provokable, better loot.[/]");
     AnsiConsole.MarkupLine("[grey]  It leaves you alone; [yellow]fight <name>[/] it only if you want what it's carrying.[/]");
+    AnsiConsole.MarkupLine("[grey]  Owning a store costs Tachyon upkeep every world tick (the government store is[/]");
+    AnsiConsole.MarkupLine("[grey]  exempt) — keep it funded with [yellow]charge[/], or go unpaid too long and it's[/]");
+    AnsiConsole.MarkupLine("[grey]  repossessed: the slot, and whatever's still on its shelves, go back up for sale.[/]");
 }

@@ -67,6 +67,7 @@ public static class CharacterMapper
                 {
                     Year = pair.Key,
                     Capital = pair.Value.Capital,
+                    TachyonReserve = pair.Value.TachyonReserve,
                     Listings = pair.Value.Listings
                         .Select(l => new StoreListingSaveData { Item = ToItemSaveData(l.Item), AskingPrice = l.AskingPrice })
                         .ToList(),
@@ -100,7 +101,7 @@ public static class CharacterMapper
                 continue;
             }
 
-            var store = slot.RestoreOwnership(player, saved.Capital);
+            var store = slot.RestoreOwnership(player, saved.Capital, saved.TachyonReserve);
             foreach (var listing in saved.Listings)
             {
                 store.Stock(FromItemSaveData(listing.Item), listing.AskingPrice);

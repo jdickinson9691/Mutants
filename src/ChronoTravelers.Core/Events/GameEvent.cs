@@ -9,6 +9,7 @@ public enum GameEventKind
     LevelReached,
     TimeTraveled,
     Ambushed,
+    StoreRepossessed,
 }
 
 /// <summary>
@@ -48,6 +49,11 @@ public sealed record GameEvent(string Message, GameEventKind Kind = GameEventKin
     public static GameEvent Ambushed(string monsterName, string victimName, int damage, int? year = null) =>
         new($"{Ref(monsterName, isCreature: true, sentenceStart: true)} ambushes {Plain(victimName)} for {damage}.",
             GameEventKind.Ambushed, year);
+
+    /// <summary>docs/GDD.md §6.2: unpaid Tachyon maintenance eventually "causes stores, and their inventories, to become for sale" — published when that threshold is crossed and a slot is reclaimed.</summary>
+    public static GameEvent StoreRepossessed(string storeName, string ownerName, int year) =>
+        new($"{storeName} fell behind on maintenance and was repossessed from {Plain(ownerName)} — it's for sale again.",
+            GameEventKind.StoreRepossessed, year);
 
     /// <summary>Formats a participant for the feed — article for a creature, bare for a proper noun, instance suffix always stripped.</summary>
     private static string Ref(string name, bool isCreature, bool sentenceStart)

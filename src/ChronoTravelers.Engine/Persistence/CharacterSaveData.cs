@@ -74,6 +74,9 @@ public sealed class OwnedStoreSaveData
 {
     public int Year { get; set; }
     public int Capital { get; set; }
+
+    /// <summary>The store's Tachyon maintenance reserve (see Core.Economy.Store.TachyonReserve). Additive — old blobs deserialize as 0, meaning maintenance starts unfunded next session.</summary>
+    public int TachyonReserve { get; set; }
     public List<StoreListingSaveData> Listings { get; set; } = [];
 }
 

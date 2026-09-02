@@ -208,7 +208,8 @@ public class CharacterMapperTests
         player.AddCredits(5000);
         player.PlaceAt(world.GetYear(year).Map.Start);
 
-        var slot = world.GetYear(year).StoreSlots.Single(s => s.IsAvailableForPurchase);
+        // A year now offers several purchasable slots (TimeWorld.PlayerSlotCount) — grab any one.
+        var slot = world.GetYear(year).StoreSlots.First(s => s.IsAvailableForPurchase);
         var store = slot.Purchase(player, startingCapital: 100);
         var creditsAfterPurchase = player.Credits;
 

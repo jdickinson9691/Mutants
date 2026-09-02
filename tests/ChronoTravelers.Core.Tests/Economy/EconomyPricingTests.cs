@@ -35,4 +35,16 @@ public class EconomyPricingTests
         var item = Item.Create("Scrap", ItemType.Junk, tier: 3, Rarity.Common);
         Assert.True(EconomyPricing.DefaultAskingPrice(item) > EconomyPricing.BuyPrice(item));
     }
+
+    [Fact]
+    public void MaintenanceCostPerTick_NeverGoesBelowOne()
+    {
+        Assert.Equal(1, EconomyPricing.MaintenanceCostPerTick(0.1));
+    }
+
+    [Fact]
+    public void MaintenanceCostPerTick_RisesWithTier()
+    {
+        Assert.True(EconomyPricing.MaintenanceCostPerTick(9.0) > EconomyPricing.MaintenanceCostPerTick(1.0));
+    }
 }

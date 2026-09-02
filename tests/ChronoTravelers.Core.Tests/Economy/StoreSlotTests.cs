@@ -1,6 +1,7 @@
 using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Economy;
+using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.World;
 
 namespace ChronoTravelers.Core.Tests.Economy;
@@ -84,5 +85,68 @@ public class StoreSlotTests
         var slot = new StoreSlot("Depot", Coordinate.Origin, homeLevel: 2600, purchaseCost: 0, store);
 
         Assert.Throws<InvalidOperationException>(() => slot.RestoreOwnership(new Traveler("Rook", CharacterClass.Soldier), capital: 0));
+    }
+
+    [Fact]
+    public void RestoreOwnership_RestoresTheTachyonReserveToo()
+    {
+        var slot = new StoreSlot("Vacant Storefront", Coordinate.Origin, homeLevel: 2600, purchaseCost: 400);
+        var owner = new Traveler("Rook", CharacterClass.Soldier);
+
+        var store = slot.RestoreOwnership(owner, capital: 0, tachyonReserve: 42);
+
+        Assert.Equal(42, store.TachyonReserve);
+    }
+
+    [Fact]
+    public void Repossess_ThrowsOnAnAlreadyVacantSlot()
+    {
+        var slot = new StoreSlot("Gutted Storefront", Coordinate.Origin, homeLevel: 1, purchaseCost: 150);
+
+        Assert.Throws<InvalidOperationException>(() => slot.Repossess());
+    }
+
+    [Fact]
+    public void Repossess_ThrowsOnAGovernmentStore()
+    {
+        var store = Store.CreateGovernmentStore("Depot", homeLevel: 1);
+        var slot = new StoreSlot("Depot", Coordinate.Origin, homeLevel: 1, purchaseCost: 0, store);
+
+        Assert.Throws<InvalidOperationException>(() => slot.Repossess());
+    }
+
+    [Fact]
+    public void Repossess_ClearsTheOwnerAndMakesTheSlotAvailableAgain()
+    {
+        var slot = new StoreSlot("Gutted Storefront", Coordinate.Origin, homeLevel: 1, purchaseCost: 150);
+        var buyer = new Traveler("Rook", CharacterClass.Soldier);
+        buyer.AddCredits(200);
+        slot.Purchase(buyer);
+
+        slot.Repossess();
+
+        Assert.True(slot.IsAvailableForPurchase);
+        Assert.Null(slot.Store);
+    }
+
+    [Fact]
+    public void Repossess_PreservesListingsForWhoeverBuysTheSlotNext()
+    {
+        var slot = new StoreSlot("Gutted Storefront", Coordinate.Origin, homeLevel: 1, purchaseCost: 150);
+        var firstOwner = new Traveler("Rook", CharacterClass.Soldier);
+        firstOwner.AddCredits(200);
+        var store = slot.Purchase(firstOwner);
+        var item = Item.Create("Widget", ItemType.Junk, 1, Rarity.Common);
+        store.Stock(item, askingPrice: 25);
+
+        slot.Repossess();
+        Assert.True(slot.HasAbandonedInventory);
+
+        var secondOwner = new Traveler("Zeta", CharacterClass.Scientist);
+        secondOwner.AddCredits(200);
+        var newStore = slot.Purchase(secondOwner);
+
+        Assert.Contains(newStore.Listings, l => l.Item == item && l.AskingPrice == 25);
+        Assert.False(slot.HasAbandonedInventory);
     }
 }

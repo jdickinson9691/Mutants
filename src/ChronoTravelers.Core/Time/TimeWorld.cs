@@ -203,15 +203,19 @@ public sealed class TimeWorld
         }
     }
 
+    /// <summary>
+    /// Purchasable store slots offered per year, beyond the one always-open
+    /// government store — docs/GDD.md §6.2. A small map with too few rooms
+    /// simply gets fewer; the government store always exists regardless.
+    /// </summary>
+    private const int PlayerSlotCount = 3;
+
     private IReadOnlyList<StoreSlot> BuildStores(EraDefinition era, int year, LevelMap map)
     {
         var rng = DeterministicRandom.For(WorldSeed, year, "stores");
         var rooms = map.Rooms.Keys.OrderBy(c => c.North).ThenBy(c => c.East).ToList();
 
         var govRoom = rooms[rng.Next(rooms.Count)];
-        var slotRoom = rooms.Count > 1
-            ? rooms.Where(c => !c.Equals(govRoom)).ElementAt(rng.Next(rooms.Count - 1))
-            : govRoom;
 
         var displayTier = TimelineContentFactory.DisplayTier(year);
         var themedPool = _itemArchetypes.Where(a => a.SharesThemeWith(era.ItemThemeTags)).ToList();
@@ -230,13 +234,28 @@ public sealed class TimeWorld
         var governmentSlot = new StoreSlot(
             government.Name, govRoom, homeLevel: year, purchaseCost: 0, government);
 
-        var playerSlot = new StoreSlot(
-            $"{era.Name} Vacant Storefront",
-            slotRoom,
-            homeLevel: year,
-            purchaseCost: _storeTemplate.PlayerSlotCostForTier(displayTier));
+        // Up to PlayerSlotCount distinct rooms (never the government's own
+        // room) each get a purchasable "Vacant Storefront" slot — docs/GDD.md
+        // §6.2's "limited number of store locations." A one-room map (or one
+        // with fewer than PlayerSlotCount+1 rooms) just yields fewer slots;
+        // the government store is never displaced.
+        var remainingRooms = rooms.Where(c => !c.Equals(govRoom)).ToList();
+        var slots = new List<StoreSlot> { governmentSlot };
 
-        return slotRoom.Equals(govRoom) ? [governmentSlot] : [governmentSlot, playerSlot];
+        for (var i = 0; i < PlayerSlotCount && remainingRooms.Count > 0; i++)
+        {
+            var pickIndex = rng.Next(remainingRooms.Count);
+            var slotRoom = remainingRooms[pickIndex];
+            remainingRooms.RemoveAt(pickIndex);
+
+            slots.Add(new StoreSlot(
+                $"{era.Name} Vacant Storefront",
+                slotRoom,
+                homeLevel: year,
+                purchaseCost: _storeTemplate.PlayerSlotCostForTier(displayTier)));
+        }
+
+        return slots;
     }
 
     private IEnumerable<ItemArchetypeDefinition> StapleArchetypes(IReadOnlyList<ItemArchetypeDefinition> pool)
