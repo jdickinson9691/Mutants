@@ -144,13 +144,18 @@ public sealed class TimeWorld
 
         // A third of the grid gets a random item on year-load so a year
         // never feels empty, plus exactly one Time Shard (a weapon 25%
-        // above the year's best, and a year-scaled Credit value).
+        // above the year's best, and a year-scaled Credit value) and a
+        // couple of permanent-stat elixirs ("half as rare as the Shard").
         var floorLootRng = DeterministicRandom.For(WorldSeed, year, "floorloot");
         Func<Item> floorLoot = () => TimelineContentFactory.RandomFloorItem(floorLootRng, _itemArchetypes, year);
         Func<Item> timeShard = () => TimelineContentFactory.TimeShard(year, _itemArchetypes);
+        var elixirRng = DeterministicRandom.For(WorldSeed, year, "statelixir");
+        Func<Item> statElixir = () => TimelineContentFactory.StatElixir(elixirRng, year);
 
         var stores = BuildStores(era, year, map);
-        var population = YearPopulation.Seed(WorldSeed, year, map, roster, warden, apexRoster, floorLoot, timeShard);
+        var population = YearPopulation.Seed(
+            WorldSeed, year, map, roster, warden, apexRoster, floorLoot, timeShard,
+            statElixir, TimelineContentFactory.StatElixirsPerYear);
 
         return new YearContent(year, map, era, roster, stores, warden, tier, population);
     }

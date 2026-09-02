@@ -92,9 +92,9 @@ public class TravelerTests
 
         var gained = traveler.Convert(item);
 
-        Assert.Equal(8, gained); // floor(22 * 0.4) = 8
+        Assert.Equal(52, gained); // junk -> trash rate: floor(22 * 2.4) = 52
         Assert.DoesNotContain(item, traveler.Inventory);
-        Assert.Equal(8, traveler.Tachyons.Current);
+        Assert.Equal(52, traveler.Tachyons.Current);
     }
 
     [Fact]
@@ -179,6 +179,43 @@ public class TravelerTests
         traveler.Consume(potion);
 
         Assert.Equal(defenseBefore + 3, traveler.EffectiveDefense);
+    }
+
+    [Fact]
+    public void Consume_StatElixir_PermanentlyRaisesTheStat_NoTimedEffect()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier); // primary = Strength
+        var strBefore = traveler.Stats.Strength;
+        var attackBefore = traveler.EffectiveAttackPower;
+        var elixir = Item.Create("Meridian Serum: Strength", ItemType.Consumable, 3, Rarity.Epic,
+            consumableEffect: ConsumableEffectType.BoostStrength, effectMagnitude: 5);
+        traveler.AddToInventory(elixir);
+
+        traveler.Consume(elixir);
+
+        Assert.Equal(strBefore + 5, traveler.Stats.Strength);
+        Assert.Equal(attackBefore + 5, traveler.EffectiveAttackPower); // Strength is the Soldier's attack stat
+        Assert.Empty(traveler.ActiveEffects);                          // permanent, not a timed buff
+        Assert.DoesNotContain(elixir, traveler.Inventory);
+    }
+
+    [Fact]
+    public void Consume_AgilityElixir_RaisesAgilityDerivedDefenseAndSpeed()
+    {
+        var traveler = new Traveler("Nyx", CharacterClass.Spy);
+        var agiBefore = traveler.Stats.Agility;
+        var speedBefore = traveler.Speed;
+        var defBefore = traveler.EffectiveDefense;
+        var elixir = Item.Create("Meridian Serum: Agility", ItemType.Consumable, 3, Rarity.Epic,
+            consumableEffect: ConsumableEffectType.BoostAgility, effectMagnitude: 5);
+        traveler.AddToInventory(elixir);
+
+        traveler.Consume(elixir);
+
+        Assert.Equal(agiBefore + 5, traveler.Stats.Agility);
+        Assert.Equal(speedBefore + 5, traveler.Speed);                       // speed = Agility
+        Assert.Equal(defBefore + ((agiBefore + 5) / 2 - agiBefore / 2), traveler.EffectiveDefense); // defense = Agility / 2
+        Assert.True(traveler.EffectiveDefense > defBefore);
     }
 
     [Fact]

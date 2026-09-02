@@ -23,4 +23,22 @@ public enum ConsumableEffectType
 
     /// <summary>Temporary flat bonus to defense for DurationTicks ticks — a "temporary resistance" potion (this engine has no elemental damage types to resist individually, so resistance = reduced incoming damage = a defense buff, the same mechanism as an attack/defense-boosting stat potion).</summary>
     BuffDefense,
+
+    // --- Permanent stat elixirs -----------------------------------------
+    // Each raises one primary stat by Magnitude points *for good* — no
+    // duration, it just rewrites the StatBlock the way a level-up does.
+    // Rare floor loot (see ChronoTravelers.Core.Time.TimelineContentFactory
+    // .StatElixir); DurationTicks is unused for these.
+
+    /// <summary>Permanently adds Magnitude to Strength.</summary>
+    BoostStrength,
+
+    /// <summary>Permanently adds Magnitude to Agility.</summary>
+    BoostAgility,
+
+    /// <summary>Permanently adds Magnitude to Resolve.</summary>
+    BoostResolve,
+
+    /// <summary>Permanently adds Magnitude to Intellect.</summary>
+    BoostIntellect,
 }

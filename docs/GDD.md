@@ -88,11 +88,23 @@ stay capped.)
   the early game an unrecoverable attrition spiral. Regen alone tops out
   at the nominal pool size (you can't wait your way to an infinite pool);
   only converting loot pushes past it.
-- Item→Tachyon conversion value = `base_item_value * 0.4`, rounded down, with a
-  minimum of 1. This keeps converting strictly worse than selling for Credits
-  when a store is reachable, but better than nothing when it isn't — replicating
-  the "quasi semi-flawed but usable" economy the original was known for,
-  without the parts that made it exploitable.
+- Item→Tachyon conversion value = `base_item_value * rate`, rounded down, with a
+  minimum of 1. `rate` is **0.4 for a normal item** (weapon / armour /
+  consumable) — kept strictly worse than selling for Credits when a store is
+  reachable, but better than nothing when it isn't — and **2.4 for trash
+  loot** (`ItemType.Junk`), i.e. +500%. Junk exists only to be burned or
+  sold; at the old flat 0.4 it was a poor trickle next to the travel bills a
+  downstream push runs up, so clearing the floor after a fight now actually
+  refuels you. Still replicates the "quasi semi-flawed but usable" economy
+  the original was known for, without the exploitable parts.
+- **Tachyon pool size** was scaled up end-to-end for the downstream push: the
+  starting pool (`ClassDefinition.BaseTachyons`) tripled (+200%, Soldier
+  20→60 … Scientist 34→102) and per-level growth (`TachyonsPerLevel`) ×6
+  (+500%, 4→24 for melee, 5→30 for the casters). A thin pool meant a botched
+  overreach couldn't afford the retreat home and spiralled into a no-fuel
+  death, and the old per-level trickle never re-opened the buffer. A level-10
+  Soldier's nominal pool is now 276 (was 56). The pool is uncapped regardless;
+  these numbers only set the starting fill and the passive-regen ceiling.
 - Time travel cost = `max(8, ceil(0.04 * |target_year - current_year|))`
   Tachyons, symmetric (retreating toward the present costs the same as
   advancing). Original tuning (0.2 → 0.1 → 0.04 across playtests; then an
@@ -244,10 +256,20 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
   (`ClassDefinition.HpGrowthKneeLevel`), then half rate to the cap — a
   flat-linear pool ran away from what any deep-future monster could
   threaten (a level-30 Soldier had ~10× base HP under the old curve).
-  Early/mid game is unchanged; a level-30 Soldier is ~160 HP, and even at
-  the raised level-60 cap a Soldier is only ~249 HP — the half-rate tail
-  keeps the deep levels' pool bounded against the superlinear monster
-  scaling (§6).
+  `HpPerLevel` is spread by class identity so the durability order holds
+  but every class climbs steeper: **Soldier 9, Spy 7, Doctor 7, Engineer
+  5, Scientist 4** (was 6/5/5/3/3). A level-30 Soldier is now ~223 HP; at
+  the level-60 cap, ~358. The half-rate tail still keeps the deep pool
+  bounded against the superlinear monster scaling (§6), it just sits
+  higher.
+- **Permanent stat elixirs** ("Meridian Serum: `<stat>`") — Epic
+  consumables, **two per year on the floor** (`TimelineContentFactory
+  .StatElixirsPerYear`), placed the same protected way as the Time Shard
+  (monsters and NPCs can't take them), so "half as rare as the Shard."
+  `use` one and it adds **+5** to Strength / Agility / Resolve / Intellect
+  permanently — no timer, it rewrites the `StatBlock` exactly as a
+  level-up does, and is saved with the rest of `Stats`. The only
+  non-level way to grow a stat.
 
 ### 4.2 Ability trees (original design, 6 tiers per class = levels 5/10/15/20/25/30)
 
@@ -310,6 +332,10 @@ area/group to a capstone — is the standard every class follows.)
   whose AttackBonus is 1.25× the strongest weapon of any kind available
   that year, and whose Credit value scales with the year. Monsters and
   NPCs never pick one up — it's the player's to take, wield, or sell.
+- **Meridian Serums** (two per year, on the floor — see §4.1): Epic
+  consumables that permanently add +5 to one stat. Placed and protected
+  the same way as the Shard; "half as rare" only in that there are two,
+  not one.
 - **Drop composition**: a regular monster's table is built by category so
   a kill always pays and occasionally supplies you — a **guaranteed
   sell/convert fodder** piece (a junk item, drop chance 1.0), a real

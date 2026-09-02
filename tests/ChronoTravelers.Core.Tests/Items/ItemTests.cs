@@ -1,5 +1,6 @@
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Items;
+using ChronoTravelers.Core.Tachyons;
 
 namespace ChronoTravelers.Core.Tests.Items;
 
@@ -24,11 +25,23 @@ public class ItemTests
     }
 
     [Fact]
-    public void ConvertValue_MatchesTachyonEconomyFormula()
+    public void ConvertValue_Junk_UsesTheTrashRate()
     {
         var item = Item.Create("Junk Scrap", ItemType.Junk, tier: 2, Rarity.Common); // value = 34
 
-        Assert.Equal(13, item.ConvertValue()); // floor(34 * 0.4) = 13
+        Assert.Equal(81, item.ConvertValue()); // floor(34 * 2.4) = 81
+        Assert.Equal(TachyonEconomy.ConvertValue(34, isTrash: true), item.ConvertValue());
+    }
+
+    [Fact]
+    public void ConvertValue_NonJunk_UsesThePlainRate()
+    {
+        var weapon = Item.Create("Plain Blade", ItemType.Weapon, tier: 2, Rarity.Common);
+        var junk = Item.Create("Plain Scrap", ItemType.Junk, tier: 2, Rarity.Common);
+
+        Assert.Equal(TachyonEconomy.ConvertValue(weapon.Value, isTrash: false), weapon.ConvertValue());
+        // Same value band, but junk converts for 6× — floor rounding aside.
+        Assert.True(junk.ConvertValue() > weapon.ConvertValue() * 4);
     }
 
     [Fact]

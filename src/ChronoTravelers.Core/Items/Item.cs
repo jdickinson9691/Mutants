@@ -95,6 +95,13 @@ public sealed record Item(
     /// <summary>True for a Consumable that actually does something when used — see ChronoTravelers.Core.Characters.Traveler.Consume. A Consumable with no effect data is flavor-only (still sellable/convertible, but "use" refuses it).</summary>
     public bool IsUsable => Type == ItemType.Consumable && ConsumableEffect != ConsumableEffectType.None;
 
+    /// <summary>A permanent stat elixir (rare floor loot — see ChronoTravelers.Core.Time.TimelineContentFactory.StatElixir). Like the Time Shard, monsters and NPCs leave it alone (see ChronoTravelers.Engine.Npc.MonsterController).</summary>
+    public bool IsStatElixir => ConsumableEffect
+        is ConsumableEffectType.BoostStrength
+        or ConsumableEffectType.BoostAgility
+        or ConsumableEffectType.BoostResolve
+        or ConsumableEffectType.BoostIntellect;
+
     /// <summary>A ranged weapon (Wand / Bow / Gun).</summary>
     public bool IsRanged => RangedKind != RangedKind.None;
 
@@ -113,8 +120,8 @@ public sealed record Item(
 
     private int EffectiveValue => Math.Max(1, (int)Math.Round(Value * ValueFraction));
 
-    /// <summary>Tachyons gained by destroying this item — docs/GDD.md §2.1. A partly/fully spent ranged weapon is worth less (see <see cref="ValueFraction"/>).</summary>
-    public int ConvertValue() => TachyonEconomy.ConvertValue(EffectiveValue);
+    /// <summary>Tachyons gained by destroying this item — docs/GDD.md §2.1. Junk converts at the far higher trash rate (<see cref="TachyonEconomy.TrashConvertRate"/>); a partly/fully spent ranged weapon is worth less (see <see cref="ValueFraction"/>).</summary>
+    public int ConvertValue() => TachyonEconomy.ConvertValue(EffectiveValue, isTrash: Type == ItemType.Junk);
 
     /// <summary>
     /// Credits gained by selling this item. docs/GDD.md §6 ties real sell

@@ -1,3 +1,4 @@
+using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Time;
@@ -185,6 +186,34 @@ public class TimelineContentFactoryTests
 
         Assert.True(late.AttackBonus > early.AttackBonus, "a later year's shard beats a later, stronger weapon set");
         Assert.True(late.Value > early.Value, "the Credit value scales up with the year");
+    }
+
+    [Theory]
+    [InlineData(PrimaryStat.Strength, ConsumableEffectType.BoostStrength)]
+    [InlineData(PrimaryStat.Agility, ConsumableEffectType.BoostAgility)]
+    [InlineData(PrimaryStat.Resolve, ConsumableEffectType.BoostResolve)]
+    [InlineData(PrimaryStat.Intellect, ConsumableEffectType.BoostIntellect)]
+    public void StatElixir_IsAnEpicConsumableThatPermanentlyBoostsItsStat(PrimaryStat stat, ConsumableEffectType expected)
+    {
+        var elixir = TimelineContentFactory.StatElixir(stat, 3000);
+
+        Assert.Equal(ItemType.Consumable, elixir.Type);
+        Assert.Equal(Rarity.Epic, elixir.Rarity);
+        Assert.Equal(expected, elixir.ConsumableEffect);
+        Assert.Equal(TimelineContentFactory.StatElixirBoost, (int)elixir.EffectMagnitude);
+        Assert.Equal(0, elixir.EffectDurationTicks); // permanent, not a timed buff
+        Assert.True(elixir.IsStatElixir);
+        Assert.True(elixir.IsUsable);
+        Assert.Contains(stat.ToString(), elixir.Name);
+    }
+
+    [Fact]
+    public void StatElixir_ValueScalesWithTheYear()
+    {
+        var early = TimelineContentFactory.StatElixir(PrimaryStat.Resolve, 2000);
+        var late = TimelineContentFactory.StatElixir(PrimaryStat.Resolve, 4800);
+
+        Assert.True(late.Value > early.Value);
     }
 
     [Fact]

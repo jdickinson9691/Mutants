@@ -1,3 +1,4 @@
+using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 
@@ -178,6 +179,51 @@ public static class TimelineContentFactory
             AttackBonus: (int)Math.Round(bestWeaponBonus * TimeShardEdge),
             IsTimeShard: true);
     }
+
+    /// <summary>Points a stat elixir permanently adds to its stat.</summary>
+    public const int StatElixirBoost = 5;
+
+    /// <summary>
+    /// How many permanent-stat elixirs are scattered on the floor per year
+    /// (see <see cref="YearPopulation.Seed"/>). The Time Shard is exactly one
+    /// per year; two elixirs makes them, in the player's words, "half as rare
+    /// as the Time Shard" — still a find, not something every room has.
+    /// </summary>
+    public const int StatElixirsPerYear = 2;
+
+    private static readonly PrimaryStat[] AllStats =
+        [PrimaryStat.Strength, PrimaryStat.Agility, PrimaryStat.Resolve, PrimaryStat.Intellect];
+
+    /// <summary>
+    /// A permanent-stat elixir for <paramref name="year"/> — drinking it adds
+    /// <see cref="StatElixirBoost"/> to <paramref name="stat"/> for good (see
+    /// ChronoTravelers.Core.Characters.Traveler.Consume). Epic, with a
+    /// year-scaled Credit value; like the Time Shard, monsters and NPCs
+    /// leave it on the floor.
+    /// </summary>
+    public static Item StatElixir(PrimaryStat stat, int year)
+    {
+        var tier = TimeScale.TierForYear(year);
+        var effect = stat switch
+        {
+            PrimaryStat.Strength => ConsumableEffectType.BoostStrength,
+            PrimaryStat.Agility => ConsumableEffectType.BoostAgility,
+            PrimaryStat.Resolve => ConsumableEffectType.BoostResolve,
+            _ => ConsumableEffectType.BoostIntellect,
+        };
+
+        return new Item(
+            $"Meridian Serum: {stat}",
+            ItemType.Consumable,
+            DisplayTier(year),
+            Rarity.Epic,
+            Value: (int)Math.Round(LootScaling.ValueFor(tier, Rarity.Epic) * 1.5),
+            ConsumableEffect: effect,
+            EffectMagnitude: StatElixirBoost);
+    }
+
+    /// <summary>The stat elixir for a deterministic per-year draw — used by <see cref="YearPopulation.Seed"/> to place <see cref="StatElixirsPerYear"/> of them.</summary>
+    public static Item StatElixir(Random rng, int year) => StatElixir(AllStats[rng.Next(AllStats.Length)], year);
 
     /// <summary>A single random item scaled to <paramref name="year"/>, rarity-weighted so most floor loot is humble — for the ~third of the grid that's seeded with loot on year load.</summary>
     public static Item RandomFloorItem(Random rng, IReadOnlyList<ItemArchetypeDefinition> itemArchetypes, int year)

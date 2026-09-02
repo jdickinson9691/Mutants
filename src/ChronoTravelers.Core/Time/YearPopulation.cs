@@ -74,7 +74,9 @@ public sealed class YearPopulation
         Func<Monster>? wardenFactory,
         IReadOnlyList<Func<Monster>>? apexRoster = null,
         Func<Item>? floorLootFactory = null,
-        Func<Item>? timeShardFactory = null)
+        Func<Item>? timeShardFactory = null,
+        Func<Item>? statElixirFactory = null,
+        int statElixirCount = 0)
     {
         var rng = DeterministicRandom.For(worldSeed, year, "monsters");
 
@@ -132,9 +134,10 @@ public sealed class YearPopulation
 
         // --- floor loot -------------------------------------------------
         // A separate deterministic shuffle of every room (start included)
-        // so a year never feels empty: one room gets the Time Shard, then
-        // ~a third of the grid gets a random item.
-        if (floorLootFactory is not null || timeShardFactory is not null)
+        // so a year never feels empty: one room gets the Time Shard, a
+        // couple more get a permanent-stat elixir, then ~a third of the
+        // grid gets a random item.
+        if (floorLootFactory is not null || timeShardFactory is not null || statElixirFactory is not null)
         {
             var lootRng = DeterministicRandom.For(worldSeed, year, "floorloot-rooms");
             var lootRooms = map.Rooms.Keys.OrderBy(c => c.North).ThenBy(c => c.East).ToList();
@@ -148,6 +151,14 @@ public sealed class YearPopulation
             if (timeShardFactory is not null && next < lootRooms.Count)
             {
                 population.AddGroundLoot(lootRooms[next++], timeShardFactory());
+            }
+
+            if (statElixirFactory is not null)
+            {
+                for (var i = 0; i < statElixirCount && next < lootRooms.Count; i++, next++)
+                {
+                    population.AddGroundLoot(lootRooms[next], statElixirFactory());
+                }
             }
 
             if (floorLootFactory is not null)

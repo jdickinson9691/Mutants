@@ -292,14 +292,18 @@ public class CombatSessionTests
     public void Cast_RestoreTachyons_AddsTachyonsBackWithoutNetLoss()
     {
         var traveler = Soldier();
-        traveler.Tachyons.Spend(15); // 5/20 remaining
+        var max = traveler.Tachyons.Max;
+        traveler.Tachyons.Spend(15);
+        var before = traveler.Tachyons.Current;
         var monster = TankMonster();
         var session = new CombatSession(traveler, monster, NeutralRandom());
         var ability = MakeAbility("Soldier", 1, "Mana Well", "RestoreTachyons", 0.25, tachyonCost: 0);
 
         session.Cast(ability);
 
-        Assert.Equal(5 + (int)Math.Round(20 * 0.25), traveler.Tachyons.Current);
+        // RestoreTachyons adds round(nominalMax * magnitude); the player pool
+        // is uncapped so nothing clamps the result here.
+        Assert.Equal(before + (int)Math.Round(max * 0.25), traveler.Tachyons.Current);
     }
 
     [Fact]

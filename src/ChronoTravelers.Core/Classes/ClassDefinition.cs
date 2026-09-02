@@ -27,50 +27,60 @@ public sealed record ClassDefinition(
         // TachyonsPerLevel bumped +1 across the board after playtesting: the
         // pool grew too slowly to keep pace with travel + heal + cast all
         // drawing on it (paired with the cheaper travel coefficient).
+        //
+        // BaseTachyons then tripled (+200%) and TachyonsPerLevel raised ×6
+        // (+500%): the pool was too thin end-to-end for a downstream push —
+        // a botched overreach couldn't afford the retreat, so a bad jump
+        // turned into a no-fuel death spiral, and the per-level growth never
+        // opened the gap back up. With both bumped, a mid-game Traveler
+        // carries a real travel/heal buffer (e.g. a level-10 Soldier's
+        // nominal pool is 60 + 24·9 = 276, was 20 + 4·9 = 56). The pool is
+        // uncapped anyway; these only move the starting fill and the
+        // passive-regen ceiling.
         new Dictionary<CharacterClass, ClassDefinition>
         {
             [CharacterClass.Soldier] = new(
                 CharacterClass.Soldier, PrimaryStat.Strength,
                 BaseStats: new StatBlock(Strength: 15, Agility: 10, Resolve: 8, Intellect: 8),
-                BaseHp: 30, HpPerLevel: 6,
-                BaseTachyons: 20, TachyonsPerLevel: 4,
+                BaseHp: 30, HpPerLevel: 9,
+                BaseTachyons: 60, TachyonsPerLevel: 24,  // base 20 x3, per-level 4 x6
                 TachyonDrainMultiplier: 0.8),
 
             [CharacterClass.Spy] = new(
                 CharacterClass.Spy, PrimaryStat.Agility,
                 BaseStats: new StatBlock(Strength: 9, Agility: 15, Resolve: 8, Intellect: 10),
-                BaseHp: 24, HpPerLevel: 5,
-                BaseTachyons: 24, TachyonsPerLevel: 4,
+                BaseHp: 24, HpPerLevel: 7,
+                BaseTachyons: 72, TachyonsPerLevel: 24,  // base 24 x3, per-level 4 x6
                 TachyonDrainMultiplier: 0.9),
 
-            // Doctor/Scientist BaseHp nudged up (22→24, 18→21) — playtests
-            // had both wiping in the first year to a single bad opening
-            // exchange. Doctor's HpPerLevel also bumped (4→5, matching
-            // Spy) — the BaseHp bump alone still left it losing early
-            // fights it should've had the margin for; growing the whole
-            // curve fits its "keeps you and allies standing" identity
-            // better than a one-time early buffer that fades by mid-game.
-            // Scientist's HpPerLevel is untouched — it's meant to stay the
-            // squishiest caster past the opening.
+            // HpPerLevel raised across the board, spread by class identity so
+            // the roster's durability order is preserved, just steeper:
+            //   Soldier 6→9  (station security — heaviest gear, the tank)
+            //   Spy     5→7  (skirmisher — frontline, but leans on evasion)
+            //   Doctor  5→7  (trauma medicine — "keeps you and allies standing")
+            //   Engineer 3→5 (frail systems class, but has to live to L5 for its kit)
+            //   Scientist 3→4 (glass cannon — smallest bump, stays the squishiest)
+            // BaseHp for Doctor/Scientist keeps its earlier nudge (22→24,
+            // 18→21) that stopped both wiping to a single bad opening.
             [CharacterClass.Doctor] = new(
                 CharacterClass.Doctor, PrimaryStat.Resolve,
                 BaseStats: new StatBlock(Strength: 9, Agility: 8, Resolve: 15, Intellect: 10),
-                BaseHp: 24, HpPerLevel: 5,
-                BaseTachyons: 30, TachyonsPerLevel: 4,
+                BaseHp: 24, HpPerLevel: 7,
+                BaseTachyons: 90, TachyonsPerLevel: 24,  // base 30 x3, per-level 4 x6
                 TachyonDrainMultiplier: 1.0),
 
             [CharacterClass.Scientist] = new(
                 CharacterClass.Scientist, PrimaryStat.Intellect,
                 BaseStats: new StatBlock(Strength: 7, Agility: 9, Resolve: 8, Intellect: 16),
-                BaseHp: 21, HpPerLevel: 3,
-                BaseTachyons: 34, TachyonsPerLevel: 5,
+                BaseHp: 21, HpPerLevel: 4,
+                BaseTachyons: 102, TachyonsPerLevel: 30, // base 34 x3, per-level 5 x6
                 TachyonDrainMultiplier: 1.3),
 
             [CharacterClass.Engineer] = new(
                 CharacterClass.Engineer, PrimaryStat.Intellect,
                 BaseStats: new StatBlock(Strength: 7, Agility: 10, Resolve: 9, Intellect: 15),
-                BaseHp: 18, HpPerLevel: 3,
-                BaseTachyons: 32, TachyonsPerLevel: 5,
+                BaseHp: 18, HpPerLevel: 5,
+                BaseTachyons: 96, TachyonsPerLevel: 30,  // base 32 x3, per-level 5 x6
                 TachyonDrainMultiplier: 1.2),
         };
 

@@ -1119,6 +1119,14 @@ static bool TryHandleItemCommand(Traveler traveler, string command, string argum
             }
 
             var effect = item.ConsumableEffect;
+            var boostStat = effect switch
+            {
+                ConsumableEffectType.BoostStrength => (PrimaryStat?)PrimaryStat.Strength,
+                ConsumableEffectType.BoostAgility => PrimaryStat.Agility,
+                ConsumableEffectType.BoostResolve => PrimaryStat.Resolve,
+                ConsumableEffectType.BoostIntellect => PrimaryStat.Intellect,
+                _ => null,
+            };
             var healed = traveler.Consume(item);
             AnsiConsole.MarkupLine(effect switch
             {
@@ -1128,6 +1136,8 @@ static bool TryHandleItemCommand(Traveler traveler, string command, string argum
                     $"[green]You use {Markup.Escape(item.Name)}. Your attack is bolstered for {item.EffectDurationTicks} ticks.[/]",
                 ConsumableEffectType.BuffDefense =>
                     $"[green]You use {Markup.Escape(item.Name)}. Your defenses are bolstered for {item.EffectDurationTicks} ticks.[/]",
+                _ when boostStat is { } stat =>
+                    $"[green]You drink {Markup.Escape(item.Name)}. [bold]{stat} +{item.EffectMagnitude:0}[/], permanently.[/] (now {traveler.Stats.Get(stat)})",
                 _ => $"[green]You use {Markup.Escape(item.Name)}.[/]",
             });
             break;
@@ -2194,6 +2204,10 @@ static void RenderInventory(Traveler traveler)
             ConsumableEffectType.Heal => $"heals {item.EffectMagnitude:0} HP",
             ConsumableEffectType.BuffAttack => $"+{item.EffectMagnitude:0} attack ({item.EffectDurationTicks} ticks)",
             ConsumableEffectType.BuffDefense => $"+{item.EffectMagnitude:0} defense ({item.EffectDurationTicks} ticks)",
+            ConsumableEffectType.BoostStrength => $"+{item.EffectMagnitude:0} Strength (permanent)",
+            ConsumableEffectType.BoostAgility => $"+{item.EffectMagnitude:0} Agility (permanent)",
+            ConsumableEffectType.BoostResolve => $"+{item.EffectMagnitude:0} Resolve (permanent)",
+            ConsumableEffectType.BoostIntellect => $"+{item.EffectMagnitude:0} Intellect (permanent)",
             _ => item.IsRanged
                 ? (item.IsDepleted
                     ? $"{item.RangedKind} — spent (convert/sell only)"

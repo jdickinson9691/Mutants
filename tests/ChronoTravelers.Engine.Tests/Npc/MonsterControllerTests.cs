@@ -169,6 +169,31 @@ public class MonsterControllerTests
     }
 
     [Fact]
+    public void Tick_AMonsterNeverTakesAStatElixir_EvenBrokeAndUnarmed()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var monster = new Monster("Scrounger", 2, 40, 8, 3, 10, 80, maxTachyons: 30);
+        monster.Tachyons.Spend(monster.Tachyons.Current); // broke -> would scavenge a consumable to burn
+        monster.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(monster);
+
+        var elixir = TimelineContentFactory.StatElixir(PrimaryStat.Strength, 2600);
+        pop.AddGroundLoot(Coordinate.Origin, elixir);
+        pop.AddGroundLoot(Coordinate.Origin, Item.Create("Scrap", ItemType.Junk, 2, Rarity.Common));
+
+        for (var i = 0; i < 5; i++)
+        {
+            Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99));
+        }
+
+        // It burned the ordinary scrap and left the elixir on the floor.
+        Assert.DoesNotContain(pop.LootAt(Coordinate.Origin), i => i.IsStatElixir == false && i.Name == "Scrap");
+        Assert.Contains(pop.LootAt(Coordinate.Origin), i => i.IsStatElixir);
+        Assert.DoesNotContain(monster.Inventory, i => i.IsStatElixir);
+    }
+
+    [Fact]
     public void Tick_AMonsterUpgradesToABetterGroundWeaponAndHitsHarderForIt()
     {
         var map = FourRoomMap();

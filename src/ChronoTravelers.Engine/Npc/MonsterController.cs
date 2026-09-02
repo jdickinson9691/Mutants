@@ -268,11 +268,11 @@ public static class MonsterController
 
         // (a) Low on Tachyons → grab one thing to convert. Prefer junk/consumables
         // so a good weapon on the ground survives for the player. Never a
-        // Time Shard — those are the player's alone.
+        // Time Shard or a stat elixir — those are the player's alone.
         if (monster.Tachyons.Current < monster.Tachyons.Max * ScavengeForTachyonsBelow)
         {
-            var fuel = population.TakeGroundLoot(monster.Position, i => !i.IsTimeShard && i.Type is not (ItemType.Weapon or ItemType.Armor))
-                       ?? population.TakeGroundLoot(monster.Position, i => !i.IsTimeShard);
+            var fuel = population.TakeGroundLoot(monster.Position, i => !i.IsTimeShard && !i.IsStatElixir && i.Type is not (ItemType.Weapon or ItemType.Armor))
+                       ?? population.TakeGroundLoot(monster.Position, i => !i.IsTimeShard && !i.IsStatElixir);
             if (fuel is not null)
             {
                 monster.AddToInventory(fuel);

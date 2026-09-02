@@ -147,9 +147,10 @@ public class YearPopulationTests
         var roomsWithLoot = content.Map.Rooms.Keys.Count(c => pop.LootAt(c).Count > 0);
         var expectedItemRooms = System.Math.Max(1, (int)System.Math.Round(content.Map.RoomCount / 3.0));
 
-        // ~a third get an item, plus one more for the shard (allow the shard
-        // room to coincide with nothing else).
-        Assert.InRange(roomsWithLoot, expectedItemRooms, expectedItemRooms + 1);
+        // ~a third get a random item, plus a room for the shard and one each
+        // for the two stat elixirs (any of those may land on a room the
+        // random-item pass didn't reach).
+        Assert.InRange(roomsWithLoot, expectedItemRooms, expectedItemRooms + 1 + TimelineContentFactory.StatElixirsPerYear);
 
         var shards = content.Map.Rooms.Keys
             .SelectMany(c => pop.LootAt(c))
@@ -157,6 +158,13 @@ public class YearPopulationTests
             .ToList();
         Assert.Single(shards);
         Assert.Equal(ItemType.Weapon, shards[0].Type);
+
+        var elixirs = content.Map.Rooms.Keys
+            .SelectMany(c => pop.LootAt(c))
+            .Where(i => i.IsStatElixir)
+            .ToList();
+        Assert.Equal(TimelineContentFactory.StatElixirsPerYear, elixirs.Count);
+        Assert.All(elixirs, e => Assert.Equal(ItemType.Consumable, e.Type));
     }
 
     [Fact]

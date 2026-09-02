@@ -406,6 +406,24 @@ public sealed class Traveler
                 _activeEffects.Add(new ActiveEffect(item.ConsumableEffect, item.EffectMagnitude, item.EffectDurationTicks));
                 return 0;
 
+            case ConsumableEffectType.BoostStrength:
+            case ConsumableEffectType.BoostAgility:
+            case ConsumableEffectType.BoostResolve:
+            case ConsumableEffectType.BoostIntellect:
+                // Permanent — rewrites the StatBlock like a level-up. Derived
+                // values (attack from the primary stat, defense/speed from
+                // Agility) pick it up live; HP isn't stat-derived so it's
+                // unchanged. Saved with the rest of Stats, no extra plumbing.
+                var boosted = item.ConsumableEffect switch
+                {
+                    ConsumableEffectType.BoostStrength => PrimaryStat.Strength,
+                    ConsumableEffectType.BoostAgility => PrimaryStat.Agility,
+                    ConsumableEffectType.BoostResolve => PrimaryStat.Resolve,
+                    _ => PrimaryStat.Intellect,
+                };
+                Stats = Stats.Increase(boosted, (int)Math.Round(item.EffectMagnitude));
+                return 0;
+
             default:
                 return 0;
         }

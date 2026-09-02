@@ -60,6 +60,12 @@ THE TIME SHARD
   sells for a price that scales with how far downstream you found it.
   Monsters and other Travelers can't touch it - it's yours to claim.
 
+MERIDIAN SERUMS
+  Two per year on the floor - half as rare as the Time Shard, and like it,
+  monsters and Travelers leave them alone. Each one permanently raises one
+  stat (Strength / Agility / Resolve / Intellect) by 5 the moment you
+  "use" it - no timer, it just sticks. Worth going out of your way for.
+
 TRAVELLING
   travel <year>        jump anywhere from 2000 to 5000 A.D.
   travel +N / -N       jump N years forward / back

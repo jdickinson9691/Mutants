@@ -16,10 +16,26 @@ public class TachyonEconomyTests
         Assert.Equal(expected, TachyonEconomy.ConvertValue(baseValue));
     }
 
+    [Theory]
+    [InlineData(0, 1)]     // minimum of 1 still applies
+    [InlineData(1, 2)]     // floor(1 * 2.4) = 2
+    [InlineData(10, 24)]   // floor(10 * 2.4) = 24
+    [InlineData(25, 60)]   // floor(25 * 2.4) = 60
+    [InlineData(100, 240)]
+    public void ConvertValue_TrashRateIsSixTimesThePlainRate(int baseValue, int expected)
+    {
+        Assert.Equal(expected, TachyonEconomy.ConvertValue(baseValue, isTrash: true));
+        if (baseValue > 0)
+        {
+            Assert.Equal(6.0, TachyonEconomy.TrashConvertRate / TachyonEconomy.ConvertRate, precision: 6);
+        }
+    }
+
     [Fact]
     public void ConvertValue_RejectsNegativeValues()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => TachyonEconomy.ConvertValue(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TachyonEconomy.ConvertValue(-1, isTrash: true));
     }
 
     [Theory]

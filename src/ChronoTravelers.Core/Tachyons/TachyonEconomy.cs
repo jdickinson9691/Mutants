@@ -7,11 +7,26 @@ namespace ChronoTravelers.Core.Tachyons;
 /// </summary>
 public static class TachyonEconomy
 {
+    /// <summary>Fraction of an item's value returned as Tachyons on <c>convert</c> for a normal item — docs/GDD.md §2.1.</summary>
+    public const double ConvertRate = 0.4;
+
+    /// <summary>
+    /// Conversion fraction for <em>trash</em> loot (<c>ItemType.Junk</c>) —
+    /// <see cref="ConvertRate"/> × 6, i.e. +500%. Junk exists only to be
+    /// burned or sold, and burning it was a poor trickle next to the travel
+    /// bills a downstream push runs up; this makes clearing the floor after
+    /// a fight a real refuel. Weapons/armour/consumables still convert at
+    /// the plain <see cref="ConvertRate"/>.
+    /// </summary>
+    public const double TrashConvertRate = ConvertRate * 6.0;
+
     /// <summary>
     /// Converting an item destroys it for Tachyons equal to
-    /// floor(base_item_value * 0.4), minimum 1 — docs/GDD.md §2.1.
+    /// floor(base_item_value × rate), minimum 1 — docs/GDD.md §2.1. The rate
+    /// is <see cref="TrashConvertRate"/> for junk, <see cref="ConvertRate"/>
+    /// otherwise.
     /// </summary>
-    public static int ConvertValue(int baseItemValue)
+    public static int ConvertValue(int baseItemValue, bool isTrash = false)
     {
         if (baseItemValue < 0)
         {
@@ -19,7 +34,7 @@ public static class TachyonEconomy
                 "Item value cannot be negative.");
         }
 
-        return Math.Max(1, (int)Math.Floor(baseItemValue * 0.4));
+        return Math.Max(1, (int)Math.Floor(baseItemValue * (isTrash ? TrashConvertRate : ConvertRate)));
     }
 
     /// <summary>
