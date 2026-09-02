@@ -44,8 +44,10 @@ The level is persisted to `%APPDATA%\ChronoTravelers\settings.json`
 (`{ "volume": 0.0–1.0 }`) — loaded once at startup by
 `AudioManager.LoadSettings()` **before** the first `RenderTitle()`, saved
 on every adjustment. A missing, empty, or corrupt file just means the
-100% default; a read-only profile means the change holds for the session
-but isn't remembered. This file is `ChronoTravelers.Console`'s only
+**75% default** (`AudioManager.DefaultVolume` — the raw clips run a little
+hot at full, so a fresh install starts a quarter down and the player
+brings it up with `+`); a read-only profile means the change holds for the
+session but isn't remembered. This file is `ChronoTravelers.Console`'s only
 setting store and is deliberately separate from the LiteDB save DB so it
 needs no schema/migration handling.
 

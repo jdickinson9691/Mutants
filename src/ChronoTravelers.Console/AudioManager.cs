@@ -42,7 +42,11 @@ internal static class AudioManager
     // --- Master volume ---------------------------------------------------
 
     private const float VolumeStep = 0.1f;
-    private static float _volume = 1.0f;
+
+    /// <summary>Master volume for a fresh install (no <c>settings.json</c> yet). 0.75 — the raw clips sit a touch hot at full, so start a quarter down and let the player bring it up with <c>+</c>.</summary>
+    private const float DefaultVolume = 0.75f;
+
+    private static float _volume = DefaultVolume;
 
     private static readonly string SettingsPath = ResolveSettingsPath();
 
@@ -52,7 +56,8 @@ internal static class AudioManager
     /// <summary>
     /// Loads the persisted master volume, if any. Call once at startup
     /// before the title theme plays. A missing, empty, or corrupt settings
-    /// file just leaves the volume at its 100% default — never fatal.
+    /// file just leaves the volume at its <see cref="DefaultVolume"/> (75%)
+    /// — never fatal.
     /// </summary>
     public static void LoadSettings()
     {
@@ -151,7 +156,7 @@ internal static class AudioManager
 
     private sealed class ConsoleSettings
     {
-        public float Volume { get; set; } = 1.0f;
+        public float Volume { get; set; } = DefaultVolume;
     }
 
     // --- Playback -------------------------------------------------------
