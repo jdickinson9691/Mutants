@@ -26,18 +26,35 @@ internal static class AudioManager
     // returns except its own playback thread - fine in practice, but this
     // dictionary gives it an explicit one for the life of the clip so a clip
     // can never get cut off by a GC pass, and drops it again on
-    // PlaybackStopped so nothing here leaks. The value is the clip's reader,
-    // kept so a live volume change can reach every currently-playing clip.
-    private static readonly ConcurrentDictionary<WaveOutEvent, AudioFileReader> ActivePlayers = new();
+    // PlaybackStopped so nothing here leaks. The value is the clip's reader
+    // plus the per-clip volume multiplier it was started with (see
+    // PlayFireAndForget), kept together so a live master-volume change (see
+    // SetVolume) can retune every currently-playing clip without losing its
+    // relative level.
+    private static readonly ConcurrentDictionary<WaveOutEvent, (AudioFileReader Reader, float VolumeMultiplier)> ActivePlayers = new();
 
     // "Random, not every time" per the brief - roughly one move in four gets
-    // an ambience clip (wind / scraping / footsteps), picked from the pool
-    // below so repeat moves don't always sound identical.
+    // an ambience clip, picked from the pool below so repeat moves don't
+    // always sound identical. The moan and wraith-scream entries carry a
+    // 0.5 volume multiplier — quieter, unsettling background flavor rather
+    // than a sound as prominent as wind/footsteps.
     private const int MovementSfxOneInN = 4;
-    private static readonly string[] MovementSfxFiles =
+    private static readonly (string File, float VolumeMultiplier)[] MovementSfxFiles =
     [
-        "wind_1.wav", "wind_2.wav", "scrape_1.wav", "footsteps_1.wav", "footsteps_2.wav",
+        ("wind_1.wav", 1.0f),
+        ("wind_2.wav", 1.0f),
+        ("scrape_1.wav", 1.0f),
+        ("footsteps_1.wav", 1.0f),
+        ("footsteps_2.wav", 1.0f),
+        ("moan_1.wav", 0.5f),
+        ("wraith_scream_1.wav", 0.5f),
     ];
+
+    // The title theme is picked once per run, 50/50 between the original
+    // and the alternative disco-synth theme (docs/AUDIO.md) — set once,
+    // right before it's needed, so the flip is stable if PlayTitleThemeOnce
+    // is somehow called more than once in the same run.
+    private static readonly string[] TitleThemeFiles = ["title_theme.wav", "title_theme_alt.wav"];
 
     // --- Master volume ---------------------------------------------------
 
@@ -111,11 +128,11 @@ internal static class AudioManager
     {
         _volume = Math.Clamp((float)Math.Round(value, 2), 0f, 1f);
 
-        foreach (var reader in ActivePlayers.Values)
+        foreach (var (reader, multiplier) in ActivePlayers.Values)
         {
             try
             {
-                reader.Volume = _volume;
+                reader.Volume = _volume * multiplier;
             }
             catch
             {
@@ -167,7 +184,9 @@ internal static class AudioManager
     /// is shown this run. Safe to call from every code path that renders
     /// the title (single-player and <c>--connect</c> both call
     /// <c>RenderTitle()</c> once each), since the flag makes every call
-    /// after the first a no-op.
+    /// after the first a no-op. Picks evenly between the two themes in
+    /// <see cref="TitleThemeFiles"/> — a coin flip each run, not a
+    /// per-process fixed choice, so which one plays varies run to run.
     /// </summary>
     public static void PlayTitleThemeOnce()
     {
@@ -177,7 +196,7 @@ internal static class AudioManager
         }
 
         _titleThemePlayed = true;
-        PlayFireAndForget("title_theme.wav");
+        PlayFireAndForget(TitleThemeFiles[Rng.Next(TitleThemeFiles.Length)]);
     }
 
     /// <summary>Call after a successful grid move (one room to the next). Plays a random ambience clip about 1 time in <see cref="MovementSfxOneInN"/> — never on every step.</summary>
@@ -188,13 +207,15 @@ internal static class AudioManager
             return;
         }
 
-        PlayFireAndForget(MovementSfxFiles[Rng.Next(MovementSfxFiles.Length)]);
+        var (file, multiplier) = MovementSfxFiles[Rng.Next(MovementSfxFiles.Length)];
+        PlayFireAndForget(file, multiplier);
     }
 
     /// <summary>Call once a time-travel jump actually succeeds.</summary>
     public static void PlayTimeTravelSfx() => PlayFireAndForget("transporter.wav");
 
-    private static void PlayFireAndForget(string fileName)
+    /// <summary><paramref name="volumeMultiplier"/> scales this clip's level relative to the current master volume (1.0 = full, e.g. 0.5 = half) — see <see cref="MovementSfxFiles"/> for the clips that use it. Applied both at start and by any live volume change while the clip is still playing (see <see cref="SetVolume"/>).</summary>
+    private static void PlayFireAndForget(string fileName, float volumeMultiplier = 1.0f)
     {
         try
         {
@@ -204,7 +225,7 @@ internal static class AudioManager
                 return; // A dev build run outside publish/, or a stripped tree — never fatal.
             }
 
-            var reader = new AudioFileReader(path) { Volume = _volume };
+            var reader = new AudioFileReader(path) { Volume = _volume * volumeMultiplier };
             var output = new WaveOutEvent();
             output.PlaybackStopped += (_, _) =>
             {
@@ -212,7 +233,7 @@ internal static class AudioManager
                 output.Dispose();
                 reader.Dispose();
             };
-            ActivePlayers.TryAdd(output, reader);
+            ActivePlayers.TryAdd(output, (reader, volumeMultiplier));
             output.Init(reader);
             output.Play();
         }

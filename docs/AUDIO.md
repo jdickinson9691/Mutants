@@ -12,8 +12,8 @@ console app has speakers to use.
 
 | Trigger | File | Behaviour |
 |---|---|---|
-| Title screen (`RenderTitle()`) | `Audio/title_theme.wav` | Plays once — and only once — per run. Both entry points (`--connect` and the local single-player game) call `RenderTitle()` exactly once each, so `AudioManager.PlayTitleThemeOnce()` there is sufficient; a static flag makes every later call a no-op even if that ever changes. The fade in/out is baked into the file itself (~30s total, a few seconds of fade on each end) rather than done in code, so playing the file start-to-finish is all the code has to do. |
-| A successful grid move (`HandleMove`) | one of `Audio/wind_1.wav`, `wind_2.wav`, `scrape_1.wav`, `footsteps_1.wav`, `footsteps_2.wav`, picked at random | Roughly **1 move in 4** (`AudioManager`'s `MovementSfxOneInN`), never every step — the brief was "random, not every time." Failed moves ("You can't go that way") don't trigger it. |
+| Title screen (`RenderTitle()`) | `Audio/title_theme.wav` **or** `Audio/title_theme_alt.wav`, picked 50/50 | Plays once — and only once — per run. Both entry points (`--connect` and the local single-player game) call `RenderTitle()` exactly once each, so `AudioManager.PlayTitleThemeOnce()` there is sufficient; a static flag makes every later call a no-op even if that ever changes. Which theme plays is a coin flip each run (`AudioManager.TitleThemeFiles`, `Rng.Next`), not a fixed per-install choice. The fade in/out is baked into each file itself (~30s total, a few seconds of fade on each end) rather than done in code, so playing the file start-to-finish is all the code has to do. |
+| A successful grid move (`HandleMove`) | one of `Audio/wind_1.wav`, `wind_2.wav`, `scrape_1.wav`, `footsteps_1.wav`, `footsteps_2.wav`, `moan_1.wav`, `wraith_scream_1.wav`, picked at random | Roughly **1 move in 4** (`AudioManager`'s `MovementSfxOneInN`), never every step — the brief was "random, not every time." Failed moves ("You can't go that way") don't trigger it. `moan_1.wav` and `wraith_scream_1.wav` play at **half the current master volume** — see "Per-clip volume" below — so they land as a quieter, unsettling undertone rather than as prominent as the wind/footsteps clips. |
 | A successful time-travel jump | `Audio/transporter.wav` | Every time, right after the jump succeeds (not on a failed/cancelled jump). |
 
 ## Master volume
@@ -27,6 +27,21 @@ reaches the "unrecognised command" path. A change takes effect
 immediately, including on a clip that's already playing (the title theme
 fading under the menu): `AudioManager` keeps each active clip's
 `AudioFileReader` in `ActivePlayers` and rewrites its `Volume` in place.
+
+### Per-clip volume
+
+A handful of clips (currently `moan_1.wav` and `wraith_scream_1.wav`) are
+meant to sit quieter than the rest of the pool regardless of what the
+master level is set to. `PlayFireAndForget` takes an optional
+`volumeMultiplier` (default `1.0`, i.e. full master volume); a clip started
+at `0.5f` plays at half the current master volume the instant it starts,
+and stays at half if the player then adjusts the master volume while it's
+still playing — `ActivePlayers` stores the multiplier alongside each active
+`AudioFileReader`, and `SetVolume` retunes every active clip as
+`master × thatClip'sMultiplier`, not just to the new master level.
+`MovementSfxFiles` carries the multiplier per entry (`(string File, float
+VolumeMultiplier)[]`); every other trigger (title theme, transporter)
+implicitly uses the default `1.0`.
 
 On the **start menu specifically**, `+`/`=`/`-`/`_` apply the instant
 they're pressed — no Enter needed — via `Program.ReadMenuLine`, which reads
@@ -54,15 +69,26 @@ needs no schema/migration handling.
 ## The audio files
 
 `src/ChronoTravelers.Console/Audio/*.wav` — 16-bit PCM mono, 44.1kHz.
-**All seven are original, procedurally synthesized placeholder audio** (sine
-oscillators, filtered noise, simple envelopes — see the synthesis script
-kept alongside this doc's PR/commit if you want to regenerate or tweak
-them); nothing here is sampled from *Lost in Space*, *Star Trek*, or any
+**All ten are original, procedurally synthesized placeholder audio** (sine
+oscillators, filtered noise, ring modulation, simple envelopes — see the
+synthesis script kept alongside this doc's PR/commit if you want to
+regenerate or tweak them); nothing here is sampled from *Lost in Space*,
+*Star Trek*, *The Lord of the Rings*, the *Buck Rogers* TV theme, or any
 other copyrighted source. They're "inspired by" in mood only — a
-theremin-style wandering melody over a slow analog pad for the title
-theme, a rising/shimmering chorus with a sparkly dispersing tail for the
-time-travel cue, filtered noise beds for wind, a swept bandpass for
-scraping, and short percussive bursts for footsteps.
+theremin-style wandering melody over a slow analog pad for the original
+title theme, a four-on-the-floor synth-bass/brass groove evoking
+late-1970s space-disco for the alternative title theme
+(`title_theme_alt.wav`), a rising/shimmering chorus with a sparkly
+dispersing tail for the time-travel cue, filtered noise beds for wind, a
+swept bandpass for scraping, short percussive bursts for footsteps, a
+slow wavering vocal-like swell built from sine harmonics through
+vowel-formant bandpasses for the moan (`moan_1.wav`), and a rising
+sine-sweep through ring modulation and filtered noise for the wraith
+shriek (`wraith_scream_1.wav`, evocative of a classic fantasy
+wraith-screech mood, not derived from any specific film's sound design).
+The moan and wraith-scream clips are also baked quieter than the rest of
+the pool (a lower normalize peak) on top of their 0.5 playback multiplier
+— see "Per-clip volume" above.
 
 Swap in better/licensed audio any time by replacing these files under the
 same names and durations (or updating the filenames in `AudioManager.cs`
@@ -91,4 +117,4 @@ SDK's single-file publish pipeline reproducibly drops `title_theme.wav`
 a `ForceCopyAudioToPublishDir` target (`AfterTargets="Publish"`) that
 re-copies the whole `Audio\` folder into `$(PublishDir)Audio` afterwards,
 unconditionally. That's what makes a plain `dotnet publish` (local or the
-`release.yml` CI job) ship all seven WAVs with no manual step.
+`release.yml` CI job) ship all ten WAVs with no manual step.
