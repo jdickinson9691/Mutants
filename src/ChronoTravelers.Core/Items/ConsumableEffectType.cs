@@ -41,4 +41,20 @@ public enum ConsumableEffectType
 
     /// <summary>Permanently adds Magnitude to Intellect.</summary>
     BoostIntellect,
+
+    /// <summary>
+    /// Permanently adds Magnitude to a stat picked at the moment it's
+    /// drunk, not baked into the item at spawn time — the ordinary floor
+    /// spawn for a Meridian Serum (see
+    /// ChronoTravelers.Core.Time.TimelineContentFactory.StatElixir(Random, int)).
+    /// A serum pre-rolled to one stat before anyone found it was a dead
+    /// item for four of the five classes (only a class's own primary stat,
+    /// or Agility, does anything mechanically for it); asking at drink time
+    /// instead makes every serum useful to whoever picks it up. The four
+    /// Boost&lt;Stat&gt; values above still exist for a serum built with a
+    /// stat already fixed (tests, scripted rewards) — see
+    /// ChronoTravelers.Core.Characters.Traveler.Consume for how each is
+    /// applied.
+    /// </summary>
+    BoostChosenStat,
 }

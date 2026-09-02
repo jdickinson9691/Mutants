@@ -593,6 +593,46 @@ static string? ReadMenuLine(string prompt)
     }
 }
 
+/// <summary>
+/// Prompts which stat a choose-on-drink Meridian Serum (<see
+/// cref="Item.NeedsStatChoice"/>) should raise — 1–4 or the stat name/first
+/// letter, case-insensitive; <c>cancel</c>/<c>c</c> (or EOF) backs out
+/// without spending the item, since the caller only calls
+/// <see cref="Traveler.Consume(Item, PrimaryStat?)"/> once a choice comes
+/// back non-null.
+/// </summary>
+static PrimaryStat? ReadStatChoice(string itemName)
+{
+    AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(itemName)}[/] — raise which stat?");
+    AnsiConsole.MarkupLine("  [green]1[/]. Strength   [green]2[/]. Agility   [green]3[/]. Resolve   [green]4[/]. Intellect   [green]c[/]. cancel");
+
+    while (true)
+    {
+        var input = ReadNonEmptyLine("> ");
+        if (input is null)
+        {
+            return null;
+        }
+
+        switch (input.Trim().ToLowerInvariant())
+        {
+            case "1" or "strength" or "str" or "s":
+                return PrimaryStat.Strength;
+            case "2" or "agility" or "agi" or "a":
+                return PrimaryStat.Agility;
+            case "3" or "resolve" or "res" or "r":
+                return PrimaryStat.Resolve;
+            case "4" or "intellect" or "int" or "i":
+                return PrimaryStat.Intellect;
+            case "c" or "cancel" or "q" or "quit":
+                return null;
+            default:
+                AnsiConsole.MarkupLine("[red]Pick 1–4, or 'cancel'.[/]");
+                break;
+        }
+    }
+}
+
 static CharacterClass? ReadClassChoice(IReadOnlyList<CharacterClass> classes)
 {
     AnsiConsole.MarkupLine("Choose your [green]Traveler[/] on the Meridian crew:");
@@ -1118,8 +1158,25 @@ static bool TryHandleItemCommand(Traveler traveler, string command, string argum
                 break;
             }
 
+            // A Meridian Serum (docs/GDD.md §4.1) doesn't arrive pre-labeled
+            // to one stat any more — ask which one it should raise before
+            // spending it, so every serum is useful to whoever finds it
+            // regardless of class (see Item.NeedsStatChoice /
+            // Traveler.Consume). Bail out without consuming it if the
+            // player backs out.
+            PrimaryStat? chosenStat = null;
+            if (item.NeedsStatChoice)
+            {
+                chosenStat = ReadStatChoice(item.Name);
+                if (chosenStat is null)
+                {
+                    AnsiConsole.MarkupLine($"[grey]Left {Markup.Escape(item.Name)} untouched.[/]");
+                    break;
+                }
+            }
+
             var effect = item.ConsumableEffect;
-            var boostStat = effect switch
+            var boostStat = chosenStat ?? effect switch
             {
                 ConsumableEffectType.BoostStrength => (PrimaryStat?)PrimaryStat.Strength,
                 ConsumableEffectType.BoostAgility => PrimaryStat.Agility,
@@ -1127,7 +1184,7 @@ static bool TryHandleItemCommand(Traveler traveler, string command, string argum
                 ConsumableEffectType.BoostIntellect => PrimaryStat.Intellect,
                 _ => null,
             };
-            var healed = traveler.Consume(item);
+            var healed = traveler.Consume(item, chosenStat);
             AnsiConsole.MarkupLine(effect switch
             {
                 ConsumableEffectType.Heal =>

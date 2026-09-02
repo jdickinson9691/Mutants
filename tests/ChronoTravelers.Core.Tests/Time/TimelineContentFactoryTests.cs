@@ -217,6 +217,29 @@ public class TimelineContentFactoryTests
     }
 
     [Fact]
+    public void StatElixir_RandomDraw_IsAGenericChooseOnDrinkSerum()
+    {
+        // The floor-spawn overload no longer pre-rolls a stat (a serum
+        // locked to, say, Strength before anyone found it was a dead item
+        // for four of the five classes) - it hands back the same generic
+        // BoostChosenStat item regardless of what the rng draws.
+        var fromLowRoll = TimelineContentFactory.StatElixir(new Random(1), 3000);
+        var fromHighRoll = TimelineContentFactory.StatElixir(new Random(2), 3000);
+
+        foreach (var elixir in new[] { fromLowRoll, fromHighRoll })
+        {
+            Assert.Equal("Meridian Serum", elixir.Name);
+            Assert.Equal(ItemType.Consumable, elixir.Type);
+            Assert.Equal(Rarity.Epic, elixir.Rarity);
+            Assert.Equal(ConsumableEffectType.BoostChosenStat, elixir.ConsumableEffect);
+            Assert.Equal(TimelineContentFactory.StatElixirBoost, (int)elixir.EffectMagnitude);
+            Assert.True(elixir.IsStatElixir);
+            Assert.True(elixir.IsUsable);
+            Assert.True(elixir.NeedsStatChoice);
+        }
+    }
+
+    [Fact]
     public void Warden_IsABulletSpongeWithAGuaranteedLegendaryWeaponTrophy()
     {
         var year = 3210;

@@ -95,12 +95,16 @@ public sealed record Item(
     /// <summary>True for a Consumable that actually does something when used — see ChronoTravelers.Core.Characters.Traveler.Consume. A Consumable with no effect data is flavor-only (still sellable/convertible, but "use" refuses it).</summary>
     public bool IsUsable => Type == ItemType.Consumable && ConsumableEffect != ConsumableEffectType.None;
 
-    /// <summary>A permanent stat elixir (rare floor loot — see ChronoTravelers.Core.Time.TimelineContentFactory.StatElixir). Like the Time Shard, monsters and NPCs leave it alone (see ChronoTravelers.Engine.Npc.MonsterController).</summary>
+    /// <summary>A permanent stat elixir (rare floor loot — see ChronoTravelers.Core.Time.TimelineContentFactory.StatElixir). Like the Time Shard, monsters and NPCs leave it alone (see ChronoTravelers.Engine.Npc.MonsterController). True for both the fixed-stat form and the choose-on-drink form (<see cref="NeedsStatChoice"/>).</summary>
     public bool IsStatElixir => ConsumableEffect
         is ConsumableEffectType.BoostStrength
         or ConsumableEffectType.BoostAgility
         or ConsumableEffectType.BoostResolve
-        or ConsumableEffectType.BoostIntellect;
+        or ConsumableEffectType.BoostIntellect
+        or ConsumableEffectType.BoostChosenStat;
+
+    /// <summary>True for the generic "Meridian Serum" floor spawn, which needs a stat chosen at the moment it's drunk — see ChronoTravelers.Core.Characters.Traveler.Consume's <c>chosenStat</c> parameter.</summary>
+    public bool NeedsStatChoice => ConsumableEffect == ConsumableEffectType.BoostChosenStat;
 
     /// <summary>A ranged weapon (Wand / Bow / Gun).</summary>
     public bool IsRanged => RangedKind != RangedKind.None;

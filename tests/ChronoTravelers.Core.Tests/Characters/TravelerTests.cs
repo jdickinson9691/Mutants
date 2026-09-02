@@ -219,6 +219,40 @@ public class TravelerTests
     }
 
     [Fact]
+    public void Consume_ChooseOnDrinkSerum_RaisesWhicheverStatIsPassed()
+    {
+        // The floor-spawn form (TimelineContentFactory.StatElixir(Random, int))
+        // doesn't fix a stat at all - this is what an off-primary class
+        // actually drinks: a Soldier choosing Intellect, something a
+        // pre-rolled serum could never have given them.
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        var intBefore = traveler.Stats.Intellect;
+        var serum = Item.Create("Meridian Serum", ItemType.Consumable, 3, Rarity.Epic,
+            consumableEffect: ConsumableEffectType.BoostChosenStat, effectMagnitude: 5);
+        traveler.AddToInventory(serum);
+
+        traveler.Consume(serum, PrimaryStat.Intellect);
+
+        Assert.Equal(intBefore + 5, traveler.Stats.Intellect);
+        Assert.DoesNotContain(serum, traveler.Inventory);
+    }
+
+    [Fact]
+    public void Consume_ChooseOnDrinkSerum_ThrowsWithoutAChosenStat_AndLeavesItUnconsumed()
+    {
+        // Guards against the one-argument Consume(item) overload silently
+        // picking a stat (or worse, consuming the serum for nothing) when
+        // the caller forgot to ask the player which stat to raise.
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        var serum = Item.Create("Meridian Serum", ItemType.Consumable, 3, Rarity.Epic,
+            consumableEffect: ConsumableEffectType.BoostChosenStat, effectMagnitude: 5);
+        traveler.AddToInventory(serum);
+
+        Assert.Throws<InvalidOperationException>(() => traveler.Consume(serum));
+        Assert.Contains(serum, traveler.Inventory); // untouched - nothing consumed
+    }
+
+    [Fact]
     public void Consume_ThrowsForAnItemThatIsNotUsable()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);

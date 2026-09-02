@@ -62,9 +62,9 @@ THE TIME SHARD
 
 MERIDIAN SERUMS
   Two per year on the floor - half as rare as the Time Shard, and like it,
-  monsters and Travelers leave them alone. Each one permanently raises one
-  stat (Strength / Agility / Resolve / Intellect) by 5 the moment you
-  "use" it - no timer, it just sticks. Worth going out of your way for.
+  monsters and Travelers leave them alone. "use" one and pick which stat
+  to raise (Strength / Agility / Resolve / Intellect) - it permanently
+  adds 5, no timer, it just sticks. Worth going out of your way for.
 
 TRAVELLING
   travel <year>        jump anywhere from 2000 to 5000 A.D.

@@ -116,6 +116,26 @@ public class ItemTests
     }
 
     [Fact]
+    public void NeedsStatChoice_TrueOnlyForTheGenericChooseOnDrinkSerum()
+    {
+        var chooseOnDrink = Item.Create("Meridian Serum", ItemType.Consumable, 3, Rarity.Epic,
+            consumableEffect: ConsumableEffectType.BoostChosenStat, effectMagnitude: 5);
+        var fixedStat = Item.Create("Meridian Serum: Strength", ItemType.Consumable, 3, Rarity.Epic,
+            consumableEffect: ConsumableEffectType.BoostStrength, effectMagnitude: 5);
+        var heal = Item.Create("Ration Pack", ItemType.Consumable, 1, Rarity.Common,
+            consumableEffect: ConsumableEffectType.Heal, effectMagnitude: 10);
+
+        Assert.True(chooseOnDrink.NeedsStatChoice);
+        Assert.True(chooseOnDrink.IsStatElixir); // both forms count as a stat elixir - see IsStatElixir_...
+
+        Assert.False(fixedStat.NeedsStatChoice);
+        Assert.True(fixedStat.IsStatElixir);
+
+        Assert.False(heal.NeedsStatChoice);
+        Assert.False(heal.IsStatElixir);
+    }
+
+    [Fact]
     public void IsUsable_TrueOnlyForAConsumableWithARealEffect()
     {
         var foodWithEffect = Item.Create("Ration Pack", ItemType.Consumable, 1, Rarity.Common, consumableEffect: ConsumableEffectType.Heal, effectMagnitude: 10);

@@ -191,15 +191,16 @@ public static class TimelineContentFactory
     /// </summary>
     public const int StatElixirsPerYear = 2;
 
-    private static readonly PrimaryStat[] AllStats =
-        [PrimaryStat.Strength, PrimaryStat.Agility, PrimaryStat.Resolve, PrimaryStat.Intellect];
-
     /// <summary>
-    /// A permanent-stat elixir for <paramref name="year"/> — drinking it adds
-    /// <see cref="StatElixirBoost"/> to <paramref name="stat"/> for good (see
+    /// A permanent-stat elixir for <paramref name="year"/>, pre-set to raise
+    /// <paramref name="stat"/> specifically — drinking it adds
+    /// <see cref="StatElixirBoost"/> to that stat for good (see
     /// ChronoTravelers.Core.Characters.Traveler.Consume). Epic, with a
     /// year-scaled Credit value; like the Time Shard, monsters and NPCs
-    /// leave it on the floor.
+    /// leave it on the floor. This fixed-stat form is kept for content that
+    /// wants to hand out a specific known boost (tests, a future scripted
+    /// reward); ordinary floor spawns use the choose-on-drink form below
+    /// instead — see <see cref="StatElixir(Random, int)"/>.
     /// </summary>
     public static Item StatElixir(PrimaryStat stat, int year)
     {
@@ -222,8 +223,35 @@ public static class TimelineContentFactory
             EffectMagnitude: StatElixirBoost);
     }
 
-    /// <summary>The stat elixir for a deterministic per-year draw — used by <see cref="YearPopulation.Seed"/> to place <see cref="StatElixirsPerYear"/> of them.</summary>
-    public static Item StatElixir(Random rng, int year) => StatElixir(AllStats[rng.Next(AllStats.Length)], year);
+    /// <summary>
+    /// The stat elixir for a deterministic per-year draw — used by
+    /// <see cref="YearPopulation.Seed"/> to place <see cref="StatElixirsPerYear"/>
+    /// of them. Unlike the fixed-stat overload above, this one doesn't pick
+    /// a stat at spawn time: pre-rolling one of the four before anyone had
+    /// found it meant a serum landed on Strength or Resolve was a dead item
+    /// for four of the five classes (only each class's own primary stat, or
+    /// Agility, does anything for it — see docs/GDD.md §4). Instead this
+    /// builds a generic "Meridian Serum" with
+    /// <see cref="ConsumableEffectType.BoostChosenStat"/>, which asks which
+    /// stat to raise at the moment it's drunk, so every serum is useful to
+    /// whoever picks it up regardless of class. <paramref name="rng"/> is
+    /// kept for call-site stability (the caller's deterministic per-year
+    /// draw) but no longer consumed — there's nothing left to randomize at
+    /// spawn time.
+    /// </summary>
+    public static Item StatElixir(Random rng, int year)
+    {
+        _ = rng;
+        var tier = TimeScale.TierForYear(year);
+        return new Item(
+            "Meridian Serum",
+            ItemType.Consumable,
+            DisplayTier(year),
+            Rarity.Epic,
+            Value: (int)Math.Round(LootScaling.ValueFor(tier, Rarity.Epic) * 1.5),
+            ConsumableEffect: ConsumableEffectType.BoostChosenStat,
+            EffectMagnitude: StatElixirBoost);
+    }
 
     /// <summary>A single random item scaled to <paramref name="year"/>, rarity-weighted so most floor loot is humble — for the ~third of the grid that's seeded with loot on year load.</summary>
     public static Item RandomFloorItem(Random rng, IReadOnlyList<ItemArchetypeDefinition> itemArchetypes, int year)

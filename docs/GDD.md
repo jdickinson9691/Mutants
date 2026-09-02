@@ -262,14 +262,31 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
   the level-60 cap, ~358. The half-rate tail still keeps the deep pool
   bounded against the superlinear monster scaling (§6), it just sits
   higher.
-- **Permanent stat elixirs** ("Meridian Serum: `<stat>`") — Epic
-  consumables, **two per year on the floor** (`TimelineContentFactory
-  .StatElixirsPerYear`), placed the same protected way as the Time Shard
-  (monsters and NPCs can't take them), so "half as rare as the Shard."
-  `use` one and it adds **+5** to Strength / Agility / Resolve / Intellect
-  permanently — no timer, it rewrites the `StatBlock` exactly as a
-  level-up does, and is saved with the rest of `Stats`. The only
-  non-level way to grow a stat.
+- **Permanent stat elixirs** ("Meridian Serum") — Epic consumables, **two
+  per year on the floor** (`TimelineContentFactory.StatElixirsPerYear`),
+  placed the same protected way as the Time Shard (monsters and NPCs
+  can't take them), so "half as rare as the Shard." `use` one and it adds
+  **+5** to a stat permanently — no timer, it rewrites the `StatBlock`
+  exactly as a level-up does, and is saved with the rest of `Stats`. The
+  only non-level way to grow a stat.
+  > **Which stat is chosen when you drink it, not when it spawns.** A
+  > serum found on the floor doesn't arrive pre-labeled to one of the four
+  > stats any more (`ConsumableEffectType.BoostChosenStat`,
+  > `TimelineContentFactory.StatElixir(Random, int)`); `use` prompts for
+  > Strength / Agility / Resolve / Intellect at the moment it's drunk. This
+  > closes a real balance gap: only a class's own primary stat (attack) or
+  > Agility (defense + turn order, universal — see `EffectiveDefense`/
+  > `Speed`) does anything mechanically for a character, so a pre-rolled
+  > serum was a dead item for four of the five classes roughly half the
+  > time, and for Spy — whose primary *is* Agility — three-quarters of the
+  > time. Choosing at drink time makes every serum useful to whoever finds
+  > it, for any class. The fixed-stat overload
+  > (`StatElixir(PrimaryStat, int)`, `ConsumableEffectType.BoostStrength`
+  > etc.) still exists for content that wants to hand out a specific known
+  > boost. Strength, Resolve, and Intellect still only feed their own
+  > class's attack formula (Agility remains the only stat with a universal
+  > effect) — widening what each stat *does* is a separate, not-yet-done
+  > follow-up from this fix.
 
 ### 4.2 Ability trees (original design, 6 tiers per class = levels 5/10/15/20/25/30)
 

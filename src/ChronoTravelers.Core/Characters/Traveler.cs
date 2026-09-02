@@ -387,11 +387,31 @@ public sealed class Traveler
     /// adds a timed <see cref="ActiveEffect"/> — see
     /// <see cref="AdvanceEffectTicks"/> for how those expire).
     /// </summary>
-    public int Consume(Item item)
+    /// <remarks>
+    /// Overload for anything that isn't a choose-on-drink Meridian Serum
+    /// (see <see cref="Item.NeedsStatChoice"/>); calling this on one throws
+    /// rather than silently picking a stat for the player.
+    /// </remarks>
+    public int Consume(Item item) => Consume(item, chosenStat: null);
+
+    /// <summary>
+    /// <see cref="Consume(Item)"/>, plus <paramref name="chosenStat"/> for a
+    /// choose-on-drink Meridian Serum (<see cref="Item.NeedsStatChoice"/>) —
+    /// the stat the player picked when prompted, applied exactly like the
+    /// fixed-stat Boost&lt;Stat&gt; effects always have been. Required (and
+    /// only meaningful) when <see cref="Item.NeedsStatChoice"/> is true;
+    /// ignored for every other item.
+    /// </summary>
+    public int Consume(Item item, PrimaryStat? chosenStat)
     {
         if (!item.IsUsable)
         {
             throw new InvalidOperationException($"'{item.Name}' cannot be used.");
+        }
+
+        if (item.NeedsStatChoice && chosenStat is null)
+        {
+            throw new InvalidOperationException($"'{item.Name}' needs a stat to boost — ask the player which one before calling Consume.");
         }
 
         RemoveFromInventoryOrThrow(item);
@@ -422,6 +442,11 @@ public sealed class Traveler
                     _ => PrimaryStat.Intellect,
                 };
                 Stats = Stats.Increase(boosted, (int)Math.Round(item.EffectMagnitude));
+                return 0;
+
+            case ConsumableEffectType.BoostChosenStat:
+                // chosenStat is guaranteed non-null here by the guard above.
+                Stats = Stats.Increase(chosenStat!.Value, (int)Math.Round(item.EffectMagnitude));
                 return 0;
 
             default:
