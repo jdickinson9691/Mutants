@@ -65,7 +65,9 @@ public sealed record Item(
     /// unique <see cref="InstanceId"/> and a full magazine
     /// (<see cref="AmmoRemaining"/> = <paramref name="ammoCapacity"/>).
     /// <paramref name="magnitude"/> is the damage multiplier on top of the
-    /// weapon's AttackBonus (and the amount of a <see cref="RangedEffectType.Weaken"/>).
+    /// weapon's AttackBonus (and, doubling up, the amount of a
+    /// <see cref="RangedEffectType.Weaken"/> or <see cref="RangedEffectType.Stagger"/>
+    /// effect — see <see cref="ChronoTravelers.Engine.Combat.RangedResolver"/>).
     /// </summary>
     public static Item CreateRanged(
         string name, int tier, Rarity rarity, RangedKind kind, int ammoCapacity,

@@ -205,6 +205,47 @@ public class ContentLoaderTests
     }
 
     [Fact]
+    public void LoadTimeWorld_ParsesAStaggerRangedArchetype()
+    {
+        using var dir = new TempContentDirectory();
+        var withTaser = MinimalArchetypesJson.TrimEnd().TrimEnd(']')
+            + """
+            ,
+              { "id": "taser", "name": "Test Taser", "type": "Ranged", "rarity": "Uncommon", "rangedKind": "Gun", "ammoCapacity": 5, "rangedEffect": "Stagger", "effectMagnitude": 2, "themeTags": ["common"] }
+            ]
+            """;
+
+        var world = ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir, archetypes: withTaser), worldSeed: 1);
+
+        var government = world.GetYear(2400).StoreSlots
+            .Select(s => s.Store)
+            .Single(s => s is { IsGovernmentRun: true })!;
+
+        var ranged = government.Listings.Select(l => l.Item).First(i => i.IsRanged && i.RangedEffect == RangedEffectType.Stagger);
+        Assert.Equal(RangedKind.Gun, ranged.RangedKind);
+        Assert.Equal(RangedEffectType.Stagger, ranged.RangedEffect);
+    }
+
+    [Fact]
+    public void LoadItemArchetypes_ParsesTheNewConsumableEffectTypes()
+    {
+        using var dir = new TempContentDirectory();
+        var path = dir.WriteFile("item-archetypes.json", """
+            [
+              { "id": "cell", "name": "Battery Cell", "type": "Consumable", "rarity": "Common", "effect": "RestoreTachyons", "effectMagnitude": 12, "themeTags": ["common"] },
+              { "id": "regen", "name": "Regen Tonic", "type": "Consumable", "rarity": "Common", "effect": "HealOverTime", "effectMagnitude": 4, "effectDurationTicks": 10, "themeTags": ["common"] },
+              { "id": "quick", "name": "Quickstep Draught", "type": "Consumable", "rarity": "Common", "effect": "BuffSpeed", "effectMagnitude": 3, "effectDurationTicks": 10, "themeTags": ["common"] }
+            ]
+            """);
+
+        var archetypes = ContentLoader.LoadItemArchetypes(path);
+
+        Assert.Equal(ConsumableEffectType.RestoreTachyons, archetypes.Single(a => a.Id == "cell").Effect);
+        Assert.Equal(ConsumableEffectType.HealOverTime, archetypes.Single(a => a.Id == "regen").Effect);
+        Assert.Equal(ConsumableEffectType.BuffSpeed, archetypes.Single(a => a.Id == "quick").Effect);
+    }
+
+    [Fact]
     public void LoadTimeWorld_ThrowsOnUnknownRangedKind()
     {
         using var dir = new TempContentDirectory();

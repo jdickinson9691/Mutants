@@ -99,6 +99,24 @@ public class RangedResolverTests
     }
 
     [Fact]
+    public void Fire_Stagger_SetsAPendingAttackPenaltyThatTheNextFightConsumesOnce()
+    {
+        var gun = Item.CreateRanged("Riot Taser", 2, Rarity.Rare, RangedKind.Gun, 10, RangedEffectType.Stagger, magnitude: 3.0);
+        var target = Target(hp: 500);
+
+        RangedResolver.Fire(Shooter(), target, gun, Neutral());
+        Assert.Equal(3, target.PendingAttackPenalty);
+
+        var session = new CombatSession(Shooter(), target, Neutral());
+        Assert.Equal(0, target.PendingAttackPenalty); // spent
+        Assert.Contains(session.Log, l => l.Contains("staggered"));
+
+        // A brand-new fight against an un-staggered monster has no such line.
+        var fresh = new CombatSession(Shooter(), Target(), Neutral());
+        Assert.DoesNotContain(fresh.Log, l => l.Contains("staggered"));
+    }
+
+    [Fact]
     public void Fire_RejectsANonRangedOrDepletedWeapon()
     {
         var melee = Item.Create("Axe", ItemType.Weapon, 1, Rarity.Common);

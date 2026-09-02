@@ -24,6 +24,15 @@ public enum ConsumableEffectType
     /// <summary>Temporary flat bonus to defense for DurationTicks ticks — a "temporary resistance" potion (this engine has no elemental damage types to resist individually, so resistance = reduced incoming damage = a defense buff, the same mechanism as an attack/defense-boosting stat potion).</summary>
     BuffDefense,
 
+    /// <summary>Temporary flat bonus to Speed (turn order — see <see cref="ChronoTravelers.Core.Characters.Traveler.Speed"/>) for DurationTicks ticks — a "quickened reflexes" potion. Same shape as BuffAttack/BuffDefense: a timed <see cref="ChronoTravelers.Core.Characters.ActiveEffect"/>, not an instant effect.</summary>
+    BuffSpeed,
+
+    /// <summary>Instantly restores Magnitude Tachyons, flat — a "battery" / "capacitor cell" item, the Tachyon-pool counterpart to Heal. Unlike <see cref="ChronoTravelers.Core.Characters.Traveler.Heal"/> (which spends Tachyons to buy HP), this is pure income with no cost.</summary>
+    RestoreTachyons,
+
+    /// <summary>Heals Magnitude HP at the end of each of the next DurationTicks world ticks — a "regen tonic," the timed counterpart to the instant <see cref="Heal"/>. Also a timed <see cref="ChronoTravelers.Core.Characters.ActiveEffect"/>, but unlike BuffAttack/BuffDefense/BuffSpeed it does something on every tick rather than just expiring.</summary>
+    HealOverTime,
+
     // --- Permanent stat elixirs -----------------------------------------
     // Each raises one primary stat by Magnitude points *for good* — no
     // duration, it just rewrites the StatBlock the way a level-up does.

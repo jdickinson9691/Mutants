@@ -54,6 +54,12 @@ public static class RangedResolver
                 target.PendingDefensePenalty += weaken;
                 effectNote = $" {target.Name}'s guard is rattled (-{weaken} defense next fight).";
             }
+            else if (weapon.RangedEffect == RangedEffectType.Stagger)
+            {
+                var stagger = Math.Max(1, (int)Math.Round(magnitude));
+                target.PendingAttackPenalty += stagger;
+                effectNote = $" {target.Name} is staggered (-{stagger} attack next fight).";
+            }
         }
 
         var verb = weapon.RangedKind == RangedKind.Wand ? "blasts" : "hits";

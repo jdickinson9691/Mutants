@@ -1266,6 +1266,12 @@ static bool TryHandleItemCommand(Traveler traveler, string command, string argum
                     $"[green]You use {Markup.Escape(item.Name)}. Your attack is bolstered for {item.EffectDurationTicks} ticks.[/]",
                 ConsumableEffectType.BuffDefense =>
                     $"[green]You use {Markup.Escape(item.Name)}. Your defenses are bolstered for {item.EffectDurationTicks} ticks.[/]",
+                ConsumableEffectType.BuffSpeed =>
+                    $"[green]You use {Markup.Escape(item.Name)}. You feel quickened for {item.EffectDurationTicks} ticks.[/]",
+                ConsumableEffectType.HealOverTime =>
+                    $"[green]You use {Markup.Escape(item.Name)}. You'll recover HP steadily for {item.EffectDurationTicks} ticks.[/]",
+                ConsumableEffectType.RestoreTachyons =>
+                    $"[green]You use {Markup.Escape(item.Name)} and restore {healed} Tachyons.[/] ({traveler.Tachyons.Current} now on hand)",
                 _ when boostStat is { } stat =>
                     $"[green]You drink {Markup.Escape(item.Name)}. [bold]{stat} +{item.EffectMagnitude:0}[/], permanently.[/] (now {traveler.Stats.Get(stat)})",
                 _ => $"[green]You use {Markup.Escape(item.Name)}.[/]",

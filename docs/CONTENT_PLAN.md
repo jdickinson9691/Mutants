@@ -33,7 +33,7 @@ file I/O.
       heals them each tick. No per-year placement content — it's all
       derived from the species roster + the world seed.
 
-- [x] **Item archetypes** — `item-archetypes.json`. ~55 archetypes: `{ id,
+- [x] **Item archetypes** — `item-archetypes.json`. ~95 archetypes: `{ id,
       name, type, powerMultiplier? | rarity, restrictedClass?, effect?,
       effectMagnitude?, effectDurationTicks?, rangedKind?, ammoCapacity?,
       rangedEffect?, themeTags }`, no tier. `TimelineContentFactory.
@@ -50,12 +50,28 @@ file I/O.
     Consumables/junk still author `rarity`.
   - **Ranged weapons** (`type: "Ranged"`, GDD §5): a `rangedKind` of
     `Wand`/`Bow`/`Gun` plus an `ammoCapacity` (the built-in shot count —
-    no separate ammo item) and an optional `rangedEffect` (`Weaken`).
-    `EffectMagnitude` doubles as the damage multiplier / Weaken amount.
-    v1 ships three: Hexbolt Wand (`common`, Weaken, 5), Recurve Bow
-    (`scrap`/`ash`, 10), Slug Carbine (`orbital`/`paradox`, 8). A full
-    per-era spread (slings → longbows → muskets → rifles → railguns) is a
-    later content pass.
+    no separate ammo item) and an optional `rangedEffect` (`Weaken` or
+    `Stagger`). `EffectMagnitude` doubles as the damage multiplier / effect
+    amount. **Every era theme now has its own 2–4-entry ranged ladder**
+    (`scrap`: Pipe Slugger + the shared Tension Bow; `neon`: Signal Lance
+    (Wand, Weaken) + Riot Taser (Gun, Stagger); `ash`: Flare Cannon;
+    `drowned`: Harpoon Launcher + Depth Charge Emitter (Stagger); `deep`:
+    Arc-Lantern Wand (Weaken) + Vault-Piercer Rifle; `frost`: Rime-Fletched
+    Bow + Cryo Carbine (Stagger); `orbital`: Tesla Arc Rifle, Micro-Thrust
+    Harpoon, Ion Caster (Weaken), plus the shared Slug Carbine; `paradox`:
+    Causal Disruptor (Stagger), Grandfather's Railgun (Weaken), plus the
+    shared Slug Carbine) — replacing the old three-sample-archetype spread.
+  - **Consumables are no longer `common`-only.** Beyond the original
+    Heal/BuffAttack/BuffDefense trio, `ConsumableEffectType` (see
+    `ChronoTravelers.Core.Items`) now also has `BuffSpeed` (a timed Speed/
+    turn-order buff), `RestoreTachyons` (an instant flat Tachyon refill —
+    the Tachyon-pool counterpart to Heal), and `HealOverTime` (heals every
+    tick for a duration, the timed counterpart to Heal) — see
+    `Traveler.Consume` / `Traveler.AdvanceEffectTicks`. Every non-`common`
+    era theme now authors 2–3 themed consumables mixing old and new effect
+    types (e.g. `neon`'s Capacitor Cell is `RestoreTachyons`, `ash`'s
+    Smoldering Broth is `HealOverTime`, `scrap`'s Salvaged Stim-Legs is
+    `BuffSpeed`), escalating in rarity/magnitude with the theme.
 
 - [x] **Era bands** — `eras.json`. 14 bands from year 2000 to 4950,
       `fromYear` ascending (the first must be 2000). Each: `{ fromYear,
@@ -131,6 +147,3 @@ Not new plumbing — tuning and polish:
   only a full cross-timeline leap is still an end-game Tachyon commit.
 - **More / finer era bands** for tighter thematic progression.
 - **Denser rosters / catalogs** if the game wants more variety per year.
-- **A full per-era ranged-weapon spread** (slings → longbows → muskets →
-  rifles → railguns, with era-appropriate `rangedEffect`s) — v1 ships only
-  three sample archetypes.

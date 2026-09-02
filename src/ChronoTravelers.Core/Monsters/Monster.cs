@@ -63,6 +63,9 @@ public sealed class Monster
     /// <summary>A defence penalty applied by a ranged <see cref="Items.RangedEffectType.Weaken"/> shot, consumed once by the next ChronoTravelers.Engine.Combat.CombatSession against this monster.</summary>
     public int PendingDefensePenalty { get; set; }
 
+    /// <summary>An attack penalty applied by a ranged <see cref="Items.RangedEffectType.Stagger"/> shot, consumed once by the next ChronoTravelers.Engine.Combat.CombatSession against this monster — the offense-side counterpart to <see cref="PendingDefensePenalty"/>.</summary>
+    public int PendingAttackPenalty { get; set; }
+
     /// <summary>
     /// How annoyed this monster is with the player — 0 = indifferent. Raised
     /// by the player entering/lingering on its tile or shooting it (see

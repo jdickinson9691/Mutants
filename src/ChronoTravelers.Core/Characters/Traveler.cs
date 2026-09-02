@@ -64,15 +64,19 @@ public sealed class Traveler
 
     /// <summary>
     /// Turn order / "who acts first" stat for combat — original design
-    /// (not GDD-specified), currently just the raw Agility stat.
+    /// (not GDD-specified), the raw Agility stat plus any active BuffSpeed
+    /// potion (see <see cref="Consume"/>).
     /// </summary>
-    public int Speed => Stats.Agility;
+    public int Speed => Stats.Agility + TemporarySpeedBonus;
 
     /// <summary>Sum of any active BuffAttack potions' magnitude — see <see cref="Consume"/>.</summary>
     private int TemporaryAttackBonus => (int)Math.Round(_activeEffects.Where(e => e.Type == ConsumableEffectType.BuffAttack).Sum(e => e.Magnitude));
 
     /// <summary>Sum of any active BuffDefense potions' magnitude — see <see cref="Consume"/>.</summary>
     private int TemporaryDefenseBonus => (int)Math.Round(_activeEffects.Where(e => e.Type == ConsumableEffectType.BuffDefense).Sum(e => e.Magnitude));
+
+    /// <summary>Sum of any active BuffSpeed potions' magnitude — see <see cref="Consume"/>.</summary>
+    private int TemporarySpeedBonus => (int)Math.Round(_activeEffects.Where(e => e.Type == ConsumableEffectType.BuffSpeed).Sum(e => e.Magnitude));
 
     /// <summary>
     /// Combat attack power: primary stat + equipped weapon's AttackBonus,
@@ -308,7 +312,12 @@ public sealed class Traveler
     /// that just expired — called once per tick alongside
     /// <see cref="AdvanceTachyonDrainTick"/> (see WorldSimulation.Tick), for
     /// NPCs and the player alike, regardless of whether either can
-    /// currently drink potions themselves.
+    /// currently drink potions themselves. A <see cref="ConsumableEffectType.HealOverTime"/>
+    /// effect also heals for its Magnitude on every tick it's active
+    /// (including the tick it expires on) — the one active effect that does
+    /// something besides just running out; BuffAttack/BuffDefense/BuffSpeed
+    /// only ever change what <see cref="EffectiveAttackPower"/> /
+    /// <see cref="EffectiveDefense"/> / <see cref="Speed"/> read while active.
     /// </summary>
     public void AdvanceEffectTicks()
     {
@@ -319,6 +328,11 @@ public sealed class Traveler
 
         for (var i = _activeEffects.Count - 1; i >= 0; i--)
         {
+            if (_activeEffects[i].Type == ConsumableEffectType.HealOverTime)
+            {
+                Health.Heal((int)Math.Round(_activeEffects[i].Magnitude));
+            }
+
             var remaining = _activeEffects[i].TicksRemaining - 1;
             if (remaining <= 0)
             {
@@ -383,9 +397,12 @@ public sealed class Traveler
     /// way once this is called; validating it's actually usable is the
     /// caller's job (see <see cref="Item.IsUsable"/>), same as Wield
     /// leaves <see cref="Item.IsWieldable"/> to its caller. Returns the HP
-    /// actually restored for a Heal effect (0 for a buff, which instead
+    /// actually restored for a Heal effect, the Tachyons actually restored
+    /// for a RestoreTachyons effect, and 0 for every timed effect
+    /// (BuffAttack/BuffDefense/BuffSpeed/HealOverTime), which instead
     /// adds a timed <see cref="ActiveEffect"/> — see
-    /// <see cref="AdvanceEffectTicks"/> for how those expire).
+    /// <see cref="AdvanceEffectTicks"/> for how those expire (and, for
+    /// HealOverTime, what they do on every tick).
     /// </summary>
     /// <remarks>
     /// Overload for anything that isn't a choose-on-drink Meridian Serum
@@ -423,8 +440,13 @@ public sealed class Traveler
 
             case ConsumableEffectType.BuffAttack:
             case ConsumableEffectType.BuffDefense:
+            case ConsumableEffectType.BuffSpeed:
+            case ConsumableEffectType.HealOverTime:
                 _activeEffects.Add(new ActiveEffect(item.ConsumableEffect, item.EffectMagnitude, item.EffectDurationTicks));
                 return 0;
+
+            case ConsumableEffectType.RestoreTachyons:
+                return Tachyons.Add((int)Math.Round(item.EffectMagnitude));
 
             case ConsumableEffectType.BoostStrength:
             case ConsumableEffectType.BoostAgility:

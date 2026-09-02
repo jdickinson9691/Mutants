@@ -65,6 +65,14 @@ public sealed class CombatSession
             monster.PendingDefensePenalty = 0;
             _log.Add($"{monster.Name} is still reeling from the shot — its guard is down.");
         }
+
+        // Same, for a ranged Stagger shot — the offense-side counterpart.
+        if (monster.PendingAttackPenalty > 0)
+        {
+            _monsterAttackPenalty += monster.PendingAttackPenalty;
+            monster.PendingAttackPenalty = 0;
+            _log.Add($"{monster.Name} is still staggered from the shot — its swings are off.");
+        }
     }
 
     /// <summary>Makes a normal attack this round.</summary>

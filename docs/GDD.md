@@ -386,20 +386,30 @@ area/group to a capstone — is the standard every class follows.)
   or finishing a target before it reaches you; the shot has no direction
   inside a locked 1v1, so it isn't a combat-round option. Each ranged
   weapon carries a **finite built-in magazine** (no separate ammo item);
-  every shot spends one round and the count persists in the save. A wand
-  may also carry an effect — `Weaken` leaves the target fighting at
-  reduced defence for its next `fight`. Once empty the weapon can't fire
-  and is worth only a fraction (down to 25%, scaling with rounds spent) on
-  `convert`/`sell`. Damage-wise wands and guns pierce armour; bows don't.
-  A kill from range drops the loot on the target's floor — walk in and
-  `take` it.
+  every shot spends one round and the count persists in the save. A ranged
+  shot may also carry an effect — `Weaken` leaves the target fighting at
+  reduced defence for its next `fight`; `Stagger` is the offense-side
+  counterpart, leaving it fighting with reduced attack instead. Either way
+  the same `effectMagnitude` field doubles as the shot's own damage
+  multiplier, so a stronger effect also hits harder. Once empty the weapon
+  can't fire and is worth only a fraction (down to 25%, scaling with
+  rounds spent) on `convert`/`sell`. Damage-wise wands and guns pierce
+  armour; bows don't. A kill from range drops the loot on the target's
+  floor — walk in and `take` it. Every era theme ships its own small
+  ranged ladder now (docs/CONTENT_PLAN.md's item archetypes catalog),
+  rather than the handful of early sample weapons.
 - **Consumables** (original addition — not in the source material) get a
   fourth verb instead of `wield`: `use`/`eat`/`drink <item>`, which
-  triggers the item's effect and destroys it — an instant flat HP heal for
-  "food," or a temporary attack/defense buff (lasting a set number of
-  world ticks) for a "potion." This is separate from — and doesn't cost
-  Tachyons like — the `heal` command in §2/§2.1; a potion/food item is a
-  one-time consumable you have to loot or buy first.
+  triggers the item's effect and destroys it. Beyond the original instant
+  flat HP heal ("food") and temporary attack/defense buff ("potion",
+  lasting a set number of world ticks), the catalog now also has: a
+  temporary Speed buff (quickens turn order in combat); an instant flat
+  Tachyon refill (a "battery"/"cell" — the Tachyon-pool counterpart to a
+  heal item, pure income, no cost); and a heal-over-time tonic (heals a
+  flat amount on every tick for a duration, rather than all at once). This
+  is separate from — and doesn't cost Tachyons like — the `heal` command
+  in §2/§2.1; any consumable is a one-time item you have to loot or buy
+  first.
 - Rarity bands (Common/Uncommon/Rare/Epic/Legendary) — original addition,
   since the source material never specifies a rarity system, but a
   near-universal expectation in a modern loot-driven RPG.

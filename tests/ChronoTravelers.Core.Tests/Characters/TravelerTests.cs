@@ -182,6 +182,61 @@ public class TravelerTests
     }
 
     [Fact]
+    public void Consume_BuffSpeedEffect_AddsATimedActiveEffectAndBoostsSpeed()
+    {
+        var traveler = new Traveler("Nyx", CharacterClass.Spy);
+        var speedBefore = traveler.Speed;
+        var potion = Item.Create("Quickstep Draught", ItemType.Consumable, 1, Rarity.Common, consumableEffect: ConsumableEffectType.BuffSpeed, effectMagnitude: 3, effectDurationTicks: 12);
+        traveler.AddToInventory(potion);
+
+        traveler.Consume(potion);
+
+        Assert.Equal(speedBefore + 3, traveler.Speed);
+        Assert.Single(traveler.ActiveEffects);
+        Assert.Equal(12, traveler.ActiveEffects[0].TicksRemaining);
+    }
+
+    [Fact]
+    public void Consume_RestoreTachyonsEffect_AddsFlatTachyonsInstantlyAndReturnsAmountRestored()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        traveler.Tachyons.Spend(traveler.Tachyons.Current); // drain to 0 so Add() has headroom to observe
+        var cell = Item.Create("Reclaimed Tachyon Flask", ItemType.Consumable, 1, Rarity.Common, consumableEffect: ConsumableEffectType.RestoreTachyons, effectMagnitude: 10);
+        traveler.AddToInventory(cell);
+
+        var restored = traveler.Consume(cell);
+
+        Assert.Equal(10, restored);
+        Assert.Equal(10, traveler.Tachyons.Current);
+        Assert.Empty(traveler.ActiveEffects); // instant, not a timed buff
+        Assert.DoesNotContain(cell, traveler.Inventory);
+    }
+
+    [Fact]
+    public void Consume_HealOverTimeEffect_AddsATimedActiveEffectAndHealsOnEachTick()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        traveler.Health.Damage(20);
+        var hpAfterDamage = traveler.Health.Current;
+        var tonic = Item.Create("Slow-Drip IV", ItemType.Consumable, 1, Rarity.Common, consumableEffect: ConsumableEffectType.HealOverTime, effectMagnitude: 3, effectDurationTicks: 2);
+        traveler.AddToInventory(tonic);
+
+        var immediateReturn = traveler.Consume(tonic);
+
+        Assert.Equal(0, immediateReturn); // not instant - see AdvanceEffectTicks
+        Assert.Equal(hpAfterDamage, traveler.Health.Current); // no healing yet
+        Assert.Single(traveler.ActiveEffects);
+
+        traveler.AdvanceEffectTicks();
+        Assert.Equal(hpAfterDamage + 3, traveler.Health.Current);
+        Assert.Single(traveler.ActiveEffects); // one tick remaining
+
+        traveler.AdvanceEffectTicks();
+        Assert.Equal(hpAfterDamage + 6, traveler.Health.Current); // heals on the expiring tick too
+        Assert.Empty(traveler.ActiveEffects);
+    }
+
+    [Fact]
     public void Consume_StatElixir_PermanentlyRaisesTheStat_NoTimedEffect()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier); // primary = Strength
