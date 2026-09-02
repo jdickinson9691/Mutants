@@ -1,4 +1,5 @@
 {
   "playerSlotBaseCost": 120,
-  "playerSlotCostPerTier": 110
+  "playerSlotCostPerTier": 110,
+  "playerSlotCount": 3
 }

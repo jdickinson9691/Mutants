@@ -134,4 +134,7 @@ public sealed class StoreTemplateData
 {
     public int PlayerSlotBaseCost { get; set; } = 100;
     public int PlayerSlotCostPerTier { get; set; } = 110;
+
+    /// <summary>Purchasable store slots per year, beyond the always-open government store (docs/GDD.md §6.2) — a small map with too few rooms just yields fewer. Additive; old JSON without it loads as 3.</summary>
+    public int PlayerSlotCount { get; set; } = 3;
 }

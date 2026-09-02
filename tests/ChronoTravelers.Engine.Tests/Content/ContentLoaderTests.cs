@@ -227,6 +227,48 @@ public class ContentLoaderTests
     }
 
     [Fact]
+    public void LoadTimeWorld_MissingStoreTemplateFile_FallsBackToDefaults()
+    {
+        using var dir = new TempContentDirectory();
+        // No store-templates.json written — it's optional.
+        var world = ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir), worldSeed: 1);
+
+        var vacant = world.GetYear(2500).StoreSlots.Count(s => s.IsAvailableForPurchase);
+
+        Assert.Equal(3, vacant); // StoreTemplateData's default PlayerSlotCount
+    }
+
+    [Fact]
+    public void LoadTimeWorld_ReadsPlayerSlotCountFromStoreTemplates()
+    {
+        using var dir = new TempContentDirectory();
+        WriteMinimalTimeline(dir);
+        dir.WriteFile("store-templates.json", """
+            { "playerSlotBaseCost": 100, "playerSlotCostPerTier": 50, "playerSlotCount": 1 }
+            """);
+
+        var world = ContentLoader.LoadTimeWorld(dir.Path, worldSeed: 1);
+        var vacant = world.GetYear(2500).StoreSlots.Count(s => s.IsAvailableForPurchase);
+
+        Assert.Equal(1, vacant);
+    }
+
+    [Fact]
+    public void LoadTimeWorld_ReadsPlayerSlotCostFromStoreTemplates()
+    {
+        using var dir = new TempContentDirectory();
+        WriteMinimalTimeline(dir);
+        dir.WriteFile("store-templates.json", """
+            { "playerSlotBaseCost": 250, "playerSlotCostPerTier": 0, "playerSlotCount": 1 }
+            """);
+
+        var world = ContentLoader.LoadTimeWorld(dir.Path, worldSeed: 1);
+        var slot = world.GetYear(2500).StoreSlots.Single(s => s.IsAvailableForPurchase);
+
+        Assert.Equal(250, slot.PurchaseCost);
+    }
+
+    [Fact]
     public void LoadTimeWorld_ThrowsForInvalidJson()
     {
         using var dir = new TempContentDirectory();

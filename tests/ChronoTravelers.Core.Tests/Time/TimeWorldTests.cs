@@ -118,6 +118,29 @@ public class TimeWorldTests
     }
 
     [Fact]
+    public void GetYear_PlayerSlotCountIsContentAuthored_NotHardcoded()
+    {
+        var template = new StoreStockTemplate(PlayerSlotBaseCost: 100, PlayerSlotCostPerTier: 50, PlayerSlotCount: 1);
+        var world = TestTimeWorld.Build(seed: 4242, storeTemplate: template);
+
+        var vacant = world.GetYear(3500).StoreSlots.Where(s => s.IsAvailableForPurchase).ToList();
+
+        Assert.Single(vacant);
+    }
+
+    [Fact]
+    public void GetYear_PlayerSlotCountOfZero_YieldsOnlyTheGovernmentStore()
+    {
+        var template = new StoreStockTemplate(PlayerSlotBaseCost: 100, PlayerSlotCostPerTier: 50, PlayerSlotCount: 0);
+        var world = TestTimeWorld.Build(seed: 4242, storeTemplate: template);
+
+        var content = world.GetYear(3500);
+
+        Assert.Single(content.StoreSlots);
+        Assert.True(content.StoreSlots[0].Store is { IsGovernmentRun: true });
+    }
+
+    [Fact]
     public void GetYear_GovernmentStoreStocksTheStapleKinds()
     {
         var listings = World().GetYear(3500).StoreSlots

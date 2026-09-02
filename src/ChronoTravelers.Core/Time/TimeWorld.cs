@@ -203,13 +203,6 @@ public sealed class TimeWorld
         }
     }
 
-    /// <summary>
-    /// Purchasable store slots offered per year, beyond the one always-open
-    /// government store — docs/GDD.md §6.2. A small map with too few rooms
-    /// simply gets fewer; the government store always exists regardless.
-    /// </summary>
-    private const int PlayerSlotCount = 3;
-
     private IReadOnlyList<StoreSlot> BuildStores(EraDefinition era, int year, LevelMap map)
     {
         var rng = DeterministicRandom.For(WorldSeed, year, "stores");
@@ -234,15 +227,17 @@ public sealed class TimeWorld
         var governmentSlot = new StoreSlot(
             government.Name, govRoom, homeLevel: year, purchaseCost: 0, government);
 
-        // Up to PlayerSlotCount distinct rooms (never the government's own
-        // room) each get a purchasable "Vacant Storefront" slot — docs/GDD.md
-        // §6.2's "limited number of store locations." A one-room map (or one
-        // with fewer than PlayerSlotCount+1 rooms) just yields fewer slots;
-        // the government store is never displaced.
+        // Up to _storeTemplate.PlayerSlotCount distinct rooms (never the
+        // government's own room) each get a purchasable "Vacant Storefront"
+        // slot — docs/GDD.md §6.2's "limited number of store locations,"
+        // content-authored via store-templates.json. A one-room map (or one
+        // with fewer rooms than the configured count+1) just yields fewer
+        // slots; the government store is never displaced.
         var remainingRooms = rooms.Where(c => !c.Equals(govRoom)).ToList();
         var slots = new List<StoreSlot> { governmentSlot };
+        var playerSlotCount = Math.Max(0, _storeTemplate.PlayerSlotCount);
 
-        for (var i = 0; i < PlayerSlotCount && remainingRooms.Count > 0; i++)
+        for (var i = 0; i < playerSlotCount && remainingRooms.Count > 0; i++)
         {
             var pickIndex = rng.Next(remainingRooms.Count);
             var slotRoom = remainingRooms[pickIndex];

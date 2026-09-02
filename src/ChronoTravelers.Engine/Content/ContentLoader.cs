@@ -43,7 +43,7 @@ public static class ContentLoader
 
         var templatePath = Path.Combine(contentDirectory, "store-templates.json");
         var template = File.Exists(templatePath) ? ReadJson<StoreTemplateData>(templatePath) : new StoreTemplateData();
-        var storeTemplate = new StoreStockTemplate(template.PlayerSlotBaseCost, template.PlayerSlotCostPerTier);
+        var storeTemplate = new StoreStockTemplate(template.PlayerSlotBaseCost, template.PlayerSlotCostPerTier, template.PlayerSlotCount);
 
         EraTable eraTable;
         try

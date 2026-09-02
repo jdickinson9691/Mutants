@@ -299,6 +299,71 @@ public class MonsterControllerTests
     }
 
     [Fact]
+    public void Tick_NarratesAMonsterPickingUpLootWhileSharingThePlayersRoom()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+
+        var player = new Traveler("Prey", CharacterClass.Soldier);
+        player.PlaceAt(Coordinate.Origin);
+
+        var monster = new Monster("Scrounger", 2, 40, 8, 3, 10, 80, maxTachyons: 30);
+        monster.Tachyons.Spend(monster.Tachyons.Current); // broke -> scavenges the scrap
+        monster.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(monster);
+        pop.AddGroundLoot(Coordinate.Origin, Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common));
+
+        var log = new List<string>();
+        Tick(pop, map, player, StubRandomSource.Fixed(0.99), narration: log);
+
+        Assert.Contains(monster.Inventory, i => i.Name == "Scrap");
+        Assert.Contains(log, l => l.Contains("Scrounger") && l.Contains("Scrap"));
+    }
+
+    [Fact]
+    public void Tick_NarratesAMonsterUpgradingItsWeaponWhileSharingThePlayersRoom()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+
+        var player = new Traveler("Prey", CharacterClass.Soldier);
+        player.PlaceAt(Coordinate.Origin);
+
+        var monster = Monster.Create("Brute", tier: 1); // full Tachyons -> only the weapon rule applies
+        monster.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(monster);
+        var weapon = Item.Create("Bent Rebar", ItemType.Weapon, 1, Rarity.Uncommon);
+        pop.AddGroundLoot(Coordinate.Origin, weapon);
+
+        var log = new List<string>();
+        Tick(pop, map, player, StubRandomSource.Fixed(0.99), narration: log);
+
+        Assert.Same(weapon, monster.EquippedWeapon);
+        Assert.Contains(log, l => l.Contains("Brute") && l.Contains("Bent Rebar"));
+    }
+
+    [Fact]
+    public void Tick_DoesNotNarrateALootPickupOutsideThePlayersRoom()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+
+        var player = OffMapPlayer(); // nowhere near the monster's room
+
+        var monster = new Monster("Scrounger", 2, 40, 8, 3, 10, 80, maxTachyons: 30);
+        monster.Tachyons.Spend(monster.Tachyons.Current);
+        monster.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(monster);
+        pop.AddGroundLoot(Coordinate.Origin, Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common));
+
+        var log = new List<string>();
+        Tick(pop, map, player, StubRandomSource.Fixed(0.99), narration: log);
+
+        Assert.Contains(monster.Inventory, i => i.Name == "Scrap");
+        Assert.Empty(log);
+    }
+
+    [Fact]
     public void Tick_NarratesAMonsterFirstComingWithinOneRoom()
     {
         // Three-room corridor: from the far room the only open exit is west,

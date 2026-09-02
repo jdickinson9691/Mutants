@@ -14,8 +14,8 @@ public static class TestTimeWorld
 {
     public const long DefaultSeed = 20000305L;
 
-    public static TimeWorld Build(long seed = DefaultSeed) =>
-        new(seed, BuildEras(), BuildSpecies(), BuildItemArchetypes(), StoreStockTemplate.Default);
+    public static TimeWorld Build(long seed = DefaultSeed, StoreStockTemplate? storeTemplate = null) =>
+        new(seed, BuildEras(), BuildSpecies(), BuildItemArchetypes(), storeTemplate ?? StoreStockTemplate.Default);
 
     private static EraTable BuildEras() => new(
     [

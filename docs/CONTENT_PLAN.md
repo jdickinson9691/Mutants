@@ -71,10 +71,14 @@ file I/O.
       Final Instant.
 
 - [x] **Store template** — `store-templates.json`: `{ playerSlotBaseCost,
-      playerSlotCostPerTier }`. Every year gets one supply store / depot
-      (seeded room; stocks the staple kinds pulled from the year's era
-      themes, priced via `EconomyPricing`) and one vacant player slot
-      (seeded room; cost `base + perTier·(tier-1)`).
+      playerSlotCostPerTier, playerSlotCount }`. Every year gets one supply
+      store / depot (seeded room; stocks the staple kinds pulled from the
+      year's era themes, priced via `EconomyPricing`; exempt from
+      maintenance — GDD §6.2) plus up to `playerSlotCount` vacant player
+      slots (seeded distinct rooms; cost `base + perTier·(tier-1)` each — a
+      map with too few rooms just yields fewer). All three fields are
+      optional — a missing file, or a missing `playerSlotCount`, falls back
+      to `StoreTemplateData`'s defaults (`100`/`110`/`3`).
 
 - [x] **Wardens** — no file; `WardenSchedule` places one every
       random 50–100 years from the world seed. A Warden year's

@@ -101,10 +101,13 @@ public static class MonsterController
     /// <param name="narration">
     /// Optional sink for player-local ambient lines — a monster entering /
     /// leaving the player's room (with the direction), first coming within
-    /// earshot ("you hear something to the north"), or one monster yelling
-    /// a callout at another by name (see <see cref="MaybeYell"/>) — that
-    /// last one isn't proximity-gated like the rest, since it's flavor for
-    /// the whole year, not something tied to the player's own room.
+    /// earshot ("you hear something to the north"), grabbing a piece of
+    /// ground loot while sharing the player's room (see
+    /// <see cref="TryGrabLoot"/> / <see cref="PicksUpLines"/>), or one
+    /// monster yelling a callout at another by name (see
+    /// <see cref="MaybeYell"/>) — that last one isn't proximity-gated like
+    /// the rest, since it's flavor for the whole year, not something tied to
+    /// the player's own room.
     /// </param>
     /// <param name="year">
     /// The timeline year this population belongs to — used to tag the
@@ -164,7 +167,10 @@ public static class MonsterController
             var mood = AggroModel.MoodFor(monster.Aggro);
 
             // --- movement ------------------------------------------------------
-            if (!TryHeal(monster) && !TryGrabLoot(population, monster))
+            var healedThisTick = TryHeal(monster);
+            var grabbedLoot = healedThisTick ? null : TryGrabLoot(population, monster);
+
+            if (!healedThisTick && grabbedLoot is null)
             {
                 var shadowing = mood != AggroMood.Calm && playerHere && !playerSafe;
 
@@ -195,6 +201,11 @@ public static class MonsterController
             if (narration is not null && playerHere && !monster.Position.Equals(startedAt))
             {
                 NarrateMovement(narration, monster, startedAt, player!.Position, random);
+            }
+
+            if (narration is not null && grabbedLoot is not null && playerHere && monster.Position.Equals(player!.Position))
+            {
+                narration.Add(string.Format(Pick(PicksUpLines, random), monster.Name, grabbedLoot.Name));
             }
 
             monster.AdvanceTachyonRegenTick(TachyonEconomy.TicksPerTachyonRegen(monster.Tier, classDrainMultiplier: 1.0));
@@ -276,13 +287,15 @@ public static class MonsterController
     /// A monster only takes loot off the floor for a reason (docs/GDD.md
     /// §7.1): one item to burn for Tachyons when it's running low, or a single
     /// weapon that beats what it's wielding. Otherwise it steps over the
-    /// pile. Returns true if it took something.
+    /// pile. Returns the item it took (fuel or the new weapon), or null if
+    /// it left the pile alone — the caller narrates the pickup when it
+    /// happened in the player's own room (see <see cref="PicksUpLines"/>).
     /// </summary>
-    private static bool TryGrabLoot(YearPopulation population, Monster monster)
+    private static Item? TryGrabLoot(YearPopulation population, Monster monster)
     {
         if (population.LootAt(monster.Position).Count == 0)
         {
-            return false;
+            return null;
         }
 
         // (a) Low on Tachyons → grab one thing to convert. Prefer junk/consumables
@@ -295,7 +308,7 @@ public static class MonsterController
             if (fuel is not null)
             {
                 monster.AddToInventory(fuel);
-                return true;
+                return fuel;
             }
         }
 
@@ -317,10 +330,10 @@ public static class MonsterController
             }
 
             monster.EquipWeapon(upgrade);
-            return true;
+            return upgrade;
         }
 
-        return false;
+        return null;
     }
 
     private static bool IsBlocked(IReadOnlySet<Coordinate>? safeRooms, Coordinate room) =>
@@ -437,6 +450,18 @@ public static class MonsterController
         "The {0} breaks {1}.",
     ];
 
+    /// <summary>Player-local line when a monster grabs ground loot while sharing the player's room — see <see cref="TryGrabLoot"/>. <c>{0}</c> is the monster, <c>{1}</c> the item.</summary>
+    private static readonly string[] PicksUpLines =
+    [
+        "{0} snatches up the {1}.",
+        "{0} scoops up the {1} from the floor.",
+        "{0} grabs the {1} off the ground.",
+    ];
+
+    /// <summary>Picks a random line from a narration line bank.</summary>
+    private static string Pick(string[] lines, IRandomSource random) =>
+        lines[Math.Min(lines.Length - 1, (int)(random.NextDouble() * lines.Length))];
+
     private static string WithArticle(string name)
     {
         var vowel = name.Length > 0 && "AEIOUaeiou".Contains(name[0]);
@@ -501,24 +526,22 @@ public static class MonsterController
         var wasHere = from.Equals(playerPos);
         var nowHere = to.Equals(playerPos);
 
-        string Pick(string[] lines) => lines[Math.Min(lines.Length - 1, (int)(random.NextDouble() * lines.Length))];
-
         if (nowHere && !wasHere)
         {
-            narration.Add(string.Format(Pick(EntersLines), WithArticle(monster.Name), DirectionBetween(playerPos, from).Name()));
+            narration.Add(string.Format(Pick(EntersLines, random), WithArticle(monster.Name), DirectionBetween(playerPos, from).Name()));
             return;
         }
 
         if (wasHere && !nowHere)
         {
-            narration.Add(string.Format(Pick(LeavesLines), monster.Name, DirectionBetween(playerPos, to).Name()));
+            narration.Add(string.Format(Pick(LeavesLines, random), monster.Name, DirectionBetween(playerPos, to).Name()));
             return;
         }
 
         // First time within one room of the player (crossed from farther out).
         if (ManhattanDistance(to, playerPos) == 1 && ManhattanDistance(from, playerPos) > 1)
         {
-            narration.Add(string.Format(Pick(EarshotLines), DirectionBetween(playerPos, to).Name()));
+            narration.Add(string.Format(Pick(EarshotLines, random), DirectionBetween(playerPos, to).Name()));
         }
     }
 

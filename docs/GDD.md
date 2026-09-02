@@ -434,18 +434,40 @@ area/group to a capstone — is the standard every class follows.)
   the time travel level" gets implemented against the timeline.
 
 ### 6.2 Player-owned stores `[SOURCE: players can buy the NPC stores]`
-- A Traveler (human or NPC) can purchase an available depot store slot in a
-  year for a Credit cost scaled to that year's tier. A human player's owned
-  stores persist across sessions (§3.2).
-- Once owned, the player stocks it manually (deposit items from inventory,
-  set an asking price per item, within store-level-appropriate bounds to
-  prevent trivial arbitrage).
+- Every year offers, beyond its always-open depot store, a limited number
+  of purchasable store slots (`TimeWorld.BuildStores`; the count is
+  content-authored — `store-templates.json`'s `playerSlotCount`, 3 by
+  default — not an unbounded supply). A Traveler (human or NPC) can
+  purchase an available slot for a Credit cost scaled to that year's tier.
+  A human player's owned stores persist across sessions (§3.2).
+- Once owned, the owner stocks it manually: **stock** an item from
+  inventory at an asking price, **withdraw** it back, or **reprice** a
+  listing.
+- **Maintenance & foreclosure**: a player/NPC-owned store (the depot store
+  is exempt) costs Tachyons per world tick to stay open, drawn from a
+  dedicated maintenance reserve the owner tops up with **charge**. Go
+  unfunded for 10 consecutive ticks (`Store.ForeclosureThreshold`) and the
+  store is repossessed — the slot goes back up for sale, and its unsold
+  listings stay attached for whoever buys it next rather than vanishing, so
+  a lapsed owner doesn't erase a stranger's future find.
+- **deposit** funds a store's Capital (the pool it buys from other
+  Travelers with) directly from the owner's own Credits — the funding
+  counterpart to **stock**'s item-listing side.
+- **collect** withdraws a store's accumulated Capital (from NPC/player
+  sales) into the owner's own Credits — the idle-income loop below.
 - **NPC shoppers** periodically path to player-owned stores and buy/sell
   based on their own needs (an NPC low on a class-appropriate weapon will buy
   one if the store has it and the price is within their budget heuristic; an
   NPC over-encumbered with junk will sell to a store with open capital) —
   this is the "NPCs will sometimes visit and buy and sell from the player
   stores" requirement, made concrete.
+- **NPCs also buy and run stores themselves**, same as a human player:
+  buying an open slot, charging its maintenance, stocking surplus gear, and
+  collecting Capital (`NpcController.TryPurchaseStoreSlot` /
+  `TryTendOwnStore`). They never take the *last* purchasable slot in a
+  year — one always stays open for the human player, on top of the
+  always-open depot store (resolves the §12 open question below: capped by
+  this reservation rule, not an outright ownership count).
 - Store owners collect Credits from NPC sales automatically (idle-income
   loop) and can visit in person to restock/collect/adjust prices.
 
@@ -455,7 +477,9 @@ semi-flawed." To avoid reproducing that: NPC store customers have a budget
 cap per visit, sale prices are clamped to a level-appropriate band (no
 selling level-1 junk into a level-10 store for level-10 money), and Credit
 sinks exist (store purchase cost, restocking depot inventory, repair costs)
-so currency doesn't purely inflate.
+so currency doesn't purely inflate. Store maintenance (§6.2) is another such
+sink, this time in Tachyons rather than Credits — an owned store nobody ever
+funds eventually stops being an asset at all.
 
 ## 7. NPC simulation ("simulated players")
 
@@ -482,9 +506,12 @@ Since v1 has no network multiplayer, the world needs to feel alive:
   conversion fodder or a store if low), assess HP (retreat/heal if low),
   otherwise pursue its current goal — wear a better weapon/armor/ranged item
   already sitting in its pack the instant it's looted (no store needed),
-  trade at a year's store (selling genuine surplus gear it can't use before
-  falling back to excess junk, and buying a weapon if unarmed), grind
-  monsters in its year, or hop along the timeline. A local-pool NPC not
+  tend a store it already owns here (pay down Tachyon maintenance, stock
+  surplus gear, collect Capital — §6.2), occasionally buy an open store slot
+  if it doesn't own one (never the year's last one), trade at a year's store
+  (selling genuine surplus gear it can't use before falling back to excess
+  junk, and buying a weapon if unarmed), grind monsters in its year, or hop
+  along the timeline. A local-pool NPC not
   already at the anchor year rolls a much higher travel chance and, when it
   rolls, heads straight for the anchor — the full jump if it can afford the
   Tachyon cost, otherwise the biggest hop toward it it can afford, so the
@@ -677,6 +704,8 @@ yours) using NPCs instead of real concurrent users.
   full cross-timeline leap is still a ~120-Tachyon commitment you build toward
   by converting loot. If pacing later feels off, the remaining lever is a
   "charge a jump over several ticks" mechanic.
-- Whether NPC store ownership should be capped (to avoid NPCs monopolizing
-  all store slots before the human player can buy in).
+- ~~Whether NPC store ownership should be capped (to avoid NPCs monopolizing
+  all store slots before the human player can buy in).~~ Resolved (§6.2):
+  NPCs may buy and run stores, but never the year's last purchasable slot —
+  a reservation rule, not an outright ownership count cap.
 - Save format: single local save vs. multiple character slots.
