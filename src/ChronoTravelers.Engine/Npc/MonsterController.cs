@@ -72,6 +72,17 @@ public static class MonsterController
     /// </summary>
     private const int AggroRange = 1;
 
+    /// <summary>
+    /// Per-tick chance the year's monsters produce one "yell" line —
+    /// ambient banter, not tied to the player's position, so the whole
+    /// year feels inhabited rather than just the room you're standing in.
+    /// Deliberately low: at roughly a once-in-eight-turns rate it reads as
+    /// atmosphere, not noise between every command. Needs at least two
+    /// living monsters (a caller and a target); a year with only one gets
+    /// no banter, since there's nobody to call out.
+    /// </summary>
+    private const double YellChance = 0.12;
+
     /// <param name="previousPlayerPosition">
     /// Where the player stood at the end of the last tick — lets a monster
     /// tell "stepped onto my tile" (a big aggro bump) from "was already
@@ -89,8 +100,11 @@ public static class MonsterController
     /// </param>
     /// <param name="narration">
     /// Optional sink for player-local ambient lines — a monster entering /
-    /// leaving the player's room (with the direction), or first coming
-    /// within earshot ("you hear something to the north").
+    /// leaving the player's room (with the direction), first coming within
+    /// earshot ("you hear something to the north"), or one monster yelling
+    /// a callout at another by name (see <see cref="MaybeYell"/>) — that
+    /// last one isn't proximity-gated like the rest, since it's flavor for
+    /// the whole year, not something tied to the player's own room.
     /// </param>
     /// <param name="year">
     /// The timeline year this population belongs to — used to tag the
@@ -196,6 +210,11 @@ public static class MonsterController
         }
 
         population.TicksSinceAmbush++;
+
+        if (narration is not null && playerHere)
+        {
+            MaybeYell(population, random, narration);
+        }
     }
 
     /// <summary>
@@ -424,6 +443,57 @@ public static class MonsterController
         return (vowel ? "An " : "A ") + name;
     }
 
+    /// <summary>
+    /// One monster in the year calling out another by its enumerated name
+    /// (see <see cref="Monster.Enumerate"/>) — a mix of hunting threats and
+    /// plain insults, so the timeline sounds like it's full of rivals even
+    /// when the player's alone in the room. <c>{0}</c> is the caller,
+    /// <c>{1}</c> the target.
+    /// </summary>
+    private static readonly string[] YellLines =
+    [
+        "{0} bellows, \"{1}, I am looking for you!\"",
+        "{0} howls across the ruins, \"{1}, come out and face me!\"",
+        "{0} snarls, \"{1}, I'm still hunting you!\"",
+        "{0} shouts, \"{1}, you call that scavenging? Pathetic!\"",
+        "{0} roars, \"{1}, get out of my territory!\"",
+        "{0} jeers, \"{1}, run while you still can!\"",
+        "{0} taunts, \"{1}, is that the best you've got?\"",
+        "{0} calls out, \"{1}, I can smell your fear from here!\"",
+        "{0} yells, \"{1}, you're not worth the trouble!\"",
+        "{0} rasps, \"{1}, I remember you. Coward.\"",
+    ];
+
+    /// <summary>
+    /// Rolls <see cref="YellChance"/> for one ambient callout naming two of
+    /// the year's living monsters — see <see cref="YellLines"/>. Not
+    /// proximity-gated (unlike <see cref="NarrateMovement"/>'s earshot
+    /// lines): this is world flavor for "the year feels alive," not
+    /// something the player is meant to be able to sneak up on.
+    /// </summary>
+    private static void MaybeYell(YearPopulation population, IRandomSource random, ICollection<string> narration)
+    {
+        if (random.NextDouble() >= YellChance)
+        {
+            return;
+        }
+
+        var living = population.Monsters.Where(m => !m.Health.IsDead).ToList();
+        if (living.Count < 2)
+        {
+            return;
+        }
+
+        var callerIndex = (int)(random.NextDouble() * living.Count);
+        var caller = living[callerIndex];
+
+        var others = living.Where((_, i) => i != callerIndex).ToList();
+        var target = others[(int)(random.NextDouble() * others.Count)];
+
+        var line = YellLines[(int)(random.NextDouble() * YellLines.Length)];
+        narration.Add(string.Format(line, caller.Name, target.Name));
+    }
+
     /// <summary>Adds a player-local line when a monster's move crosses into/out of the player's room, or first comes within one room.</summary>
     private static void NarrateMovement(ICollection<string> narration, Monster monster, Coordinate from, Coordinate playerPos, IRandomSource random)
     {
@@ -583,6 +653,7 @@ public static class MonsterController
         }
 
         var monster = roster[(int)(random.NextDouble() * roster.Count)]();
+        monster.Enumerate((int)(random.NextDouble() * 1000)); // gets its own "-###" callsign, like every other spatial monster
         monster.PlaceAt(freeRooms[(int)(random.NextDouble() * freeRooms.Count)]);
         population.AddMonster(monster);
     }

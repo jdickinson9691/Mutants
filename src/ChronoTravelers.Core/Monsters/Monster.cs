@@ -17,7 +17,20 @@ namespace ChronoTravelers.Core.Monsters;
 /// </summary>
 public sealed class Monster
 {
-    public string Name { get; }
+    /// <summary>
+    /// The display name — the species name (<see cref="BaseName"/>) alone
+    /// until <see cref="Enumerate"/> gives it a per-instance
+    /// <c>"-###"</c> suffix (docs/GDD.md §7.1: "Ashfall Echo-042"), which
+    /// every spatial monster in a year's population gets, so it's
+    /// addressable individually — most importantly by
+    /// <c>ChronoTravelers.Engine.Npc.MonsterController</c>'s periodic yell
+    /// banter, which calls out one living monster by name to another.
+    /// </summary>
+    public string Name { get; private set; }
+
+    /// <summary>The un-numbered species/kind name ("Ashfall Echo", "Junk Golem") — <see cref="Name"/> before <see cref="Enumerate"/> appends its instance suffix.</summary>
+    public string BaseName { get; }
+
     public int Tier { get; }
     public HealthPool Health { get; }
     public TachyonPool Tachyons { get; }
@@ -134,6 +147,7 @@ public sealed class Monster
         }
 
         Name = name;
+        BaseName = name;
         Tier = tier;
         Health = new HealthPool(maxHp);
         Tachyons = new TachyonPool(maxTachyons ?? MonsterScaling.BaseTachyons(tier));
@@ -144,6 +158,36 @@ public sealed class Monster
         LootTable = lootTable ?? [];
         Tags = tags ?? [];
         IsApex = isApex;
+    }
+
+    private bool _enumerated;
+
+    /// <summary>
+    /// Gives this instance its <c>"-###"</c> callsign — a three-digit,
+    /// zero-padded suffix on <see cref="BaseName"/> (e.g. "042"), wrapped
+    /// into range from whatever <paramref name="number"/> the caller rolled
+    /// (so a deterministic per-year RNG stream, like
+    /// <see cref="YearPopulation.Seed"/>'s, reproduces the same callsigns on
+    /// every re-seed of the same world/year — <see cref="Name"/> itself
+    /// isn't part of any seed's determinism contract before this is called,
+    /// only after). A no-op past the first call — every real call site
+    /// enumerates exactly once, right after construction; this just makes
+    /// a stray extra call harmless rather than silently re-rolling the
+    /// player-visible name. Deliberately not applied to a boss-unique
+    /// Warden (see <see cref="ChronoTravelers.Core.Time.TimelineContentFactory.Warden"/>)
+    /// or a transient NPC "grind" opponent that's fought and discarded
+    /// within one tick, never placed on the map.
+    /// </summary>
+    public void Enumerate(int number)
+    {
+        if (_enumerated)
+        {
+            return;
+        }
+
+        var n = ((number % 1000) + 1000) % 1000;
+        Name = $"{BaseName}-{n:D3}";
+        _enumerated = true;
     }
 
     public bool HasTag(string tag) => Tags.Contains(tag, StringComparer.OrdinalIgnoreCase);

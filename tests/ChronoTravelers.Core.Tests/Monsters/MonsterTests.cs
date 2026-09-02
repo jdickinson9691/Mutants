@@ -215,4 +215,45 @@ public class MonsterTests
         var entry = new LootTableEntry(item, 1.0);
         Assert.Equal(1.0, entry.DropChance);
     }
+
+    [Fact]
+    public void Name_StartsAsJustTheBaseNameUntilEnumerated()
+    {
+        var monster = Monster.Create("Ashfall Echo", tier: 1);
+
+        Assert.Equal("Ashfall Echo", monster.Name);
+        Assert.Equal("Ashfall Echo", monster.BaseName);
+    }
+
+    [Fact]
+    public void Enumerate_AppendsAThreeDigitZeroPaddedSuffix()
+    {
+        var monster = Monster.Create("Ashfall Echo", tier: 1);
+
+        monster.Enumerate(42);
+
+        Assert.Equal("Ashfall Echo-042", monster.Name);
+        Assert.Equal("Ashfall Echo", monster.BaseName); // BaseName never changes
+    }
+
+    [Fact]
+    public void Enumerate_WrapsAnOutOfRangeNumberIntoThreeDigits()
+    {
+        var monster = Monster.Create("Beast", tier: 1);
+
+        monster.Enumerate(1042); // > 999
+
+        Assert.Equal("Beast-042", monster.Name);
+    }
+
+    [Fact]
+    public void Enumerate_IsANoOpOnceAlreadyEnumerated()
+    {
+        var monster = Monster.Create("Beast", tier: 1);
+
+        monster.Enumerate(7);
+        monster.Enumerate(999); // should not overwrite the first callsign
+
+        Assert.Equal("Beast-007", monster.Name);
+    }
 }

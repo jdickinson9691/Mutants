@@ -461,18 +461,36 @@ so currency doesn't purely inflate.
 
 Since v1 has no network multiplayer, the world needs to feel alive:
 
-- A configurable population of NPC Travelers is scattered across the whole
-  timeline (a single `totalCount`, each spawned in a random year and
-  fast-levelled into that year's soft-cap band), each a full character with
-  class, level, inventory, and Tachyon pool — built on the *exact same
-  character/inventory/ability code path* as the human player, per the
-  requirement that NPCs "play like players, with the same character classes
-  and restrictions."
+- A configurable population of NPC Travelers exists (a single `totalCount`,
+  default 5), each a full character with class, level, inventory, and
+  Tachyon pool — built on the *exact same character/inventory/ability code
+  path* as the human player, per the requirement that NPCs "play like
+  players, with the same character classes and restrictions." The first
+  `NpcPopulation.LocalPopulationTarget` (5) population slots are the **local
+  pool**: they actively gravitate toward wherever the player currently is
+  (or, on the shared-world server, a rotating occupied year) so their
+  fights, travel, and — most importantly — store sales are things the
+  player actually runs into, rather than statistically-almost-never across
+  a 3000-year timeline. Any slots beyond that (only reachable if a designer
+  raises `totalCount` past 5) keep the original whole-timeline scatter as
+  background flavor. A local-pool NPC that dies respawns back near the
+  current anchor year (`NpcPopulation.RespawnNear`, within
+  `LocalSpawnSpreadYears` of it); a background-pool NPC respawns from a
+  fresh whole-timeline draw (`NpcPopulation.RespawnScattered`), same as its
+  original spawn.
 - Each NPC runs a lightweight behavior loop each tick: assess Tachyon level (seek
   conversion fodder or a store if low), assess HP (retreat/heal if low),
-  otherwise pursue its current goal (grind monsters in its year, trade at
-  its year's store, hop a short way along the timeline — usually forward —
-  if it can afford the Tachyon cost).
+  otherwise pursue its current goal — wear a better weapon/armor/ranged item
+  already sitting in its pack the instant it's looted (no store needed),
+  trade at a year's store (selling genuine surplus gear it can't use before
+  falling back to excess junk, and buying a weapon if unarmed), grind
+  monsters in its year, or hop along the timeline. A local-pool NPC not
+  already at the anchor year rolls a much higher travel chance and, when it
+  rolls, heads straight for the anchor — the full jump if it can afford the
+  Tachyon cost, otherwise the biggest hop toward it it can afford, so the
+  gap keeps closing across ticks. A background-pool NPC (or a local-pool one
+  already at the anchor) keeps the original low-chance, mostly-forward
+  random hop.
 - NPCs participate in the same kill-feed / **fray-band broadcast** channel
   as the player `[SOURCE: cross-board telepathic messages]` — "An Ashfall
   Echo was slain by a Dune Stalker," "Fang reached level 12," "Static
@@ -514,6 +532,25 @@ saved):
   list is still near where it was when you get there, rather than a
   same-speed target you can never catch. The `monsters` list shows each
   one's exact room (and the way it last stepped).
+- **Every spatial monster is individually named** — `Monster.Enumerate`
+  appends a three-digit `-###` callsign to its species name the moment it's
+  seeded or trickle-respawned ("Ashfall Echo-042"), drawn from the same
+  deterministic per-year stream everything else in that year's population
+  uses, so re-seeding the same world/year reproduces the same callsigns.
+  This replaces the earlier design where every monster of a species shared
+  one plain name; it exists so a monster can be addressed individually —
+  most importantly by the yell banter below. The Warden and a transient NPC
+  "grind" opponent (fought and discarded within one tick, never placed on
+  the map) are left un-enumerated — a boss and a nobody-sees-it fight don't
+  need a callsign.
+- **Monsters yell** — every tick, the year the player is standing in has a
+  small (~12%) chance that one living monster calls out another by its
+  enumerated name — a mix of hunting threats and plain insults ("Ashfall
+  Echo-042 bellows, 'Junk Golem-017, I am looking for you!'"). It's not
+  proximity-gated like the movement/earshot narration above — it's ambient
+  flavor for the whole year, meant to make the place sound inhabited without
+  interrupting every command with a line. Needs at least two living
+  monsters; a year down to its last one goes quiet.
 - **Monster fights stay relevant** — four linked knobs (with the HP-per-
   level taper in §4.1), tuned so a same-tier fight costs real HP without
   the early game getting harsh:

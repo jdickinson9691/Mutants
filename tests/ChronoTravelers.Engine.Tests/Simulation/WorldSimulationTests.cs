@@ -2,6 +2,7 @@ using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Time;
+using ChronoTravelers.Engine.Npc;
 using ChronoTravelers.Engine.Simulation;
 
 namespace ChronoTravelers.Engine.Tests.Simulation;
@@ -60,21 +61,12 @@ public class WorldSimulationTests
         Assert.True(player.Tachyons.Current < startingTachyons, "In the far future the drain should outpace the regen.");
     }
 
-    [Fact]
-    public void Tick_SkipsDeadNpcsEntirely()
-    {
-        var world = World();
-        var player = OffGridPlayer("Player", world, 2000);
-        var npc = NewTraveler("Vex", world, 2000);
-        npc.Health.Damage(npc.Health.Max);
-        var startingPosition = npc.Position;
-        var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.5));
-
-        simulation.Tick(player);
-
-        Assert.Equal(startingPosition, npc.Position);
-        Assert.Empty(simulation.Broadcast.Events);
-    }
+    // (Was Tick_SkipsDeadNpcsEntirely — removed. Its premise, "a dead NPC
+    //  stays put and emits nothing, forever", no longer holds now that
+    //  WorldSimulation.RespawnDeadNpcs revives a dead slot each tick. The
+    //  replacement contract is covered by
+    //  Tick_RespawnsADeadLocalPoolNpc_NearThePlayersCurrentYear and
+    //  Tick_LeavesALivingNpcAlone_NoRespawn below.)
 
     [Fact]
     public void Tick_PublishesSlainEventWhenAnNpcDefeatsAMonster()
@@ -249,5 +241,34 @@ public class WorldSimulationTests
 
         Assert.Equal(fullHp, player.Health.Current);
         Assert.DoesNotContain(simulation.Broadcast.Events, e => e.Message.Contains("ambushes"));
+    }
+
+    [Fact]
+    public void Tick_RespawnsADeadLocalPoolNpc_NearThePlayersCurrentYear()
+    {
+        var world = World();
+        var player = OffGridPlayer("Player", world, 3000);
+        var deadNpc = NewTraveler("Vex", world, 2000);
+        deadNpc.Health.Damage(deadNpc.Health.Max);
+        var simulation = new WorldSimulation(world, [deadNpc], StubRandomSource.Fixed(0.5));
+
+        simulation.Tick(player);
+
+        var respawned = simulation.Npcs[0];
+        Assert.False(respawned.Health.IsDead);
+        Assert.InRange(respawned.CurrentYear, 3000 - NpcPopulation.LocalSpawnSpreadYears, 3000 + NpcPopulation.LocalSpawnSpreadYears);
+    }
+
+    [Fact]
+    public void Tick_LeavesALivingNpcAlone_NoRespawn()
+    {
+        var world = World();
+        var player = OffGridPlayer("Player", world, 3000);
+        var npc = NewTraveler("Vex", world, 2000);
+        var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.99));
+
+        simulation.Tick(player);
+
+        Assert.Same(npc, simulation.Npcs[0]);
     }
 }

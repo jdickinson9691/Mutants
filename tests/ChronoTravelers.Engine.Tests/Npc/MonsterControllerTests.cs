@@ -689,4 +689,109 @@ public class MonsterControllerTests
 
         Assert.True(pop.Monsters.Count(m => !m.Health.IsDead) > 0, "The trickle should refill an emptied year.");
     }
+
+    [Fact]
+    public void MaybeRespawn_GivesTheNewMonsterAnEnumeratedInstanceName()
+    {
+        var world = TestTimeWorld.Build(seed: 314);
+        var content = world.GetYear(2400);
+        var pop = content.Population;
+
+        var player = new Traveler("Bystander", CharacterClass.Soldier);
+        player.SetCurrentYear(2400);
+        player.PlaceAt(new Coordinate(99, 99));
+
+        foreach (var m in pop.Monsters.ToList())
+        {
+            m.Health.Damage(m.Health.Max);
+            pop.RemoveMonster(m);
+        }
+
+        for (var i = 0; i < 120; i++)
+        {
+            Tick(pop, content.Map, player, StubRandomSource.Fixed(0.0), roster: content.MonsterRoster);
+        }
+
+        Assert.NotEmpty(pop.Monsters);
+        Assert.All(pop.Monsters, m => Assert.Matches(@"-\d{3}$", m.Name));
+    }
+
+    // --- ambient monster "yell" banter --------------------------------------
+
+    [Fact]
+    public void Tick_TwoOrMoreLivingMonsters_OccasionallyYellsACalloutNamingTwoOfThem()
+    {
+        // A long corridor, monsters at opposite ends — even if both wander
+        // this tick, they stay far too apart to collide into the same room
+        // (which would otherwise risk an infight consuming the same
+        // Fixed(0.0) stream and killing one before the yell roll).
+        var map = CorridorMap(8);
+        var pop = EmptyPopulation(map);
+        var a = Monster.Create("Scavenger", tier: 1);
+        a.PlaceAt(new Coordinate(0, 0));
+        a.Enumerate(12);
+        var b = Monster.Create("Junk Golem", tier: 1);
+        b.PlaceAt(new Coordinate(7, 0));
+        b.Enumerate(34);
+        pop.AddMonster(a);
+        pop.AddMonster(b);
+
+        var log = new List<string>();
+        // 0.0 clears every gate it touches: the yell chance, the caller/
+        // target picks, and the line pick.
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.0), narration: log);
+
+        Assert.Contains(log, l => l.Contains("Scavenger-012") && l.Contains("Junk Golem-034"));
+    }
+
+    [Fact]
+    public void Tick_OnlyOneLivingMonster_NeverYells_NobodyToCallOut()
+    {
+        var map = CorridorMap(8);
+        var pop = EmptyPopulation(map);
+        var a = Monster.Create("Scavenger", tier: 1);
+        a.PlaceAt(new Coordinate(0, 0));
+        pop.AddMonster(a);
+
+        var log = new List<string>();
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.0), narration: log);
+
+        Assert.Empty(log);
+    }
+
+    [Fact]
+    public void Tick_YellChanceMissed_ProducesNoCallout()
+    {
+        var map = CorridorMap(8);
+        var pop = EmptyPopulation(map);
+        var a = Monster.Create("Scavenger", tier: 1);
+        a.PlaceAt(new Coordinate(0, 0));
+        var b = Monster.Create("Junk Golem", tier: 1);
+        b.PlaceAt(new Coordinate(7, 0));
+        pop.AddMonster(a);
+        pop.AddMonster(b);
+
+        var log = new List<string>();
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99), narration: log);
+
+        Assert.Empty(log);
+    }
+
+    [Fact]
+    public void TickUnattended_NeverYells_NoNarrationSinkToWriteTo()
+    {
+        var map = CorridorMap(8);
+        var pop = EmptyPopulation(map);
+        var a = Monster.Create("Scavenger", tier: 1);
+        a.PlaceAt(new Coordinate(0, 0));
+        var b = Monster.Create("Junk Golem", tier: 1);
+        b.PlaceAt(new Coordinate(7, 0));
+        pop.AddMonster(a);
+        pop.AddMonster(b);
+        var broadcast = new BroadcastChannel();
+
+        // Should not throw despite narration being null internally, and
+        // obviously produces no player-local lines since there's no sink.
+        MonsterController.TickUnattended(pop, map, [], year: 2400, StubRandomSource.Fixed(0.0), broadcast);
+    }
 }

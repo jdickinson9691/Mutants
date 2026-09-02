@@ -17,8 +17,11 @@ public enum NpcGoal
     /// <summary>HP is low; sits out this tick rather than fighting. A placeholder for real heal/flee behavior.</summary>
     Retreat,
 
-    /// <summary>Visited a store this tick — sold excess junk, or bought a needed weapon/armor.</summary>
+    /// <summary>Visited a store this tick — sold excess junk or surplus gear, or bought a needed weapon.</summary>
     Trade,
+
+    /// <summary>Swapped to a better weapon/armor/ranged item already sitting in the pack (looted, not bought) — no store needed.</summary>
+    Upgrade,
 
     /// <summary>Attempted a time-travel jump to the next-deeper level this tick — win or lose (see NpcTickResult.Fight for a warden attempt).</summary>
     Travel,

@@ -183,6 +183,26 @@ public class YearPopulationTests
     }
 
     [Fact]
+    public void Seed_GivesEveryRegularAndApexMonsterAnEnumeratedInstanceName()
+    {
+        var content = TestTimeWorld.Build(seed: 555).GetYear(2200);
+
+        Assert.NotEmpty(content.Population.Monsters);
+        Assert.All(content.Population.Monsters, m => Assert.Matches(@"-\d{3}$", m.Name));
+    }
+
+    [Fact]
+    public void Seed_NeverEnumeratesTheWarden_ItsNameStaysUniqueOnItsOwn()
+    {
+        var world = TestTimeWorld.Build(seed: 99);
+        var gkYear = world.WardenYears.First();
+
+        var warden = world.GetYear(gkYear).Population.Warden!;
+
+        Assert.DoesNotMatch(@"-\d{3}$", warden.Name);
+    }
+
+    [Fact]
     public void AddAndRemoveMonster_MutateTheLivePopulation()
     {
         var pop = PopulationFor(2, 2100);

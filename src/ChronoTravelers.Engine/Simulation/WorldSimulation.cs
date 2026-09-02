@@ -25,7 +25,16 @@ public sealed class WorldSimulation
 {
     public TimeWorld World { get; }
     public BroadcastChannel Broadcast { get; }
-    public IReadOnlyList<Traveler> Npcs { get; }
+
+    /// <summary>
+    /// The live NPC population, stored (not copied) from the constructor's
+    /// <paramref name="npcs"/> argument, so a dead local-pool NPC can be
+    /// replaced in place — see <see cref="RespawnDeadNpcs"/> — and the
+    /// caller's own list reference (ChronoTravelers.Console's <c>npcs</c>
+    /// local, <see cref="ChronoTravelers.Game.SharedGame"/>'s <c>_npcs</c>
+    /// field) sees the replacement without either side re-syncing anything.
+    /// </summary>
+    public IList<Traveler> Npcs { get; }
 
     /// <summary>
     /// Player-local ambient narration from the most recent <see cref="Tick"/>
@@ -44,7 +53,7 @@ public sealed class WorldSimulation
 
     public WorldSimulation(
         TimeWorld world,
-        IReadOnlyList<Traveler> npcs,
+        IList<Traveler> npcs,
         IRandomSource random,
         BroadcastChannel? broadcast = null)
     {
@@ -52,6 +61,31 @@ public sealed class WorldSimulation
         Npcs = npcs;
         _random = random;
         Broadcast = broadcast ?? new BroadcastChannel();
+    }
+
+    /// <summary>
+    /// Replaces any dead entry in <see cref="Npcs"/> in place — a local-pool
+    /// slot (index below <see cref="NpcPopulation.LocalPopulationTarget"/>)
+    /// comes back near <paramref name="anchorYear"/> via
+    /// <see cref="NpcPopulation.RespawnNear"/> so it's still somewhere the
+    /// player can run into it; any other slot (or a local slot when there's
+    /// no anchor yet) comes back from a whole-timeline draw via
+    /// <see cref="NpcPopulation.RespawnScattered"/>, same as the original
+    /// no-respawn-locality design.
+    /// </summary>
+    private void RespawnDeadNpcs(int? anchorYear)
+    {
+        for (var i = 0; i < Npcs.Count; i++)
+        {
+            if (!Npcs[i].Health.IsDead)
+            {
+                continue;
+            }
+
+            Npcs[i] = i < NpcPopulation.LocalPopulationTarget && anchorYear is { } anchor
+                ? NpcPopulation.RespawnNear(i, anchor, World, _random)
+                : NpcPopulation.RespawnScattered(i, World, _random);
+        }
     }
 
     /// <summary>
@@ -86,8 +120,13 @@ public sealed class WorldSimulation
             traveler.AdvanceEffectTicks();
         }
 
-        foreach (var npc in Npcs)
+        var playerAnchorYear = TimeScale.IsValidYear(player.CurrentYear) ? player.CurrentYear : (int?)null;
+        RespawnDeadNpcs(playerAnchorYear);
+
+        for (var i = 0; i < Npcs.Count; i++)
         {
+            var npc = Npcs[i];
+
             if (npc.Health.IsDead)
             {
                 continue;
@@ -107,7 +146,8 @@ public sealed class WorldSimulation
 
             var levelBefore = npc.Level;
             var yearBefore = npc.CurrentYear;
-            var result = NpcController.Act(npc, yearContent.Map, _random, activeStores, yearContent.MonsterRoster, World);
+            var pullToAnchor = i < NpcPopulation.LocalPopulationTarget;
+            var result = NpcController.Act(npc, yearContent.Map, _random, activeStores, yearContent.MonsterRoster, World, playerAnchorYear, pullToAnchor);
 
             if (result.Fight is { } fight)
             {
@@ -197,8 +237,28 @@ public sealed class WorldSimulation
             traveler.AdvanceEffectTicks();
         }
 
-        foreach (var npc in Npcs)
+        // A rotating occupied-year anchor, computed before the NPC pass so
+        // the local pool (see NpcPopulation.LocalPopulationTarget) has
+        // somewhere live to gravitate toward and respawn near this tick —
+        // same idea as Tick's player.CurrentYear anchor, but shared-world
+        // NPCs have no single player to follow, so the anchor rotates
+        // through whichever years actually have someone in them.
+        var candidateYears = players
+            .Where(p => !p.Player.Health.IsDead && TimeScale.IsValidYear(p.Player.CurrentYear))
+            .Select(p => p.Player.CurrentYear)
+            .Distinct()
+            .OrderBy(y => y)
+            .ToList();
+        var mpAnchorYear = candidateYears.Count > 0
+            ? candidateYears[(int)(_mpTick % candidateYears.Count)]
+            : (int?)null;
+
+        RespawnDeadNpcs(mpAnchorYear);
+
+        for (var i = 0; i < Npcs.Count; i++)
         {
+            var npc = Npcs[i];
+
             if (npc.Health.IsDead || !TimeScale.IsValidYear(npc.CurrentYear))
             {
                 continue;
@@ -212,7 +272,8 @@ public sealed class WorldSimulation
 
             var levelBefore = npc.Level;
             var yearBefore = npc.CurrentYear;
-            var result = NpcController.Act(npc, yearContent.Map, _random, activeStores, yearContent.MonsterRoster, World);
+            var pullToAnchor = i < NpcPopulation.LocalPopulationTarget;
+            var result = NpcController.Act(npc, yearContent.Map, _random, activeStores, yearContent.MonsterRoster, World, mpAnchorYear, pullToAnchor);
 
             if (result.Fight is { } fight)
             {

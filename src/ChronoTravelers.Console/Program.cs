@@ -712,7 +712,7 @@ static IReadOnlyList<AbilityData> LoadAbilities()
     }
 }
 
-/// <summary>Spawns the whole NPC population (npc-population.json's totalCount), scattered across the timeline. Falls back to 12 if the config is missing/malformed.</summary>
+/// <summary>Spawns the whole NPC population (npc-population.json's totalCount), scattered across the timeline. Falls back to NpcPopulation.LocalPopulationTarget (5) if the config is missing/malformed.</summary>
 static List<Traveler> SpawnNpcs(TimeWorld world, IRandomSource random)
 {
     int count;
@@ -722,7 +722,7 @@ static List<Traveler> SpawnNpcs(TimeWorld world, IRandomSource random)
     }
     catch (ContentException)
     {
-        count = 12;
+        count = NpcPopulation.LocalPopulationTarget;
     }
 
     return NpcPopulation.Spawn(count, world, random).ToList();

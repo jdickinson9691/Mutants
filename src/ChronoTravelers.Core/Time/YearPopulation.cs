@@ -100,6 +100,7 @@ public sealed class YearPopulation
         for (var i = 0; i < count; i++)
         {
             var monster = roster[rng.Next(roster.Count)]();
+            monster.Enumerate(rng.Next(1000)); // "Ashfall Echo-042" — see Monster.Enumerate
             monster.PlaceAt(rooms[i]);
             monsters.Add(monster);
         }
@@ -118,6 +119,7 @@ public sealed class YearPopulation
             for (var i = 0; i < apexCount && count + i < rooms.Count; i++)
             {
                 var apex = apexRoster[rng.Next(apexRoster.Count)]();
+                apex.Enumerate(rng.Next(1000));
                 apex.PlaceAt(rooms[count + i]);
                 monsters.Add(apex);
             }

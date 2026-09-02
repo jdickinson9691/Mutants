@@ -230,4 +230,98 @@ public class NpcControllerTests
         Assert.NotNull(result.MonsterName);
         Assert.Contains(customRoster, factory => factory().Name == result.MonsterName);
     }
+
+    [Fact]
+    public void Act_LocalPoolNotAtAnchor_RollPasses_JumpsStraightToTheAnchorWhenAffordable()
+    {
+        var npc = ReadyToTravelNpc();
+        var world = TestTimeWorld.Build();
+
+        // 0.01 passes the AnchorTravelAttemptChance (0.6) gate.
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), world: world, anchorYear: 2250, pullToAnchor: true);
+
+        Assert.Equal(NpcGoal.Travel, result.Goal);
+        Assert.Equal(2250, npc.CurrentYear);
+    }
+
+    [Fact]
+    public void Act_LocalPoolNotAtAnchor_RollFails_FallsThroughToGrind()
+    {
+        var npc = ReadyToTravelNpc();
+        var world = TestTimeWorld.Build();
+
+        // 0.9 misses the AnchorTravelAttemptChance (0.6) gate.
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.9), world: world, anchorYear: 2250, pullToAnchor: true);
+
+        Assert.NotEqual(NpcGoal.Travel, result.Goal);
+        Assert.Equal(2000, npc.CurrentYear);
+    }
+
+    [Fact]
+    public void Act_LocalPoolAlreadyAtTheAnchor_DoesNotForceATravelAttempt()
+    {
+        var npc = ReadyToTravelNpc();
+        var world = TestTimeWorld.Build();
+
+        // Already at the anchor, so the anchor-pull branch is skipped entirely;
+        // 0.5 also misses the background TravelAttemptChance (0.10) gate.
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), world: world, anchorYear: 2000, pullToAnchor: true);
+
+        Assert.NotEqual(NpcGoal.Travel, result.Goal);
+        Assert.Equal(2000, npc.CurrentYear);
+    }
+
+    [Fact]
+    public void Act_LootedWeaponBeatsWhatsEquipped_AutoWieldsItWithoutAStore()
+    {
+        var npc = FreshNpc();
+        var weapon = Item.Create("Rusty Blade", ItemType.Weapon, 1, Rarity.Common);
+        npc.AddToInventory(weapon);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5));
+
+        Assert.Equal(NpcGoal.Upgrade, result.Goal);
+        Assert.Equal(weapon, npc.EquippedWeapon);
+        Assert.Contains(weapon, npc.Inventory);
+    }
+
+    [Fact]
+    public void Act_LootedWeaponNoBetterThanWhatsEquipped_DoesNotSwap()
+    {
+        var npc = FreshNpc();
+        var goodWeapon = Item.Create("Fine Blade", ItemType.Weapon, 5, Rarity.Rare);
+        npc.AddToInventory(goodWeapon);
+        npc.Wield(goodWeapon);
+        var worseWeapon = Item.Create("Rusty Blade", ItemType.Weapon, 1, Rarity.Common);
+        npc.AddToInventory(worseWeapon);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5));
+
+        Assert.NotEqual(NpcGoal.Upgrade, result.Goal);
+        Assert.Equal(goodWeapon, npc.EquippedWeapon);
+    }
+
+    [Fact]
+    public void Act_SurplusGearAndExcessJunkBothPresent_SellsTheGearFirst()
+    {
+        var npc = FreshNpc();
+        var goodWeapon = Item.Create("Fine Blade", ItemType.Weapon, 5, Rarity.Rare);
+        npc.AddToInventory(goodWeapon);
+        npc.Wield(goodWeapon);
+        var surplusWeapon = Item.Create("Rusty Blade", ItemType.Weapon, 1, Rarity.Common);
+        npc.AddToInventory(surplusWeapon);
+        for (var tier = 1; tier <= 4; tier++)
+        {
+            npc.AddToInventory(Item.Create($"Junk Tier {tier}", ItemType.Junk, tier, Rarity.Common));
+        }
+
+        var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [store]);
+
+        Assert.Equal(NpcGoal.Trade, result.Goal);
+        Assert.DoesNotContain(surplusWeapon, npc.Inventory);
+        Assert.Equal(4, npc.Inventory.Count(i => i.Type == ItemType.Junk));
+        Assert.Equal(goodWeapon, npc.EquippedWeapon);
+    }
 }

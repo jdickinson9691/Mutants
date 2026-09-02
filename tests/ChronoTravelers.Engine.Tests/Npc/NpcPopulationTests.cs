@@ -76,4 +76,50 @@ public class NpcPopulationTests
     {
         Assert.Empty(NpcPopulation.Spawn(0, World(), StubRandomSource.Fixed(0.5)));
     }
+
+    [Fact]
+    public void RespawnNear_LandsWithinTheSpreadOfTheAnchorYear()
+    {
+        var world = World();
+        var anchor = 3000;
+
+        var npc = NpcPopulation.RespawnNear(0, anchor, world, new StubRandomSource(0.1, 0.5, 0.9, 0.3));
+
+        Assert.InRange(npc.CurrentYear, anchor - NpcPopulation.LocalSpawnSpreadYears, anchor + NpcPopulation.LocalSpawnSpreadYears);
+        Assert.Equal(world.GetYear(npc.CurrentYear).Map.Start, npc.Position);
+    }
+
+    [Fact]
+    public void RespawnNear_ClampsTheSpreadToTheTimelineBounds()
+    {
+        var world = World();
+
+        var npcNearFloor = NpcPopulation.RespawnNear(0, TimeScale.MinYear, world, new StubRandomSource(0.0));
+        var npcNearCeiling = NpcPopulation.RespawnNear(0, TimeScale.MaxYear, world, new StubRandomSource(0.99));
+
+        Assert.InRange(npcNearFloor.CurrentYear, TimeScale.MinYear, TimeScale.MinYear + NpcPopulation.LocalSpawnSpreadYears);
+        Assert.InRange(npcNearCeiling.CurrentYear, TimeScale.MaxYear - NpcPopulation.LocalSpawnSpreadYears, TimeScale.MaxYear);
+    }
+
+    [Fact]
+    public void RespawnNear_KeepsTheSameNameForTheSamePopulationIndex()
+    {
+        var world = World();
+
+        var first = NpcPopulation.RespawnNear(2, 2500, world, StubRandomSource.Fixed(0.5));
+        var second = NpcPopulation.RespawnNear(2, 4000, world, StubRandomSource.Fixed(0.2));
+
+        Assert.Equal(first.Name, second.Name);
+    }
+
+    [Fact]
+    public void RespawnScattered_ProducesAYearAnywhereOnTheTimeline()
+    {
+        var world = World();
+
+        var npc = NpcPopulation.RespawnScattered(0, world, new StubRandomSource(0.1, 0.5, 0.9));
+
+        Assert.InRange(npc.CurrentYear, TimeScale.MinYear, TimeScale.MaxYear);
+        Assert.Equal(world.GetYear(npc.CurrentYear).Map.Start, npc.Position);
+    }
 }
