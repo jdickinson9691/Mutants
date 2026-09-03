@@ -61,8 +61,17 @@ The installer lands in `installer/Output/`. Pushing a `v*` tag (e.g.
 attaches the installer to a GitHub Release automatically — see
 [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
-Saves and the leaderboard DB live under `%APPDATA%\ChronoTravelers\`. If the
-game hits an unhandled exception it writes a full report to
+Saves and the leaderboard DB live under `%APPDATA%\ChronoTravelers\`
+(`chronotravelers.db`), **outside the install directory** — so installing a
+new version, upgrading, or even uninstalling never touches your characters
+or the leaderboard. Set `CHRONOTRAVELERS_SAVE_DIR` to keep a run's saves
+somewhere else (the test harness uses this so playtests can't clobber a
+real save). If the DB can't be opened (e.g. a partial write from a hard
+kill), the game moves it aside as
+`chronotravelers.db.unreadable-<timestamp>` and starts a fresh one — it
+never deletes the old data.
+
+If the game hits an unhandled exception it writes a full report to
 `%APPDATA%\ChronoTravelers\crashes\crash-<timestamp>.log` (and prints the
 path) before exiting — attach that when reporting a crash.
 

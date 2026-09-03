@@ -138,13 +138,52 @@ if (connectUrl is not null)
 
 RenderTitle();
 
-var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-var savesDirectory = string.IsNullOrEmpty(appDataFolder)
-    ? "saves"
-    : Path.Combine(appDataFolder, "ChronoTravelers");
+// Save/leaderboard DB lives in the user's profile, NOT next to the exe —
+// so installing, upgrading, or uninstalling the game never touches a
+// player's characters (installer/ChronoTravelers.iss ships nothing here
+// and its uninstaller deliberately leaves this folder alone). A build or
+// automated run can point CHRONOTRAVELERS_SAVE_DIR at a scratch folder to
+// keep its throwaway characters out of the real save.
+var savesDirectory = Environment.GetEnvironmentVariable("CHRONOTRAVELERS_SAVE_DIR") is { Length: > 0 } saveDirOverride
+    ? saveDirOverride
+    : (Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) is { Length: > 0 } appDataFolder
+        ? Path.Combine(appDataFolder, "ChronoTravelers")
+        : "saves");
 Directory.CreateDirectory(savesDirectory);
 var savePath = Path.Combine(savesDirectory, "chronotravelers.db");
-using var repository = new GameRepository(savePath);
+
+// Open the DB defensively: if the file is present but LiteDB can't open it
+// (a partially-written file from a hard kill, a genuinely incompatible
+// future format), set it aside with a timestamped name rather than losing
+// it, and start a fresh one. The player's old data stays on disk to be
+// recovered; nothing is ever deleted.
+GameRepository OpenRepository(string path)
+{
+    try
+    {
+        return new GameRepository(path);
+    }
+    catch (Exception ex) when (File.Exists(path))
+    {
+        var salvaged = $"{path}.unreadable-{DateTime.Now:yyyyMMdd-HHmmss}";
+        try
+        {
+            File.Move(path, salvaged);
+            AnsiConsole.MarkupLine($"[yellow]Your save file couldn't be opened ({Markup.Escape(ex.Message)}).[/]");
+            AnsiConsole.MarkupLine($"[yellow]It's been kept as[/] [grey]{Markup.Escape(salvaged)}[/] [yellow]and a new one started. Nothing was deleted.[/]");
+        }
+        catch
+        {
+            // Couldn't even move it — re-throw the original so the crash
+            // handler records it rather than silently starting fresh.
+            throw ex;
+        }
+
+        return new GameRepository(path);
+    }
+}
+
+using var repository = OpenRepository(savePath);
 
 var abilities = LoadAbilities();
 var random = new SystemRandomSource();

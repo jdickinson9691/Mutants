@@ -61,6 +61,17 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; wizard graphics needed.
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
+; PLAYER DATA IS NEVER TOUCHED BY INSTALL / UPGRADE / UNINSTALL.
+; The save + leaderboard DB lives at
+;   %APPDATA%\ChronoTravelers\chronotravelers.db
+; (see ChronoTravelers.Console's Program.cs). This installer ships nothing
+; into that folder, every [Files] entry writes under {app} only, and there
+; is deliberately NO [InstallDelete] / [UninstallDelete] rule for
+; %APPDATA%\ChronoTravelers - so a reinstall or version upgrade keeps every
+; saved Traveler and the leaderboard intact, and even a full uninstall
+; leaves the player's data on disk. Do not add a rule that removes
+; {userappdata}\ChronoTravelers.
+
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
