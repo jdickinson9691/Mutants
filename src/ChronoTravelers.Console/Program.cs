@@ -861,29 +861,96 @@ static string? ConnectTarget(string[] argv)
     return null;
 }
 
-/// <summary>The custom Chrono Travelers wordmark shown once at launch (a hand-set banner, not Spectre's Figlet), with a timeline motif and the intro flavour.</summary>
+/// <summary>
+/// The full-block "CHRONO TRAVELERS" wordmark — the original title screen,
+/// unchanged. One of three designs <see cref="RenderTitle"/> picks between
+/// at random; see <see cref="TimeTunnelBanner"/> and
+/// <see cref="RuinedCityBanner"/> for the other two.
+/// </summary>
+static string[] WordmarkBanner() =>
+[
+    @" ██████╗██╗  ██╗██████╗  ██████╗ ███╗   ██╗ ██████╗ ",
+    @"██╔════╝██║  ██║██╔══██╗██╔═══██╗████╗  ██║██╔═══██╗",
+    @"██║     ███████║██████╔╝██║   ██║██╔██╗ ██║██║   ██║",
+    @"██║     ██╔══██║██╔══██╗██║   ██║██║╚██╗██║██║   ██║",
+    @"╚██████╗██║  ██║██║  ██║╚██████╔╝██║ ╚████║╚██████╔╝",
+    @" ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ",
+    @"████████╗██████╗  █████╗ ██╗   ██╗███████╗██╗     ███████╗██████╗ ███████╗",
+    @"╚══██╔══╝██╔══██╗██╔══██╗██║   ██║██╔════╝██║     ██╔════╝██╔══██╗██╔════╝",
+    @"   ██║   ██████╔╝███████║██║   ██║█████╗  ██║     █████╗  ██████╔╝███████╗",
+    @"   ██║   ██╔══██╗██╔══██║╚██╗ ██╔╝██╔══╝  ██║     ██╔══╝  ██╔══██╗╚════██║",
+    @"   ██║   ██║  ██║██║  ██║ ╚████╔╝ ███████╗███████╗███████╗██║  ██║███████║",
+    @"   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝",
+];
+
+/// <summary>
+/// A nested-rectangle "looking down the tunnel" motif — four concentric
+/// frames connected by corner diagonals, converging on a glowing
+/// "TACHYON" core, per docs/GDD.md §1's Project Meridian tunnel. Built
+/// programmatically (not hand-typed) to keep every ring perfectly square
+/// and centered; see this PR/commit for the generator if it ever needs
+/// resizing.
+/// </summary>
+static string[] TimeTunnelBanner() =>
+[
+    @"┌─────────────────────────────────────────────────────────────┐",
+    @"│ \\\                                                     /// │",
+    @"│    \┌─────────────────────────────────────────────────┐/    │",
+    @"│     │ \\\                                         /// │     │",
+    @"│     │    \┌─────────────────────────────────────┐/    │     │",
+    @"│     │     │ \\\                             /// │     │     │",
+    @"│     │     │    \┌─────────────────────────┐/    │     │     │",
+    @"│     │     │     │    · T A C H Y O N ·    │     │     │     │",
+    @"│     │     │    /└─────────────────────────┘\    │     │     │",
+    @"│     │     │ ///                             \\\ │     │     │",
+    @"│     │    /└─────────────────────────────────────┘\    │     │",
+    @"│     │ ///                                         \\\ │     │",
+    @"│    /└─────────────────────────────────────────────────┘\    │",
+    @"│ ///                                                     \\\ │",
+    @"└─────────────────────────────────────────────────────────────┘",
+    @"",
+    @"                C H R O N O   T R A V E L E R S",
+];
+
+/// <summary>
+/// A Traveler sprinting down a broken street — a jagged, notched skyline
+/// (the fray's damage), rubble at ground level, and a running figure with
+/// motion lines, per docs/GDD.md §1's "you explore a grid-based city and
+/// wasteland." Also generator-built for clean column alignment.
+/// </summary>
+static string[] RuinedCityBanner() =>
+[
+    @"                            ██   ██                               ",
+    @"               ██   █       ██   ██                      ██   ██  ",
+    @"  █   █        ██   █       ███████        ██   █        ██   ██  ",
+    @"  █   █        ██   █       ███████  ████  ██   █        ██   ██  ",
+    @"  █   █  ████  ██   █       ███████  ████  ██   █  ████  ██   ██  ",
+    @"  █████  ████  ██   █  ███  ███████  ████  ██   █  ████  ██   ██  ",
+    @"  █████  ████  ██   █  ███  ███████  ████  ██████  ████  ███████  ",
+    @"  █████  ████  ██████  ███  ███████  ████  ██████  ████  ███████  ",
+    @"    .  '  .      .  '   .      .  '   .      .  '   .      .  '   ",
+    @"  `      `  ,  `      `   ,  `      `   ,  `      `   ,  `     `  ",
+    @"        - - -                 __O                                 ",
+    @"    - - - -                 _-\<,_                                ",
+    @"- - - - -                  (_)/  (_)                              ",
+    @"═══════════╱╲════════════════╱╲════════════════╱╲═════════════════",
+    @"",
+    @"                 C H R O N O   T R A V E L E R S",
+];
+
+/// <summary>The three title-screen designs <see cref="RenderTitle"/> picks between at random, every run.</summary>
+static string[][] TitleBanners() => [WordmarkBanner(), TimeTunnelBanner(), RuinedCityBanner()];
+
+/// <summary>The custom Chrono Travelers title screen shown once at launch — one of three hand-set banner designs (a timeline-tunnel motif, not Spectre's Figlet), picked at random each run (see <see cref="TitleBanners"/>), with the intro flavour beneath.</summary>
 static void RenderTitle()
 {
-    string[] banner =
-    [
-        @" ██████╗██╗  ██╗██████╗  ██████╗ ███╗   ██╗ ██████╗ ",
-        @"██╔════╝██║  ██║██╔══██╗██╔═══██╗████╗  ██║██╔═══██╗",
-        @"██║     ███████║██████╔╝██║   ██║██╔██╗ ██║██║   ██║",
-        @"██║     ██╔══██║██╔══██╗██║   ██║██║╚██╗██║██║   ██║",
-        @"╚██████╗██║  ██║██║  ██║╚██████╔╝██║ ╚████║╚██████╔╝",
-        @" ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ",
-        @"████████╗██████╗  █████╗ ██╗   ██╗███████╗██╗     ███████╗██████╗ ███████╗",
-        @"╚══██╔══╝██╔══██╗██╔══██╗██║   ██║██╔════╝██║     ██╔════╝██╔══██╗██╔════╝",
-        @"   ██║   ██████╔╝███████║██║   ██║█████╗  ██║     █████╗  ██████╔╝███████╗",
-        @"   ██║   ██╔══██╗██╔══██║╚██╗ ██╔╝██╔══╝  ██║     ██╔══╝  ██╔══██╗╚════██║",
-        @"   ██║   ██║  ██║██║  ██║ ╚████╔╝ ███████╗███████╗███████╗██║  ██║███████║",
-        @"   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝",
-    ];
+    var banners = TitleBanners();
+    var banner = banners[Random.Shared.Next(banners.Length)];
 
-    // The wordmark takes a different colour every time the title screen
+    // The banner takes a different colour every time the title screen
     // loads — one hue for the whole banner, picked at random from a set of
     // hues that all read clearly on a dark terminal.
-    string[] wordmarkColours =
+    string[] titleColours =
     [
         "#5fd75f", // green (the long-standing default)
         "#5fd7ff", // sky
@@ -896,12 +963,12 @@ static void RenderTitle()
         "#ff5f5f", // red
         "#5fffd7", // mint
     ];
-    var wordmarkColour = wordmarkColours[Random.Shared.Next(wordmarkColours.Length)];
+    var titleColour = titleColours[Random.Shared.Next(titleColours.Length)];
 
     AnsiConsole.WriteLine();
     foreach (var line in banner)
     {
-        AnsiConsole.MarkupLine($"[{wordmarkColour}]{line}[/]");
+        AnsiConsole.MarkupLine($"[{titleColour}]{line}[/]");
     }
 
     AnsiConsole.WriteLine();

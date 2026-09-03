@@ -50,11 +50,13 @@ internal static class AudioManager
         ("wraith_scream_1.wav", 0.5f),
     ];
 
-    // The title theme is picked once per run, 50/50 between the original
-    // and the alternative disco-synth theme (docs/AUDIO.md) — set once,
-    // right before it's needed, so the flip is stable if PlayTitleThemeOnce
-    // is somehow called more than once in the same run.
-    private static readonly string[] TitleThemeFiles = ["title_theme.wav", "title_theme_alt.wav"];
+    // The title theme is picked once per run, evenly among all three themes
+    // (docs/AUDIO.md): the original wandering-theremin theme, the
+    // late-70s space-disco alternative, and the sad, Quantum-Leap-inspired
+    // theme (title_theme_sad.wav) — set once, right before it's needed, so
+    // the pick is stable if PlayTitleThemeOnce is somehow called more than
+    // once in the same run.
+    private static readonly string[] TitleThemeFiles = ["title_theme.wav", "title_theme_alt.wav", "title_theme_sad.wav"];
 
     // --- Master volume ---------------------------------------------------
 
@@ -184,8 +186,8 @@ internal static class AudioManager
     /// is shown this run. Safe to call from every code path that renders
     /// the title (single-player and <c>--connect</c> both call
     /// <c>RenderTitle()</c> once each), since the flag makes every call
-    /// after the first a no-op. Picks evenly between the two themes in
-    /// <see cref="TitleThemeFiles"/> — a coin flip each run, not a
+    /// after the first a no-op. Picks evenly among the three themes in
+    /// <see cref="TitleThemeFiles"/> — a fresh random pick each run, not a
     /// per-process fixed choice, so which one plays varies run to run.
     /// </summary>
     public static void PlayTitleThemeOnce()

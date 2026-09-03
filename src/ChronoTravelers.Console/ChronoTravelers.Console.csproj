@@ -102,4 +102,28 @@
              Text="ForceCopyAudioToPublishDir: ensured @(_AllAudioWav->Count()) Audio\*.wav file(s) in $(PublishDir)Audio" />
   </Target>
 
+  <!--
+    Same belt-and-braces for Content\*.json. An INCREMENTAL `dotnet publish
+    -o <dir>` (nothing changed since the last one) cleans the output dir
+    but then, judging the project up-to-date, skips re-copying the linked
+    Content\*.json items above - leaving publish\...\Content\ empty and the
+    installed game silently falling back to the tiny 3-era sandbox
+    (ContentLoader in ChronoTravelers.Engine). Re-copy the folder ourselves
+    after publish: unconditional and idempotent, exactly like the Audio
+    target. See installer/ChronoTravelers.iss.
+  -->
+  <Target Name="ForceCopyContentToPublishDir"
+          AfterTargets="Publish"
+          Condition="'$(PublishDir)' != ''">
+    <ItemGroup>
+      <_AllContentJson Include="$(MSBuildProjectDirectory)\..\ChronoTravelers.Content\*.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AllContentJson)"
+          DestinationFolder="$(PublishDir)Content"
+          SkipUnchangedFiles="false"
+          OverwriteReadOnlyFiles="true" />
+    <Message Importance="high"
+             Text="ForceCopyContentToPublishDir: ensured @(_AllContentJson->Count()) Content\*.json file(s) in $(PublishDir)Content" />
+  </Target>
+
 </Project>
