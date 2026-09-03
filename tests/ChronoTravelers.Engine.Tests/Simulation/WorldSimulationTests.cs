@@ -2,6 +2,7 @@ using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Items;
+using ChronoTravelers.Core.Stats;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Engine.Npc;
 using ChronoTravelers.Engine.Simulation;
@@ -27,12 +28,34 @@ public class WorldSimulationTests
         return traveler;
     }
 
+    /// <summary>
+    /// An NPC levelled up and given a real weapon, then healed to full —
+    /// MonsterScaling calibrates a same-tier monster against a level-10·N
+    /// character, so a fresh level-1 NPC can't win (or survive) a grind
+    /// fight in its own starting year. Mirrors NpcPopulation.Create's
+    /// fast-level-then-top-off.
+    /// </summary>
+    private static Traveler ArmedNpc(string name, TimeWorld world, int year, int levels)
+    {
+        var npc = NewTraveler(name, world, year);
+        for (var i = 0; i < levels; i++) npc.LevelUp();
+        var weapon = Item.Create("Test Blade", ItemType.Weapon, 3, Rarity.Epic);
+        npc.AddToInventory(weapon);
+        npc.Wield(weapon);
+        npc.Health.Heal(npc.Health.Max);
+        return npc;
+    }
+
     [Fact]
     public void Tick_RegeneratesTachyonsForADepletedTravelerInEarlyYears()
     {
         var world = World();
         var player = NewTraveler("Player", world, 2000);
         var npc = NewTraveler("Vex", world, 2000);
+        // MonsterScaling calibrates a tier-N monster against a level-10·N
+        // character, so a fresh level-1 NPC can't survive its own starting
+        // year's monsters long enough to show regen — level it into that band.
+        for (var i = 0; i < 15; i++) npc.LevelUp();
         player.Tachyons.Spend(player.Tachyons.Current);
         npc.Tachyons.Spend(npc.Tachyons.Current);
         var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.5));
@@ -74,10 +97,10 @@ public class WorldSimulationTests
     {
         var world = World();
         var player = NewTraveler("Player", world, 2000);
-        var npc = NewTraveler("Vex", world, 2000);
+        var npc = ArmedNpc("Vex", world, 2000, levels: 14);
         var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.5));
 
-        simulation.Tick(player);
+        for (var i = 0; i < 6; i++) simulation.Tick(player);
 
         Assert.Contains(simulation.Broadcast.Events, e => e.Message.Contains("was slain by Vex"));
     }
@@ -87,15 +110,19 @@ public class WorldSimulationTests
     {
         var world = World();
         var player = NewTraveler("Player", world, 2000);
-        var npc = NewTraveler("Vex", world, 2000);
-        // A tier-1 kill awards 40 XP; level 2 needs 100 cumulative.
-        npc.GainXp(80);
+        // Vex needs to both *win* a fight (a same-tier monster is calibrated
+        // for level 10 now — MonsterScaling) and still be below year 2000's
+        // soft level cap of 10 so a kill can level it. Level 8 + a real
+        // weapon clears the fight; preload XP to 20 short of level 9 so the
+        // first ~40-XP kill tips it over.
+        var npc = ArmedNpc("Vex", world, 2000, levels: 7);
+        npc.GainXp(Leveling.CumulativeXpForLevel(9) - npc.Xp - 20);
         var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.5));
 
-        simulation.Tick(player);
+        for (var i = 0; i < 6; i++) simulation.Tick(player);
 
-        Assert.Equal(2, npc.Level);
-        Assert.Contains(simulation.Broadcast.Events, e => e.Message == "Vex reached level 2!");
+        Assert.True(npc.Level >= 9, $"Vex should have reached at least level 9 (was {npc.Level}).");
+        Assert.Contains(simulation.Broadcast.Events, e => e.Message == "Vex reached level 9!");
     }
 
     [Fact]
@@ -256,7 +283,13 @@ public class WorldSimulationTests
         simulation.Tick(player);
 
         var respawned = simulation.Npcs[0];
-        Assert.False(respawned.Health.IsDead);
+        // A genuine replacement: a new instance, fast-levelled into the
+        // anchor year's band (so not the leftover corpse), placed within
+        // the local spawn spread of the player's current year. (Whether
+        // that fresh NPC then survives its first combat tick is a
+        // combat-balance question, not a respawn one.)
+        Assert.NotSame(deadNpc, respawned);
+        Assert.True(respawned.Level > 1, "a respawned local-pool NPC is fast-levelled into its year's band");
         Assert.InRange(respawned.CurrentYear, 3000 - NpcPopulation.LocalSpawnSpreadYears, 3000 + NpcPopulation.LocalSpawnSpreadYears);
     }
 

@@ -16,15 +16,22 @@ public class MonsterScalingTests
     }
 
     [Fact]
-    public void BaseAttackPower_IsSuperlinear_RampingHarderAtHighTiers()
+    public void BaseAttackPower_TracksTheLevelMatchedReference_RisingLinearlyAcrossTheTimeline()
     {
+        // Derived from a level-matched character's own defence, where the
+        // matched level ramps linearly (tier 1 → level 1, tier 9 → the
+        // hard cap — see MonsterScaling.ReferenceLevel). Every input term
+        // is linear in tier, so the curve is too: tier-to-tier steps are
+        // near-constant, not superlinear (an earlier hand-tuned polynomial)
+        // and not decelerating (an earlier level-10·tier reference that
+        // clamped early).
         var lowStep = MonsterScaling.BaseAttackPower(2) - MonsterScaling.BaseAttackPower(1);
         var highStep = MonsterScaling.BaseAttackPower(9) - MonsterScaling.BaseAttackPower(8);
 
-        Assert.True(highStep > lowStep * 2,
-            $"a tier-8→9 step ({highStep}) should dwarf a tier-1→2 step ({lowStep})");
-        // still tame at the low end (near the old 3 + 2·tier)
-        Assert.True(MonsterScaling.BaseAttackPower(1) < 6);
+        Assert.True(MonsterScaling.BaseAttackPower(9) > MonsterScaling.BaseAttackPower(1), "still climbs with tier");
+        Assert.True(Math.Abs(highStep - lowStep) <= 2, $"steps stay roughly constant ({lowStep} vs {highStep})");
+        // tier 1 is calibrated for a level-1 arrival now — a modest hit, not the old flat 3-5 or the level-10 double-digits
+        Assert.InRange(MonsterScaling.BaseAttackPower(1), 8, 16);
     }
 
     [Fact]
@@ -68,19 +75,20 @@ public class MonsterScalingTests
         Assert.True(defHalf > defTwo && defHalf < defThree);
         Assert.Equal((defTwo + defThree) / 2, defHalf, precision: 6);
 
-        // BaseHp / BaseAttackPower are superlinear (convex): still smoothly
-        // increasing between whole tiers, but a half tier sits *below* the
-        // straight-line midpoint.
-        var convex = new Func<double, double>[]
+        // BaseHp / BaseAttackPower are now built from terms that are each
+        // linear in tier (reference level, gear bonus), so they're smooth
+        // and effectively linear between whole tiers too — a half tier
+        // sits on (or within a hair of) the straight-line midpoint.
+        var smooth = new Func<double, double>[]
         {
             t => MonsterScaling.BaseHp(t),
             t => MonsterScaling.BaseAttackPower(t),
         };
-        foreach (var f in convex)
+        foreach (var f in smooth)
         {
             double lo = f(2.0), mid = f(2.5), hi = f(3.0);
             Assert.True(mid > lo && mid < hi, "still monotonically increasing between tiers");
-            Assert.True(mid < (lo + hi) / 2, "convex — a half tier is below the linear midpoint");
+            Assert.True(Math.Abs(mid - (lo + hi) / 2) <= (hi - lo) * 0.05, "effectively linear between whole tiers");
         }
     }
 

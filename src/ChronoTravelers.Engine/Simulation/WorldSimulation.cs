@@ -54,6 +54,10 @@ public sealed class WorldSimulation
     private int? _lastPlayerYear;
     private ChronoTravelers.Core.World.Coordinate _lastPlayerPosition;
 
+    // Ticks the player has spent in their current year — drives the
+    // low-level spawn grace (see MonsterController.StartRoomGraceTicks).
+    private int _ticksInCurrentYear;
+
     /// <param name="npcClassWeights">
     /// Optional per-class spawn weights (docs/CONTENT_PLAN.md's "config-driven
     /// NPC class distribution") threaded into every respawn this simulation
@@ -219,12 +223,37 @@ public sealed class WorldSimulation
         // sim — movement plus aggro / shadowing / ambush / narration.
         if (ChronoTravelers.Core.Time.TimeScale.IsValidYear(player.CurrentYear))
         {
+            var sameYearAsLastTick = _lastPlayerYear == player.CurrentYear;
             var lingered = playerActedIdly
-                && _lastPlayerYear == player.CurrentYear
+                && sameYearAsLastTick
                 && _lastPlayerPosition.Equals(player.Position);
-            var previousPosition = _lastPlayerYear == player.CurrentYear ? _lastPlayerPosition : player.Position;
+            var previousPosition = sameYearAsLastTick ? _lastPlayerPosition : player.Position;
+            _ticksInCurrentYear = sameYearAsLastTick ? _ticksInCurrentYear + 1 : 0;
+
             var here = World.GetYear(player.CurrentYear);
             var safeRooms = here.StoreSlots.Select(slot => slot.Location).ToHashSet();
+
+            // Low-level spawn grace: a fresh arrival's start room and its
+            // immediate neighbours are off-limits to monster movement for
+            // the first few ticks in the year, so the character has a
+            // pocket to gear up and pick its first fights (playtest — a
+            // monster drifting into the start room otherwise forces the
+            // opener before a level-1 can establish itself).
+            if (player.Level <= MonsterController.StartRoomGraceMaxLevel
+                && _ticksInCurrentYear < MonsterController.StartRoomGraceTicks)
+            {
+                var start = here.Map.Start;
+                safeRooms.Add(start);
+                foreach (var dir in Enum.GetValues<ChronoTravelers.Core.World.Direction>())
+                {
+                    var neighbour = start.Move(dir);
+                    if (here.Map.Rooms.ContainsKey(neighbour))
+                    {
+                        safeRooms.Add(neighbour);
+                    }
+                }
+            }
+
             MonsterController.Tick(here.Population, here.Map, here.MonsterRoster, player.CurrentYear, player, previousPosition, lingered, _random, Broadcast, safeRooms, _narration);
         }
 

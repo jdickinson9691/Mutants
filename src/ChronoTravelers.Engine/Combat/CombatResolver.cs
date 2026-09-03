@@ -23,21 +23,10 @@ public static class CombatResolver
     private const int MaxRounds = 200;
 
     /// <summary>
-    /// Damage variance band applied on top of (attack - defense): a raw
-    /// hit is scaled by a random factor in [1 - Variance, 1 + Variance].
+    /// Damage variance band applied on top of the mitigated raw hit: it's
+    /// scaled by a random factor in [1 - Variance, 1 + Variance].
     /// </summary>
     private const double DamageVariance = 0.15;
-
-    /// <summary>
-    /// Armour-penetration floor: however much defence exceeds attack, a
-    /// hit still lands at least this fraction of the attacker's power
-    /// (before variance). Stops heavy armour from reducing every hit to 1
-    /// — mid/late fights against a well-armoured character now cost real
-    /// HP. Only bites when defence &gt; 0.70 × attack, i.e. essentially
-    /// only against an armoured player; monster-vs-monster and
-    /// player-vs-monster (low monster defence) are unaffected.
-    /// </summary>
-    private const double MinDamageFraction = 0.30;
 
     /// <summary>
     /// Fights <paramref name="traveler"/> against <paramref name="monster"/>
@@ -123,10 +112,29 @@ public static class CombatResolver
         return loot;
     }
 
-    /// <summary>Rolls one attack's damage with the standard variance band — shared with CombatSession.</summary>
+    /// <summary>
+    /// Rolls one attack's damage with the standard variance band — shared
+    /// with CombatSession. Mitigation is ratio-based
+    /// (<c>attack² / (attack + defense)</c>, a common diminishing-returns
+    /// armour curve) rather than a linear subtraction: full attack lands
+    /// when defence is 0, half lands when defence equals attack, and it
+    /// keeps falling — smoothly, never to a hard floor or to 0 — as
+    /// defence climbs further past it. This replaced a subtract-then-clamp
+    /// formula (<c>max(attack - defense, 0.30 × attack)</c>) whose floor
+    /// was meant to be a rare safety net for an over-armoured late-game
+    /// player but, because defence and attack are tuned on separate
+    /// numeric scales (see <see cref="ChronoTravelers.Core.Monsters.MonsterScaling"/>'s
+    /// doc comment), turned out to be the permanent state of almost every
+    /// fight at every tier — a flat 2-4 damage regardless of how deep the
+    /// timeline got. A ratio stays meaningful at any scale, so it doesn't
+    /// need its own threshold to keep in sync with whatever the attack/
+    /// defense curves are doing.
+    /// </summary>
     internal static int RollDamage(int attackerPower, int defenderDefense, IRandomSource random)
     {
-        var raw = Math.Max(attackerPower - defenderDefense, attackerPower * MinDamageFraction);
+        var attack = Math.Max(1, attackerPower);
+        var defense = Math.Max(0, defenderDefense);
+        var raw = attack * (double)attack / (attack + defense);
         var varianceFactor = 1 - DamageVariance + random.NextDouble() * (2 * DamageVariance);
         return Math.Max(1, (int)Math.Round(raw * varianceFactor));
     }

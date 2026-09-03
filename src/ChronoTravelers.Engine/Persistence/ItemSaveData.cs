@@ -36,4 +36,7 @@ public sealed class ItemSaveData
 
     /// <summary>True only for a Time Shard. Additive — old blobs deserialize as false.</summary>
     public bool IsTimeShard { get; set; }
+
+    /// <summary>How many rooms out (1–4) a ranged item can hit — ChronoTravelers.Core.Items.Item.Range. Ignored for non-ranged items. Additive — old blobs deserialize as 0, which FromSaveData treats as the pre-this-field default of 1 rather than an invalid range.</summary>
+    public int Range { get; set; }
 }

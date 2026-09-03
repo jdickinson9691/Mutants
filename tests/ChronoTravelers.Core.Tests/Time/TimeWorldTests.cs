@@ -171,24 +171,15 @@ public class TimeWorldTests
     }
 
     [Fact]
-    public void Constructor_RejectsAnEraReferencingAnUnknownSpecies()
-    {
-        var eras = new EraTable([new EraDefinition(2000, "Bad", ["r."], ["no-such-species"], [])]);
-        Assert.Throws<ArgumentException>(() =>
-            new TimeWorld(1, eras,
-                [new SpeciesDefinition("real", "Real", [], MonsterArchetype.Baseline, ["common"])],
-                TestArchetypes()));
-    }
-
-    [Fact]
     public void Constructor_RejectsAnItemCatalogMissingAStaple()
     {
-        var eras = new EraTable([new EraDefinition(2000, "E", ["r."], ["s"], ["common"])]);
-        var species = new[] { new SpeciesDefinition("s", "S", [], MonsterArchetype.Baseline, ["common"]) };
+        var eras = new EraTable([new EraDefinition(2000, "E", ["r."], ["common"])]);
+        var generations = new GenerationTable(
+            [new GenerationDefinition(2000, "G1", [new SpeciesDefinition("s", "S", [], MonsterArchetype.Baseline, ["common"])])]);
         // Weapon + armour + heal + attack potion, but no defense potion.
         var incomplete = TestArchetypes().Where(a => a.Effect != ConsumableEffectType.BuffDefense).ToList();
 
-        Assert.Throws<ArgumentException>(() => new TimeWorld(1, eras, species, incomplete));
+        Assert.Throws<ArgumentException>(() => new TimeWorld(1, eras, generations, incomplete));
     }
 
     private static IReadOnlyList<ItemArchetypeDefinition> TestArchetypes() =>

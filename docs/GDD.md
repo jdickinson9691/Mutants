@@ -380,11 +380,18 @@ area/group to a capstone — is the standard every class follows.)
   regardless of type; `wield` makes sense for Weapon/Armor/Ranged.
 - **Ranged weapons** (original addition, enabled by §7.1's spatial
   monsters): wands, bows, and — in later years — guns occupy their own
-  equip slot alongside the melee weapon. `wield` one, then `point <dir>`
-  (wands) or `shoot <dir>` (bows/guns) fires it down an exit at the first
-  monster in the **adjacent** room — an out-of-combat action for softening
-  or finishing a target before it reaches you; the shot has no direction
-  inside a locked 1v1, so it isn't a combat-round option. Each ranged
+  equip slot alongside the melee weapon. `wield` one, then `fight <name>`
+  **locks it in as your ranged target instead of starting blocking melee**
+  ("You draw a bead on the Ashfall Behemoth.") — `fight` only opens the
+  turn-by-turn melee loop when no ranged weapon is readied. From there
+  `point <dir>` (wands) or `shoot <dir>` / `fire <dir>` (bows/guns) fires
+  at the locked target specifically, down a **straight, unbroken chain of
+  room exits** in that direction, out to the weapon's own **range (1–4
+  rooms** — content-authored per weapon, ChronoTravelers.Content's item
+  archetypes catalog; more powerful weapons reach farther). Nothing fires
+  (and no ammo is spent) if the corridor breaks early or the locked target
+  isn't out that way within range — an out-of-combat action for kiting: line
+  up, back off, keep firing, all before it's ever adjacent. Each ranged
   weapon carries a **finite built-in magazine** (no separate ammo item);
   every shot spends one round and the count persists in the save. A ranged
   shot may also carry an effect — `Weaken` leaves the target fighting at
@@ -398,6 +405,19 @@ area/group to a capstone — is the standard every class follows.)
   floor — walk in and `take` it. Every era theme ships its own small
   ranged ladder now (docs/CONTENT_PLAN.md's item archetypes catalog),
   rather than the handful of early sample weapons.
+  - **A hit that doesn't kill provokes a reaction**, not just aggro: caught
+    sharing the shooter's room, the target goes straight to Hostile — no
+    use running. Hit from a room away, it either **pursues** (closes the
+    distance every tick, ignoring the normal aggro-range shadowing limit,
+    for up to ~40 ticks before giving up) or, if the hit drops it to a
+    fraction of its HP some species are prone to breaking under (an
+    archetype-based default — Bruisers never do; see
+    docs/CONTENT_PLAN.md's monster generations), **flees** instead (steps
+    away every tick until it heals back up, dies, or the player leaves). A
+    pursuing monster yells a threat at the player every tick it's closing
+    in; a fleeing one yells something like "Get away from me!" instead —
+    both unconditional per tick, distinct from the ambient monster-to-
+    monster banter in §7.1.
 - **Consumables** (original addition — not in the source material) get a
   fourth verb instead of `wield`: `use`/`eat`/`drink <item>`, which
   triggers the item's effect and destroys it. Beyond the original instant

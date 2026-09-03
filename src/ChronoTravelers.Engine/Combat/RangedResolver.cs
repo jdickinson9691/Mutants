@@ -48,6 +48,33 @@ public static class RangedResolver
         {
             target.RaiseAggro(ChronoTravelers.Core.Monsters.AggroModel.RangedHitAggro); // you shot it — it noticed
 
+            // Fight, pursue, or flee — see Monster.IsPursuing/IsFleeing and
+            // MonsterController's per-tick handling of both. Sharing the
+            // shooter's room (the defensive case; the normal 'fight'-then-
+            // 'fire' flow always shoots from a room away) means straight to
+            // Hostile — no use running with the target already toe to toe.
+            if (shooter.Position.Equals(target.Position))
+            {
+                target.RaiseAggro(AggroModel.Cap);
+                target.IsPursuing = false;
+                target.IsFleeing = false;
+            }
+            else
+            {
+                var hpFraction = target.Health.Max > 0 ? target.Health.Current / (double)target.Health.Max : 0;
+                if (target.FleeBelowHpFraction > 0 && hpFraction <= target.FleeBelowHpFraction)
+                {
+                    target.IsFleeing = true;
+                    target.IsPursuing = false;
+                }
+                else
+                {
+                    target.IsPursuing = true;
+                    target.IsFleeing = false;
+                    target.PursuitTicksRemaining = Monster.MaxPursuitTicks;
+                }
+            }
+
             if (weapon.RangedEffect == RangedEffectType.Weaken)
             {
                 var weaken = Math.Max(1, (int)Math.Round(magnitude));

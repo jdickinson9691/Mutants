@@ -30,15 +30,34 @@ public class RangedResolverTests
     }
 
     [Fact]
-    public void Fire_RaisesTheTargetsAggro_WhenItSurvives()
+    public void Fire_AtASurvivorFromARoomAway_RaisesAggroAndStartsAPursuit()
     {
         var bow = Item.CreateRanged("Longbow", 2, Rarity.Uncommon, RangedKind.Bow, ammoCapacity: 10);
+        var shooter = Shooter();
         var target = Target();
+        target.PlaceAt(new Core.World.Coordinate(1, 0)); // a room east of the shooter — the normal fire flow
         Assert.Equal(0, target.Aggro);
 
-        RangedResolver.Fire(Shooter(), target, bow, Neutral());
+        RangedResolver.Fire(shooter, target, bow, Neutral());
 
         Assert.Equal(AggroModel.RangedHitAggro, target.Aggro);
+        Assert.True(target.IsPursuing);
+        Assert.False(target.IsFleeing);
+    }
+
+    [Fact]
+    public void Fire_AtASurvivorSharingTheShootersRoom_SendsItStraightToHostile()
+    {
+        var bow = Item.CreateRanged("Longbow", 2, Rarity.Uncommon, RangedKind.Bow, ammoCapacity: 10);
+        var shooter = Shooter();
+        var target = Target(); // both at the default position — point blank
+
+        RangedResolver.Fire(shooter, target, bow, Neutral());
+
+        // No use running with the shooter already toe to toe.
+        Assert.Equal(AggroModel.Cap, target.Aggro);
+        Assert.False(target.IsPursuing);
+        Assert.False(target.IsFleeing);
     }
 
     [Fact]

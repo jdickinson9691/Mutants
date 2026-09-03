@@ -1,7 +1,6 @@
 [
   {
     "fromYear": 2000, "name": "The Fallout Belt", "itemThemeTags": ["scrap", "common"],
-    "speciesIds": ["scavenger", "rubble-brute", "scrapyard-wraith", "alley-runner"],
     "roomText": [
       "A ruined city block, downwind of the site. The evac routes were never used.",
       "You're in a stripped maintenance shop. A faded government notice is taped to the till.",
@@ -15,7 +14,6 @@
   },
   {
     "fromYear": 2200, "name": "The Rust Quarter", "itemThemeTags": ["scrap", "common"],
-    "speciesIds": ["scavenger", "alley-runner", "rubble-brute"],
     "roomText": [
       "Everything here has rusted to the same flaking orange.",
       "A collapsed overpass makes a low iron ceiling you have to stoop under.",
@@ -29,7 +27,6 @@
   },
   {
     "fromYear": 2400, "name": "The Neon Undercity", "itemThemeTags": ["neon", "common"],
-    "speciesIds": ["circuit-wraith", "riot-drone", "wire-skulker"],
     "roomText": [
       "Flickering signage buzzes over a flooded transit platform.",
       "Rusted turnstiles block a half-collapsed tunnel mouth.",
@@ -43,7 +40,6 @@
   },
   {
     "fromYear": 2650, "name": "The Drowned Sprawl", "itemThemeTags": ["drowned", "common"],
-    "speciesIds": ["drowned-archivist", "flood-serpent", "bulk-diver"],
     "roomText": [
       "Black water laps at your knees in the gap between two leaning towers.",
       "A rooftop garden has gone under and become a reeking green swamp.",
@@ -57,7 +53,6 @@
   },
   {
     "fromYear": 2900, "name": "The Ashfall Wastes", "itemThemeTags": ["ash", "common"],
-    "speciesIds": ["dune-stalker", "ash-wraith", "ashfall-behemoth"],
     "roomText": [
       "Ash drifts in slow spirals over a dead six-lane highway.",
       "A skeletal billboard frame creaks in a wind that never fully stops.",
@@ -71,7 +66,6 @@
   },
   {
     "fromYear": 3150, "name": "The Deep Archive", "itemThemeTags": ["deep", "common"],
-    "speciesIds": ["deep-warden", "bone-choir", "undercroft-eel"],
     "roomText": [
       "The ceiling is lost somewhere far above you in the dark.",
       "Pale roots hang through the cracks in the poured-stone walls.",
@@ -85,7 +79,6 @@
   },
   {
     "fromYear": 3400, "name": "The Buried Reaches", "itemThemeTags": ["deep", "drowned"],
-    "speciesIds": ["deep-warden", "bone-choir", "drowned-archivist"],
     "roomText": [
       "Flooded galleries stretch away beneath the weight of the world.",
       "Bioluminescent scum lights the water a faint, sick green.",
@@ -99,7 +92,6 @@
   },
   {
     "fromYear": 3650, "name": "The Frostbound Vaults", "itemThemeTags": ["frost", "common"],
-    "speciesIds": ["rime-stalker", "cryo-revenant", "vault-sentinel"],
     "roomText": [
       "Frost has grown over every surface in feathered white sheets.",
       "A sealed blast door, rimed shut, stands a hand's width open.",
@@ -113,7 +105,6 @@
   },
   {
     "fromYear": 3900, "name": "The Glacier Deeps", "itemThemeTags": ["frost", "deep"],
-    "speciesIds": ["rime-stalker", "vault-sentinel", "cryo-revenant"],
     "roomText": [
       "A blue-black crevasse drops away past the reach of your light.",
       "The walls here are old ice, packed with trapped bubbles like held breath.",
@@ -127,7 +118,6 @@
   },
   {
     "fromYear": 4100, "name": "The Shattered Orbital", "itemThemeTags": ["orbital", "common"],
-    "speciesIds": ["void-drifter", "vacuum-wraith", "hull-breacher"],
     "roomText": [
       "A ring corridor curves up and away from you in both directions.",
       "Stars wheel slowly past a cracked observation port.",
@@ -141,7 +131,6 @@
   },
   {
     "fromYear": 4350, "name": "The Vacuum Reaches", "itemThemeTags": ["orbital"],
-    "speciesIds": ["void-drifter", "vacuum-wraith", "hull-breacher"],
     "roomText": [
       "Torn hull plating opens directly onto absolute black.",
       "Everything not bolted down has long since drifted out and away.",
@@ -155,7 +144,6 @@
   },
   {
     "fromYear": 4600, "name": "The Chronofracture", "itemThemeTags": ["paradox", "common"],
-    "speciesIds": ["fracture-wisp", "paradox-wraith", "bulwark-construct"],
     "roomText": [
       "Reality stutters here; the same moment happens twice, then a third time.",
       "A corridor folds back into itself, and you walk out of the door you walked in.",
@@ -169,7 +157,6 @@
   },
   {
     "fromYear": 4800, "name": "The Long Now", "itemThemeTags": ["paradox"],
-    "speciesIds": ["paradox-wraith", "bulwark-construct", "void-drifter"],
     "roomText": [
       "Every clock in the room reads a different century, and all of them are right.",
       "Dust falls upward, slowly, and settles in a grey coat on the ceiling.",
@@ -183,7 +170,6 @@
   },
   {
     "fromYear": 4950, "name": "The Final Instant", "itemThemeTags": ["paradox"],
-    "speciesIds": ["paradox-wraith", "bulwark-construct", "fracture-wisp"],
     "roomText": [
       "The end of the timeline is a white, soundless room with no far side.",
       "There is no 'next' here. There is only this.",

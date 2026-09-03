@@ -49,11 +49,6 @@ public sealed class EraTable
             {
                 throw new ArgumentException($"Era '{era.Name}' has no room-text lines.", nameof(eras));
             }
-
-            if (era.SpeciesIds.Count == 0)
-            {
-                throw new ArgumentException($"Era '{era.Name}' lists no monster species.", nameof(eras));
-            }
         }
     }
 

@@ -15,7 +15,7 @@ public static class TestTimeWorld
     public const long DefaultSeed = 20000305L;
 
     public static TimeWorld Build(long seed = DefaultSeed, StoreStockTemplate? storeTemplate = null) =>
-        new(seed, BuildEras(), BuildSpecies(), BuildItemArchetypes(), storeTemplate ?? StoreStockTemplate.Default);
+        new(seed, BuildEras(), BuildGenerations(), BuildItemArchetypes(), storeTemplate ?? StoreStockTemplate.Default);
 
     private static EraTable BuildEras() => new(
     [
@@ -29,7 +29,6 @@ public static class TestTimeWorld
                 "You see rubble everywhere; the street has collapsed into it.",
                 "You feel a cold breeze cutting between the buildings.",
             ],
-            SpeciesIds: ["scavenger", "rubble-brute", "scrapyard-wraith"],
             ItemThemeTags: ["scrap", "common"]),
         new EraDefinition(
             FromYear: 3000,
@@ -40,7 +39,6 @@ public static class TestTimeWorld
                 "A skeletal billboard creaks in the wind.",
                 "Sand has swallowed half of what was once a plaza.",
             ],
-            SpeciesIds: ["dune-stalker", "ash-wraith", "ashfall-behemoth"],
             ItemThemeTags: ["ash", "common"]),
         new EraDefinition(
             FromYear: 4200,
@@ -51,22 +49,39 @@ public static class TestTimeWorld
                 "A corridor folds back into itself here.",
                 "Shards of frozen time hang in the air.",
             ],
-            SpeciesIds: ["fracture-wisp", "paradox-wraith", "bulwark-construct"],
             ItemThemeTags: ["paradox", "common"]),
     ]);
 
-    private static IReadOnlyList<SpeciesDefinition> BuildSpecies() =>
+    private static GenerationTable BuildGenerations() => new(
     [
-        new SpeciesDefinition("scavenger", "Scavenger", [], MonsterArchetype.Baseline, ["scrap", "common"]),
-        new SpeciesDefinition("rubble-brute", "Rubble Hulk", [], MonsterArchetype.Bruiser, ["scrap", "common"]),
-        new SpeciesDefinition("scrapyard-wraith", "Static Echo", ["echo"], MonsterArchetype.Caster, ["scrap"]),
-        new SpeciesDefinition("dune-stalker", "Dune Stalker", [], MonsterArchetype.Skirmisher, ["ash", "common"]),
-        new SpeciesDefinition("ash-wraith", "Ashfall Echo", ["echo"], MonsterArchetype.Caster, ["ash"]),
-        new SpeciesDefinition("ashfall-behemoth", "Ashfall Behemoth", [], MonsterArchetype.Bruiser, ["ash", "common"]),
-        new SpeciesDefinition("fracture-wisp", "Fracture Wisp", [], MonsterArchetype.Skirmisher, ["paradox", "common"]),
-        new SpeciesDefinition("paradox-wraith", "Paradox Echo", ["echo"], MonsterArchetype.Caster, ["paradox"]),
-        new SpeciesDefinition("bulwark-construct", "Bulwark Construct", [], MonsterArchetype.Bruiser, ["paradox", "common"]),
-    ];
+        new GenerationDefinition(
+            FromYear: 2000,
+            Name: "First Generation",
+            Species:
+            [
+                new SpeciesDefinition("scavenger", "Scavenger", [], MonsterArchetype.Baseline, ["scrap", "common"]),
+                new SpeciesDefinition("rubble-brute", "Rubble Hulk", [], MonsterArchetype.Bruiser, ["scrap", "common"]),
+                new SpeciesDefinition("scrapyard-wraith", "Static Echo", ["echo"], MonsterArchetype.Caster, ["scrap"]),
+            ]),
+        new GenerationDefinition(
+            FromYear: 3000,
+            Name: "Second Generation",
+            Species:
+            [
+                new SpeciesDefinition("dune-stalker", "Dune Stalker", [], MonsterArchetype.Skirmisher, ["ash", "common"]),
+                new SpeciesDefinition("ash-wraith", "Ashfall Echo", ["echo"], MonsterArchetype.Caster, ["ash"]),
+                new SpeciesDefinition("ashfall-behemoth", "Ashfall Behemoth", [], MonsterArchetype.Bruiser, ["ash", "common"]),
+            ]),
+        new GenerationDefinition(
+            FromYear: 4200,
+            Name: "Third Generation",
+            Species:
+            [
+                new SpeciesDefinition("fracture-wisp", "Fracture Wisp", [], MonsterArchetype.Skirmisher, ["paradox", "common"]),
+                new SpeciesDefinition("paradox-wraith", "Paradox Echo", ["echo"], MonsterArchetype.Caster, ["paradox"]),
+                new SpeciesDefinition("bulwark-construct", "Bulwark Construct", [], MonsterArchetype.Bruiser, ["paradox", "common"]),
+            ]),
+    ]);
 
     private static IReadOnlyList<ItemArchetypeDefinition> BuildItemArchetypes() =>
     [

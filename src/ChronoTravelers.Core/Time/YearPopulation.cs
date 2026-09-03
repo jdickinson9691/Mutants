@@ -92,9 +92,17 @@ public sealed class YearPopulation
             (rooms[i], rooms[j]) = (rooms[j], rooms[i]);
         }
 
-        var count = roster.Count == 0
-            ? 0
-            : Math.Min(rooms.Count, Math.Max(4, map.RoomCount * 2 / 5));
+        // Normal population is max(4, rooms·2/5), but the earliest years
+        // hold far fewer: a fresh level-1 arrival in year 2000 can't clear
+        // an opening area packed with monsters that each now take multiple
+        // rounds (playtest — every cold start wiped before its first
+        // level-up). The count ramps from 2 at tier 1 back to the normal
+        // figure by tier ~4 (year ~2750), by which point the character has
+        // levelled into the band. Deep-timeline density is unchanged.
+        var normalCount = Math.Max(4, map.RoomCount * 2 / 5);
+        var earlyFactor = Math.Clamp((TimeScale.TierForYear(year) - 1) / 3.0, 0.0, 1.0);
+        var target = (int)Math.Round(2 + earlyFactor * (normalCount - 2));
+        var count = roster.Count == 0 ? 0 : Math.Min(rooms.Count, target);
 
         var monsters = new List<Monster>(count);
         for (var i = 0; i < count; i++)

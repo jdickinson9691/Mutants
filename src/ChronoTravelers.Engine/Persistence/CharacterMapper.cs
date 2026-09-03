@@ -57,6 +57,7 @@ public static class CharacterMapper
             PositionEast = traveler.Position.East,
             PositionNorth = traveler.Position.North,
             DefeatedWardens = traveler.DefeatedWardenYears.OrderBy(y => y).ToList(),
+            ElixirUsesByStat = traveler.ElixirUsesByStat.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value),
             Inventory = inventory,
             EquippedWeaponIndex = equippedWeaponIndex >= 0 ? equippedWeaponIndex : null,
             EquippedArmorIndex = equippedArmorIndex >= 0 ? equippedArmorIndex : null,
@@ -118,6 +119,10 @@ public static class CharacterMapper
         int furthestYear;
         IEnumerable<int> defeatedWardenYears;
 
+        var elixirUsesByStat = data.ElixirUsesByStat
+            .Where(kv => Enum.TryParse<PrimaryStat>(kv.Key, ignoreCase: true, out _))
+            .Select(kv => new KeyValuePair<PrimaryStat, int>(Enum.Parse<PrimaryStat>(kv.Key, ignoreCase: true), kv.Value));
+
         if (data.SchemaVersion >= 2)
         {
             currentYear = data.CurrentYear;
@@ -140,7 +145,7 @@ public static class CharacterMapper
             data.CurrentHp, data.MaxHp, data.CurrentTachyons, data.MaxTachyons, data.Credits,
             currentYear, furthestYear,
             new Coordinate(data.PositionEast, data.PositionNorth),
-            defeatedWardenYears);
+            defeatedWardenYears, elixirUsesByStat);
 
         var items = data.Inventory.Select(FromItemSaveData).ToList();
         foreach (var item in items)
@@ -189,6 +194,7 @@ public static class CharacterMapper
         RangedEffect = item.RangedEffect.ToString(),
         InstanceId = item.InstanceId == Guid.Empty ? "" : item.InstanceId.ToString(),
         IsTimeShard = item.IsTimeShard,
+        Range = item.Range,
     };
 
     private static Item FromItemSaveData(ItemSaveData data)
@@ -214,7 +220,8 @@ public static class CharacterMapper
             isRanged
                 ? (Guid.TryParse(data.InstanceId, out var id) && id != Guid.Empty ? id : Guid.NewGuid())
                 : Guid.Empty,
-            data.IsTimeShard);
+            data.IsTimeShard,
+            Range: isRanged ? Math.Clamp(data.Range == 0 ? 1 : data.Range, 1, 4) : 1);
 
         if (isRanged)
         {

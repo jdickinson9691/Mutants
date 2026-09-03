@@ -13,7 +13,9 @@ public class YearPopulationTests
     [Fact]
     public void Seed_PlacesMaxOfFourOrTwoFifthsOfTheRoomsInDistinctNonStartRooms()
     {
-        var content = TestTimeWorld.Build(seed: 777).GetYear(2200);
+        // Year 3000 (tier ~5) — past the early-year thinning ramp, so the
+        // full max(4, rooms·2/5) figure applies.
+        var content = TestTimeWorld.Build(seed: 777).GetYear(3000);
         var pop = content.Population;
         var nonStartRooms = content.Map.RoomCount - 1;
         var expected = System.Math.Min(nonStartRooms, System.Math.Max(4, content.Map.RoomCount * 2 / 5));
@@ -25,6 +27,17 @@ public class YearPopulationTests
         Assert.All(pop.Monsters, m => Assert.True(content.Map.Rooms.ContainsKey(m.Position)));
         Assert.DoesNotContain(pop.Monsters, m => m.Position.Equals(content.Map.Start));
         Assert.Equal(pop.Monsters.Count, pop.Monsters.Select(m => m.Position).Distinct().Count());
+    }
+
+    [Fact]
+    public void Seed_ThinsTheEarliestYears_SoALevel1ArrivalIsntSwarmed()
+    {
+        var world = TestTimeWorld.Build(seed: 777);
+        var year2000 = world.GetYear(2000).Population.SoftCap;
+        var deep = world.GetYear(3000).Population.SoftCap;
+
+        Assert.Equal(2, year2000);   // tier 1 → the floor of 2
+        Assert.True(year2000 < deep, $"year 2000 ({year2000}) should hold fewer monsters than year 3000 ({deep})");
     }
 
     [Fact]

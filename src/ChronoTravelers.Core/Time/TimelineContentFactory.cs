@@ -55,19 +55,26 @@ public static class TimelineContentFactory
         IReadOnlyList<ItemArchetypeDefinition> lootPool)
     {
         var tier = TimeScale.TierForYear(year);
-        var (hp, attack, defense, speed) = StatsFor(species.Archetype, tier);
+        var (hp, attack, defense, speed) = StatsFor(species.Archetype, tier, species.EffectivePowerProfile);
         var xp = (int)Math.Round(MonsterScaling.XpReward(tier));
         var tachyons = (int)Math.Round(MonsterScaling.BaseTachyons(tier));
         var displayTier = DisplayTier(year);
         var tags = species.Tags;
         var name = species.Name;
+        var behavior = species.EffectiveBehaviorProfile;
 
         var loot = BuildLootTable(worldSeed, year, species.Id, lootPool);
         var starterWeapon = MaybeStarterWeapon(worldSeed, year, species.Id, tier, displayTier);
 
         return () =>
         {
-            var monster = new Monster(name, displayTier, hp, attack, defense, speed, xp, loot, tags, maxTachyons: tachyons);
+            var monster = new Monster(
+                name, displayTier, hp, attack, defense, speed, xp, loot, tags, maxTachyons: tachyons,
+                fleeBelowHpFraction: behavior.FleeBelowHpFraction,
+                packHunting: behavior.PackHunting,
+                neverInfights: behavior.NeverInfights,
+                aggroRangeBonus: behavior.AggroRangeBonus,
+                ambushDamageMultiplier: behavior.AmbushDamageMultiplier);
             if (starterWeapon is not null)
             {
                 monster.EquipWeapon(starterWeapon); // adds its bonus to EffectiveAttackPower; drops on death
@@ -133,7 +140,7 @@ public static class TimelineContentFactory
         IReadOnlyList<ItemArchetypeDefinition> lootPool)
     {
         var tier = TimeScale.TierForYear(year);
-        var (hp, attack, defense, speed) = StatsFor(species.Archetype, tier);
+        var (hp, attack, defense, speed) = StatsFor(species.Archetype, tier, species.EffectivePowerProfile);
 
         var apexHp = Math.Max(1, (int)Math.Round(hp * ApexHpMultiplier));
         var apexAttack = Math.Max(1, (int)Math.Round(attack * ApexAttackMultiplier));
@@ -312,15 +319,22 @@ public static class TimelineContentFactory
                 archetype.RangedEffect,
                 magnitude: archetype.EffectMagnitude > 0 ? archetype.EffectMagnitude : 1.0,
                 restrictedClass: archetype.RestrictedClass,
-                powerMultiplier: archetype.PowerMultiplier);
+                powerMultiplier: archetype.PowerMultiplier,
+                range: archetype.Range);
         }
 
         // Weapons/armour take their combat bonus from the archetype's
         // power multiplier (which also fixed its rarity, in the loader);
-        // everything else is flat.
-        var equipBonus = archetype.IsEquippable
-            ? (int)Math.Round(LootScaling.EquipBonusFor(tier, archetype.PowerMultiplier))
-            : 0;
+        // everything else is flat. Armour uses its own, shallower curve
+        // (LootScaling.ArmorEquipBonusFor) than a weapon's AttackBonus —
+        // see that method's doc comment for why they're no longer the
+        // same formula.
+        var equipBonus = archetype.Type switch
+        {
+            ItemType.Weapon => (int)Math.Round(LootScaling.EquipBonusFor(tier, archetype.PowerMultiplier)),
+            ItemType.Armor => (int)Math.Round(LootScaling.ArmorEquipBonusFor(tier, archetype.PowerMultiplier)),
+            _ => 0,
+        };
 
         return new Item(
             archetype.Name,
@@ -459,7 +473,17 @@ public static class TimelineContentFactory
         return items[^1];
     }
 
-    private static (int Hp, int Attack, int Defense, int Speed) StatsFor(MonsterArchetype archetype, double tier)
+    /// <summary>
+    /// Archetype-shifted tier baseline, then <paramref name="powerProfile"/>'s
+    /// multipliers (see <see cref="Time.PowerProfile"/>) on top — this is
+    /// what lets two species sharing an archetype (e.g. two Bruisers) still
+    /// land on different numbers for the same tier instead of both being
+    /// the exact same monster under a different name. A species that
+    /// doesn't author a profile passes <see cref="Time.PowerProfile.Default"/>
+    /// (every multiplier 1.0), so its stats are unchanged from before this
+    /// existed.
+    /// </summary>
+    private static (int Hp, int Attack, int Defense, int Speed) StatsFor(MonsterArchetype archetype, double tier, PowerProfile? powerProfile = null)
     {
         var hp = MonsterScaling.BaseHp(tier);
         var atk = MonsterScaling.BaseAttackPower(tier);
@@ -475,10 +499,12 @@ public static class TimelineContentFactory
             _ => throw new ArgumentOutOfRangeException(nameof(archetype), archetype, null),
         };
 
+        var profile = powerProfile ?? PowerProfile.Default;
+
         return (
-            Math.Max(1, (int)Math.Round(shifted.Hp)),
-            Math.Max(1, (int)Math.Round(shifted.Attack)),
-            Math.Max(0, (int)Math.Round(shifted.Defense)),
-            Math.Max(1, (int)Math.Round(shifted.Speed)));
+            Math.Max(1, (int)Math.Round(shifted.Hp * profile.HpMultiplier)),
+            Math.Max(1, (int)Math.Round(shifted.Attack * profile.AttackMultiplier)),
+            Math.Max(0, (int)Math.Round(shifted.Defense * profile.DefenseMultiplier)),
+            Math.Max(1, (int)Math.Round(shifted.Speed * profile.SpeedMultiplier)));
     }
 }

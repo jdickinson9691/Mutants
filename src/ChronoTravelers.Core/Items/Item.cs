@@ -10,7 +10,11 @@ namespace ChronoTravelers.Core.Items;
 ///
 /// A ranged weapon (<see cref="ItemType.Ranged"/> / <see cref="RangedKind"/>)
 /// carries a finite built-in shot count — <see cref="AmmoCapacity"/> and
-/// a live, mutable <see cref="AmmoRemaining"/>. Because that state is
+/// a live, mutable <see cref="AmmoRemaining"/> — plus a <see cref="Range"/>
+/// (1–4 rooms, content-authored: more powerful ranged weapons reach
+/// further) checked as a straight, unbroken corridor of connected exits by
+/// ChronoTravelers.Engine.Combat.RangedResolver and the console's 'fight'/
+/// 'fire' commands. Because that state is
 /// per-instance, ranged items get a unique <see cref="InstanceId"/>; every
 /// other item leaves it <see cref="Guid.Empty"/> and keeps plain
 /// value-equality. Once <see cref="AmmoRemaining"/> hits 0 the weapon is
@@ -33,7 +37,8 @@ public sealed record Item(
     int AmmoCapacity = 0,
     RangedEffectType RangedEffect = RangedEffectType.None,
     Guid InstanceId = default,
-    bool IsTimeShard = false)
+    bool IsTimeShard = false,
+    int Range = 1)
 {
     /// <summary>Shots left in a ranged weapon (starts at <see cref="AmmoCapacity"/>). Mutable — decremented by ChronoTravelers.Engine.Combat.RangedResolver. 0 for every non-ranged item.</summary>
     public int AmmoRemaining { get; set; }
@@ -54,7 +59,7 @@ public sealed record Item(
         new(name, type, tier, rarity,
             Value: LootScaling.ValueFor(tier, rarity),
             AttackBonus: type == ItemType.Weapon ? LootScaling.CombatBonusFor(tier, rarity) : 0,
-            DefenseBonus: type == ItemType.Armor ? LootScaling.CombatBonusFor(tier, rarity) : 0,
+            DefenseBonus: type == ItemType.Armor ? LootScaling.ArmorCombatBonusFor(tier, rarity) : 0,
             RestrictedClass: restrictedClass,
             ConsumableEffect: consumableEffect,
             EffectMagnitude: effectMagnitude,
@@ -72,7 +77,7 @@ public sealed record Item(
     public static Item CreateRanged(
         string name, int tier, Rarity rarity, RangedKind kind, int ammoCapacity,
         RangedEffectType rangedEffect = RangedEffectType.None, double magnitude = 1.0,
-        CharacterClass? restrictedClass = null, double? powerMultiplier = null)
+        CharacterClass? restrictedClass = null, double? powerMultiplier = null, int range = 1)
     {
         // When a power multiplier is given (the content path) it drives
         // both the AttackBonus curve and the rarity band; otherwise fall
@@ -89,7 +94,8 @@ public sealed record Item(
             RangedKind: kind,
             AmmoCapacity: ammoCapacity,
             RangedEffect: rangedEffect,
-            InstanceId: Guid.NewGuid());
+            InstanceId: Guid.NewGuid(),
+            Range: Math.Clamp(range, 1, 4));
         item.AmmoRemaining = ammoCapacity;
         return item;
     }

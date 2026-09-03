@@ -44,6 +44,26 @@ public class TimeWorldContentTests
         var world = ShippedWorld();
         Assert.NotEmpty(world.Eras.Eras);
         Assert.Equal(2000, world.Eras.Eras[0].FromYear);
+
+        Assert.NotEmpty(world.Generations.Generations);
+        Assert.Equal(2000, world.Generations.Generations[0].FromYear);
+    }
+
+    [Fact]
+    public void MonsterGenerationsAreIndependentOfEraBands_AndEachSpans500Years()
+    {
+        var world = ShippedWorld();
+        var generations = world.Generations.Generations;
+
+        Assert.Equal(6, generations.Count);
+        for (var i = 1; i < generations.Count; i++)
+        {
+            Assert.Equal(500, generations[i].FromYear - generations[i - 1].FromYear);
+        }
+
+        // Species ids are new per generation, never reused.
+        var allIds = generations.SelectMany(g => g.Species).Select(s => s.Id).ToList();
+        Assert.Equal(allIds.Count, allIds.Distinct(StringComparer.OrdinalIgnoreCase).Count());
     }
 
     [Fact]

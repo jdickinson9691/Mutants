@@ -96,6 +96,52 @@ public sealed class Monster
     /// </summary>
     public Direction? Heading { get; set; }
 
+    // --- per-species behavior traits (see Time.BehaviorProfile) ---------
+
+    /// <summary>Fraction of max HP at/below which this monster flees rather than pursuing or standing its ground — see <see cref="IsFleeing"/>. 0 = never.</summary>
+    public double FleeBelowHpFraction { get; }
+
+    /// <summary>When aggro'd, raises every living monster of the same <see cref="BaseName"/> sharing its room to the same aggro.</summary>
+    public bool PackHunting { get; }
+
+    /// <summary>Excluded from infighting — never turns on its own kind (or anyone else) when a room gets crowded.</summary>
+    public bool NeverInfights { get; }
+
+    /// <summary>Extra rooms (added to the base aggro range) this monster notices/tracks the player from.</summary>
+    public int AggroRangeBonus { get; }
+
+    /// <summary>Scales this monster's ambush-hit damage once Hostile. 1.0 = unchanged.</summary>
+    public double AmbushDamageMultiplier { get; }
+
+    // --- ranged-hit reaction (session state, not saved) ------------------
+
+    /// <summary>How many ticks a <see cref="IsPursuing"/> chase keeps going before giving up if it never closes the distance — see <c>ChronoTravelers.Engine.Npc.MonsterController</c>.</summary>
+    public const int MaxPursuitTicks = 40;
+
+    /// <summary>
+    /// True after a ranged hit lands from a room away (see
+    /// ChronoTravelers.Engine.Combat.RangedResolver): the monster actively
+    /// closes on the player every tick regardless of distance, bypassing
+    /// the passive proximity-aggro shadowing every other monster uses.
+    /// Cleared on catching the player (shares their room), on death, or
+    /// after <see cref="MaxPursuitTicks"/> ticks without catching up.
+    /// Mutually exclusive with <see cref="IsFleeing"/>.
+    /// </summary>
+    public bool IsPursuing { get; set; }
+
+    /// <summary>Ticks left in the current <see cref="IsPursuing"/> chase before it gives up. Session state.</summary>
+    public int PursuitTicksRemaining { get; set; }
+
+    /// <summary>
+    /// True after a ranged hit drops this monster to/below
+    /// <see cref="FleeBelowHpFraction"/> away from the player's room: it
+    /// steps toward whichever exit most increases distance to the player
+    /// every tick instead of wandering or pursuing, until it heals back
+    /// above the threshold, dies, or the player leaves. Mutually exclusive
+    /// with <see cref="IsPursuing"/>.
+    /// </summary>
+    public bool IsFleeing { get; set; }
+
     private readonly List<Item> _inventory = [];
 
     /// <summary>Items this monster is carrying — picked up off the ground, spent via <see cref="Convert"/>, and dropped where it dies.</summary>
@@ -137,7 +183,12 @@ public sealed class Monster
         IReadOnlyList<LootTableEntry>? lootTable = null,
         IReadOnlyList<string>? tags = null,
         int? maxTachyons = null,
-        bool isApex = false)
+        bool isApex = false,
+        double fleeBelowHpFraction = 0.0,
+        bool packHunting = false,
+        bool neverInfights = false,
+        int aggroRangeBonus = 0,
+        double ambushDamageMultiplier = 1.0)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -161,6 +212,11 @@ public sealed class Monster
         LootTable = lootTable ?? [];
         Tags = tags ?? [];
         IsApex = isApex;
+        FleeBelowHpFraction = Math.Clamp(fleeBelowHpFraction, 0, 1);
+        PackHunting = packHunting;
+        NeverInfights = neverInfights;
+        AggroRangeBonus = Math.Max(0, aggroRangeBonus);
+        AmbushDamageMultiplier = Math.Max(0, ambushDamageMultiplier);
     }
 
     private bool _enumerated;

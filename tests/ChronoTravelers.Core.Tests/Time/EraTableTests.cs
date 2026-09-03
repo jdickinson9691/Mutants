@@ -5,7 +5,7 @@ namespace ChronoTravelers.Core.Tests.Time;
 public class EraTableTests
 {
     private static EraDefinition Era(int fromYear, string name = "Era") =>
-        new(fromYear, name, ["a room."], ["some-species"], []);
+        new(fromYear, name, ["a room."], []);
 
     [Fact]
     public void EraForYear_ReturnsTheLastEraStartingOnOrBeforeTheYear()
@@ -47,12 +47,11 @@ public class EraTableTests
     }
 
     [Fact]
-    public void Constructor_RejectsAnEraWithNoRoomTextOrNoSpecies()
+    public void Constructor_RejectsAnEraWithNoRoomText()
     {
+        // Monster species moved to GenerationTable; an era only owns room text + item themes now.
         Assert.Throws<ArgumentException>(() =>
-            new EraTable([new EraDefinition(2000, "Empty rooms", [], ["s"], [])]));
-        Assert.Throws<ArgumentException>(() =>
-            new EraTable([new EraDefinition(2000, "Empty species", ["r."], [], [])]));
+            new EraTable([new EraDefinition(2000, "Empty rooms", [], [])]));
     }
 
     [Fact]

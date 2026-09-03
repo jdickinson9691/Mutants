@@ -73,6 +73,23 @@ public static class MonsterController
     private const int AggroRange = 1;
 
     /// <summary>
+    /// Spawn grace: while the player is at or below this level, a freshly
+    /// entered year keeps its start room (and the rooms one step off it)
+    /// off-limits to monster movement for <see cref="StartRoomGraceTicks"/>
+    /// ticks — a safe pocket for a fresh arrival to find the year's floor
+    /// gear / Time Shard and pick its first fights on its own terms,
+    /// rather than have a monster drift into the start room and force the
+    /// opener before the character is established. Applied by
+    /// <see cref="ChronoTravelers.Engine.Simulation.WorldSimulation"/>,
+    /// which folds those rooms into the <c>safeRooms</c> set it already
+    /// passes for store havens.
+    /// </summary>
+    public const int StartRoomGraceMaxLevel = 3;
+
+    /// <summary><see cref="StartRoomGraceMaxLevel"/> — ticks the grace lasts after entering a year.</summary>
+    public const int StartRoomGraceTicks = 18;
+
+    /// <summary>
     /// Per-tick chance the year's monsters produce one "yell" line —
     /// ambient banter, not tied to the player's position, so the whole
     /// year feels inhabited rather than just the room you're standing in.
@@ -141,30 +158,59 @@ public static class MonsterController
         {
             var startedAt = monster.Position;
             var distance = playerHere ? ManhattanDistance(monster.Position, player!.Position) : int.MaxValue;
+            var effectiveAggroRange = AggroRange + monster.AggroRangeBonus;
 
             // --- aggro accrual / decay -------------------------------------
             // An apex barely registers a passer-by (it picks its fights),
             // so every gain it would take is heavily scaled down.
             var aggroScale = monster.IsApex ? AggroModel.ApexAggroMultiplier : 1.0;
 
-            if (!playerHere || playerSafe || distance > AggroRange)
+            if (!playerHere || playerSafe || distance > effectiveAggroRange)
             {
                 monster.DecayAggro(AggroModel.DecayPerTick);
             }
             else if (player!.Position.Equals(monster.Position) && !previousPlayerPosition.Equals(monster.Position))
             {
-                monster.RaiseAggro(AggroModel.EnterTileAggro * aggroScale); // stepped onto me
+                RaiseAggroWithPack(population, monster, AggroModel.EnterTileAggro * aggroScale); // stepped onto me
             }
             else if (distance == 0)
             {
-                monster.RaiseAggro(AggroModel.CoLocatedPerTick * aggroScale); // parked on me
+                RaiseAggroWithPack(population, monster, AggroModel.CoLocatedPerTick * aggroScale); // parked on me
             }
             else
             {
-                monster.RaiseAggro(AggroModel.AdjacentPerTick * aggroScale); // loitering next door
+                RaiseAggroWithPack(population, monster, AggroModel.AdjacentPerTick * aggroScale); // loitering next door
             }
 
             var mood = AggroModel.MoodFor(monster.Aggro);
+
+            // --- ranged-hit pursue/flee state (see RangedResolver.Fire) -----
+            // Bypasses the passive proximity-aggro shadowing below: a
+            // pursuing monster closes in every tick no matter how far the
+            // player has run, not just within effectiveAggroRange.
+            if (monster.IsFleeing
+                && (!playerHere || monster.Health.Current > monster.Health.Max * monster.FleeBelowHpFraction))
+            {
+                monster.IsFleeing = false; // healed back up, or nothing left to flee from
+            }
+
+            if (monster.IsPursuing)
+            {
+                if (!playerHere)
+                {
+                    monster.IsPursuing = false;
+                }
+                else if (distance == 0)
+                {
+                    // Caught up — ready to fight immediately, not just Alert.
+                    monster.IsPursuing = false;
+                    monster.RaiseAggro(AggroModel.Cap);
+                }
+                else if (--monster.PursuitTicksRemaining <= 0)
+                {
+                    monster.IsPursuing = false; // gave up the chase
+                }
+            }
 
             // --- movement ------------------------------------------------------
             var healedThisTick = TryHeal(monster);
@@ -174,7 +220,15 @@ public static class MonsterController
             {
                 var shadowing = mood != AggroMood.Calm && playerHere && !playerSafe;
 
-                if (shadowing && distance is > 0 and <= AggroRange)
+                if (monster.IsFleeing && playerHere && !playerSafe)
+                {
+                    StepAway(map, monster, player!.Position, random, safeRooms);
+                }
+                else if (monster.IsPursuing && playerHere && !playerSafe)
+                {
+                    StepToward(map, monster, player!.Position, random, safeRooms);
+                }
+                else if (shadowing && distance > 0 && distance <= effectiveAggroRange)
                 {
                     StepToward(map, monster, player!.Position, random, safeRooms);
                 }
@@ -201,6 +255,11 @@ public static class MonsterController
             if (narration is not null && playerHere && !monster.Position.Equals(startedAt))
             {
                 NarrateMovement(narration, monster, startedAt, player!.Position, random);
+            }
+
+            if (narration is not null && playerHere && (monster.IsPursuing || monster.IsFleeing))
+            {
+                NarratePursuitOrFlee(narration, monster, random);
             }
 
             if (narration is not null && grabbedLoot is not null && playerHere && monster.Position.Equals(player!.Position))
@@ -412,6 +471,38 @@ public static class MonsterController
         }
     }
 
+    /// <summary>Steps one room along whichever exit most <b>increases</b> the Manhattan distance from <paramref name="target"/> (never into a <paramref name="safeRooms"/> tile) — the flee counterpart to <see cref="StepToward"/>; holds if no exit increases distance.</summary>
+    private static void StepAway(LevelMap map, Monster monster, Coordinate target, IRandomSource random, IReadOnlySet<Coordinate>? safeRooms)
+    {
+        var exits = map.GetRoom(monster.Position).ExitDescriptions.Keys
+            .OrderBy(_ => random.NextDouble())
+            .ToList();
+
+        var bestDistance = ManhattanDistance(monster.Position, target);
+        Coordinate? bestRoom = null;
+
+        foreach (var dir in exits)
+        {
+            var move = map.TryMove(monster.Position, dir);
+            if (!move.Success || IsBlocked(safeRooms, move.Destination!.Value))
+            {
+                continue;
+            }
+
+            var distance = ManhattanDistance(move.Destination.Value, target);
+            if (distance > bestDistance)
+            {
+                bestDistance = distance;
+                bestRoom = move.Destination.Value;
+            }
+        }
+
+        if (bestRoom is { } room)
+        {
+            monster.MoveTo(room);
+        }
+    }
+
     private static int ManhattanDistance(Coordinate a, Coordinate b) =>
         Math.Abs(a.East - b.East) + Math.Abs(a.North - b.North);
 
@@ -489,6 +580,42 @@ public static class MonsterController
         "{0} rasps, \"{1}, I remember you. Coward.\"",
     ];
 
+    /// <summary>A monster with <see cref="Monster.IsPursuing"/> set, addressed at the player directly — see <see cref="NarratePursuitOrFlee"/>. <c>{0}</c> is the monster.</summary>
+    private static readonly string[] PursuingLines =
+    [
+        "{0} snarls, \"I see you! No use running!\"",
+        "{0} shouts, \"You can't outrun me!\"",
+        "{0} roars and keeps coming.",
+        "{0} howls, closing the distance.",
+        "{0} barks, \"Stand and fight!\"",
+        "{0} snaps, \"Nowhere left to run!\"",
+    ];
+
+    /// <summary>A monster with <see cref="Monster.IsFleeing"/> set, addressed at the player directly — see <see cref="NarratePursuitOrFlee"/>. <c>{0}</c> is the monster.</summary>
+    private static readonly string[] FleeingLines =
+    [
+        "{0} yelps, \"Get away from me!\"",
+        "{0} cries, \"Stay back!\"",
+        "{0} shrieks and scrambles for distance.",
+        "{0} pleads, \"No more, no more!\"",
+        "{0} bolts, casting a fearful look back.",
+        "{0} whimpers, \"Leave me be!\"",
+    ];
+
+    /// <summary>
+    /// Every tick a <see cref="Monster.IsPursuing"/> or <see cref="Monster.IsFleeing"/>
+    /// monster shares the player's year, it gets one line addressed
+    /// directly at the player — unlike <see cref="MaybeYell"/>'s ambient
+    /// monster-to-monster banter, this is unconditional (every eligible
+    /// tick, not a dice roll) since it's meant to read as "this thing is
+    /// actively reacting to you right now."
+    /// </summary>
+    private static void NarratePursuitOrFlee(ICollection<string> narration, Monster monster, IRandomSource random)
+    {
+        var bank = monster.IsFleeing ? FleeingLines : PursuingLines;
+        narration.Add(string.Format(Pick(bank, random), monster.Name));
+    }
+
     /// <summary>
     /// Rolls <see cref="YellChance"/> for one ambient callout naming two of
     /// the year's living monsters — see <see cref="YellLines"/>. Not
@@ -545,10 +672,27 @@ public static class MonsterController
         }
     }
 
+    /// <summary>Raises <paramref name="monster"/>'s aggro, and — when it's <see cref="Monster.PackHunting"/> — every other living monster of the same species (<see cref="Monster.BaseName"/>) sharing its room, by the same amount: a nest wakes together instead of one at a time.</summary>
+    private static void RaiseAggroWithPack(YearPopulation population, Monster monster, double amount)
+    {
+        monster.RaiseAggro(amount);
+        if (!monster.PackHunting)
+        {
+            return;
+        }
+
+        foreach (var packmate in population.Monsters.Where(m =>
+            !m.Health.IsDead && !ReferenceEquals(m, monster)
+            && m.BaseName == monster.BaseName && m.Position.Equals(monster.Position)))
+        {
+            packmate.RaiseAggro(amount);
+        }
+    }
+
     private static void ResolveInfighting(YearPopulation population, IRandomSource random, BroadcastChannel broadcast, int year)
     {
         var crowdedRooms = population.Monsters
-            .Where(m => !m.Health.IsDead)
+            .Where(m => !m.Health.IsDead && !m.NeverInfights)
             .GroupBy(m => m.Position)
             .Where(g => g.Count() >= 2)
             .ToList();
@@ -628,7 +772,12 @@ public static class MonsterController
 
         // An ambush catches you unbraced — only half your defense applies, so
         // a lingering low-tier monster still stings rather than pinging for 1.
-        var dealt = player.Health.Damage(CombatResolver.RollDamage(attacker.EffectiveAttackPower, player.EffectiveDefense / 2, random));
+        // AmbushDamageMultiplier (Monster/BehaviorProfile) lets a species hit
+        // harder once Hostile than its base attack alone would — 1.0 for
+        // every species that doesn't author one, i.e. unchanged.
+        var raw = CombatResolver.RollDamage(attacker.EffectiveAttackPower, player.EffectiveDefense / 2, random);
+        var scaled = Math.Max(0, (int)Math.Round(raw * attacker.AmbushDamageMultiplier));
+        var dealt = player.Health.Damage(scaled);
         broadcast.Publish(GameEvent.Ambushed(attacker.Name, player.Name, dealt, year));
         return true;
     }

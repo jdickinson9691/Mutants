@@ -153,21 +153,26 @@ public class CombatSessionTests
     }
 
     [Fact]
-    public void Attack_ArmourPenFloor_HeavyArmourStillTakesRealDamage()
+    public void Attack_HeavyArmourDefender_StillTakesRealMitigatedDamage()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);
         var plate = Item.Create("Bulwark Plate", ItemType.Armor, tier: 6, Rarity.Rare, CharacterClass.Soldier);
         traveler.AddToInventory(plate);
         traveler.Wield(plate);
-        Assert.True(traveler.EffectiveDefense > 30); // far above the monster's attack — pre-floor this was a 1-damage hit
+        Assert.True(traveler.EffectiveDefense >= 30); // above the monster's own attack power
 
         var monster = new Monster("Sledge", tier: 1, maxHp: 500, attackPower: 30, defense: 0, speed: 1, xpReward: 10);
         var hpBefore = traveler.Health.Current;
 
         new CombatSession(traveler, monster, NeutralRandom()).Attack(); // one round incl. the monster's counter
 
+        // CombatResolver.RollDamage's ratio-based mitigation (attack² /
+        // (attack + defense)) still lands a real hit even when defence
+        // exceeds attack — here 30²/(30+32) ≈ 14.5 → 15 — rather than the
+        // old linear-subtraction formula's near-zero (or the even-older
+        // flat 30%-of-attack floor this replaced).
         var taken = hpBefore - traveler.Health.Current;
-        Assert.True(taken >= 7, $"armour-pen floor should land ~0.30 × 30 ≈ 9, not 1; took {taken}");
+        Assert.True(taken >= 10, $"heavy armour should still take real damage (~15), not near-zero; took {taken}");
     }
 
     [Fact]
@@ -183,9 +188,10 @@ public class CombatSessionTests
 
         // Casting a Heal still uses the round: the monster gets its own
         // counter-attack afterward. TankMonster attack 5 vs Soldier
-        // defense 5 → raw 0, but the armour-pen floor (0.35 × 5 ≈ 2) lands
-        // it for 2.
-        Assert.Equal(10 + (int)Math.Round(30 * 0.20) - 2, traveler.Health.Current);
+        // defense 4 (Agility 10 ÷ MonsterScaling.AgilityToDefenseDivisor)
+        // → CombatResolver.RollDamage's ratio mitigation, 5²/(5+4) ≈ 2.8,
+        // rounds to 3.
+        Assert.Equal(10 + (int)Math.Round(30 * 0.20) - 3, traveler.Health.Current);
     }
 
     [Fact]
@@ -219,8 +225,9 @@ public class CombatSessionTests
         var hpAfterDebuff = monster.Health.Current;
         session.Attack();
 
+        // attack 15 vs defense (10 debuffed by 6 = 4): 15²/(15+4) ≈ 11.8 → 12.
         var damageAfterDebuff = hpAfterDebuff - monster.Health.Current;
-        Assert.Equal(15 - (10 - 6), damageAfterDebuff); // attack 15 - (defense 10 debuffed by 6)
+        Assert.Equal(12, damageAfterDebuff);
     }
 
     [Fact]

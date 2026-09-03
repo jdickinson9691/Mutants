@@ -8,7 +8,7 @@ public class YearMapFactoryTests
     private static readonly EraDefinition SampleEra = new(
         2000, "Sample Era",
         ["a cracked plaza.", "a silent corridor.", "a collapsed stairwell.", "an open rooftop."],
-        ["some-species"], []);
+        []);
 
     [Theory]
     [InlineData(2000)]

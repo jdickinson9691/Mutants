@@ -1,5 +1,6 @@
 using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
+using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Engine.Combat;
 
@@ -13,11 +14,20 @@ public class CombatResolverTests
     // roll < dropChance.
     private static StubRandomSource NeutralRandom() => StubRandomSource.Fixed(0.5);
 
+    // An explicitly feeble monster, so these tests exercise the win →
+    // XP/loot bookkeeping in isolation. (MonsterScaling now calibrates a
+    // tier-N monster against a level-10·N character, so a same-tier
+    // Monster.Create / TestMonsters fixture is no longer a pushover for a
+    // fresh level-1 Traveler — that's covered by the scaling tests.)
+    private static Monster WeakMonster() =>
+        new("Feral Dog", tier: 1, maxHp: 28, attackPower: 5, defense: 2, speed: 6, xpReward: 40,
+            lootTable: [new LootTableEntry(Item.Create("Torn Hide", ItemType.Junk, 1, Rarity.Common), dropChance: 0.7)]);
+
     [Fact]
     public void Fight_TravelerDefeatsWeakMonster_AwardsXpAndLoot()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);
-        var monster = TestMonsters.FeralDog(); // tier 1: HP 28, attack 5, defense 2, xpReward 40, Torn Hide @ 0.7
+        var monster = WeakMonster();
 
         var result = CombatResolver.Fight(traveler, monster, NeutralRandom());
 
@@ -33,7 +43,7 @@ public class CombatResolverTests
     public void Fight_TravelerDefeatsWeakMonster_LootIsAddedToInventory()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);
-        var monster = TestMonsters.FeralDog(); // Torn Hide drops at 0.7, roll is 0.5 -> drops
+        var monster = WeakMonster(); // Torn Hide drops at 0.7, roll is 0.5 -> drops
 
         var result = CombatResolver.Fight(traveler, monster, NeutralRandom());
 
@@ -85,7 +95,7 @@ public class CombatResolverTests
     [Fact]
     public void Fight_MoreFavorableRandomRollsFinishFasterOrEqual()
     {
-        var monster = () => Monster.Create("Punching Bag", tier: 1);
+        var monster = () => new Monster("Punching Bag", tier: 1, maxHp: 60, attackPower: 1, defense: 0, speed: 1, xpReward: 10);
 
         var lowRollResult = CombatResolver.Fight(new Traveler("Rook", CharacterClass.Soldier), monster(), StubRandomSource.Fixed(0.0));
         var highRollResult = CombatResolver.Fight(new Traveler("Rook", CharacterClass.Soldier), monster(), StubRandomSource.Fixed(1.0));

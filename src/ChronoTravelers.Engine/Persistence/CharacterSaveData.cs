@@ -45,6 +45,17 @@ public sealed class CharacterSaveData
     /// <summary>The Warden years the character has cleared (schema 2). Legacy blobs carry level numbers here; the migration discards them.</summary>
     public List<int> DefeatedWardens { get; set; } = [];
 
+    /// <summary>
+    /// How many permanent stat elixirs have already landed on each stat —
+    /// <c>ChronoTravelers.Core.Characters.Traveler.ElixirUsesByStat</c>, keyed by
+    /// <c>PrimaryStat</c> name. Drives the diminishing-returns falloff on
+    /// the next one (see <c>Traveler.Consume</c>) — persisted so a save/
+    /// reload can't reset the falloff. Additive; old blobs deserialize as
+    /// an empty map (every stat starts undiminished, matching pre-existing
+    /// saves that predate the mechanic).
+    /// </summary>
+    public Dictionary<string, int> ElixirUsesByStat { get; set; } = [];
+
     // --- Legacy (schema 1) fields, read only for migration ---------------
     /// <summary>Legacy: the deepest unlocked discrete level. Migrated to <see cref="FurthestYearReached"/>.</summary>
     public int UnlockedTimeLevel { get; set; }

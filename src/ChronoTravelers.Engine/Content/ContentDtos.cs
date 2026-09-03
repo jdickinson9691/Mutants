@@ -79,7 +79,7 @@ public sealed class NpcPopulationConfig
 // year-based world generator scales on the fly. See ContentLoader.LoadTimeWorld.
 // ---------------------------------------------------------------------------
 
-/// <summary>A monster species — <c>monster-species.json</c>. No stats/tier: <see cref="Archetype"/> + the encounter year produce them.</summary>
+/// <summary>A monster species, nested under a <see cref="MonsterGenerationData"/> in <c>monster-generations.json</c>. No stats/tier: <see cref="Archetype"/> + the encounter year produce them.</summary>
 public sealed class MonsterSpeciesData
 {
     public string Id { get; set; } = "";
@@ -91,6 +91,39 @@ public sealed class MonsterSpeciesData
 
     /// <summary>Item theme tags this species can drop — matched against <see cref="ItemArchetypeData.ThemeTags"/>.</summary>
     public List<string> LootThemeTags { get; set; } = [];
+
+    /// <summary>Optional per-species stat multipliers (see ChronoTravelers.Core.Time.PowerProfile). Omitted = every multiplier 1.0.</summary>
+    public PowerProfileData? PowerProfile { get; set; }
+
+    /// <summary>Optional per-species behavior traits (see ChronoTravelers.Core.Time.BehaviorProfile). Omitted = an archetype-based default (see ChronoTravelers.Core.Time.SpeciesDefinition.EffectiveBehaviorProfile).</summary>
+    public BehaviorProfileData? BehaviorProfile { get; set; }
+}
+
+/// <summary>See ChronoTravelers.Core.Time.PowerProfile. Every field defaults to 1.0 (no change).</summary>
+public sealed class PowerProfileData
+{
+    public double HpMultiplier { get; set; } = 1.0;
+    public double AttackMultiplier { get; set; } = 1.0;
+    public double DefenseMultiplier { get; set; } = 1.0;
+    public double SpeedMultiplier { get; set; } = 1.0;
+}
+
+/// <summary>See ChronoTravelers.Core.Time.BehaviorProfile. <see cref="FleeBelowHpFraction"/> is nullable so an authored block that omits it still falls back to the archetype-based default rather than becoming 0 ("never flees").</summary>
+public sealed class BehaviorProfileData
+{
+    public double? FleeBelowHpFraction { get; set; }
+    public bool PackHunting { get; set; }
+    public bool NeverInfights { get; set; }
+    public int AggroRangeBonus { get; set; }
+    public double AmbushDamageMultiplier { get; set; } = 1.0;
+}
+
+/// <summary>One 500-year monster generation — <c>monster-generations.json</c>. Ordered by <see cref="FromYear"/>; the first must be 2000.</summary>
+public sealed class MonsterGenerationData
+{
+    public int FromYear { get; set; }
+    public string Name { get; set; } = "";
+    public List<MonsterSpeciesData> Species { get; set; } = [];
 }
 
 /// <summary>An item archetype — <c>item-archetypes.json</c>. No tier: value/bonuses come from the year it drops in.</summary>
@@ -125,19 +158,21 @@ public sealed class ItemArchetypeData
     /// <summary>Built-in shot count for a ranged archetype. Ignored when <see cref="RangedKind"/> is "None".</summary>
     public int AmmoCapacity { get; set; }
 
+    /// <summary>How many rooms out (1–4) this ranged weapon can hit in a straight connected corridor — see ChronoTravelers.Core.Items.Item.Range. Ignored when <see cref="RangedKind"/> is "None"; defaults to 1 (today's single-room shot) when omitted.</summary>
+    public int Range { get; set; } = 1;
+
     /// <summary>One of ChronoTravelers.Core.Items.RangedEffectType's names ("Weaken"); "None" for a damage-only ranged weapon. <see cref="EffectMagnitude"/> doubles as the ranged damage multiplier / Weaken amount.</summary>
     public string RangedEffect { get; set; } = "None";
 
     public List<string> ThemeTags { get; set; } = [];
 }
 
-/// <summary>One era band of the timeline — <c>eras.json</c>. Ordered by <see cref="FromYear"/>; the first must be 2000.</summary>
+/// <summary>One era band of the timeline — <c>eras.json</c>. Ordered by <see cref="FromYear"/>; the first must be 2000. Room text and loot theming only — which monsters roam a year is <c>monster-generations.json</c>'s call (see <see cref="MonsterGenerationData"/>).</summary>
 public sealed class EraData
 {
     public int FromYear { get; set; }
     public string Name { get; set; } = "";
     public List<string> RoomText { get; set; } = [];
-    public List<string> SpeciesIds { get; set; } = [];
     public List<string> ItemThemeTags { get; set; } = [];
 }
 

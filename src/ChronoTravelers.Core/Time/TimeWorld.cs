@@ -19,8 +19,7 @@ public sealed class TimeWorld
     public long WorldSeed { get; }
 
     private readonly EraTable _eras;
-    private readonly IReadOnlyList<SpeciesDefinition> _species;
-    private readonly Dictionary<string, SpeciesDefinition> _speciesById;
+    private readonly GenerationTable _generations;
     private readonly IReadOnlyList<ItemArchetypeDefinition> _itemArchetypes;
     private readonly StoreStockTemplate _storeTemplate;
     private readonly WardenSchedule _wardens;
@@ -29,25 +28,16 @@ public sealed class TimeWorld
     public TimeWorld(
         long worldSeed,
         EraTable eras,
-        IReadOnlyList<SpeciesDefinition> species,
+        GenerationTable generations,
         IReadOnlyList<ItemArchetypeDefinition> itemArchetypes,
         StoreStockTemplate? storeTemplate = null)
     {
         WorldSeed = worldSeed;
         _eras = eras;
-        _species = species;
+        _generations = generations;
         _itemArchetypes = itemArchetypes;
         _storeTemplate = storeTemplate ?? StoreStockTemplate.Default;
         _wardens = new WardenSchedule(worldSeed);
-
-        _speciesById = new Dictionary<string, SpeciesDefinition>(StringComparer.OrdinalIgnoreCase);
-        foreach (var sp in species)
-        {
-            if (!_speciesById.TryAdd(sp.Id, sp))
-            {
-                throw new ArgumentException($"Duplicate species id '{sp.Id}'.", nameof(species));
-            }
-        }
 
         var archetypeIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var arch in itemArchetypes)
@@ -60,14 +50,6 @@ public sealed class TimeWorld
 
         foreach (var era in eras.Eras)
         {
-            foreach (var id in era.SpeciesIds)
-            {
-                if (!_speciesById.ContainsKey(id))
-                {
-                    throw new ArgumentException($"Era '{era.Name}' references unknown species id '{id}'.", nameof(eras));
-                }
-            }
-
             foreach (var theme in era.ItemThemeTags)
             {
                 if (!itemArchetypes.Any(a => a.HasTheme(theme)))
@@ -100,6 +82,9 @@ public sealed class TimeWorld
 
     public EraTable Eras => _eras;
 
+    /// <summary>The 500-year monster-roster bands — see <see cref="GenerationDefinition"/>. Independent of <see cref="Eras"/>.</summary>
+    public GenerationTable Generations => _generations;
+
     /// <summary>Every year <see cref="GetYear"/> has been called for this session — the set whose store slots hold live, mutable state (ownership, capital, listings).</summary>
     public IReadOnlyCollection<int> VisitedYears => _cache.Keys;
 
@@ -128,13 +113,16 @@ public sealed class TimeWorld
         var map = YearMapFactory.Build(WorldSeed, era, year);
         var tier = TimeScale.TierForYear(year);
 
-        var eraSpecies = era.SpeciesIds.Select(id => _speciesById[id]).ToList();
+        // Which monsters roam this year is the generation's call (its own
+        // fixed 500-year cadence — see GenerationDefinition), independent
+        // of the era, which only supplies room text and loot theming here.
+        var generationSpecies = _generations.GenerationForYear(year).Species;
 
-        var roster = eraSpecies
+        var roster = generationSpecies
             .Select(sp => TimelineContentFactory.ForSpecies(WorldSeed, sp, year, LootPoolFor(sp, era)))
             .ToList();
 
-        var apexRoster = eraSpecies
+        var apexRoster = generationSpecies
             .Select(sp => TimelineContentFactory.ApexForSpecies(WorldSeed, sp, year, LootPoolFor(sp, era)))
             .ToList();
 

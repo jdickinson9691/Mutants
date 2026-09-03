@@ -19,10 +19,15 @@ public static class CharacterFactory
         return offered.Count > 0 ? offered : Enum.GetValues<CharacterClass>().ToList();
     }
 
-    /// <summary>A fresh Traveler with the console's starter kit (three Field Rations).</summary>
+    /// <summary>A fresh Traveler with the console's starter kit: a wielded basic melee weapon (so the opening year-2000 fight isn't bare-fisted — playtested) plus three Field Rations.</summary>
     public static Traveler NewTraveler(string name, CharacterClass characterClass)
     {
         var traveler = new Traveler(name, characterClass);
+
+        var starterWeapon = new Item("Standard-Issue Baton", ItemType.Weapon, 1, Rarity.Common, Value: 5, AttackBonus: 10);
+        traveler.AddToInventory(starterWeapon);
+        traveler.Wield(starterWeapon);
+
         for (var i = 0; i < 3; i++)
         {
             traveler.AddToInventory(Item.Create("Field Ration", ItemType.Consumable, 1, Rarity.Common,

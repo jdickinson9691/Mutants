@@ -172,9 +172,16 @@ if (loadedSave is not null)
 }
 else
 {
-    // Starter kit for a fresh character — a few field rations so the
-    // first year isn't a pure attrition race before you can loot/buy any
-    // HP recovery of your own (playtested).
+    // Starter kit for a fresh character (playtested):
+    //  - a basic melee weapon, wielded, so the opening fight in year 2000
+    //    isn't bare-fisted. A fresh L1 loses the arrival year's first 1v1
+    //    unarmed — its damage-per-hit can't out-trade a tier-1 monster's
+    //    HP before its own ~30 HP runs out; +10 attack tips it.
+    //  - a few field rations so the first year isn't a pure attrition race
+    //    before you can loot or buy any HP recovery of your own.
+    var starterWeapon = new Item("Standard-Issue Baton", ItemType.Weapon, 1, Rarity.Common, Value: 5, AttackBonus: 10);
+    traveler.AddToInventory(starterWeapon);
+    traveler.Wield(starterWeapon);
     for (var i = 0; i < 3; i++)
     {
         traveler.AddToInventory(Item.Create("Field Ration", ItemType.Consumable, 1, Rarity.Common,
@@ -1685,6 +1692,22 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
             : here.FirstOrDefault(m => !m.IsApex) ?? here[0];
     }
 
+    // A readied ranged weapon changes what 'fight' means entirely: instead
+    // of closing to blocking melee, it locks this monster in as
+    // traveler.RangedTarget so 'fire <direction>' can snipe it from up to
+    // the weapon's Range rooms away (see HandleShoot). No melee weapon
+    // readied at all is not required — a ranged sidearm simply takes
+    // priority the moment one is wielded; wield it away to go back to
+    // 'fight' starting blocking melee as it always has.
+    if (traveler.EquippedRanged is not null)
+    {
+        traveler.SetRangedTarget(monster);
+        AnsiConsole.MarkupLine(
+            $"[bold]You draw a bead on {(isWardenFight ? "" : "the ")}{Markup.Escape(monster.Name)}.[/] (tier {monster.Tier}) " +
+            $"[grey]fire <direction> to shoot it, or unwield your ranged weapon to melee instead.[/]");
+        return true;
+    }
+
     var levelBefore = traveler.Level;
 
     AnsiConsole.MarkupLine(isWardenFight
@@ -1800,15 +1823,21 @@ static void PrintNewLogLines(CombatSession session, ref int loggedSoFar)
 }
 
 /// <summary>
-/// Fires the readied ranged weapon (Traveler.EquippedRanged) one room away
-/// in an exit direction — 'point &lt;dir&gt;' for a Wand, 'shoot &lt;dir&gt;'
-/// for a Bow/Gun — hitting the first living monster there (or that room's
-/// stationed Warden). A hit spends one round of the weapon's built-in
-/// ammo via ChronoTravelers.Engine.Combat.RangedResolver; no target or no exit that
-/// way spends nothing. On a kill, XP and loot are awarded here — the loot
-/// lands on the target room's floor, since the player never walked in.
-/// Softening a monster with a Weaken wand carries into the next 'fight'
-/// (CombatSession consumes Monster.PendingDefensePenalty once).
+/// Fires the readied ranged weapon (Traveler.EquippedRanged) at
+/// Traveler.RangedTarget — the monster locked in by a prior 'fight' — in
+/// a given exit direction: 'point &lt;dir&gt;' for a Wand, 'shoot &lt;dir&gt;'
+/// / 'fire &lt;dir&gt;' for a Bow/Gun. The shot travels a straight, unbroken
+/// chain of room exits that way, up to the weapon's Range (1–4 rooms —
+/// see Item.Range); it only ever hits the locked target specifically; if
+/// the corridor breaks early or the target isn't out that way within
+/// range, nothing fires and no ammo is spent. A hit spends one round of
+/// the weapon's built-in ammo via ChronoTravelers.Engine.Combat.RangedResolver,
+/// which also sets the target's fight/pursue/flee reaction. On a kill, XP
+/// and loot are awarded here — the loot lands on the target's room floor,
+/// since the player never walked in. Softening a monster with a Weaken
+/// wand carries into the next melee fight (CombatSession consumes
+/// Monster.PendingDefensePenalty once) — moot for a killed target, but
+/// relevant if you switch to melee against a target that survives.
 /// </summary>
 static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, string verb, string argument)
 {
@@ -1825,6 +1854,14 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
         return;
     }
 
+    var target = traveler.RangedTarget;
+    if (target is null || target.Health.IsDead)
+    {
+        traveler.SetRangedTarget(null);
+        AnsiConsole.MarkupLine("[red]You have nothing lined up.[/] [yellow]fight <name>[/] a monster first to draw a bead on it.");
+        return;
+    }
+
     var direction = DirectionExtensions.Parse(argument.Trim());
     if (direction is null)
     {
@@ -1833,32 +1870,35 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
     }
 
     var yearContent = world.GetYear(traveler.CurrentYear);
-    if (!yearContent.Map.GetRoom(traveler.Position).ExitDescriptions.ContainsKey(direction.Value))
-    {
-        AnsiConsole.MarkupLine("[red]You can't shoot through a wall.[/] There's no exit that way.");
-        return;
-    }
-
-    var targetRoom = traveler.Position.Move(direction.Value);
+    var map = yearContent.Map;
     var population = yearContent.Population;
 
-    var target = population.MonstersAt(targetRoom).FirstOrDefault(m => !m.Health.IsDead);
-    var warden = population.Warden;
-    var targetIsWarden = false;
-    if (target is null
-        && warden is not null && !warden.Health.IsDead
-        && !traveler.HasDefeatedWarden(traveler.CurrentYear)
-        && warden.Position.Equals(targetRoom))
+    var current = traveler.Position;
+    var found = false;
+    for (var step = 0; step < weapon.Range; step++)
     {
-        target = warden;
-        targetIsWarden = true;
+        var move = map.TryMove(current, direction.Value);
+        if (!move.Success)
+        {
+            break; // the corridor doesn't reach any farther that way
+        }
+
+        current = move.Destination!.Value;
+        if (target.Position.Equals(current))
+        {
+            found = true;
+            break;
+        }
     }
 
-    if (target is null)
+    if (!found)
     {
-        AnsiConsole.MarkupLine($"[grey]Nothing to {verb} that way.[/] (no shot spent)");
+        AnsiConsole.MarkupLine($"[grey]No clear shot at {Markup.Escape(target.Name)} that way.[/] (no shot spent)");
         return;
     }
+
+    var targetRoom = current;
+    var targetIsWarden = ReferenceEquals(target, population.Warden);
 
     var levelBefore = traveler.Level;
     var result = RangedResolver.Fire(traveler, target, weapon, random);
@@ -1869,6 +1909,8 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
     {
         return;
     }
+
+    traveler.SetRangedTarget(null); // dead — nothing left to lock onto
 
     broadcast.Publish(GameEvent.Slain(target.Name, traveler.Name, traveler.CurrentYear, victimIsCreature: true));
     var xpAwarded = MonsterScaling.KillXp(target.XpReward, target.Tier, traveler.Level);
@@ -1884,7 +1926,7 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
             population.AddGroundLoot(targetRoom, drop);
         }
 
-        AnsiConsole.MarkupLine($"[bold yellow]You drop the Warden of {traveler.CurrentYear} from a room away — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{xpAwarded} XP.");
+        AnsiConsole.MarkupLine($"[bold yellow]You drop the Warden of {traveler.CurrentYear} from afar — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{xpAwarded} XP.");
     }
     else
     {

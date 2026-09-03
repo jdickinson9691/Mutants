@@ -32,7 +32,8 @@ public sealed record ItemArchetypeDefinition(
     RangedKind RangedKind = RangedKind.None,
     int AmmoCapacity = 0,
     RangedEffectType RangedEffect = RangedEffectType.None,
-    double PowerMultiplier = 1.0)
+    double PowerMultiplier = 1.0,
+    int Range = 1)
 {
     /// <summary>A ranged-weapon archetype (Wand / Bow / Gun) — <see cref="TimelineContentFactory.ForArchetype"/> builds it via <see cref="Item.CreateRanged"/> with a full magazine.</summary>
     public bool IsRanged => RangedKind != RangedKind.None;

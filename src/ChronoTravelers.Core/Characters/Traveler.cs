@@ -1,6 +1,7 @@
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Items;
+using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Stats;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Core.World;
@@ -53,6 +54,47 @@ public sealed class Traveler
     private readonly List<ActiveEffect> _activeEffects = [];
     public IReadOnlyList<ActiveEffect> ActiveEffects => _activeEffects;
 
+    /// <summary>
+    /// How many Meridian Serum-style permanent boosts have already landed
+    /// on each stat — see <see cref="Consume"/>'s diminishing-returns
+    /// calculation. Persisted (<c>ChronoTravelers.Engine.Persistence</c>)
+    /// so a save/reload can't reset the falloff and effectively un-diminish
+    /// a stat by cycling saves.
+    /// </summary>
+    private readonly Dictionary<PrimaryStat, int> _elixirUsesByStat = [];
+
+    /// <summary>Read-only view of <see cref="_elixirUsesByStat"/>, for save-data mapping. A stat with no recorded uses is absent, not zero.</summary>
+    public IReadOnlyDictionary<PrimaryStat, int> ElixirUsesByStat => _elixirUsesByStat;
+
+    /// <summary>
+    /// How much a permanent stat elixir grown from base magnitude
+    /// <paramref name="baseMagnitude"/> raises <paramref name="stat"/> the
+    /// *next* time one is drunk, and records that use. Each successive
+    /// elixir on the same stat is worth <see cref="ElixirDiminishingFalloff"/>
+    /// times the last (never below <see cref="ElixirMinimumBoost"/>) — a
+    /// deliberate "no hard cap, but stacking stops being worth the grind"
+    /// design (docs/GDD.md §4.1): with the base +5 and a 0.75 falloff, the
+    /// *first several* drinks still matter (5, 4, 3, 2, 2, 1, 1, …) but the
+    /// running total on one stat converges toward roughly +20 rather than
+    /// growing without bound the way an unlimited +5-per-drink did — that
+    /// unbounded growth (stacking dozens of serums across a long timeline
+    /// run) was a real balance bug, see
+    /// <see cref="ChronoTravelers.Core.Monsters.MonsterScaling"/>'s doc
+    /// comment.
+    /// </summary>
+    private const double ElixirDiminishingFalloff = 0.75;
+
+    /// <summary>The smallest a diminished elixir boost ever rounds down to — keeps drinking one always worth *something*, matching the "no hard cap" design (see <see cref="ElixirDiminishingFalloff"/>).</summary>
+    private const int ElixirMinimumBoost = 1;
+
+    private int NextElixirBoost(PrimaryStat stat, double baseMagnitude)
+    {
+        var uses = _elixirUsesByStat.GetValueOrDefault(stat);
+        var boost = Math.Max(ElixirMinimumBoost, (int)Math.Round(baseMagnitude * Math.Pow(ElixirDiminishingFalloff, uses)));
+        _elixirUsesByStat[stat] = uses + 1;
+        return boost;
+    }
+
     private readonly List<Item> _inventory = [];
     public IReadOnlyList<Item> Inventory => _inventory;
 
@@ -61,6 +103,20 @@ public sealed class Traveler
 
     /// <summary>The wielded ranged weapon (Wand / Bow / Gun), fired with <c>point</c> / <c>shoot</c>. Separate from <see cref="EquippedWeapon"/> — you carry a melee weapon and a ranged sidearm.</summary>
     public Item? EquippedRanged { get; private set; }
+
+    /// <summary>
+    /// The monster locked in as a ranged target via <c>fight</c> while a
+    /// ranged weapon is readied — <c>fight</c> marks it instead of opening
+    /// blocking melee, and <c>fire &lt;direction&gt;</c> only ever shoots
+    /// this monster specifically (see ChronoTravelers.Engine.Combat.RangedResolver
+    /// and the console's <c>HandleFight</c>/<c>HandleShoot</c>). Session
+    /// state, not saved. Cleared on the target's death, on changing year
+    /// (<see cref="SetCurrentYear"/>), or by locking a different target.
+    /// </summary>
+    public Monster? RangedTarget { get; private set; }
+
+    /// <summary>Locks (or clears, with <c>null</c>) <see cref="RangedTarget"/>.</summary>
+    public void SetRangedTarget(Monster? monster) => RangedTarget = monster;
 
     /// <summary>
     /// Turn order / "who acts first" stat for combat — original design
@@ -98,12 +154,19 @@ public sealed class Traveler
         }
     }
 
-    /// <summary>Combat defense: half of Agility + equipped armor's DefenseBonus (scaled by wield effectiveness) + any active BuffDefense potion. Original design.</summary>
+    /// <summary>
+    /// Combat defense: Agility ÷ <see cref="MonsterScaling.AgilityToDefenseDivisor"/>
+    /// + equipped armor's DefenseBonus (scaled by wield effectiveness) +
+    /// any active BuffDefense potion. Original design; the divisor lives
+    /// on <see cref="MonsterScaling"/> (not here) since that's the single
+    /// source of truth for keeping player and monster combat stats
+    /// proportionate — see its doc comment.
+    /// </summary>
     public int EffectiveDefense
     {
         get
         {
-            var baseDefense = Stats.Agility / 2;
+            var baseDefense = (int)(Stats.Agility / MonsterScaling.AgilityToDefenseDivisor);
             var armorBonus = EquippedArmor is null
                 ? 0
                 : (int)Math.Round(EquippedArmor.DefenseBonus * EquippedArmor.WieldEffectiveness(Class));
@@ -144,7 +207,8 @@ public sealed class Traveler
         string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
         int currentHp, int maxHp, int currentTachyons, int maxTachyons, int credits,
         int currentYear, int furthestYearReached, Coordinate position,
-        IEnumerable<int> defeatedWardenYears)
+        IEnumerable<int> defeatedWardenYears,
+        IEnumerable<KeyValuePair<PrimaryStat, int>>? elixirUsesByStat)
     {
         Name = name;
         Class = characterClass;
@@ -159,6 +223,13 @@ public sealed class Traveler
         FurthestYearReached = Math.Clamp(furthestYearReached, TimeScale.MinYear, TimeScale.MaxYear);
         Position = position;
         _defeatedWardens = new HashSet<int>(defeatedWardenYears);
+        if (elixirUsesByStat is not null)
+        {
+            foreach (var (stat, uses) in elixirUsesByStat)
+            {
+                _elixirUsesByStat[stat] = uses;
+            }
+        }
     }
 
     /// <summary>See the private snapshot constructor above — this is its public entry point, used by ChronoTravelers.Engine.Persistence when loading a save.</summary>
@@ -166,7 +237,8 @@ public sealed class Traveler
         string name, CharacterClass characterClass, int level, int xp, StatBlock stats,
         int currentHp, int maxHp, int currentTachyons, int maxTachyons, int credits,
         int currentYear, int furthestYearReached, Coordinate position,
-        IEnumerable<int> defeatedWardenYears)
+        IEnumerable<int> defeatedWardenYears,
+        IEnumerable<KeyValuePair<PrimaryStat, int>>? elixirUsesByStat = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -176,7 +248,7 @@ public sealed class Traveler
         return new Traveler(
             name, characterClass, level, xp, stats,
             currentHp, maxHp, currentTachyons, maxTachyons, credits,
-            currentYear, furthestYearReached, position, defeatedWardenYears);
+            currentYear, furthestYearReached, position, defeatedWardenYears, elixirUsesByStat);
     }
 
     /// <summary>
@@ -238,6 +310,8 @@ public sealed class Traveler
         {
             FurthestYearReached = CurrentYear;
         }
+
+        RangedTarget = null; // a locked target doesn't survive a jump to a different year
     }
 
     /// <summary>Whether this Traveler has already beaten the Warden standing watch over <paramref name="year"/> — docs/GDD.md §3.2. Wardens gate nothing; this just stops the trophy fight repeating.</summary>
@@ -456,6 +530,8 @@ public sealed class Traveler
                 // values (attack from the primary stat, defense/speed from
                 // Agility) pick it up live; HP isn't stat-derived so it's
                 // unchanged. Saved with the rest of Stats, no extra plumbing.
+                // The actual amount added diminishes with repeat use on the
+                // same stat — see NextElixirBoost.
                 var boosted = item.ConsumableEffect switch
                 {
                     ConsumableEffectType.BoostStrength => PrimaryStat.Strength,
@@ -463,12 +539,12 @@ public sealed class Traveler
                     ConsumableEffectType.BoostResolve => PrimaryStat.Resolve,
                     _ => PrimaryStat.Intellect,
                 };
-                Stats = Stats.Increase(boosted, (int)Math.Round(item.EffectMagnitude));
+                Stats = Stats.Increase(boosted, NextElixirBoost(boosted, item.EffectMagnitude));
                 return 0;
 
             case ConsumableEffectType.BoostChosenStat:
                 // chosenStat is guaranteed non-null here by the guard above.
-                Stats = Stats.Increase(chosenStat!.Value, (int)Math.Round(item.EffectMagnitude));
+                Stats = Stats.Increase(chosenStat!.Value, NextElixirBoost(chosenStat.Value, item.EffectMagnitude));
                 return 0;
 
             default:

@@ -29,10 +29,22 @@ public class LevelingTests
     }
 
     [Fact]
-    public void CumulativeXpForLevel_QuadraticThroughKnee()
+    public void CumulativeXpForLevel_EarlyLevelsAreAFlatCheapClimb()
     {
-        // Each step below the knee costs 100 more than the one before it.
-        for (var level = 3; level <= Leveling.XpCurveKneeLevel; level++)
+        // Levels 2..EarlyFlatLevel each cost the same small amount.
+        for (var level = 2; level <= Leveling.EarlyFlatLevel; level++)
+        {
+            var step = Leveling.CumulativeXpForLevel(level) - Leveling.CumulativeXpForLevel(level - 1);
+            Assert.Equal(Leveling.EarlyLevelXpCost, step);
+        }
+    }
+
+    [Fact]
+    public void CumulativeXpForLevel_QuadraticFromTheEarlyBandThroughTheKnee()
+    {
+        // Once past the flat early band the quadratic ramp resumes: each
+        // step costs 100 more than the one before it, right up to the knee.
+        for (var level = Leveling.EarlyFlatLevel + 2; level <= Leveling.XpCurveKneeLevel; level++)
         {
             var stepHere = Leveling.CumulativeXpForLevel(level) - Leveling.CumulativeXpForLevel(level - 1);
             var stepBefore = Leveling.CumulativeXpForLevel(level - 1) - Leveling.CumulativeXpForLevel(level - 2);

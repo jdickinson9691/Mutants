@@ -1,6 +1,7 @@
 using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Items;
+using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Stats;
 using ChronoTravelers.Core.World;
 
@@ -269,7 +270,9 @@ public class TravelerTests
 
         Assert.Equal(agiBefore + 5, traveler.Stats.Agility);
         Assert.Equal(speedBefore + 5, traveler.Speed);                       // speed = Agility
-        Assert.Equal(defBefore + ((agiBefore + 5) / 2 - agiBefore / 2), traveler.EffectiveDefense); // defense = Agility / 2
+        Assert.Equal(
+            defBefore + ((int)((agiBefore + 5) / MonsterScaling.AgilityToDefenseDivisor) - (int)(agiBefore / MonsterScaling.AgilityToDefenseDivisor)),
+            traveler.EffectiveDefense); // defense = Agility / AgilityToDefenseDivisor (2.5)
         Assert.True(traveler.EffectiveDefense > defBefore);
     }
 

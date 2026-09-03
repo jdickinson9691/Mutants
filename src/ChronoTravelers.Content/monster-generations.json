@@ -1,0 +1,85 @@
+[
+  {
+    "fromYear": 2000, "name": "The Salvage Swarm",
+    "species": [
+      { "id": "junk-shambler", "name": "Junk Shambler", "tags": [], "archetype": "Baseline", "lootThemeTags": ["scrap", "common"] },
+      { "id": "arc-wisp", "name": "Arc Wisp", "tags": ["echo"], "archetype": "Caster", "lootThemeTags": ["scrap", "neon"],
+        "behaviorProfile": { "fleeBelowHpFraction": 0.3 } },
+      { "id": "junkyard-colossus", "name": "Junkyard Colossus", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["scrap", "common"],
+        "powerProfile": { "hpMultiplier": 1.15 } },
+      { "id": "circuit-jackal", "name": "Circuit Jackal", "tags": [], "archetype": "Skirmisher", "lootThemeTags": ["neon", "common"],
+        "behaviorProfile": { "packHunting": true } },
+      { "id": "riot-chassis", "name": "Riot Chassis", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["scrap", "neon"],
+        "behaviorProfile": { "neverInfights": true } }
+    ]
+  },
+  {
+    "fromYear": 2500, "name": "The Drowned Ashfall",
+    "species": [
+      { "id": "silt-crawler", "name": "Silt Crawler", "tags": [], "archetype": "Baseline", "lootThemeTags": ["drowned", "common"] },
+      { "id": "cinder-wraith", "name": "Cinder Wraith", "tags": ["echo"], "archetype": "Caster", "lootThemeTags": ["ash"],
+        "behaviorProfile": { "fleeBelowHpFraction": 0.3 } },
+      { "id": "tide-behemoth", "name": "Tide Behemoth", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["drowned", "common"],
+        "powerProfile": { "hpMultiplier": 1.2, "defenseMultiplier": 1.1 } },
+      { "id": "ash-skitterer", "name": "Ash Skitterer", "tags": [], "archetype": "Skirmisher", "lootThemeTags": ["ash", "common"],
+        "behaviorProfile": { "aggroRangeBonus": 1 } },
+      { "id": "brine-stalker", "name": "Brine Stalker", "tags": [], "archetype": "Skirmisher", "lootThemeTags": ["drowned", "ash"],
+        "powerProfile": { "speedMultiplier": 1.15 } }
+    ]
+  },
+  {
+    "fromYear": 3000, "name": "The Deep Reaches",
+    "species": [
+      { "id": "archive-drone", "name": "Archive Drone", "tags": [], "archetype": "Baseline", "lootThemeTags": ["deep", "common"] },
+      { "id": "choir-remnant", "name": "Choir Remnant", "tags": ["echo"], "archetype": "Caster", "lootThemeTags": ["deep"],
+        "behaviorProfile": { "packHunting": true } },
+      { "id": "vault-titan", "name": "Vault Titan", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["deep", "common"],
+        "powerProfile": { "hpMultiplier": 1.25 } },
+      { "id": "gallery-eel", "name": "Gallery Eel", "tags": [], "archetype": "Skirmisher", "lootThemeTags": ["deep", "drowned"] },
+      { "id": "record-warden", "name": "Record Warden", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["deep", "common"],
+        "behaviorProfile": { "neverInfights": true, "ambushDamageMultiplier": 1.2 } }
+    ]
+  },
+  {
+    "fromYear": 3500, "name": "The Frostbound Deep",
+    "species": [
+      { "id": "rime-shambler", "name": "Rime Shambler", "tags": [], "archetype": "Baseline", "lootThemeTags": ["frost", "common"] },
+      { "id": "glacial-echo", "name": "Glacial Echo", "tags": ["echo"], "archetype": "Caster", "lootThemeTags": ["frost"],
+        "behaviorProfile": { "fleeBelowHpFraction": 0.35 } },
+      { "id": "permafrost-colossus", "name": "Permafrost Colossus", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["frost", "deep"],
+        "powerProfile": { "hpMultiplier": 1.2, "defenseMultiplier": 1.15 } },
+      { "id": "frost-skitterer", "name": "Frost Skitterer", "tags": [], "archetype": "Skirmisher", "lootThemeTags": ["frost", "common"],
+        "powerProfile": { "speedMultiplier": 1.2 } },
+      { "id": "cryo-sentinel", "name": "Cryo Sentinel", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["frost", "deep"],
+        "behaviorProfile": { "neverInfights": true } }
+    ]
+  },
+  {
+    "fromYear": 4000, "name": "The Shattered Void",
+    "species": [
+      { "id": "debris-crawler", "name": "Debris Crawler", "tags": [], "archetype": "Baseline", "lootThemeTags": ["orbital", "common"] },
+      { "id": "static-phantom", "name": "Static Phantom", "tags": ["echo"], "archetype": "Caster", "lootThemeTags": ["orbital"],
+        "behaviorProfile": { "fleeBelowHpFraction": 0.3 } },
+      { "id": "hull-titan", "name": "Hull Titan", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["orbital", "common"],
+        "powerProfile": { "hpMultiplier": 1.2 } },
+      { "id": "vacuum-skiff", "name": "Vacuum Skiff", "tags": [], "archetype": "Skirmisher", "lootThemeTags": ["orbital", "common"],
+        "behaviorProfile": { "aggroRangeBonus": 1 } },
+      { "id": "orbital-jackal", "name": "Orbital Jackal", "tags": [], "archetype": "Skirmisher", "lootThemeTags": ["orbital"],
+        "behaviorProfile": { "packHunting": true } }
+    ]
+  },
+  {
+    "fromYear": 4500, "name": "The Paradox Fray",
+    "species": [
+      { "id": "fray-shambler", "name": "Fray Shambler", "tags": [], "archetype": "Baseline", "lootThemeTags": ["paradox", "common"] },
+      { "id": "echo-fragment", "name": "Echo Fragment", "tags": ["echo"], "archetype": "Caster", "lootThemeTags": ["paradox"],
+        "behaviorProfile": { "fleeBelowHpFraction": 0.3 } },
+      { "id": "causal-colossus", "name": "Causal Colossus", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["paradox", "common"],
+        "powerProfile": { "hpMultiplier": 1.25, "attackMultiplier": 1.05 } },
+      { "id": "temporal-skitterer", "name": "Temporal Skitterer", "tags": [], "archetype": "Skirmisher", "lootThemeTags": ["paradox", "common"],
+        "powerProfile": { "speedMultiplier": 1.25 } },
+      { "id": "paradox-warden", "name": "Paradox Warden", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["paradox"],
+        "behaviorProfile": { "neverInfights": true, "ambushDamageMultiplier": 1.25 } }
+    ]
+  }
+]

@@ -20,19 +20,19 @@ public static class ContentLoader
 
     /// <summary>
     /// Loads the continuous-timeline world (ChronoTravelers.Core.Time) from a
-    /// content directory expected to contain <c>monster-species.json</c>,
+    /// content directory expected to contain <c>monster-generations.json</c>,
     /// <c>item-archetypes.json</c>, <c>eras.json</c>, and (optionally)
     /// <c>store-templates.json</c>. <paramref name="worldSeed"/> is the
     /// per-save seed that fixes the Warden schedule and every year's
     /// map/store layout. Throws <see cref="ContentException"/> on a
     /// missing/malformed file, an unknown enum value, or a failed
-    /// cross-reference (the <see cref="EraTable"/> / <see cref="TimeWorld"/>
-    /// validation surfaced as content errors).
+    /// cross-reference (the <see cref="EraTable"/> / <see cref="GenerationTable"/>
+    /// / <see cref="TimeWorld"/> validation surfaced as content errors).
     /// </summary>
     public static TimeWorld LoadTimeWorld(string contentDirectory, long worldSeed)
     {
-        var species = ReadJson<List<MonsterSpeciesData>>(Path.Combine(contentDirectory, "monster-species.json"))
-            .Select(ToSpecies)
+        var generations = ReadJson<List<MonsterGenerationData>>(Path.Combine(contentDirectory, "monster-generations.json"))
+            .Select(ToGeneration)
             .ToList();
 
         var archetypes = LoadItemArchetypes(Path.Combine(contentDirectory, "item-archetypes.json"));
@@ -55,9 +55,19 @@ public static class ContentLoader
             throw new ContentException($"eras.json: {ex.Message}", ex);
         }
 
+        GenerationTable generationTable;
         try
         {
-            return new TimeWorld(worldSeed, eraTable, species, archetypes, storeTemplate);
+            generationTable = new GenerationTable(generations);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new ContentException($"monster-generations.json: {ex.Message}", ex);
+        }
+
+        try
+        {
+            return new TimeWorld(worldSeed, eraTable, generationTable, archetypes, storeTemplate);
         }
         catch (ArgumentException ex)
         {
@@ -106,6 +116,9 @@ public static class ContentLoader
         return weights;
     }
 
+    private static GenerationDefinition ToGeneration(MonsterGenerationData data) =>
+        new(data.FromYear, data.Name, data.Species.Select(ToSpecies).ToList());
+
     private static SpeciesDefinition ToSpecies(MonsterSpeciesData data)
     {
         if (!Enum.TryParse<MonsterArchetype>(data.Archetype, ignoreCase: true, out var archetype))
@@ -113,7 +126,24 @@ public static class ContentLoader
             throw new ContentException($"Species '{data.Id}': unknown archetype '{data.Archetype}'.");
         }
 
-        return new SpeciesDefinition(data.Id, data.Name, data.Tags, archetype, data.LootThemeTags);
+        var powerProfile = data.PowerProfile is { } p
+            ? new PowerProfile(p.HpMultiplier, p.AttackMultiplier, p.DefenseMultiplier, p.SpeedMultiplier)
+            : null;
+
+        // fleeBelowHpFraction is nullable in the DTO so an authored
+        // behaviorProfile block that omits it still falls back to the
+        // archetype-based default (SpeciesDefinition.EffectiveBehaviorProfile)
+        // rather than silently becoming 0 ("never flees").
+        BehaviorProfile? behaviorProfile = data.BehaviorProfile is { } b
+            ? new BehaviorProfile(
+                b.FleeBelowHpFraction ?? (archetype == MonsterArchetype.Bruiser ? 0.0 : 0.25),
+                b.PackHunting,
+                b.NeverInfights,
+                b.AggroRangeBonus,
+                b.AmbushDamageMultiplier)
+            : null;
+
+        return new SpeciesDefinition(data.Id, data.Name, data.Tags, archetype, data.LootThemeTags, powerProfile, behaviorProfile);
     }
 
     private static ItemArchetypeDefinition ToArchetype(ItemArchetypeData data)
@@ -159,6 +189,11 @@ public static class ContentLoader
             throw new ContentException($"Item archetype '{data.Id}': type 'Ranged' requires a rangedKind ('Wand', 'Bow', or 'Gun').");
         }
 
+        if (rangedKind != RangedKind.None && data.Range is < 1 or > 4)
+        {
+            throw new ContentException($"Item archetype '{data.Id}': range {data.Range} is outside [1, 4].");
+        }
+
         var isEquippable = type is ItemType.Weapon or ItemType.Armor || rangedKind != RangedKind.None;
 
         Rarity rarity;
@@ -188,11 +223,12 @@ public static class ContentLoader
         return new ItemArchetypeDefinition(
             data.Id, data.Name, type, rarity, restrictedClass,
             effect, data.EffectMagnitude, data.EffectDurationTicks, data.ThemeTags,
-            rangedKind, data.AmmoCapacity, rangedEffect, powerMultiplier);
+            rangedKind, data.AmmoCapacity, rangedEffect, powerMultiplier,
+            rangedKind == RangedKind.None ? 1 : data.Range);
     }
 
     private static EraDefinition ToEra(EraData data) =>
-        new(data.FromYear, data.Name, data.RoomText, data.SpeciesIds, data.ItemThemeTags);
+        new(data.FromYear, data.Name, data.RoomText, data.ItemThemeTags);
 
     private static T ReadJson<T>(string path)
     {

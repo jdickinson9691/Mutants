@@ -86,8 +86,10 @@ public class ContentLoaderTests
 
     // --- LoadTimeWorld (continuous timeline) ---------------------------------
 
-    private const string MinimalSpeciesJson = """
-        [ { "id": "grunt", "name": "Grunt", "archetype": "Baseline", "lootThemeTags": ["common"] } ]
+    private const string MinimalGenerationsJson = """
+        [ { "fromYear": 2000, "name": "First Generation", "species": [
+              { "id": "grunt", "name": "Grunt", "archetype": "Baseline", "lootThemeTags": ["common"] }
+            ] } ]
         """;
 
     private const string MinimalArchetypesJson = """
@@ -101,12 +103,12 @@ public class ContentLoaderTests
         """;
 
     private const string MinimalErasJson = """
-        [ { "fromYear": 2000, "name": "Start", "roomText": ["a room."], "speciesIds": ["grunt"], "itemThemeTags": ["common"] } ]
+        [ { "fromYear": 2000, "name": "Start", "roomText": ["a room."], "itemThemeTags": ["common"] } ]
         """;
 
-    private static string WriteMinimalTimeline(TempContentDirectory dir, string? species = null, string? archetypes = null, string? eras = null)
+    private static string WriteMinimalTimeline(TempContentDirectory dir, string? generations = null, string? archetypes = null, string? eras = null)
     {
-        dir.WriteFile("monster-species.json", species ?? MinimalSpeciesJson);
+        dir.WriteFile("monster-generations.json", generations ?? MinimalGenerationsJson);
         dir.WriteFile("item-archetypes.json", archetypes ?? MinimalArchetypesJson);
         dir.WriteFile("eras.json", eras ?? MinimalErasJson);
         return dir.Path;
@@ -127,30 +129,38 @@ public class ContentLoaderTests
     public void LoadTimeWorld_ThrowsOnUnknownArchetypeEnum()
     {
         using var dir = new TempContentDirectory();
-        var badSpecies = """[ { "id": "x", "name": "X", "archetype": "Nonsense", "lootThemeTags": ["common"] } ]""";
+        var badGenerations = """
+            [ { "fromYear": 2000, "name": "First Generation", "species": [
+                  { "id": "x", "name": "X", "archetype": "Nonsense", "lootThemeTags": ["common"] }
+                ] } ]
+            """;
 
         Assert.Throws<ContentException>(() =>
-            ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir, species: badSpecies), worldSeed: 1));
+            ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir, generations: badGenerations), worldSeed: 1));
     }
 
     [Fact]
     public void LoadTimeWorld_ThrowsWhenTheFirstEraDoesNotStartAt2000()
     {
         using var dir = new TempContentDirectory();
-        var badEras = """[ { "fromYear": 2100, "name": "Late", "roomText": ["r."], "speciesIds": ["grunt"], "itemThemeTags": ["common"] } ]""";
+        var badEras = """[ { "fromYear": 2100, "name": "Late", "roomText": ["r."], "itemThemeTags": ["common"] } ]""";
 
         Assert.Throws<ContentException>(() =>
             ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir, eras: badEras), worldSeed: 1));
     }
 
     [Fact]
-    public void LoadTimeWorld_ThrowsWhenAnEraReferencesAnUnknownSpecies()
+    public void LoadTimeWorld_ThrowsWhenTheFirstGenerationDoesNotStartAt2000()
     {
         using var dir = new TempContentDirectory();
-        var badEras = """[ { "fromYear": 2000, "name": "S", "roomText": ["r."], "speciesIds": ["ghost"], "itemThemeTags": ["common"] } ]""";
+        var badGenerations = """
+            [ { "fromYear": 2100, "name": "Late", "species": [
+                  { "id": "grunt", "name": "Grunt", "archetype": "Baseline", "lootThemeTags": ["common"] }
+                ] } ]
+            """;
 
         Assert.Throws<ContentException>(() =>
-            ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir, eras: badEras), worldSeed: 1));
+            ContentLoader.LoadTimeWorld(WriteMinimalTimeline(dir, generations: badGenerations), worldSeed: 1));
     }
 
     [Fact]
@@ -174,7 +184,7 @@ public class ContentLoaderTests
     public void LoadTimeWorld_ThrowsForAMissingCatalogFile()
     {
         using var dir = new TempContentDirectory();
-        dir.WriteFile("monster-species.json", MinimalSpeciesJson);
+        dir.WriteFile("monster-generations.json", MinimalGenerationsJson);
         // no item-archetypes.json / eras.json
         Assert.Throws<ContentException>(() => ContentLoader.LoadTimeWorld(dir.Path, worldSeed: 1));
     }
@@ -359,7 +369,7 @@ public class ContentLoaderTests
     public void LoadTimeWorld_ThrowsForInvalidJson()
     {
         using var dir = new TempContentDirectory();
-        dir.WriteFile("monster-species.json", "{ not valid ]");
+        dir.WriteFile("monster-generations.json", "{ not valid ]");
         dir.WriteFile("item-archetypes.json", MinimalArchetypesJson);
         dir.WriteFile("eras.json", MinimalErasJson);
 

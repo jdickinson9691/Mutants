@@ -24,8 +24,14 @@ public static class Leveling
     /// <summary>The last level that unlocks an ability tier — <see cref="AbilityTierCount"/> × <see cref="LevelsPerAbilityTier"/>. Levels past this grow stats but no new abilities (yet).</summary>
     public const int TopAbilityLevel = AbilityTierCount * LevelsPerAbilityTier;
 
-    /// <summary>Where the XP-per-level cost stops rising and holds flat — so levels 26–60 are a reachable grind, not a quadratic wall. Levels 1–25 are unchanged from the pre-cap-60 curve.</summary>
+    /// <summary>Where the XP-per-level cost stops rising and holds flat — so levels 26–60 are a reachable grind, not a quadratic wall.</summary>
     public const int XpCurveKneeLevel = 25;
+
+    /// <summary>Levels 2..this cost a small flat <see cref="EarlyLevelXpCost"/> each, instead of the quadratic ramp — see <see cref="CumulativeXpForLevel"/>.</summary>
+    public const int EarlyFlatLevel = 5;
+
+    /// <summary>Flat XP per level for levels 2..<see cref="EarlyFlatLevel"/> — roughly 1–2 tier-1 kills apiece.</summary>
+    public const int EarlyLevelXpCost = 60;
 
     /// <summary>Points added to the class's primary stat on each level-up.</summary>
     public const int PrimaryStatGainPerLevel = 2;
@@ -35,11 +41,23 @@ public static class Leveling
 
     /// <summary>
     /// Cumulative XP required to reach <paramref name="level"/> from level 1.
-    /// Quadratic (each level costs <c>100 · (level-1)</c> more than the last)
-    /// through <see cref="XpCurveKneeLevel"/>, then a flat per-level cost of
-    /// <c>100 · (XpCurveKneeLevel-1)</c> after — so the raised cap doesn't
-    /// turn the deep game into a quadratic grind wall. Levels 1–25 are
-    /// identical to the pre-cap-60 curve. Original tuning.
+    /// <para>
+    /// Levels 2..<see cref="EarlyFlatLevel"/> cost a small flat
+    /// <see cref="EarlyLevelXpCost"/> each — a fresh arrival that clears a
+    /// couple of fights levels straight into its year's band instead of
+    /// grinding a dozen kills for level 2 while healing itself dry
+    /// (playtest: cold-start runs won their fights but ran out of Tachyons
+    /// before the HP-per-level growth kicked in).
+    /// </para>
+    /// <para>
+    /// From <see cref="EarlyFlatLevel"/> up the original quadratic ramp
+    /// resumes (each level costs <c>100·(level-1)</c> more than the last),
+    /// shifted down by a single constant so it joins smoothly — the
+    /// mid/deep game tracks the previous curve to within that fixed
+    /// ~760&#160;XP. Past <see cref="XpCurveKneeLevel"/> the per-level cost
+    /// holds flat at <c>100·<see cref="XpCurveKneeLevel"/></c> so the raised
+    /// level cap isn't a quadratic wall. Original tuning.
+    /// </para>
     /// </summary>
     public static int CumulativeXpForLevel(int level)
     {
@@ -51,15 +69,25 @@ public static class Leveling
         // Triangular-number ramp: reaching level L costs sum(100·k) for k in 1..L-1.
         static int Ramp(int lvl) => 100 * (lvl - 1) * lvl / 2;
 
+        if (level <= EarlyFlatLevel)
+        {
+            return EarlyLevelXpCost * (level - 1);
+        }
+
+        // The quadratic ramp resumes from EarlyFlatLevel, shifted down by
+        // this constant so CumulativeXpForLevel(EarlyFlatLevel) matches the
+        // flat band exactly (no seam in the cumulative total).
+        var earlyOffset = Ramp(EarlyFlatLevel) - EarlyLevelXpCost * (EarlyFlatLevel - 1);
+
         if (level <= XpCurveKneeLevel)
         {
-            return Ramp(level);
+            return Ramp(level) - earlyOffset;
         }
 
         // Past the knee: the per-level cost stops rising and holds at what
         // the next quadratic step (25→26) would have been — a smooth join.
         var flatPerLevel = 100 * XpCurveKneeLevel;
-        return Ramp(XpCurveKneeLevel) + flatPerLevel * (level - XpCurveKneeLevel);
+        return Ramp(XpCurveKneeLevel) - earlyOffset + flatPerLevel * (level - XpCurveKneeLevel);
     }
 
     /// <summary>

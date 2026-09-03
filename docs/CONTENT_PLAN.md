@@ -14,24 +14,44 @@ file I/O.
 
 ## Catalogs
 
-- [x] **Monster species** — `monster-species.json`. ~25 species: `{ id,
-      name, tags, archetype, lootThemeTags }`, no numbers. `archetype` is
+- [x] **Monster generations & species** — `monster-generations.json`. Six
+      **500-year monster generations** (2000/2500/3000/3500/4000/4500),
+      each a wholly separate ~5-species roster — new names, not reused
+      across generations — nested under `{ fromYear, name, species: [...] }`.
+      Each species: `{ id, name, tags, archetype, lootThemeTags,
+      powerProfile?, behaviorProfile? }`, no tier numbers. `archetype` is
       one of `Baseline | Caster | Bruiser | Skirmisher`
       (`ChronoTravelers.Core.Time.MonsterArchetype`); `TimelineContentFactory`
-      turns it into concrete stats (incl. an Tachyon pool from
-      `MonsterScaling.BaseTachyons`) at the encounter year, as a fixed offset
-      from `MonsterScaling`'s baseline for that year. `"echo"` tags
-      carry through to combat (Doctor "Purge Echo", GDD §4.2). Loot is
-      rolled from item archetypes whose `themeTags` intersect the
-      species' `lootThemeTags` (or the era's), scaled to the year.
+      turns it into concrete stats (incl. a Tachyon pool from
+      `MonsterScaling.BaseTachyons`) at the encounter year, as a fixed
+      archetype offset from `MonsterScaling`'s baseline for that year, then
+      `powerProfile`'s per-stat multipliers on top (`ChronoTravelers.Core.
+      Time.PowerProfile` — hp/attack/defense/speed, default 1.0 each) so
+      two species sharing an archetype aren't numerically identical.
+      `behaviorProfile` (`ChronoTravelers.Core.Time.BehaviorProfile`) layers
+      real per-species behavior onto `MonsterController`'s shared tick loop:
+      `fleeBelowHpFraction` (breaks and runs once hurt enough — omitted
+      falls back to an archetype default, 0.25 except Bruisers at 0),
+      `packHunting` (aggro splashes to same-species roommates),
+      `neverInfights`, `aggroRangeBonus`, and `ambushDamageMultiplier`.
+      `"echo"` tags carry through to combat (Doctor "Purge Echo", GDD §4.2).
+      Loot is rolled from item archetypes whose `themeTags` intersect the
+      species' `lootThemeTags` (or the era's — see below), scaled to the
+      year. **Which monster generation a year falls in is a separate axis
+      from which era it falls in** (`GenerationTable.GenerationForYear`,
+      independent of `EraTable.EraForYear`): eras (~200–250 years each) own
+      room text and loot/item theming only; generations (fixed 500 years
+      each) own the monster roster, stats, and behavior. The two bandings
+      deliberately don't line up.
       **Placed spatially** (GDD §7.1): `YearPopulation.Seed` drops
       `max(2, roomCount/3)` of the year's roster into its rooms on first
       entry — plus, in ~half of years, one or two **apex** monsters
       (`TimelineContentFactory.ApexForSpecies`, `Monster.IsApex`, "Frayed
       &lt;species&gt;": ~2.4× HP, ~3.5× XP, gear-heavy loot, near-zero
-      aggro) — and `MonsterController` drifts (slow + random) / infights /
-      heals them each tick. No per-year placement content — it's all
-      derived from the species roster + the world seed.
+      aggro, and never flees/pursues regardless of its species'
+      `behaviorProfile`) — and `MonsterController` drifts (slow + random) /
+      infights / heals them each tick. No per-year placement content — it's
+      all derived from the generation's roster + the world seed.
 
 - [x] **Item archetypes** — `item-archetypes.json`. ~95 archetypes: `{ id,
       name, type, powerMultiplier? | rarity, restrictedClass?, effect?,
