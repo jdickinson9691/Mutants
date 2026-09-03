@@ -59,7 +59,14 @@ public static class TimelineContentFactory
         var xp = (int)Math.Round(MonsterScaling.XpReward(tier));
         var tachyons = (int)Math.Round(MonsterScaling.BaseTachyons(tier));
         var displayTier = DisplayTier(year);
-        var tags = species.Tags;
+        // "caster" is derived here (not content-authored) so Scientist's
+        // "Field Calibration" passive (docs/GDD.md §4.2.1 — bonus damage
+        // vs. Caster-archetype monsters) has something concrete to check:
+        // Monster carries free-form Tags but never MonsterArchetype itself
+        // (that only exists at content-gen time, right here).
+        IReadOnlyList<string> tags = species.Archetype == MonsterArchetype.Caster
+            ? [.. species.Tags, "caster"]
+            : species.Tags;
         var name = species.Name;
         var behavior = species.EffectiveBehaviorProfile;
 

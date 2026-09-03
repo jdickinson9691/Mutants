@@ -164,6 +164,10 @@ public static class MonsterController
             // An apex barely registers a passer-by (it picks its fights),
             // so every gain it would take is heavily scaled down.
             var aggroScale = monster.IsApex ? AggroModel.ApexAggroMultiplier : 1.0;
+            // Spy "Low Profile" — shrinks every aggro gain the player causes
+            // (docs/GDD.md §4.2.1). 1.0 (no change) when there's no player
+            // in this year or the passive isn't unlocked.
+            aggroScale *= playerHere ? player!.AggroGainMultiplier : 1.0;
 
             if (!playerHere || playerSafe || distance > effectiveAggroRange)
             {
@@ -770,6 +774,20 @@ public static class MonsterController
             return false;
         }
 
+        // Spy "Fleet-Footed" / Engineer "Redundant Systems" — a chance to
+        // dodge the ambush before it lands at all (docs/GDD.md §4.2.1). Doctor
+        // "Trauma Ward" is the same shape (negate rather than dodge) so both
+        // roll here, before any damage is even calculated.
+        if (player.AmbushDodgeChance > 0 && random.NextDouble() < player.AmbushDodgeChance)
+        {
+            return false;
+        }
+
+        if (player.AmbushNegateChance > 0 && random.NextDouble() < player.AmbushNegateChance)
+        {
+            return false;
+        }
+
         // An ambush catches you unbraced — only half your defense applies, so
         // a lingering low-tier monster still stings rather than pinging for 1.
         // AmbushDamageMultiplier (Monster/BehaviorProfile) lets a species hit
@@ -777,7 +795,10 @@ public static class MonsterController
         // every species that doesn't author one, i.e. unchanged.
         var raw = CombatResolver.RollDamage(attacker.EffectiveAttackPower, player.EffectiveDefense / 2, random);
         var scaled = Math.Max(0, (int)Math.Round(raw * attacker.AmbushDamageMultiplier));
-        var dealt = player.Health.Damage(scaled);
+        // Routes through TakeDamage rather than Health.Damage directly so
+        // Soldier "Thick Hide" (ambush-specific) and Doctor "Resonant Calm"
+        // (echo-specific) apply the same as everywhere else damage lands.
+        var dealt = player.TakeDamage(scaled, attackerIsEcho: attacker.HasTag("echo"), isAmbush: true);
         broadcast.Publish(GameEvent.Ambushed(attacker.Name, player.Name, dealt, year));
         return true;
     }

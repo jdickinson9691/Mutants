@@ -57,6 +57,11 @@ public sealed class CombatSession
         _random = random;
         AllowBanish = allowBanish;
 
+        // Fight-scoped passive state (Juggernaut Momentum's streak,
+        // Unbreakable's once-per-fight save — docs/GDD.md §4.2.1) starts
+        // fresh for this fight, same as CombatResolver.Fight.
+        traveler.ResetPerFightState();
+
         // A ranged Weaken shot landed before this fight — apply it once,
         // then spend it (see ChronoTravelers.Engine.Combat.RangedResolver).
         if (monster.PendingDefensePenalty > 0)
@@ -124,14 +129,24 @@ public sealed class CombatSession
             return new AbilityCastResult(false, $"{ability.Name} has no effect against a warden. No Tachyons spent.");
         }
 
-        if (!Traveler.Tachyons.CanAfford(ability.TachyonCost))
+        // Scientist "Stable Core" — a chance the cast is free outright
+        // (docs/GDD.md §4.2.1), rolled before Engineer "Failsafe
+        // Capacitor"'s discount even gets a chance to apply.
+        var freeCast = Traveler.FreeCastChance > 0 && _random.NextDouble() < Traveler.FreeCastChance;
+        var cost = freeCast ? 0 : Traveler.EffectiveCastCost(ability.TachyonCost);
+
+        if (!Traveler.Tachyons.CanAfford(cost))
         {
-            return new AbilityCastResult(false, $"Not enough Tachyons ({ability.TachyonCost} needed; you have {Traveler.Tachyons.Current}).");
+            return new AbilityCastResult(false, $"Not enough Tachyons ({cost} needed; you have {Traveler.Tachyons.Current}).");
         }
 
-        Traveler.Tachyons.Spend(ability.TachyonCost);
+        if (cost > 0)
+        {
+            Traveler.Tachyons.Spend(cost);
+        }
+
         ResolveRound(ability, effectType);
-        return new AbilityCastResult(true, $"{Traveler.Name} casts {ability.Name}!");
+        return new AbilityCastResult(true, freeCast ? $"{Traveler.Name} casts {ability.Name} at no cost!" : $"{Traveler.Name} casts {ability.Name}!");
     }
 
     private void ResolveRound(AbilityData? ability, AbilityEffectType effectType)
@@ -299,8 +314,10 @@ public sealed class CombatSession
 
         var defense = ignoreDefense ? 0 : MonsterEffectiveDefense();
         var baseDamage = CombatResolver.RollDamage(TravelerEffectiveAttack(), defense, _random);
-        var damage = Math.Max(1, (int)Math.Round(baseDamage * damageMultiplier));
+        var passiveMultiplier = Traveler.AttackDamageMultiplierAgainst(Monster);
+        var damage = Math.Max(1, (int)Math.Round(baseDamage * damageMultiplier * passiveMultiplier));
         var actualDamage = Monster.Health.Damage(damage);
+        Traveler.RecordAttackLanded();
         _log.Add($"{Traveler.Name} hits {Monster.Name} for {actualDamage} damage.");
     }
 
@@ -315,7 +332,7 @@ public sealed class CombatSession
             return;
         }
 
-        var actualDamage = Traveler.Health.Damage(incoming);
+        var actualDamage = Traveler.TakeDamage(incoming, attackerIsEcho: Monster.HasTag("echo"));
         _log.Add($"{Monster.Name} hits {Traveler.Name} for {actualDamage} damage.");
     }
 

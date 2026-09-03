@@ -32,13 +32,18 @@ public static class RangedResolver
         // Ranged damage = primary stat + the ranged weapon's own bonus
         // (class-fit scaled) x its magnitude — deliberately NOT the melee
         // weapon bonus or potion buffs, which belong to melee attacks.
-        var weaponBonus = (int)Math.Round(weapon.AttackBonus * weapon.WieldEffectiveness(shooter.Class));
+        var offClassPenaltyReduction = Core.Characters.PassiveTraits.Sum(shooter.Class, shooter.Level, Core.Characters.PassiveHook.OffClassPenaltyReductionPct);
+        var weaponBonus = (int)Math.Round(weapon.AttackBonus * weapon.WieldEffectiveness(shooter.Class, offClassPenaltyReduction));
         var attack = shooter.Stats.Get(shooter.ClassDefinition.PrimaryStat) + weaponBonus;
 
         var pierces = weapon.RangedKind is RangedKind.Wand or RangedKind.Gun;
         var raw = CombatResolver.RollDamage(attack, pierces ? 0 : target.Defense, random);
         var magnitude = weapon.EffectMagnitude > 0 ? weapon.EffectMagnitude : 1.0;
-        var damage = Math.Max(1, (int)Math.Round(raw * magnitude));
+        // Spy "Opportunist" / Scientist "Field Calibration" (docs/GDD.md
+        // §4.2.1) apply to ranged shots too — same target-aware multiplier
+        // as a melee hit.
+        var passiveMultiplier = shooter.AttackDamageMultiplierAgainst(target);
+        var damage = Math.Max(1, (int)Math.Round(raw * magnitude * passiveMultiplier));
 
         var dealt = target.Health.Damage(damage);
         var killed = target.Health.IsDead;

@@ -42,29 +42,34 @@ public static class CombatResolver
         var travelerActsFirst = traveler.Speed >= monster.Speed;
         var rounds = 0;
 
+        // Passives that only mean something "this fight" (Juggernaut
+        // Momentum's streak, Unbreakable's once-per-fight save) start fresh
+        // every time — see docs/GDD.md §4.2.1.
+        traveler.ResetPerFightState();
+
         while (!traveler.Health.IsDead && !monster.Health.IsDead && rounds < MaxRounds)
         {
             rounds++;
 
             if (travelerActsFirst)
             {
-                ResolveAttack(traveler.Name, traveler.EffectiveAttackPower, monster.Name, monster.Defense, monster.Health, random, log);
+                AttackMonster(traveler, monster, random, log);
                 if (monster.Health.IsDead)
                 {
                     break;
                 }
 
-                ResolveAttack(monster.Name, monster.EffectiveAttackPower, traveler.Name, traveler.EffectiveDefense, traveler.Health, random, log);
+                AttackTraveler(monster, traveler, random, log);
             }
             else
             {
-                ResolveAttack(monster.Name, monster.EffectiveAttackPower, traveler.Name, traveler.EffectiveDefense, traveler.Health, random, log);
+                AttackTraveler(monster, traveler, random, log);
                 if (traveler.Health.IsDead)
                 {
                     break;
                 }
 
-                ResolveAttack(traveler.Name, traveler.EffectiveAttackPower, monster.Name, monster.Defense, monster.Health, random, log);
+                AttackMonster(traveler, monster, random, log);
             }
         }
 
@@ -152,14 +157,22 @@ public static class CombatResolver
         return Math.Max(1, (int)Math.Round(raw * varianceFactor));
     }
 
-    private static void ResolveAttack(
-        string attackerName, int attackerPower,
-        string defenderName, int defenderDefense,
-        Core.Stats.HealthPool defenderHealth,
-        IRandomSource random, List<string> log)
+    /// <summary>Traveler-attacks-monster half of a round — folds in every passive that depends on knowing the target (docs/GDD.md §4.2.1: Spy "Opportunist", Scientist "Field Calibration") and records the hit for Soldier "Juggernaut Momentum".</summary>
+    private static void AttackMonster(Traveler traveler, Monster monster, IRandomSource random, List<string> log)
     {
-        var damage = RollDamage(attackerPower, defenderDefense, random);
-        var actualDamage = defenderHealth.Damage(damage);
-        log.Add($"{attackerName} hits {defenderName} for {actualDamage} damage.");
+        var rawDamage = RollDamage(traveler.EffectiveAttackPower, monster.Defense, random);
+        var multiplier = traveler.AttackDamageMultiplierAgainst(monster);
+        var damage = multiplier == 1.0 ? rawDamage : Math.Max(1, (int)Math.Round(rawDamage * multiplier));
+        var actualDamage = monster.Health.Damage(damage);
+        traveler.RecordAttackLanded();
+        log.Add($"{traveler.Name} hits {monster.Name} for {actualDamage} damage.");
+    }
+
+    /// <summary>Monster-attacks-traveler half of a round — routes the hit through <see cref="Traveler.TakeDamage"/> so Second Wind/Resonant Calm/Unbreakable (docs/GDD.md §4.2.1) apply exactly like every other damage-application site.</summary>
+    private static void AttackTraveler(Monster monster, Traveler traveler, IRandomSource random, List<string> log)
+    {
+        var damage = RollDamage(monster.EffectiveAttackPower, traveler.EffectiveDefense, random);
+        var actualDamage = traveler.TakeDamage(damage, attackerIsEcho: monster.HasTag("echo"));
+        log.Add($"{monster.Name} hits {traveler.Name} for {actualDamage} damage.");
     }
 }

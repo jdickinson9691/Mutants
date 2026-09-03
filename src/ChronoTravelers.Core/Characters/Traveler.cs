@@ -132,9 +132,10 @@ public sealed class Traveler
     /// <summary>
     /// Turn order / "who acts first" stat for combat — original design
     /// (not GDD-specified), the raw Agility stat plus any active BuffSpeed
-    /// potion (see <see cref="Consume"/>).
+    /// potion (see <see cref="Consume"/>) plus any flat passive Speed bonus
+    /// (Spy "Quick Reflexes" / Engineer "Overclocked Reflexes" — docs/GDD.md §4.2.1).
     /// </summary>
-    public int Speed => Stats.Agility + TemporarySpeedBonus;
+    public int Speed => Stats.Agility + TemporarySpeedBonus + (int)PassiveTraits.Sum(Class, Level, PassiveHook.FlatSpeedBonus);
 
     /// <summary>Sum of any active BuffAttack potions' magnitude — see <see cref="Consume"/>.</summary>
     private int TemporaryAttackBonus => (int)Math.Round(_activeEffects.Where(e => e.Type == ConsumableEffectType.BuffAttack).Sum(e => e.Magnitude));
@@ -159,10 +160,74 @@ public sealed class Traveler
             var basePower = Stats.Get(ClassDefinition.PrimaryStat);
             var weaponBonus = EquippedWeapon is null
                 ? 0
-                : (int)Math.Round(EquippedWeapon.AttackBonus * EquippedWeapon.WieldEffectiveness(Class));
+                : (int)Math.Round(EquippedWeapon.AttackBonus * EquippedWeapon.WieldEffectiveness(Class, OffClassPenaltyReduction));
 
-            return basePower + weaponBonus + TemporaryAttackBonus;
+            var passiveBonus = basePower + weaponBonus + TemporaryAttackBonus;
+
+            // Scientist "Overcurrent" — bonus while flush with Tachyons
+            // (docs/GDD.md §4.2.1). Read against the nominal pool max, not
+            // Current alone, since the player's pool is uncapped.
+            if (Tachyons.Max > 0 && Tachyons.Current >= Tachyons.Max * 0.5)
+            {
+                passiveBonus += (int)Math.Round(passiveBonus * PassiveTraits.Sum(Class, Level, PassiveHook.HighTachyonAttackBonusPct));
+            }
+
+            // Soldier "Juggernaut Momentum" — grows with consecutive rounds
+            // landed this fight; see RecordAttackLanded/ResetPerFightState.
+            passiveBonus += (int)Math.Round(passiveBonus * _consecutiveHitStacks * PassiveTraits.Sum(Class, Level, PassiveHook.ConsecutiveHitAttackBonusPct));
+
+            return passiveBonus;
         }
+    }
+
+    /// <summary>Off-class wield-penalty reduction from unlocked passives (Soldier "Weapon Discipline" / Engineer "Field-Tested Gear") — see <see cref="Items.Item.WieldEffectiveness"/>.</summary>
+    private double OffClassPenaltyReduction => PassiveTraits.Sum(Class, Level, PassiveHook.OffClassPenaltyReductionPct);
+
+    /// <summary>
+    /// How many consecutive rounds of the current fight this Traveler has
+    /// landed an attack — Soldier's "Juggernaut Momentum" passive
+    /// (docs/GDD.md §4.2.1). Capped at 10 stacks (matching the passive's
+    /// own description) since there's no "miss" in this combat model to
+    /// naturally break a streak — see <see cref="RecordAttackLanded"/>.
+    /// </summary>
+    private int _consecutiveHitStacks;
+
+    private const int MaxConsecutiveHitStacks = 10;
+
+    /// <summary>Call once per attack this Traveler lands — advances Juggernaut Momentum's stack (see <see cref="_consecutiveHitStacks"/>). A no-op for every class without that passive.</summary>
+    public void RecordAttackLanded() => _consecutiveHitStacks = Math.Min(MaxConsecutiveHitStacks, _consecutiveHitStacks + 1);
+
+    /// <summary>Resets fight-scoped passive state (Juggernaut Momentum's streak, Unbreakable's once-per-fight charge) — call at the start of every fight.</summary>
+    public void ResetPerFightState()
+    {
+        _consecutiveHitStacks = 0;
+        _deathProofUsedThisFight = false;
+    }
+
+    /// <summary>
+    /// Damage multiplier for an attack this Traveler makes against
+    /// <paramref name="target"/> — folds in the passives that depend on
+    /// knowing the target (Spy "Opportunist" vs. a low-HP target, Scientist
+    /// "Field Calibration" vs. a Caster-archetype monster), on top of
+    /// whatever multiplier the caller already has (an ability's own
+    /// Magnitude, say). Multiplicative with the caller's multiplier, not
+    /// additive with each other's percentages, to keep this simple.
+    /// </summary>
+    public double AttackDamageMultiplierAgainst(Monster target)
+    {
+        var multiplier = 1.0;
+
+        if (target.Health.Max > 0 && target.Health.Current <= target.Health.Max * 0.4)
+        {
+            multiplier += PassiveTraits.Sum(Class, Level, PassiveHook.LowHpTargetAttackBonusPct);
+        }
+
+        if (target.HasTag("caster"))
+        {
+            multiplier += PassiveTraits.Sum(Class, Level, PassiveHook.CasterDamageBonusPct);
+        }
+
+        return multiplier;
     }
 
     /// <summary>
@@ -180,9 +245,15 @@ public sealed class Traveler
             var baseDefense = (int)(Stats.Agility / MonsterScaling.AgilityToDefenseDivisor);
             var armorBonus = EquippedArmor is null
                 ? 0
-                : (int)Math.Round(EquippedArmor.DefenseBonus * EquippedArmor.WieldEffectiveness(Class));
+                : (int)Math.Round(EquippedArmor.DefenseBonus * EquippedArmor.WieldEffectiveness(Class, OffClassPenaltyReduction));
 
-            return baseDefense + armorBonus + TemporaryDefenseBonus;
+            // Soldier "Hardened" — bonus on top of armor's own DefenseBonus contribution (docs/GDD.md §4.2.1).
+            armorBonus += (int)Math.Round(armorBonus * PassiveTraits.Sum(Class, Level, PassiveHook.ArmorDefenseBonusPct));
+
+            // Engineer "Improvised Plating" — flat Defense bonus.
+            var flatBonus = (int)PassiveTraits.Sum(Class, Level, PassiveHook.FlatDefenseBonus);
+
+            return baseDefense + armorBonus + TemporaryDefenseBonus + flatBonus;
         }
     }
 
@@ -346,6 +417,15 @@ public sealed class Traveler
             throw new ArgumentOutOfRangeException(nameof(ticksPerDrain), ticksPerDrain, "Ticks per drain must be at least 1.");
         }
 
+        // Scientist "Insulated Coils" — slows drain by stretching the tick
+        // interval itself, so the caller (WorldSimulation) never needs to
+        // know this passive exists (docs/GDD.md §4.2.1).
+        var drainRateReduction = PassiveTraits.Sum(Class, Level, PassiveHook.TachyonDrainRateReductionPct);
+        if (drainRateReduction > 0)
+        {
+            ticksPerDrain = Math.Max(1, (int)Math.Round(ticksPerDrain * (1 + drainRateReduction)));
+        }
+
         _ticksSinceTachyonDrain++;
         if (_ticksSinceTachyonDrain < ticksPerDrain)
         {
@@ -382,6 +462,15 @@ public sealed class Traveler
             throw new ArgumentOutOfRangeException(nameof(ticksPerRegen), ticksPerRegen, "Ticks per regen must be at least 1.");
         }
 
+        // Doctor "Overwatch" / Scientist "Efficient Circuits" — faster regen
+        // by shrinking the tick interval (the two stack, same convention as
+        // AdvanceTachyonDrainTick's reduction above).
+        var regenRateBonus = PassiveTraits.Sum(Class, Level, PassiveHook.TachyonRegenRateBonusPct);
+        if (regenRateBonus > 0)
+        {
+            ticksPerRegen = Math.Max(1, (int)Math.Round(ticksPerRegen / (1 + regenRateBonus)));
+        }
+
         _ticksSinceTachyonRegen++;
         if (_ticksSinceTachyonRegen < ticksPerRegen)
         {
@@ -406,6 +495,16 @@ public sealed class Traveler
     /// </summary>
     public void AdvanceEffectTicks()
     {
+        // Doctor "Vital Reserves" — a trickle of passive HP regen every
+        // world tick, independent of whether any potion is active
+        // (docs/GDD.md §4.2.1), so this runs before the active-effects
+        // early-out below.
+        var vitalReservesRate = PassiveTraits.Sum(Class, Level, PassiveHook.MaxHpRegenPerTickPct);
+        if (vitalReservesRate > 0 && !Health.IsDead)
+        {
+            Health.Heal((int)Math.Round(Health.Max * vitalReservesRate));
+        }
+
         if (_activeEffects.Count == 0)
         {
             return;
@@ -428,6 +527,101 @@ public sealed class Traveler
                 _activeEffects[i] = _activeEffects[i] with { TicksRemaining = remaining };
             }
         }
+    }
+
+    /// <summary>Whether this fight's Soldier "Unbreakable" charge has already saved this Traveler once — see <see cref="TakeDamage"/> and <see cref="ResetPerFightState"/>.</summary>
+    private bool _deathProofUsedThisFight;
+
+    /// <summary>
+    /// Applies incoming damage, routing it through every damage-mitigating
+    /// passive (docs/GDD.md §4.2.1) so grind combat (<see cref="Engine.Combat.CombatResolver"/>-
+    /// style callers, referenced only in doc comments here to avoid a
+    /// Core→Engine dependency), interactive combat, and ambushes all behave
+    /// consistently — the single call site every "Traveler takes damage"
+    /// path should use instead of <c>Health.Damage</c> directly. Returns the
+    /// HP actually lost (as <see cref="Stats.HealthPool.Damage"/> does).
+    /// </summary>
+    /// <param name="rawAmount">The un-mitigated incoming damage.</param>
+    /// <param name="attackerIsEcho">True if the attacker is "echo"-tagged — triggers Doctor's "Resonant Calm".</param>
+    /// <param name="isAmbush">True if this damage comes from an ambush (a monster's opening hit before a fight starts) — triggers Soldier's "Thick Hide". Ambush dodge/negate chances are rolled by the caller (they need randomness Core doesn't own — see <see cref="AmbushDodgeChance"/>/<see cref="AmbushNegateChance"/>); by the time this is called, the ambush is assumed to be landing.</param>
+    public int TakeDamage(int rawAmount, bool attackerIsEcho = false, bool isAmbush = false)
+    {
+        if (rawAmount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(rawAmount), rawAmount, "Damage cannot be negative.");
+        }
+
+        var amount = (double)rawAmount;
+
+        if (Health.Max > 0 && Health.Current <= Health.Max * 0.3)
+        {
+            amount -= amount * PassiveTraits.Sum(Class, Level, PassiveHook.LowHpDamageReductionPct);
+        }
+
+        if (attackerIsEcho)
+        {
+            amount -= amount * PassiveTraits.Sum(Class, Level, PassiveHook.EchoDamageReductionPct);
+        }
+
+        if (isAmbush)
+        {
+            amount -= amount * PassiveTraits.Sum(Class, Level, PassiveHook.AmbushDamageReductionPct);
+        }
+
+        var mitigated = Math.Max(0, (int)Math.Round(amount));
+
+        // Soldier "Unbreakable" — once per fight, a killing blow leaves 1 HP instead.
+        if (mitigated >= Health.Current && Health.Current > 0 && !_deathProofUsedThisFight
+            && PassiveTraits.Any(Class, Level, PassiveHook.DeathProofOncePerFight))
+        {
+            _deathProofUsedThisFight = true;
+            mitigated = Health.Current - 1;
+        }
+
+        return Health.Damage(mitigated);
+    }
+
+    /// <summary>Chance [0,1) an ambush is dodged entirely (Spy "Fleet-Footed" / Engineer "Redundant Systems") — the caller rolls it (see <see cref="TakeDamage"/>'s doc comment for why Core doesn't own randomness).</summary>
+    public double AmbushDodgeChance => PassiveTraits.Sum(Class, Level, PassiveHook.AmbushDodgeChancePct);
+
+    /// <summary>Chance [0,1) an ambush is negated entirely (Doctor "Trauma Ward") — the caller rolls it.</summary>
+    public double AmbushNegateChance => PassiveTraits.Sum(Class, Level, PassiveHook.AmbushNegateChancePct);
+
+    /// <summary>Multiplier applied to aggro this Traveler causes nearby monsters to gain (Spy "Low Profile") — 1.0 with no passive, down toward 0 as reduction stacks.</summary>
+    public double AggroGainMultiplier => Math.Max(0, 1.0 - PassiveTraits.Sum(Class, Level, PassiveHook.AggroGainReductionPct));
+
+    /// <summary>Store discount-when-buying / bonus-when-selling from Spy's "Light Fingers"/"Silent Partner" — see <see cref="Economy.Store"/>.</summary>
+    public double StoreDiscountBonus => PassiveTraits.Sum(Class, Level, PassiveHook.StoreDiscountBonusPct);
+
+    /// <summary>Chance [0,1) an ability cast costs no Tachyons at all (Scientist "Stable Core") — the caller rolls it before charging <see cref="EffectiveCastCost"/>.</summary>
+    public double FreeCastChance => PassiveTraits.Sum(Class, Level, PassiveHook.FreeCastChancePct);
+
+    /// <summary>
+    /// The Tachyon cost actually charged for casting an ability whose
+    /// nominal cost is <paramref name="baseCost"/> — halved (Engineer
+    /// "Failsafe Capacitor") when paying it in full would drop the pool
+    /// below 10% of its nominal max.
+    /// </summary>
+    public int EffectiveCastCost(int baseCost)
+    {
+        if (baseCost <= 0)
+        {
+            return baseCost;
+        }
+
+        var discount = PassiveTraits.Sum(Class, Level, PassiveHook.LowTachyonCastDiscountPct);
+        if (discount <= 0 || Tachyons.Max <= 0)
+        {
+            return baseCost;
+        }
+
+        var remainingAfterFullCost = Tachyons.Current - baseCost;
+        if (remainingAfterFullCost >= Tachyons.Max * 0.1)
+        {
+            return baseCost;
+        }
+
+        return Math.Max(0, (int)Math.Round(baseCost * (1 - discount)));
     }
 
     /// <summary>Places the Traveler at a specific grid position — e.g. spawning them at a level's start room.</summary>
@@ -493,8 +687,19 @@ public sealed class Traveler
     public int Convert(Item item)
     {
         RemoveFromInventoryOrThrow(item);
-        return Tachyons.Add(item.ConvertValue());
+        var bonus = PassiveTraits.Sum(Class, Level, PassiveHook.ConvertValueBonusPct) + JunkValueBonus(item);
+        var value = bonus <= 0 ? item.ConvertValue() : (int)Math.Round(item.ConvertValue() * (1 + bonus));
+        return Tachyons.Add(value);
     }
+
+    /// <summary>
+    /// Engineer "Salvage Sense" (Junk items only — this game's stand-in for
+    /// "scrap-themed", since <see cref="Item"/> carries no content theme
+    /// tags at runtime; see docs/GDD.md §4.2.1's implementation note), 0
+    /// for anything else.
+    /// </summary>
+    private double JunkValueBonus(Item item) =>
+        item.Type == ItemType.Junk ? PassiveTraits.Sum(Class, Level, PassiveHook.JunkValueBonusPct) : 0;
 
     /// <summary>
     /// Uses/eats/drinks a Consumable item from inventory — a fourth
@@ -542,12 +747,16 @@ public sealed class Traveler
         switch (item.ConsumableEffect)
         {
             case ConsumableEffectType.Heal:
-                return Health.Heal((int)Math.Round(item.EffectMagnitude));
+                return Health.Heal((int)Math.Round(item.EffectMagnitude * (1 + ConsumableHealBonus)));
+
+            case ConsumableEffectType.HealOverTime:
+                // Doctor "Steady Hands" bumps the per-tick heal amount too.
+                _activeEffects.Add(new ActiveEffect(item.ConsumableEffect, item.EffectMagnitude * (1 + ConsumableHealBonus), item.EffectDurationTicks));
+                return 0;
 
             case ConsumableEffectType.BuffAttack:
             case ConsumableEffectType.BuffDefense:
             case ConsumableEffectType.BuffSpeed:
-            case ConsumableEffectType.HealOverTime:
                 _activeEffects.Add(new ActiveEffect(item.ConsumableEffect, item.EffectMagnitude, item.EffectDurationTicks));
                 return 0;
 
@@ -584,6 +793,9 @@ public sealed class Traveler
         }
     }
 
+    /// <summary>Doctor "Steady Hands" — bonus fraction applied to a consumable's healing (instant or over-time).</summary>
+    private double ConsumableHealBonus => PassiveTraits.Sum(Class, Level, PassiveHook.ConsumableHealBonusPct);
+
     /// <summary>
     /// Heals by spending Tachyons — docs/GDD.md §2 [SOURCE]: "spend Tachyons to
     /// heal wounds directly," usable at any time (not gated to combat or
@@ -610,7 +822,8 @@ public sealed class Traveler
         }
 
         Tachyons.Spend(ionsToSpend);
-        return Health.Heal(ionsToSpend * TachyonEconomy.HpPerTachyonHealed);
+        var hpPerIon = TachyonEconomy.HpPerTachyonHealed * (1 + PassiveTraits.Sum(Class, Level, PassiveHook.HealRatioBonusPct));
+        return Health.Heal((int)Math.Round(ionsToSpend * hpPerIon));
     }
 
     /// <summary>
@@ -623,7 +836,8 @@ public sealed class Traveler
     public int Sell(Item item, int? credits = null)
     {
         RemoveFromInventoryOrThrow(item);
-        var amount = credits ?? item.SellValue();
+        var junkBonus = JunkValueBonus(item);
+        var amount = credits ?? (junkBonus <= 0 ? item.SellValue() : (int)Math.Round(item.SellValue() * (1 + junkBonus)));
         AddCredits(amount);
         return amount;
     }

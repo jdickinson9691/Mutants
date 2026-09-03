@@ -158,7 +158,22 @@ public sealed record Item(
     /// 1.0 for class-compatible gear, otherwise an off-class penalty.
     /// The penalty value (not the "penalty, not a hard block" rule itself,
     /// which is GDD-sourced) is original tuning.
+    /// <paramref name="offClassPenaltyReduction"/> (0-1) shrinks that
+    /// penalty by the given fraction — e.g. 0.5 (Soldier's "Weapon
+    /// Discipline" / Engineer's "Field-Tested Gear" passives, see
+    /// docs/GDD.md §4.2.1) halves the penalty, taking off-class
+    /// effectiveness from 0.5 to 0.75. Ignored for class-compatible gear,
+    /// which is already at full effectiveness.
     /// </summary>
-    public double WieldEffectiveness(CharacterClass wielder) =>
-        IsClassCompatible(wielder) ? 1.0 : 0.5;
+    public double WieldEffectiveness(CharacterClass wielder, double offClassPenaltyReduction = 0)
+    {
+        if (IsClassCompatible(wielder))
+        {
+            return 1.0;
+        }
+
+        const double basePenalty = 0.5;
+        var reducedPenalty = basePenalty * (1 - Math.Clamp(offClassPenaltyReduction, 0, 1));
+        return 1.0 - reducedPenalty;
+    }
 }

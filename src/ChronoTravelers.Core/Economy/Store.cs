@@ -130,7 +130,9 @@ public sealed class Store
     /// </summary>
     public int? BuyFromTraveler(Traveler seller, Item item)
     {
-        var price = EconomyPricing.BuyPrice(item);
+        // Spy "Light Fingers" / "Silent Partner" — a bonus on top of the
+        // store's normal buy price when selling to it (docs/GDD.md §4.2.1).
+        var price = (int)Math.Round(EconomyPricing.BuyPrice(item) * (1 + seller.StoreDiscountBonus));
         if (Capital < price || _listings.Count >= MaxListings)
         {
             return null;
@@ -159,10 +161,14 @@ public sealed class Store
             return false;
         }
 
+        // Spy "Light Fingers" / "Silent Partner" — a discount off the
+        // listed asking price when buying (docs/GDD.md §4.2.1).
+        var price = (int)Math.Round(listing.AskingPrice * (1 - buyer.StoreDiscountBonus));
+
         _listings.Remove(listing);
-        buyer.SpendCredits(listing.AskingPrice);
+        buyer.SpendCredits(price);
         buyer.AddToInventory(listing.Item);
-        Capital += listing.AskingPrice;
+        Capital += price;
         return true;
     }
 
