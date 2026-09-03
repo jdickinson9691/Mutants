@@ -6,10 +6,11 @@
       { "id": "arc-wisp", "name": "Arc Wisp", "tags": ["echo"], "archetype": "Caster", "lootThemeTags": ["scrap", "neon"],
         "behaviorProfile": { "fleeBelowHpFraction": 0.3 } },
       { "id": "junkyard-colossus", "name": "Junkyard Colossus", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["scrap", "common"],
-        "powerProfile": { "hpMultiplier": 1.15 } },
+        "powerProfile": { "hpMultiplier": 0.8, "attackMultiplier": 0.85 } },
       { "id": "circuit-jackal", "name": "Circuit Jackal", "tags": [], "archetype": "Skirmisher", "lootThemeTags": ["neon", "common"],
         "behaviorProfile": { "packHunting": true } },
       { "id": "riot-chassis", "name": "Riot Chassis", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["scrap", "neon"],
+        "powerProfile": { "hpMultiplier": 0.8, "attackMultiplier": 0.85 },
         "behaviorProfile": { "neverInfights": true } }
     ]
   },
@@ -20,7 +21,7 @@
       { "id": "cinder-wraith", "name": "Cinder Wraith", "tags": ["echo"], "archetype": "Caster", "lootThemeTags": ["ash"],
         "behaviorProfile": { "fleeBelowHpFraction": 0.3 } },
       { "id": "tide-behemoth", "name": "Tide Behemoth", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["drowned", "common"],
-        "powerProfile": { "hpMultiplier": 1.2, "defenseMultiplier": 1.1 } },
+        "powerProfile": { "hpMultiplier": 1.0, "attackMultiplier": 0.9, "defenseMultiplier": 1.1 } },
       { "id": "ash-skitterer", "name": "Ash Skitterer", "tags": [], "archetype": "Skirmisher", "lootThemeTags": ["ash", "common"],
         "behaviorProfile": { "aggroRangeBonus": 1 } },
       { "id": "brine-stalker", "name": "Brine Stalker", "tags": [], "archetype": "Skirmisher", "lootThemeTags": ["drowned", "ash"],

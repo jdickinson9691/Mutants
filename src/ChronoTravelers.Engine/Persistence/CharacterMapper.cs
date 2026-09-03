@@ -105,7 +105,10 @@ public static class CharacterMapper
             var store = slot.RestoreOwnership(player, saved.Capital, saved.TachyonReserve);
             foreach (var listing in saved.Listings)
             {
-                store.Stock(FromItemSaveData(listing.Item), listing.AskingPrice);
+                // enforceCap: false — same reasoning as FromSaveData above:
+                // a save from before Store.MaxListings existed must not
+                // lose stock on load.
+                store.Stock(FromItemSaveData(listing.Item), listing.AskingPrice, enforceCap: false);
             }
         }
     }
@@ -150,7 +153,12 @@ public static class CharacterMapper
         var items = data.Inventory.Select(FromItemSaveData).ToList();
         foreach (var item in items)
         {
-            traveler.AddToInventory(item);
+            // enforceCap: false — a save written before Traveler.MaxInventorySize
+            // existed may carry more than 15 items; loading must never
+            // silently drop a returning player's belongings. The cap only
+            // stops new pickups going forward (Traveler.AddToInventory's
+            // normal default), not what a save already holds.
+            traveler.AddToInventory(item, enforceCap: false);
         }
 
         if (data.EquippedWeaponIndex is { } weaponIndex && weaponIndex >= 0 && weaponIndex < items.Count)

@@ -791,6 +791,56 @@ public class TravelerTests
     }
 
     [Fact]
+    public void AddToInventory_UpToMaxInventorySize_AllSucceed()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+
+        for (var i = 0; i < Traveler.MaxInventorySize; i++)
+        {
+            Assert.True(traveler.AddToInventory(Item.Create($"Scrap {i}", ItemType.Junk, 1, Rarity.Common)));
+        }
+
+        Assert.Equal(Traveler.MaxInventorySize, traveler.Inventory.Count);
+    }
+
+    [Fact]
+    public void AddToInventory_PastMaxInventorySize_FailsAndAddsNothing()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        for (var i = 0; i < Traveler.MaxInventorySize; i++)
+        {
+            traveler.AddToInventory(Item.Create($"Scrap {i}", ItemType.Junk, 1, Rarity.Common));
+        }
+
+        var overflow = Item.Create("One Too Many", ItemType.Junk, 1, Rarity.Common);
+        var added = traveler.AddToInventory(overflow);
+
+        Assert.False(added);
+        Assert.Equal(Traveler.MaxInventorySize, traveler.Inventory.Count);
+        Assert.DoesNotContain(overflow, traveler.Inventory);
+    }
+
+    [Fact]
+    public void AddToInventory_PastMaxInventorySize_WithCapDisabled_StillAdds()
+    {
+        // The Persistence layer's escape hatch for loading a save written
+        // before this cap existed (ChronoTravelers.Engine.Persistence.CharacterMapper)
+        // — a returning player's belongings must never be silently dropped.
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        for (var i = 0; i < Traveler.MaxInventorySize; i++)
+        {
+            traveler.AddToInventory(Item.Create($"Scrap {i}", ItemType.Junk, 1, Rarity.Common));
+        }
+
+        var overflow = Item.Create("Grandfathered Relic", ItemType.Junk, 1, Rarity.Common);
+        var added = traveler.AddToInventory(overflow, enforceCap: false);
+
+        Assert.True(added);
+        Assert.Equal(Traveler.MaxInventorySize + 1, traveler.Inventory.Count);
+        Assert.Contains(overflow, traveler.Inventory);
+    }
+
+    [Fact]
     public void WardenDefeat_StartsFalseAndCanBeRecorded()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);

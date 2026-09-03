@@ -33,6 +33,16 @@ public sealed class Store
     /// <summary>How many consecutive underfunded maintenance ticks a player/NPC-owned store tolerates before it's repossessed (docs/GDD.md §6.2: "eventually become for sale") — see StoreSlot.Repossess, driven by the WorldSimulation maintenance pass.</summary>
     public const int ForeclosureThreshold = 10;
 
+    /// <summary>
+    /// The most listings a store can carry at once — docs/GDD.md §6's
+    /// store system. Original tuning (not GDD-specified): keeps a store's
+    /// shelf space finite, so an owner's stocking choices (see
+    /// <see cref="ChronoTravelers.Engine.Npc.NpcController.TryTendOwnStore"/>)
+    /// actually mean something rather than every store growing an
+    /// unbounded pile of surplus.
+    /// </summary>
+    public const int MaxListings = 30;
+
     public bool IsGovernmentRun => Owner is null;
 
     private readonly List<StoreListing> _listings = [];
@@ -75,9 +85,41 @@ public sealed class Store
     /// Stocks a listing directly, with no owner or payment involved — for
     /// world/content setup (see ChronoTravelers.Core.Economy.TestStores), not
     /// player action. Use <see cref="Deposit"/> for an owner selling their
-    /// own inventory.
+    /// own inventory. Returns false (and adds nothing) if the store is
+    /// already at <see cref="MaxListings"/>; <paramref name="enforceCap"/>
+    /// is false only for <c>ChronoTravelers.Engine.Persistence.CharacterMapper</c>
+    /// restoring a save written before this cap existed.
     /// </summary>
-    public void Stock(Item item, int askingPrice) => _listings.Add(new StoreListing(item, askingPrice));
+    public bool Stock(Item item, int askingPrice, bool enforceCap = true)
+    {
+        if (enforceCap && _listings.Count >= MaxListings)
+        {
+            return false;
+        }
+
+        _listings.Add(new StoreListing(item, askingPrice));
+        return true;
+    }
+
+    /// <summary>
+    /// Removes and returns the oldest still-unsold listing — a markdown /
+    /// write-off of stock that isn't moving — or null if the shelf is
+    /// empty. No Capital changes hands: the point is a drain on the listing
+    /// count that doesn't depend on a buyer turning up, so an owner that
+    /// stocks faster than anyone buys settles at an equilibrium instead of
+    /// climbing to <see cref="MaxListings"/> and pinning there forever.
+    /// </summary>
+    public Item? ClearOldestListing()
+    {
+        if (_listings.Count == 0)
+        {
+            return null;
+        }
+
+        var item = _listings[0].Item;
+        _listings.RemoveAt(0);
+        return item;
+    }
 
     /// <summary>
     /// The store buys an item from <paramref name="seller"/> for Credits
@@ -89,7 +131,7 @@ public sealed class Store
     public int? BuyFromTraveler(Traveler seller, Item item)
     {
         var price = EconomyPricing.BuyPrice(item);
-        if (Capital < price)
+        if (Capital < price || _listings.Count >= MaxListings)
         {
             return null;
         }
@@ -100,25 +142,48 @@ public sealed class Store
         return price;
     }
 
-    /// <summary>A traveler buys a listed item from the store for Credits.</summary>
-    public void SellToTraveler(Traveler buyer, StoreListing listing)
+    /// <summary>
+    /// A traveler buys a listed item from the store for Credits. Returns
+    /// false (charging nothing, leaving the listing in place) if the
+    /// buyer's pack is already at <see cref="Characters.Traveler.MaxInventorySize"/>.
+    /// </summary>
+    public bool SellToTraveler(Traveler buyer, StoreListing listing)
     {
-        if (!_listings.Remove(listing))
+        if (!_listings.Contains(listing))
         {
             throw new InvalidOperationException($"'{listing.Item.Name}' is not for sale at {Name}.");
         }
 
+        if (buyer.Inventory.Count >= Traveler.MaxInventorySize)
+        {
+            return false;
+        }
+
+        _listings.Remove(listing);
         buyer.SpendCredits(listing.AskingPrice);
         buyer.AddToInventory(listing.Item);
         Capital += listing.AskingPrice;
+        return true;
     }
 
-    /// <summary>Owner deposits an item from their own inventory for sale — docs/GDD.md §6.2's "stock" command (the item-listing half of what used to be called "deposit"). Owner-only.</summary>
-    public void Deposit(Traveler owner, Item item, int askingPrice)
+    /// <summary>
+    /// Owner deposits an item from their own inventory for sale —
+    /// docs/GDD.md §6.2's "stock" command (the item-listing half of what
+    /// used to be called "deposit"). Owner-only. Returns false (leaving
+    /// the item in the owner's inventory) if the store is already at
+    /// <see cref="MaxListings"/>.
+    /// </summary>
+    public bool Deposit(Traveler owner, Item item, int askingPrice)
     {
         RequireOwner(owner);
+        if (_listings.Count >= MaxListings)
+        {
+            return false;
+        }
+
         owner.RemoveFromInventory(item);
         Stock(item, askingPrice);
+        return true;
     }
 
     /// <summary>
@@ -141,16 +206,26 @@ public sealed class Store
         Capital += credits;
     }
 
-    /// <summary>Owner pulls a listed item back into their own inventory, unlisting it. Owner-only.</summary>
-    public void Withdraw(Traveler owner, StoreListing listing)
+    /// <summary>
+    /// Owner pulls a listed item back into their own inventory, unlisting
+    /// it. Owner-only. Returns false (leaving the listing in place) if the
+    /// owner's pack is already at <see cref="Characters.Traveler.MaxInventorySize"/>.
+    /// </summary>
+    public bool Withdraw(Traveler owner, StoreListing listing)
     {
         RequireOwner(owner);
-        if (!_listings.Remove(listing))
+        if (!_listings.Contains(listing))
         {
             throw new InvalidOperationException($"'{listing.Item.Name}' is not listed at {Name}.");
         }
 
-        owner.AddToInventory(listing.Item);
+        if (!owner.AddToInventory(listing.Item))
+        {
+            return false;
+        }
+
+        _listings.Remove(listing);
+        return true;
     }
 
     /// <summary>Owner changes a listing's asking price. Owner-only.</summary>

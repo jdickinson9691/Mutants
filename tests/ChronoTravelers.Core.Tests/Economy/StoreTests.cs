@@ -330,4 +330,145 @@ public class StoreTests
         Assert.True(foreclosed);
         Assert.Equal(Store.ForeclosureThreshold, store.MissedMaintenanceTicks);
     }
+
+    private static Store FullStore(string name = "Packed Store")
+    {
+        var store = Store.CreateGovernmentStore(name, homeLevel: 1);
+        for (var i = 0; i < Store.MaxListings; i++)
+        {
+            store.Stock(Item.Create($"Filler {i}", ItemType.Junk, 1, Rarity.Common), askingPrice: 1);
+        }
+
+        return store;
+    }
+
+    [Fact]
+    public void Stock_AtMaxListings_ReturnsFalseAndAddsNothing()
+    {
+        var store = FullStore();
+
+        var added = store.Stock(Item.Create("One Too Many", ItemType.Junk, 1, Rarity.Common), askingPrice: 5);
+
+        Assert.False(added);
+        Assert.Equal(Store.MaxListings, store.Listings.Count);
+    }
+
+    [Fact]
+    public void ClearOldestListing_RemovesAndReturnsTheFirstListing_LeavingCapitalUntouched()
+    {
+        var store = Store.CreateGovernmentStore("Depot", homeLevel: 1);
+        var oldest = Item.Create("Stale Blade", ItemType.Weapon, 1, Rarity.Common);
+        store.Stock(oldest, askingPrice: 10);
+        store.Stock(Item.Create("Newer Blade", ItemType.Weapon, 1, Rarity.Common), askingPrice: 12);
+        var capitalBefore = store.Capital;
+
+        var cleared = store.ClearOldestListing();
+
+        Assert.Equal(oldest, cleared);
+        Assert.Single(store.Listings);
+        Assert.DoesNotContain(store.Listings, l => l.Item == oldest);
+        Assert.Equal(capitalBefore, store.Capital);
+    }
+
+    [Fact]
+    public void ClearOldestListing_OnAnEmptyShelf_ReturnsNull()
+    {
+        var store = Store.CreateGovernmentStore("Depot", homeLevel: 1);
+        while (store.Listings.Count > 0)
+        {
+            store.ClearOldestListing();
+        }
+
+        Assert.Null(store.ClearOldestListing());
+    }
+
+    [Fact]
+    public void Stock_AtMaxListings_WithCapDisabled_StillAdds()
+    {
+        // The Persistence layer's escape hatch (ChronoTravelers.Engine.Persistence
+        // .CharacterMapper.ApplyOwnedStores) for a save written before this
+        // cap existed — a returning owner's stock must never be dropped.
+        var store = FullStore();
+
+        var added = store.Stock(Item.Create("Grandfathered", ItemType.Junk, 1, Rarity.Common), askingPrice: 5, enforceCap: false);
+
+        Assert.True(added);
+        Assert.Equal(Store.MaxListings + 1, store.Listings.Count);
+    }
+
+    [Fact]
+    public void BuyFromTraveler_StoreAtMaxListings_ReturnsNullAndDoesNothing()
+    {
+        var store = FullStore();
+        var seller = NewTraveler();
+        var item = Item.Create("Scrap", ItemType.Junk, 2, Rarity.Common);
+        seller.AddToInventory(item);
+
+        var price = store.BuyFromTraveler(seller, item);
+
+        Assert.Null(price);
+        Assert.Equal(0, seller.Credits);
+        Assert.Contains(item, seller.Inventory);
+        Assert.Equal(Store.MaxListings, store.Listings.Count);
+    }
+
+    [Fact]
+    public void Deposit_StoreAtMaxListings_ReturnsFalseAndLeavesItemWithOwner()
+    {
+        var owner = NewTraveler("Owner");
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
+        for (var i = 0; i < Store.MaxListings; i++)
+        {
+            store.Stock(Item.Create($"Filler {i}", ItemType.Junk, 1, Rarity.Common), askingPrice: 1);
+        }
+
+        var item = Item.Create("Widget", ItemType.Junk, 1, Rarity.Common);
+        owner.AddToInventory(item);
+
+        var deposited = store.Deposit(owner, item, askingPrice: 10);
+
+        Assert.False(deposited);
+        Assert.Contains(item, owner.Inventory);
+        Assert.Equal(Store.MaxListings, store.Listings.Count);
+    }
+
+    [Fact]
+    public void SellToTraveler_BuyerPackIsFull_ReturnsFalseAndSpendsNothing()
+    {
+        var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
+        var item = Item.Create("Patch Kit", ItemType.Consumable, 1, Rarity.Common);
+        store.Stock(item, askingPrice: 15);
+        var buyer = NewTraveler();
+        buyer.AddCredits(20);
+        for (var i = 0; i < Traveler.MaxInventorySize; i++)
+        {
+            buyer.AddToInventory(Item.Create($"Junk {i}", ItemType.Junk, 1, Rarity.Common));
+        }
+
+        var bought = store.SellToTraveler(buyer, store.Listings[0]);
+
+        Assert.False(bought);
+        Assert.Equal(20, buyer.Credits);
+        Assert.DoesNotContain(item, buyer.Inventory);
+        Assert.Single(store.Listings);
+    }
+
+    [Fact]
+    public void Withdraw_OwnerPackIsFull_ReturnsFalseAndLeavesItemListed()
+    {
+        var owner = NewTraveler("Owner");
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
+        var item = Item.Create("Widget", ItemType.Junk, 1, Rarity.Common);
+        store.Stock(item, 10);
+        for (var i = 0; i < Traveler.MaxInventorySize; i++)
+        {
+            owner.AddToInventory(Item.Create($"Junk {i}", ItemType.Junk, 1, Rarity.Common));
+        }
+
+        var withdrawn = store.Withdraw(owner, store.Listings[0]);
+
+        Assert.False(withdrawn);
+        Assert.DoesNotContain(item, owner.Inventory);
+        Assert.Single(store.Listings);
+    }
 }

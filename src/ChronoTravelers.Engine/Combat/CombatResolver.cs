@@ -104,8 +104,21 @@ public static class CombatResolver
         {
             foreach (var item in loot)
             {
-                traveler.AddToInventory(item);
-                log.Add($"{traveler.Name} looted {item.Name}.");
+                // A full pack (docs/GDD.md §7's abstract, off-grid NPC
+                // grind has no floor to leave loot on) just loses it —
+                // the caller still gets the full `loot` list back
+                // regardless, since a caller with a real floor (the
+                // shared-server player fight, Game/Commands.cs's Fight)
+                // always moves everything to the ground anyway rather
+                // than relying on this add having actually happened.
+                if (traveler.AddToInventory(item))
+                {
+                    log.Add($"{traveler.Name} looted {item.Name}.");
+                }
+                else
+                {
+                    log.Add($"{traveler.Name}'s pack is full — {item.Name} is left behind.");
+                }
             }
         }
 

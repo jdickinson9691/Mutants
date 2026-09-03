@@ -230,7 +230,7 @@ else
 
 var npcClassWeights = LoadNpcClassWeights();
 var npcs = SpawnNpcs(world, random, npcClassWeights);
-var simulation = new WorldSimulation(world, npcs, random, npcClassWeights: npcClassWeights);
+var simulation = new WorldSimulation(world, npcs, random, npcClassWeights: npcClassWeights, abilities: abilities);
 var shownBroadcastCount = 0;
 var elsewhereBacklog = 0;
 
@@ -1433,7 +1433,12 @@ static void HandleBuyFromStore(Traveler traveler, TimeWorld world, string argume
         return;
     }
 
-    store.SellToTraveler(traveler, listing);
+    if (!store.SellToTraveler(traveler, listing))
+    {
+        AnsiConsole.MarkupLine($"[red]Your pack is full ({Traveler.MaxInventorySize} items)[/] — sell or convert something first.");
+        return;
+    }
+
     AnsiConsole.MarkupLine($"[green]Bought {Markup.Escape(listing.Item.Name)} for {listing.AskingPrice} Credits.[/]");
 }
 
@@ -1599,7 +1604,12 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
                 return;
             }
 
-            store.Withdraw(traveler, listing);
+            if (!store.Withdraw(traveler, listing))
+            {
+                AnsiConsole.MarkupLine($"[red]Your pack is full ({Traveler.MaxInventorySize} items)[/] — {Markup.Escape(listing.Item.Name)} stays listed at {Markup.Escape(store.Name)}.");
+                return;
+            }
+
             AnsiConsole.MarkupLine($"[green]Withdrew {Markup.Escape(listing.Item.Name)} back into your inventory.[/]");
             break;
 
@@ -1639,7 +1649,12 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
                 return;
             }
 
-            store.Deposit(traveler, item, price);
+            if (!store.Deposit(traveler, item, price))
+            {
+                AnsiConsole.MarkupLine($"[red]{Markup.Escape(store.Name)} is full ({Store.MaxListings} items)[/] — withdraw or reprice something first.");
+                return;
+            }
+
             AnsiConsole.MarkupLine($"[green]Listed {Markup.Escape(item.Name)} at {Markup.Escape(store.Name)} for {price} Credits.[/]");
             break;
         }
@@ -2242,8 +2257,16 @@ static void HandleTake(Traveler traveler, TimeWorld world, string argument)
         Item? item;
         while ((item = population.TakeGroundLoot(traveler.Position, _ => true)) is not null)
         {
-            traveler.AddToInventory(item);
-            AnsiConsole.MarkupLine($"[green]You pick up the {Markup.Escape(item.Name)}.[/]");
+            if (traveler.AddToInventory(item))
+            {
+                AnsiConsole.MarkupLine($"[green]You pick up the {Markup.Escape(item.Name)}.[/]");
+            }
+            else
+            {
+                population.AddGroundLoot(traveler.Position, item);
+                AnsiConsole.MarkupLine($"[red]Your pack is full ({Traveler.MaxInventorySize} items)[/] — {Markup.Escape(item.Name)} stays on the ground.");
+                break;
+            }
         }
 
         return;
@@ -2268,8 +2291,15 @@ static void HandleTake(Traveler traveler, TimeWorld world, string argument)
     var picked = population.TakeGroundLoot(traveler.Position, i => ReferenceEquals(i, match));
     if (picked is not null)
     {
-        traveler.AddToInventory(picked);
-        AnsiConsole.MarkupLine($"[green]You pick up the {Markup.Escape(picked.Name)}.[/]");
+        if (traveler.AddToInventory(picked))
+        {
+            AnsiConsole.MarkupLine($"[green]You pick up the {Markup.Escape(picked.Name)}.[/]");
+        }
+        else
+        {
+            population.AddGroundLoot(traveler.Position, picked);
+            AnsiConsole.MarkupLine($"[red]Your pack is full ({Traveler.MaxInventorySize} items)[/] — {Markup.Escape(picked.Name)} stays on the ground.");
+        }
     }
 }
 
@@ -2408,7 +2438,7 @@ static void RenderStores(IReadOnlyList<StoreSlot> storeSlots)
 
 static void RenderShop(Store store)
 {
-    AnsiConsole.MarkupLine($"[cyan]{Markup.Escape(store.Name)}[/] — Capital: {store.Capital} Credits");
+    AnsiConsole.MarkupLine($"[cyan]{Markup.Escape(store.Name)}[/] — Capital: {store.Capital} Credits — {store.Listings.Count}/{Store.MaxListings} items");
 
     if (store.Listings.Count == 0)
     {
@@ -2447,7 +2477,7 @@ static void RenderInventory(Traveler traveler)
         return;
     }
 
-    var table = new Table().Expand();
+    var table = new Table().Title($"Inventory ({traveler.Inventory.Count}/{Traveler.MaxInventorySize})").Expand();
     table.AddColumn("#");
     table.AddColumn("Name");
     table.AddColumn("Type");

@@ -1,3 +1,4 @@
+using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Events;
 using ChronoTravelers.Core.Tachyons;
@@ -209,7 +210,13 @@ internal static class Commands
             Item? it;
             while ((it = pop.TakeGroundLoot(p.Position, _ => true)) is not null)
             {
-                p.AddToInventory(it);
+                if (!p.AddToInventory(it))
+                {
+                    pop.AddGroundLoot(p.Position, it);
+                    session.Send($"Your pack is full ({Traveler.MaxInventorySize} items) — {it.Name} stays on the ground.");
+                    break;
+                }
+
                 session.Send($"You pick up the {it.Name}.");
             }
 
@@ -223,7 +230,13 @@ internal static class Commands
             return;
         }
 
-        p.AddToInventory(picked);
+        if (!p.AddToInventory(picked))
+        {
+            pop.AddGroundLoot(p.Position, picked);
+            session.Send($"Your pack is full ({Traveler.MaxInventorySize} items) — {picked.Name} stays on the ground.");
+            return;
+        }
+
         session.Send($"You pick up the {picked.Name}.");
     }
 
@@ -277,7 +290,10 @@ internal static class Commands
             var toGround = result.ItemsDropped.ToList();
             foreach (var it in toGround)
             {
-                p.RemoveFromInventory(it);
+                if (p.Inventory.Contains(it))
+                {
+                    p.RemoveFromInventory(it);
+                }
             }
 
             toGround.AddRange(target.Inventory);
@@ -430,7 +446,7 @@ internal static class Commands
             return;
         }
 
-        session.Send($"{store.Name} — Capital: {store.Capital} Credits");
+        session.Send($"{store.Name} — Capital: {store.Capital} Credits — {store.Listings.Count}/{Store.MaxListings} items");
         if (store.Listings.Count == 0)
         {
             session.Send("Nothing for sale right now.");
@@ -470,7 +486,12 @@ internal static class Commands
             return;
         }
 
-        store.SellToTraveler(p, listing);
+        if (!store.SellToTraveler(p, listing))
+        {
+            session.Send($"Your pack is full ({Traveler.MaxInventorySize} items) — sell or convert something first.");
+            return;
+        }
+
         session.Send($"Bought {listing.Item.Name} for {listing.AskingPrice} Credits.");
     }
 
@@ -623,7 +644,12 @@ internal static class Commands
                     return;
                 }
 
-                store.Withdraw(p, listing);
+                if (!store.Withdraw(p, listing))
+                {
+                    session.Send($"Your pack is full ({Traveler.MaxInventorySize} items) — {listing.Item.Name} stays listed at {store.Name}.");
+                    return;
+                }
+
                 session.Send($"Withdrew {listing.Item.Name} back into your inventory.");
                 break;
             }
@@ -664,7 +690,12 @@ internal static class Commands
                     return;
                 }
 
-                store.Deposit(p, item, price);
+                if (!store.Deposit(p, item, price))
+                {
+                    session.Send($"{store.Name} is full ({Store.MaxListings} items) — withdraw or reprice something first.");
+                    return;
+                }
+
                 session.Send($"Listed {item.Name} at {store.Name} for {price} Credits.");
                 break;
             }

@@ -98,6 +98,17 @@ public sealed class Traveler
     private readonly List<Item> _inventory = [];
     public IReadOnlyList<Item> Inventory => _inventory;
 
+    /// <summary>
+    /// The most items a Traveler's pack can hold at once — human and NPC
+    /// alike, per docs/GDD.md §7's "built on the exact same character/
+    /// inventory/ability code path." Original tuning (not GDD-specified):
+    /// keeps loot management a real decision (wield/sell/convert/stock —
+    /// §5) rather than an unbounded pile, and gives NPC store-tending
+    /// (<see cref="ChronoTravelers.Engine.Npc.NpcController"/>) something
+    /// real to manage. See <see cref="AddToInventory"/>.
+    /// </summary>
+    public const int MaxInventorySize = 15;
+
     public Item? EquippedWeapon { get; private set; }
     public Item? EquippedArmor { get; private set; }
 
@@ -450,7 +461,28 @@ public sealed class Traveler
         Credits -= amount;
     }
 
-    public void AddToInventory(Item item) => _inventory.Add(item);
+    /// <summary>
+    /// Adds <paramref name="item"/> to the pack. Returns false (and adds
+    /// nothing) if the pack is already at <see cref="MaxInventorySize"/> —
+    /// callers that need to tell the player/NPC "pack's full" check this;
+    /// callers that are certain the pack has room (a fresh character's
+    /// starter kit, a controlled test fixture) can ignore it, same as any
+    /// other bool-returning "did this work" method in this codebase (e.g.
+    /// <see cref="Economy.Store.BuyFromTraveler"/>). <paramref name="enforceCap"/>
+    /// is false only for <c>ChronoTravelers.Engine.Persistence.CharacterMapper</c>
+    /// restoring a save written before this cap existed — that path must
+    /// never silently drop a returning player's items.
+    /// </summary>
+    public bool AddToInventory(Item item, bool enforceCap = true)
+    {
+        if (enforceCap && _inventory.Count >= MaxInventorySize)
+        {
+            return false;
+        }
+
+        _inventory.Add(item);
+        return true;
+    }
 
     /// <summary>
     /// Destroys an item from inventory for Tachyons — docs/GDD.md §2/§5.

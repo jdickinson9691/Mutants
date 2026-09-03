@@ -56,8 +56,12 @@ catch (ContentException) { npcClassWeights = null; }
 var npcs = NpcPopulation.Spawn(npcCount, world, random, npcClassWeights);
 Log($"Spawned {npcs.Count} NPCs across the timeline.");
 
+IReadOnlyList<AbilityData> abilities;
+try { abilities = ContentLoader.LoadAbilities(Path.Combine(contentDir, "abilities.json")); }
+catch (ContentException) { abilities = []; Log("No ability catalog found — NPCs will grind without abilities."); }
+
 using var store = new ServerStore(dbPath);
-var game = new SharedGame(world, npcs, random, npcClassWeights);
+var game = new SharedGame(world, npcs, random, npcClassWeights, abilities);
 
 using var shutdown = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; Log("Shutdown requested."); shutdown.Cancel(); };

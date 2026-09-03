@@ -110,7 +110,7 @@ internal static class Render
             return;
         }
 
-        session.Send("Inventory:");
+        session.Send($"Inventory ({items.Count}/{Traveler.MaxInventorySize}):");
         for (var i = 0; i < items.Count; i++)
         {
             var it = items[i];

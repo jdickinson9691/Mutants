@@ -3,6 +3,7 @@ using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Events;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Engine;
+using ChronoTravelers.Engine.Content;
 using ChronoTravelers.Engine.Simulation;
 
 namespace ChronoTravelers.Game;
@@ -29,11 +30,23 @@ public sealed class SharedGame
     /// drawing from the same distribution the initial <paramref name="npcs"/>
     /// population did. Null (the default) means uniform-random, unchanged.
     /// </param>
-    public SharedGame(TimeWorld world, IEnumerable<Traveler> npcs, IRandomSource random, IReadOnlyDictionary<CharacterClass, double>? npcClassWeights = null)
+    /// <param name="abilities">
+    /// The class ability catalog, passed straight through to the
+    /// <see cref="WorldSimulation"/> this game owns so every NPC's grind
+    /// fight (both here and on the shared-world server) uses class
+    /// abilities. Omitted or empty (the default) keeps NPC grinding
+    /// ability-free.
+    /// </param>
+    public SharedGame(
+        TimeWorld world,
+        IEnumerable<Traveler> npcs,
+        IRandomSource random,
+        IReadOnlyDictionary<CharacterClass, double>? npcClassWeights = null,
+        IReadOnlyList<AbilityData>? abilities = null)
     {
         World = world;
         _npcs = npcs.ToList();
-        _sim = new WorldSimulation(world, _npcs, random, npcClassWeights: npcClassWeights);
+        _sim = new WorldSimulation(world, _npcs, random, npcClassWeights: npcClassWeights, abilities: abilities);
     }
 
     public TimeWorld World { get; }

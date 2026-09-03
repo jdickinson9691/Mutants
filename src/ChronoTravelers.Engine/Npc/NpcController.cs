@@ -6,6 +6,7 @@ using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Core.World;
 using ChronoTravelers.Engine.Combat;
+using ChronoTravelers.Engine.Content;
 using ChronoTravelers.Engine.Simulation;
 
 namespace ChronoTravelers.Engine.Npc;
@@ -35,6 +36,15 @@ public static class NpcController
 
     /// <summary>How often, per tick, an NPC that already owns a store here tends it (pays maintenance, stocks surplus gear, or collects Capital) — docs/GDD.md §7's "occasionally visit/stock a store it owns."</summary>
     private const double StoreTendChance = 0.5;
+
+    /// <summary>How often, per tick, an NPC with Credits at an occupied store actually buys something from it (a listed upgrade, else sometimes a consumable). Gated so listings drain gradually rather than being hoovered the moment an NPC has cash — without any buying at all, owners and sellers only ever ADD listings and the shelf count climbs forever.</summary>
+    private const double ShopPurchaseChance = 0.3;
+
+    /// <summary>An owner stops auto-stocking its own surplus once its shopfront holds this many listings — the demand side (player + NPC buyers) can't keep up with an NPC that grinds nonstop, so without a ceiling the shelf just climbs to <see cref="Store.MaxListings"/>. A player stocking by hand is unaffected.</summary>
+    private const int StoreStockSoftCap = 10;
+
+    /// <summary>How often, per tick, an owner tending a shopfront that's OVER <see cref="StoreStockSoftCap"/> marks down its oldest unsold listing (<see cref="Store.ClearOldestListing"/>) — a buyer-independent drain so an over-producing owner settles around the soft cap instead of pinning at the hard cap.</summary>
+    private const double StoreClearanceChance = 0.35;
 
     /// <summary>Tachyons an owner pays into its store's maintenance reserve in one tending action.</summary>
     private const int MaintenanceTopUpTachyons = 30;
@@ -73,6 +83,16 @@ public static class NpcController
     /// only for the population's "local pool" (see
     /// <see cref="NpcPopulation.LocalPopulationTarget"/>), so a background
     /// NPC keeps the original low-chance wander-anywhere travel instead.
+    /// <paramref name="abilities"/> is the full class ability catalog
+    /// (ChronoTravelers.Content's abilities.json via ContentLoader.LoadAbilities);
+    /// when non-empty, a grind fight is played out round-by-round through
+    /// <see cref="CombatSession"/> — the same engine the player's own
+    /// interactive `fight` uses — with <see cref="ChooseAbility"/> standing
+    /// in for the player's per-round choice, instead of the instant,
+    /// attack-only <see cref="CombatResolver.Fight"/>. Omit it (or pass an
+    /// empty list, the default) to keep the original ability-free grind —
+    /// existing callers/tests that don't care about abilities are
+    /// unaffected.
     /// </summary>
     public static NpcTickResult Act(
         Traveler npc,
@@ -82,7 +102,8 @@ public static class NpcController
         IReadOnlyList<Func<Monster>>? monsterRoster = null,
         TimeWorld? world = null,
         int? anchorYear = null,
-        bool pullToAnchor = false)
+        bool pullToAnchor = false,
+        IReadOnlyList<AbilityData>? abilities = null)
     {
         if (npc.Health.IsDead)
         {
@@ -140,10 +161,166 @@ public static class NpcController
 
         var roster = monsterRoster ?? TestMonsters.All;
         var monster = roster[(int)(random.NextDouble() * roster.Count)]();
-        var fight = CombatResolver.Fight(npc, monster, random);
+        var fight = abilities is { Count: > 0 }
+            ? FightWithAbilities(npc, monster, abilities, random)
+            : CombatResolver.Fight(npc, monster, random);
 
         return new NpcTickResult(npc.Name, NpcGoal.Grind, monster.Name, fight);
     }
+
+    /// <summary>
+    /// How often, per round, an NPC that isn't in HP trouble (see
+    /// <see cref="EmergencyHealHpFraction"/>) even considers casting an
+    /// ability instead of a plain attack — rations Tachyons across a
+    /// session's worth of fights rather than dumping the whole pool into
+    /// the first monster it meets, the same way a careful player would.
+    /// </summary>
+    private const double AbilityCastChance = 0.6;
+
+    /// <summary>Below this fraction of max HP, an NPC always tries to cast its best available Heal-effect ability first, skipping the <see cref="AbilityCastChance"/> roll entirely — self-preservation before optimization.</summary>
+    private const double EmergencyHealHpFraction = 0.4;
+
+    /// <summary>Safety valve mirroring <see cref="CombatResolver.Fight"/>'s own — see that constant's doc comment.</summary>
+    private const int AbilityFightMaxRounds = 200;
+
+    /// <summary>
+    /// Plays one grind fight round-by-round through <see cref="CombatSession"/>
+    /// — the same engine backing the player's own interactive `fight` — so
+    /// an NPC's class abilities (unlocked by level, gated by Tachyons,
+    /// exactly as <see cref="CombatSession.Cast"/> already enforces for a
+    /// human) are actually reachable in NPC combat, not just inert level-up
+    /// data. <see cref="ChooseAbility"/> picks the round's action; a cast
+    /// that somehow fails (should not normally happen, since it's only ever
+    /// offered an ability it already believes is usable/affordable) falls
+    /// back to a plain attack rather than wasting the round. On a win, loot
+    /// goes straight into the NPC's pack — same "abstract, off-grid" grind
+    /// convention <see cref="CombatResolver.AwardVictory"/> documents for
+    /// the non-interactive path, since this fight (like that one) is
+    /// against a roster monster, not one actually standing in the NPC's
+    /// room.
+    /// </summary>
+    private static FightResult FightWithAbilities(Traveler npc, Monster monster, IReadOnlyList<AbilityData> abilities, IRandomSource random)
+    {
+        var usableAbilities = abilities
+            .Where(a => string.Equals(a.Class, npc.Class.ToString(), StringComparison.OrdinalIgnoreCase)
+                && a.Level <= npc.Level
+                && !string.Equals(a.Effect, "None", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var session = new CombatSession(npc, monster, random);
+        var rounds = 0;
+
+        while (!session.IsOver && rounds < AbilityFightMaxRounds)
+        {
+            rounds++;
+
+            var chosen = usableAbilities.Count > 0 ? ChooseAbility(npc, monster, usableAbilities, random) : null;
+            if (chosen is null || !session.Cast(chosen).Success)
+            {
+                session.Attack();
+            }
+        }
+
+        if (session.TravelerWon)
+        {
+            foreach (var item in session.ItemsDropped)
+            {
+                npc.AddToInventory(item);
+            }
+        }
+
+        return new FightResult(session.TravelerWon, session.Rounds, session.XpAwarded, session.ItemsDropped, session.Log);
+    }
+
+    /// <summary>
+    /// Picks this round's ability, or null to just attack. Below
+    /// <see cref="EmergencyHealHpFraction"/> HP this always evaluates
+    /// (self-preservation first); otherwise it rolls
+    /// <see cref="AbilityCastChance"/> for whether to bother at all, then
+    /// takes the highest-<see cref="ScoreAbility"/> option the NPC can
+    /// currently afford. Returns null with nothing affordable/usable.
+    /// </summary>
+    private static AbilityData? ChooseAbility(Traveler npc, Monster monster, IReadOnlyList<AbilityData> usableAbilities, IRandomSource random)
+    {
+        var hpFraction = npc.Health.Max > 0 ? npc.Health.Current / (double)npc.Health.Max : 1.0;
+        var isEmergency = hpFraction < EmergencyHealHpFraction;
+
+        if (!isEmergency && random.NextDouble() >= AbilityCastChance)
+        {
+            return null;
+        }
+
+        AbilityData? best = null;
+        var bestScore = 0.0;
+
+        foreach (var ability in usableAbilities)
+        {
+            if (!npc.Tachyons.CanAfford(ability.TachyonCost))
+            {
+                continue;
+            }
+
+            var score = ScoreAbility(ability, npc, monster, hpFraction);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = ability;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// A rough "how good is this cast right now" heuristic — not a
+    /// GDD-specified formula, original tuning meant to approximate how a
+    /// reasonable player would spend Tachyons: an outright win button
+    /// (<see cref="AbilityEffectType.InstantDefeatNonBoss"/>) always wins,
+    /// Heal scales with how hurt the NPC actually is, a Damage-family
+    /// ability whose <c>Condition</c> is currently met gets a bonus for
+    /// not being wasted, and Restore Tachyons only matters when the pool is
+    /// actually low. Effect types this engine can't act on
+    /// (<see cref="AbilityEffectType.None"/> or an unparseable string)
+    /// score below the zero floor <see cref="ChooseAbility"/> requires, so
+    /// they're never picked.
+    /// </summary>
+    private static double ScoreAbility(AbilityData ability, Traveler npc, Monster monster, double hpFraction)
+    {
+        if (!Enum.TryParse<AbilityEffectType>(ability.Effect, ignoreCase: true, out var effect))
+        {
+            return -1;
+        }
+
+        var conditionBonus = !string.IsNullOrEmpty(ability.Condition) && ConditionCurrentlyMet(ability.Condition, ability.Tag, monster) ? 5.0 : 0.0;
+
+        return effect switch
+        {
+            AbilityEffectType.InstantDefeatNonBoss => 1000,
+            AbilityEffectType.Heal => (1.0 - hpFraction) * 25,
+            AbilityEffectType.DamageOverTime => 12 + ability.Magnitude + conditionBonus,
+            AbilityEffectType.ExtraAttack => 11,
+            AbilityEffectType.IgnoreDefenseDamage => 10 + ability.Magnitude + conditionBonus,
+            AbilityEffectType.Damage => 9 + ability.Magnitude + conditionBonus,
+            AbilityEffectType.GuaranteedCritNextAttack => 8,
+            AbilityEffectType.DebuffTargetDefense => 7,
+            AbilityEffectType.DebuffTargetAttack => 6,
+            AbilityEffectType.DebuffTargetSpeed => 5,
+            AbilityEffectType.BuffSelfAttack => 5,
+            AbilityEffectType.BuffSelfDefense => 4,
+            AbilityEffectType.Shield => 4,
+            AbilityEffectType.RestoreTachyons => npc.Tachyons.Current < npc.Tachyons.Max * 0.3 ? 15 : 0,
+            _ => -1,
+        };
+    }
+
+    /// <summary>Mirrors <see cref="CombatSession"/>'s own private condition check (see its <c>PerformTravelerAttack</c>) so scoring can tell whether a conditional Damage ability's bonus would actually land right now.</summary>
+    private static bool ConditionCurrentlyMet(string condition, string? tag, Monster monster) => condition switch
+    {
+        "TargetUndamaged" => monster.Health.Current == monster.Health.Max,
+        "TargetBelow25Percent" => monster.Health.Current <= monster.Health.Max * 0.25,
+        "TargetTagged" => tag is not null && monster.HasTag(tag),
+        _ => false,
+    };
 
     /// <summary>
     /// Rolls whether to jump to another year this tick. A local-pool NPC
@@ -329,12 +506,23 @@ public static class NpcController
     /// Tachyon maintenance (<see cref="Store.ApplyMaintenanceTick"/> is
     /// what actually draws it down each world tick — this just tops the
     /// reserve up so foreclosure doesn't creep closer), lists a piece of
-    /// surplus gear or junk for sale, or collects accumulated Capital into
-    /// Credits — docs/GDD.md §7's "occasionally visit/stock a store it
-    /// owns." At most one of the three per tick, same "one action" rule as
-    /// everywhere else; maintenance is checked first since an unpaid store
-    /// risks repossession.
+    /// its own class-relevant surplus gear for sale (only while the shelf
+    /// is under <see cref="StoreStockSoftCap"/>), marks down its oldest
+    /// unsold listing when the shelf is over that cap, or collects
+    /// accumulated Capital into Credits — docs/GDD.md §7's "occasionally
+    /// visit/stock a store it owns." At most one action per tick, same
+    /// "one action" rule as everywhere else; maintenance is checked first
+    /// since an unpaid store risks repossession.
     /// </summary>
+    /// <remarks>
+    /// Unlike the old behavior, junk and off-class gear are never stocked
+    /// here — an NPC's own shopfront should read as "themed" to its class
+    /// (see <see cref="SelectClassRelevantSurplus"/>), not a dumping ground
+    /// for whatever it happens to be carrying. Junk and off-class surplus
+    /// are still liquidated, just not showcased here — see
+    /// <see cref="TryTrade"/>, which sells them at whichever store is at
+    /// hand instead.
+    /// </remarks>
     private static NpcTickResult? TryTendOwnStore(Traveler npc, StoreSlot ownedSlot, IRandomSource random)
     {
         if (random.NextDouble() >= StoreTendChance)
@@ -350,13 +538,25 @@ public static class NpcController
             return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"paid maintenance at {store.Name}");
         }
 
-        var surplus = npc.Inventory.FirstOrDefault(i => i.IsWieldable && !i.IsTimeShard && !IsEquipped(npc, i))
-            ?? npc.Inventory.FirstOrDefault(i => i.Type == ItemType.Junk);
-        if (surplus is not null)
+        if (store.Listings.Count < StoreStockSoftCap && SelectClassRelevantSurplus(npc) is { } surplus)
         {
             var price = EconomyPricing.DefaultAskingPrice(surplus);
-            store.Deposit(npc, surplus, price);
-            return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"stocked {surplus.Name} at {store.Name} for {price} Credits");
+            if (store.Deposit(npc, surplus, price))
+            {
+                return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"stocked {surplus.Name} at {store.Name} for {price} Credits");
+            }
+        }
+
+        // Shelf is at/over the soft cap and stock isn't moving — mark down
+        // the oldest unsold listing. This is the drain that keeps an owner
+        // who out-produces demand from climbing to Store.MaxListings and
+        // staying there (playtest: NPC shopfronts only ever grew). Firing
+        // at the cap (not just above it) means a maxed shelf keeps turning
+        // over — old stock out, fresh surplus in — instead of freezing.
+        if (store.Listings.Count >= StoreStockSoftCap && random.NextDouble() < StoreClearanceChance
+            && store.ClearOldestListing() is { } cleared)
+        {
+            return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"marked down unsold {cleared.Name} at {store.Name}");
         }
 
         if (store.Capital > 0)
@@ -369,16 +569,35 @@ public static class NpcController
     }
 
     /// <summary>
+    /// Picks the single most "important to their class" piece of surplus
+    /// gear an NPC is carrying, for stocking at its own store (see
+    /// <see cref="TryTendOwnStore"/>) — the strongest wieldable, non-Time
+    /// Shard, unequipped item that's either class-agnostic or restricted
+    /// to this NPC's own class (<see cref="Item.IsClassCompatible"/>,
+    /// matching docs/GDD.md §4.3's "off-class gear works at a penalty, not
+    /// a hard block" framing turned into a curation signal). Off-class
+    /// gear and junk never qualify — null if nothing does.
+    /// </summary>
+    private static Item? SelectClassRelevantSurplus(Traveler npc) =>
+        npc.Inventory
+            .Where(i => i.IsWieldable && !i.IsTimeShard && !IsEquipped(npc, i) && i.IsClassCompatible(npc.Class))
+            .OrderByDescending(i => i.Type == ItemType.Armor ? i.DefenseBonus : i.AttackBonus)
+            .FirstOrDefault();
+
+    /// <summary>
     /// Sells one piece of surplus gear (a looted Weapon/Armor/Ranged item
     /// that isn't equipped — <see cref="Act"/> already claimed anything
     /// that would've been an upgrade, so what's left is genuine dead
-    /// weight) or excess junk, or buys the cheapest affordable weapon if
-    /// still unarmed — at most one action, at a randomly picked store.
-    /// Selling gear is tried first: it's what actually makes a store worth
-    /// browsing, junk is just Credit filler. Null if there was nothing
-    /// worth doing (falls through to grinding). Called by
-    /// <see cref="TryStoreVisit"/> with every occupied store here — this
-    /// itself has no notion of ownership/vacancy.
+    /// weight) or excess junk, or — the demand side of the economy — buys
+    /// one listed item it can afford: a real upgrade for a slot, or
+    /// (sometimes) a consumable. At most one action, at a randomly picked
+    /// store. Selling gear is tried first: it's what actually makes a store
+    /// worth browsing, junk is just Credit filler. Buying is what keeps
+    /// listing counts from climbing forever — <see cref="Store.SellToTraveler"/>
+    /// removes the listing. Null if there was nothing worth doing (falls
+    /// through to grinding). Called by <see cref="TryStoreVisit"/> with
+    /// every occupied store here — this itself has no notion of
+    /// ownership/vacancy.
     /// </summary>
     private static NpcTickResult? TryTrade(Traveler npc, IReadOnlyList<Store> stores, IRandomSource random)
     {
@@ -387,8 +606,10 @@ public static class NpcController
         var wantsToSellGear = surplusGear is not null;
         var wantsToSellJunk = junkCount > ExcessJunkThreshold;
         var wantsToBuyWeapon = npc.EquippedWeapon is null && npc.Credits > 0;
+        var wantsToShop = npc.EquippedWeapon is not null && npc.Credits > 0
+                          && npc.Inventory.Count < Traveler.MaxInventorySize;
 
-        if (!wantsToSellGear && !wantsToSellJunk && !wantsToBuyWeapon)
+        if (!wantsToSellGear && !wantsToSellJunk && !wantsToBuyWeapon && !wantsToShop)
         {
             return null;
         }
@@ -429,7 +650,93 @@ public static class NpcController
             }
         }
 
+        if (wantsToShop && random.NextDouble() < ShopPurchaseChance)
+        {
+            if (PickPurchase(npc, stores, random) is (var buyStore, var listing)
+                && buyStore.SellToTraveler(npc, listing))
+            {
+                var bought = listing.Item;
+                if (bought.IsWieldable && !bought.IsTimeShard && !IsEquipped(npc, bought))
+                {
+                    npc.Wield(bought);
+                    return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"bought and wielded {bought.Name} from {buyStore.Name} for {listing.AskingPrice} Credits");
+                }
+
+                return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"bought {bought.Name} from {buyStore.Name} for {listing.AskingPrice} Credits");
+            }
+        }
+
         return null; // wanted to trade but nothing worked out this tick
+    }
+
+    /// <summary>
+    /// Chooses one listing an NPC will buy this tick, or null. Prefers a
+    /// genuine slot upgrade — a class-compatible Weapon/Armor/Ranged whose
+    /// bonus (scaled by <see cref="Item.WieldEffectiveness"/>, the same bar
+    /// <see cref="FindUpgrade"/> uses) beats what the NPC has equipped in
+    /// that slot right now — picking the cheapest such listing across every
+    /// occupied store here. Failing that, sometimes a consumable, as Credit
+    /// filler that still drains a listing. The NPC's own store is skipped —
+    /// buying your own stock is pointless churn.
+    /// </summary>
+    private static (Store Store, StoreListing Listing)? PickPurchase(Traveler npc, IReadOnlyList<Store> stores, IRandomSource random)
+    {
+        (Store Store, StoreListing Listing)? bestUpgrade = null;
+        var bestUpgradePrice = int.MaxValue;
+        var consumables = new List<(Store Store, StoreListing Listing)>();
+
+        foreach (var store in stores)
+        {
+            if (store.Owner == npc)
+            {
+                continue;
+            }
+
+            foreach (var listing in store.Listings)
+            {
+                if (listing.AskingPrice > npc.Credits)
+                {
+                    continue;
+                }
+
+                var item = listing.Item;
+                if (item.IsWieldable && !item.IsTimeShard && item.IsClassCompatible(npc.Class)
+                    && !(item.IsRanged && item.IsDepleted))
+                {
+                    var current = item.Type switch
+                    {
+                        ItemType.Weapon => npc.EquippedWeapon is { } w ? w.AttackBonus * w.WieldEffectiveness(npc.Class) : 0,
+                        ItemType.Armor => npc.EquippedArmor is { } a ? a.DefenseBonus * a.WieldEffectiveness(npc.Class) : 0,
+                        ItemType.Ranged => npc.EquippedRanged is { } r ? r.AttackBonus * r.WieldEffectiveness(npc.Class) : 0,
+                        _ => double.MaxValue,
+                    };
+                    var offered = (item.Type == ItemType.Armor ? item.DefenseBonus : item.AttackBonus)
+                                  * item.WieldEffectiveness(npc.Class);
+
+                    if (offered > current && listing.AskingPrice < bestUpgradePrice)
+                    {
+                        bestUpgrade = (store, listing);
+                        bestUpgradePrice = listing.AskingPrice;
+                    }
+                }
+                else if (item.Type == ItemType.Consumable && !item.IsTimeShard)
+                {
+                    consumables.Add((store, listing));
+                }
+            }
+        }
+
+        if (bestUpgrade is not null)
+        {
+            return bestUpgrade;
+        }
+
+        if (consumables.Count > 0 && random.NextDouble() < 0.5)
+        {
+            return consumables[(int)(random.NextDouble() * consumables.Count)];
+        }
+
+        return null;
     }
 
     private static void Wander(Traveler npc, LevelMap level, IRandomSource random)

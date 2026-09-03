@@ -4,6 +4,7 @@ using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Events;
 using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Time;
+using ChronoTravelers.Engine.Content;
 using ChronoTravelers.Engine.Npc;
 
 namespace ChronoTravelers.Engine.Simulation;
@@ -48,6 +49,7 @@ public sealed class WorldSimulation
     private readonly IRandomSource _random;
     private readonly List<string> _narration = [];
     private readonly IReadOnlyDictionary<CharacterClass, double>? _npcClassWeights;
+    private readonly IReadOnlyList<AbilityData> _abilities;
 
     // Where the player was at the end of the previous tick — lets the
     // monster sim tell "stood still" (ambushable) from "just arrived".
@@ -67,18 +69,29 @@ public sealed class WorldSimulation
     /// (the default) means uniform-random across every class, unchanged from
     /// the original behavior.
     /// </param>
+    /// <param name="abilities">
+    /// The class ability catalog (ContentLoader.LoadAbilities), passed straight
+    /// through to every <see cref="Npc.NpcController.Act"/> call this
+    /// simulation makes (both <see cref="Tick"/> and
+    /// <see cref="TickMultiplayer"/>) so NPC grind fights use their class
+    /// abilities exactly as a human player's interactive `fight` would.
+    /// Omitted or empty (the default) keeps every NPC's grind fight
+    /// ability-free, unchanged from the original behavior.
+    /// </param>
     public WorldSimulation(
         TimeWorld world,
         IList<Traveler> npcs,
         IRandomSource random,
         BroadcastChannel? broadcast = null,
-        IReadOnlyDictionary<CharacterClass, double>? npcClassWeights = null)
+        IReadOnlyDictionary<CharacterClass, double>? npcClassWeights = null,
+        IReadOnlyList<AbilityData>? abilities = null)
     {
         World = world;
         Npcs = npcs;
         _random = random;
         Broadcast = broadcast ?? new BroadcastChannel();
         _npcClassWeights = npcClassWeights;
+        _abilities = abilities ?? [];
     }
 
     /// <summary>
@@ -199,7 +212,7 @@ public sealed class WorldSimulation
             var levelBefore = npc.Level;
             var yearBefore = npc.CurrentYear;
             var pullToAnchor = i < NpcPopulation.LocalPopulationTarget;
-            var result = NpcController.Act(npc, yearContent.Map, _random, yearContent.StoreSlots, yearContent.MonsterRoster, World, playerAnchorYear, pullToAnchor);
+            var result = NpcController.Act(npc, yearContent.Map, _random, yearContent.StoreSlots, yearContent.MonsterRoster, World, playerAnchorYear, pullToAnchor, _abilities);
 
             if (result.Fight is { } fight)
             {
@@ -347,7 +360,7 @@ public sealed class WorldSimulation
             var levelBefore = npc.Level;
             var yearBefore = npc.CurrentYear;
             var pullToAnchor = i < NpcPopulation.LocalPopulationTarget;
-            var result = NpcController.Act(npc, yearContent.Map, _random, yearContent.StoreSlots, yearContent.MonsterRoster, World, mpAnchorYear, pullToAnchor);
+            var result = NpcController.Act(npc, yearContent.Map, _random, yearContent.StoreSlots, yearContent.MonsterRoster, World, mpAnchorYear, pullToAnchor, _abilities);
 
             if (result.Fight is { } fight)
             {
