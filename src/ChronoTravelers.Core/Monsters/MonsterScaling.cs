@@ -124,20 +124,37 @@ public static class MonsterScaling
         ((ClassDefinition.All.Count - 1) * Leveling.SecondaryStatGainPerLevel + Leveling.PrimaryStatGainPerLevel)
         / (double)ClassDefinition.All.Count;
 
+    /// <summary>The tier at which <see cref="ReferenceLevel"/>'s gentle early slope hands off to its steeper late slope.</summary>
+    private const double ReferenceLevelKneeTier = 3.0;
+
+    /// <summary>The character level <see cref="ReferenceLevel"/> reaches at <see cref="ReferenceLevelKneeTier"/> — its two linear segments meet here.</summary>
+    private const double ReferenceLevelKneeLevel = 8.0;
+
     /// <summary>
     /// The character level a tier-<paramref name="tier"/> monster is
-    /// calibrated against. Ramps linearly across the whole timeline: tier
-    /// 1.0 (year 2000, where a Traveler arrives at level 1) → level 1,
-    /// tier 9.0 (year 5000) → the hard cap. A first cut pinned this at
-    /// <c>10·tier</c> — the soft-cap pairing — but that made year 2000
-    /// monsters expect a level-10 character, so a fresh level-1 start
-    /// couldn't win (or survive) a single fight in its own arrival year
-    /// (playtest). Anchoring the low end at the actual starting level
-    /// keeps the early game fightable while the far future still scales
-    /// to a capped character.
+    /// calibrated against. Anchored at tier 1.0 (year 2000) → level 1
+    /// (a fresh Traveler's actual starting level, so the arrival year is
+    /// fightable) and tier 9.0 (year 5000) → the hard cap. Between, it is
+    /// piecewise-linear with a knee at
+    /// (<see cref="ReferenceLevelKneeTier"/>, <see cref="ReferenceLevelKneeLevel"/>):
+    /// a gentle early slope so the tier-1→2 hop — a character that has just
+    /// reached ~level 5 in year 2000 and travels straight to year 2250 —
+    /// lands roughly in-band instead of three levels under content sized
+    /// for it (playtest: that gap read as a wall), then a steeper slope
+    /// from the knee on so the far future still scales all the way to a
+    /// capped character. A first cut ramped this linearly the whole way
+    /// (and an earlier one pinned it at <c>10·tier</c>, the soft-cap
+    /// pairing, which made even year 2000 expect a level-10 character).
     /// </summary>
-    private static double ReferenceLevel(double tier) =>
-        Math.Clamp(1 + (tier - 1) * (Leveling.MaxCharacterLevel - 1) / 8.0, 1, Leveling.MaxCharacterLevel);
+    private static double ReferenceLevel(double tier)
+    {
+        var level = tier <= ReferenceLevelKneeTier
+            ? 1 + (tier - 1) * (ReferenceLevelKneeLevel - 1) / (ReferenceLevelKneeTier - 1)
+            : ReferenceLevelKneeLevel
+              + (tier - ReferenceLevelKneeTier)
+                * (Leveling.MaxCharacterLevel - ReferenceLevelKneeLevel) / (9.0 - ReferenceLevelKneeTier);
+        return Math.Clamp(level, 1, Leveling.MaxCharacterLevel);
+    }
 
     /// <summary>
     /// A level-matched character's own attack power with a standard

@@ -16,21 +16,20 @@ public class MonsterScalingTests
     }
 
     [Fact]
-    public void BaseAttackPower_TracksTheLevelMatchedReference_RisingLinearlyAcrossTheTimeline()
+    public void BaseAttackPower_TracksTheLevelMatchedReference_GentleEarlyThenSteeper()
     {
         // Derived from a level-matched character's own defence, where the
-        // matched level ramps linearly (tier 1 → level 1, tier 9 → the
-        // hard cap — see MonsterScaling.ReferenceLevel). Every input term
-        // is linear in tier, so the curve is too: tier-to-tier steps are
-        // near-constant, not superlinear (an earlier hand-tuned polynomial)
-        // and not decelerating (an earlier level-10·tier reference that
-        // clamped early).
+        // matched level ramps piecewise-linearly with a knee at tier 3
+        // (see MonsterScaling.ReferenceLevel): a gentle early slope so the
+        // tier-1->2 hop lands roughly in-band for an ~L5 traveller, then a
+        // steeper slope from the knee on so tier 9 still reaches the cap.
         var lowStep = MonsterScaling.BaseAttackPower(2) - MonsterScaling.BaseAttackPower(1);
         var highStep = MonsterScaling.BaseAttackPower(9) - MonsterScaling.BaseAttackPower(8);
 
         Assert.True(MonsterScaling.BaseAttackPower(9) > MonsterScaling.BaseAttackPower(1), "still climbs with tier");
-        Assert.True(Math.Abs(highStep - lowStep) <= 2, $"steps stay roughly constant ({lowStep} vs {highStep})");
-        // tier 1 is calibrated for a level-1 arrival now — a modest hit, not the old flat 3-5 or the level-10 double-digits
+        Assert.True(lowStep > 0, $"still rises across the early tiers ({lowStep})");
+        Assert.True(highStep > lowStep, $"late tiers ramp harder than early ones ({lowStep} vs {highStep})");
+        // tier 1 is calibrated for a level-1 arrival — a modest hit, not the old flat 3-5 or the level-10 double-digits
         Assert.InRange(MonsterScaling.BaseAttackPower(1), 8, 16);
     }
 

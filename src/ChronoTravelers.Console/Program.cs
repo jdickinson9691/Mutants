@@ -104,13 +104,22 @@ using System.Text;
 // current/furthest year, the cleared Warden years, and every store
 // the player owns (year + capital + listings, re-attached on load).
 //
-// The player's character is saved on a clean `quit`/`exit`, on Ctrl+C
-// (intercepted so the save actually completes before the process ends),
-// and best-effort via AppDomain.ProcessExit for other terminations this
-// build can observe (e.g. closing the console window) - see SaveOnExit
-// below. There's no way to guarantee a save survives every kind of forced
-// kill (task-killing the process, a power loss), but progress since the
-// last save is no longer silently lost on a normal Ctrl+C or window close.
+// The player's character is saved on a clean `quit`/`exit`/`menu`, on
+// Ctrl+C (intercepted so the save actually completes before the process
+// ends), and best-effort via AppDomain.ProcessExit for other terminations
+// this build can observe (e.g. closing the console window) - see
+// SaveOnExit below. There's no way to guarantee a save survives every
+// kind of forced kill (task-killing the process, a power loss), but
+// progress since the last save is no longer silently lost on a normal
+// Ctrl+C or window close.
+//
+// `menu` returns to the title screen (auto-saving first) without exiting
+// the process, and dying - whether by losing a fight or an ambush - does
+// the same: it's never persisted (death intentionally isn't saved), but
+// the player lands back on the title screen to start a new Traveler or
+// continue another, rather than getting dropped out to the desktop. Only
+// quitting from the title screen itself, or `quit`/`exit` there, actually
+// ends the process.
 //
 // Any unhandled exception (main thread or otherwise) is written to a
 // crash report under %APPDATA%\ChronoTravelers\crashes\ before the process
@@ -120,6 +129,36 @@ using System.Text;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) => CrashHandler(e.ExceptionObject as Exception);
 System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) => CrashHandler(e.Exception);
+
+// Save-on-abrupt-exit is subscribed exactly once, here, outside the
+// play-again loop below — 'menu' and death now return to the title
+// screen instead of ending the process, and a new session starts each
+// time around that loop. These two delegates are repointed at the
+// current session's own SaveOnExit/IsDead right after a session starts
+// (see the loop below) so Ctrl+C / window-close always saves *this*
+// Traveler, never a stale one, and so the handlers never pile up one per
+// session played this run.
+Action saveOnExit = () => { };
+Func<bool> travelerIsDead = () => false;
+
+// Ctrl+C: intercept it ourselves (Cancel = true stops the default hard
+// kill) so the current session's save actually gets to run before we
+// exit.
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    saveOnExit();
+    AnsiConsole.MarkupLine(travelerIsDead()
+        ? "[grey]Game over.[/]"
+        : "[grey]Farewell, Traveler. Progress saved.[/]");
+    Environment.Exit(0);
+};
+
+// Closing the console window, a SIGTERM, or any other process-level
+// termination this build can actually observe — .NET raises ProcessExit
+// on a graceful shutdown; there's no way to guarantee it on every kind of
+// forced kill, but this catches meaningfully more than nothing did before.
+AppDomain.CurrentDomain.ProcessExit += (_, _) => saveOnExit();
 
 // Restore the persisted master volume before anything plays (the title
 // theme fires from the first RenderTitle() below). Adjusted any time with
@@ -188,6 +227,13 @@ using var repository = OpenRepository(savePath);
 var abilities = LoadAbilities();
 var random = new SystemRandomSource();
 
+// One iteration = one Traveler session, start screen to end. Typing
+// 'menu' at any point in the game loop, or dying, ends the inner loop
+// with returnToMenu = true, which sends control back to the top here
+// instead of exiting the process — see the bottom of this loop.
+while (true)
+{
+
 var start = HandleStartScreen(repository);
 if (start is null)
 {
@@ -243,7 +289,7 @@ var elsewhereBacklog = 0;
 RecordNpcLeaderboardBests(npcs, repository);
 
 AnsiConsole.WriteLine();
-AnsiConsole.MarkupLine($"Welcome, [bold]{Markup.Escape(traveler.Name)}[/] the [bold]{traveler.Class}[/]. Type [yellow]help[/] for commands.");
+AnsiConsole.MarkupLine($"Welcome, [bold]{Markup.Escape(traveler.Name)}[/] the [bold]{traveler.Class}[/]. Type [yellow]help[/] for commands, [yellow]menu[/] to return to the title screen any time.");
 AnsiConsole.MarkupLine($"[grey]{npcs.Count} other Travelers are scattered across the centuries, fending for themselves.[/]");
 AnsiConsole.WriteLine();
 
@@ -275,25 +321,14 @@ void SaveOnExit()
     }
 }
 
-// Ctrl+C: intercept it ourselves (Cancel = true stops the default hard
-// kill) so the save above actually gets to run before we exit.
-Console.CancelKeyPress += (_, e) =>
-{
-    e.Cancel = true;
-    SaveOnExit();
-    AnsiConsole.MarkupLine(traveler.Health.IsDead
-        ? "[grey]Game over.[/]"
-        : "[grey]Farewell, Traveler. Progress saved.[/]");
-    Environment.Exit(0);
-};
-
-// Closing the console window, a SIGTERM, or any other process-level
-// termination this build can actually observe — .NET raises ProcessExit
-// on a graceful shutdown; there's no way to guarantee it on every kind of
-// forced kill, but this catches meaningfully more than nothing did before.
-AppDomain.CurrentDomain.ProcessExit += (_, _) => SaveOnExit();
+// Point the process-level Ctrl+C / ProcessExit handlers (subscribed once,
+// above the play-again loop) at *this* session's save/death-check so a
+// forced kill always saves the Traveler currently being played.
+saveOnExit = SaveOnExit;
+travelerIsDead = () => traveler.Health.IsDead;
 
 var running = true;
+var returnToMenu = false;
 while (running)
 {
     AnsiConsole.Markup("[green]>[/] ");
@@ -328,6 +363,12 @@ while (running)
     {
         case "quit" or "exit":
             running = false;
+            break;
+
+        case "menu":
+            AnsiConsole.MarkupLine("[grey]Returning to the main menu... (progress saved)[/]");
+            running = false;
+            returnToMenu = true;
             break;
 
         case "help" or "?":
@@ -418,6 +459,7 @@ while (running)
                 if (!HandleFight(traveler, world, random, simulation.Broadcast, abilities, argument))
                 {
                     running = false;
+                    returnToMenu = true;
                 }
 
                 break;
@@ -491,6 +533,7 @@ while (running)
             // A monster sharing the room struck the killing blow this tick (see MonsterController's ambush).
             AnsiConsole.MarkupLine("[red]You're struck down where you stand.[/]");
             running = false;
+            returnToMenu = true;
         }
         else if (renderRoomAfterTick)
         {
@@ -504,7 +547,17 @@ SaveOnExit();
 AnsiConsole.MarkupLine(traveler.Health.IsDead
     ? "[grey]Game over.[/]"
     : "[grey]Farewell, Traveler. Progress saved.[/]");
-return;
+
+// Death, and the new 'menu' command, both return here instead of ending
+// the process — 'quit'/'exit' (or quitting from the title screen itself,
+// handled above) are the only paths that actually end Main.
+if (!returnToMenu)
+{
+    return;
+}
+
+AnsiConsole.WriteLine();
+}
 
 /// <summary>
 /// Last line of defence for an unhandled exception: write a crash report,
@@ -1927,7 +1980,10 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
         return true;
     }
 
-    // docs/GDD.md §3.3 (death & recall) is not implemented yet; a defeat here just ends the session.
+    // docs/GDD.md §3.3 (death & recall) is not implemented yet; a defeat here
+    // just ends the session — the caller (the main loop, on a false return)
+    // saves nothing for a dead Traveler and returns to the title screen
+    // rather than exiting the process.
     AnsiConsole.MarkupLine($"[red]You were defeated by {Markup.Escape(foe)}...[/]");
     broadcast.Publish(GameEvent.Slain(traveler.Name, monster.Name, year, killerIsCreature: true));
     return false;
@@ -2828,6 +2884,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]+[/] / [green]-[/] (or volume)   - turn master audio up / down (persists across sessions; costs no turn)");
     AnsiConsole.MarkupLine("  [green]wait[/] (or z)         - pass a turn (a monster in the room may get a hit in)");
     AnsiConsole.MarkupLine("  [green]help[/] (or ?)         - show this list");
+    AnsiConsole.MarkupLine("  [green]menu[/]                - save and return to the title screen (start a new or different Traveler)");
     AnsiConsole.MarkupLine("  [green]quit[/] (or exit)      - leave the game (auto-saves unless you died)");
     AnsiConsole.MarkupLine("[grey]  Monsters ignore you until provoked — mostly by stepping onto their tile over and[/]");
     AnsiConsole.MarkupLine("[grey]  over, or shooting them ([yellow]monsters[/] shows each one's mood: calm/alert/hostile).[/]");
