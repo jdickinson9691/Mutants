@@ -4,6 +4,7 @@
     "species": [
       { "id": "junk-shambler", "name": "Junk Shambler", "tags": [], "archetype": "Baseline", "lootThemeTags": ["scrap", "common"] },
       { "id": "arc-wisp", "name": "Arc Wisp", "tags": ["echo"], "archetype": "Caster", "lootThemeTags": ["scrap", "neon"],
+        "powerProfile": { "hpMultiplier": 0.8, "attackMultiplier": 0.85 },
         "behaviorProfile": { "fleeBelowHpFraction": 0.3 } },
       { "id": "junkyard-colossus", "name": "Junkyard Colossus", "tags": [], "archetype": "Bruiser", "lootThemeTags": ["scrap", "common"],
         "powerProfile": { "hpMultiplier": 0.8, "attackMultiplier": 0.85 } },

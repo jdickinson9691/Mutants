@@ -92,7 +92,11 @@ public sealed record ClassDefinition(
             [CharacterClass.Engineer] = new(
                 CharacterClass.Engineer, PrimaryStat.Intellect,
                 BaseStats: new StatBlock(Strength: 7, Agility: 10, Resolve: 9, Intellect: 15),
-                BaseHp: 28, HpPerLevel: 5,
+                // 28 -> 30 (up to the Soldier's floor, which it may tie): the
+                // Engineer won its opening fight then lost the *next* one on
+                // chip damage before its L2 ability unlock (playtest). The
+                // low HpPerLevel keeps it the frail systems class from here.
+                BaseHp: 30, HpPerLevel: 5,
                 BaseTachyons: 136, TachyonsPerLevel: 30,  // base 32 x3 + 40, per-level 5 x6
                 TachyonDrainMultiplier: 1.2),
         };
