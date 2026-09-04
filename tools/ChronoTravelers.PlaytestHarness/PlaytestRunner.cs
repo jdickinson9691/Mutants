@@ -7,6 +7,7 @@ using ChronoTravelers.Core.Time;
 using ChronoTravelers.Core.World;
 using ChronoTravelers.Engine;
 using ChronoTravelers.Engine.Content;
+using ChronoTravelers.Engine.Npc;
 using ChronoTravelers.Engine.Simulation;
 
 namespace ChronoTravelers.PlaytestHarness;
@@ -162,7 +163,16 @@ public static class PlaytestRunner
             var hpBeforeAction = bot.Health.Current;
             var monster = population.MonstersAt(bot.Position).FirstOrDefault(m => !m.Health.IsDead);
 
-            if (monster is not null && !ReferenceEquals(monster, shadowTarget) && shadowTarget is null && random.NextDouble() >= EngageChance)
+            // Below MonsterController.StartRoomGraceMaxLevel a fresh
+            // character has ~28-30 HP and no gear — the same window the
+            // game itself protects from monster movement into safe rooms.
+            // Letting the bot deliberately court an ambush on top of that
+            // organic early hazard (rather than fight/flee immediately)
+            // turned every class's early runs into a near-certain instawipe
+            // (verified: 4/5 classes died within ~40 ticks on every single
+            // run of a battery). Only shadow once past that window.
+            if (monster is not null && !ReferenceEquals(monster, shadowTarget) && shadowTarget is null
+                && bot.Level > MonsterController.StartRoomGraceMaxLevel && random.NextDouble() >= EngageChance)
             {
                 shadowTarget = monster;
                 shadowTicks = 0;
