@@ -2,6 +2,7 @@ using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Diagnostics;
 using ChronoTravelers.Core.Items;
+using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Core.World;
 using ChronoTravelers.Engine;
@@ -39,6 +40,39 @@ public static class PlaytestRunner
     /// structurally unreachable regardless of aggression.
     /// </summary>
     private const double IdleTurnChance = 0.15;
+
+    /// <summary>
+    /// Chance, the first tick a fresh monster is found sharing the bot's
+    /// room, that the bot deliberately leaves it alone instead of
+    /// engaging — and then keeps leaving that <em>same</em> monster alone
+    /// every tick after (see <c>shadowTarget</c>) rather than re-rolling.
+    /// Even with genuine idle turns wired up, ambushes still never fired:
+    /// this bot fought any co-located monster instantly, every time, so
+    /// aggro (AggroModel.CoLocatedPerTick, needing ~10 consecutive
+    /// co-located ticks to reach HostileThreshold from 0) never got the
+    /// consecutive ticks near a monster it needs — a flat per-tick reroll
+    /// at 80% engage would need a run of that same low roll ten times in a
+    /// row (0.2^10), astronomically rare. Committing to one monster once
+    /// and holding fixes that; see <see cref="ShadowGiveUpTicks"/> for the
+    /// bail-out if it never escalates (a Calm monster that wanders off
+    /// before locking on, or an apex whose aggro gain is scaled way down).
+    /// </summary>
+    private const double EngageChance = 0.8;
+
+    /// <summary>Ticks to keep deliberately ignoring a shadowTarget before giving up and resuming normal engagement — well past the ~10 co-located ticks a regular monster needs to reach Hostile from 0 aggro.</summary>
+    private const int ShadowGiveUpTicks = 20;
+
+    /// <summary>
+    /// HP fraction below which the bot abandons a shadowTarget early and
+    /// fights back for real instead. First cut of this had no such
+    /// safety valve: once a shadowed monster went Hostile it could land
+    /// several ambush hits in a row (the bot does nothing but stand there
+    /// while shadowing, no counterattack), and with no floor every single
+    /// battery run died. This isn't meant to be survivable indefinitely —
+    /// letting a monster reach Hostile is a real, played-as-intended risk
+    /// — just not a guaranteed death sentence for every run.
+    /// </summary>
+    private const double ShadowAbortHpFraction = 0.6;
 
     /// <param name="aggression">
     /// Scales down the bot's healing thresholds (1.0 = default caution;
@@ -110,6 +144,8 @@ public static class PlaytestRunner
     {
         var maxHit = 0;
         var ticksSinceMonster = 0;
+        Monster? shadowTarget = null;
+        var shadowTicks = 0;
 
         for (var tick = 0; tick < maxTicks; tick++)
         {
@@ -125,10 +161,28 @@ public static class PlaytestRunner
 
             var hpBeforeAction = bot.Health.Current;
             var monster = population.MonstersAt(bot.Position).FirstOrDefault(m => !m.Health.IsDead);
-            if (monster is not null)
+
+            if (monster is not null && !ReferenceEquals(monster, shadowTarget) && shadowTarget is null && random.NextDouble() >= EngageChance)
+            {
+                shadowTarget = monster;
+                shadowTicks = 0;
+            }
+
+            var hpFraction = bot.Health.Max > 0 ? bot.Health.Current / (double)bot.Health.Max : 1.0;
+            if (monster is not null && ReferenceEquals(monster, shadowTarget) && shadowTicks < ShadowGiveUpTicks && hpFraction > ShadowAbortHpFraction)
+            {
+                // Deliberately leaving this specific monster alone — stays
+                // put (doesn't even roll movement) so its aggro can climb
+                // toward Hostile instead of the bot wandering off and
+                // resetting the clock. See EngageChance's doc comment.
+                shadowTicks++;
+                ticksSinceMonster++;
+            }
+            else if (monster is not null)
             {
                 idle = false;
                 ticksSinceMonster = 0;
+                shadowTarget = null;
                 FightBot.Fight(bot, monster, classAbilities, random, report, population);
                 if (monster.Health.IsDead)
                 {
