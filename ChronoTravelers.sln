@@ -25,6 +25,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChronoTravelers.Server", "s
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChronoTravelers.Game.Tests", "tests\ChronoTravelers.Game.Tests\ChronoTravelers.Game.Tests.csproj", "{8F1DB604-6F9E-4AE8-976E-38A74E2844EE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChronoTravelers.Server.Tests", "tests\ChronoTravelers.Server.Tests\ChronoTravelers.Server.Tests.csproj", "{344169A4-B3E0-4D42-BD60-D9932206365F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -70,6 +72,10 @@ Global
 		{8F1DB604-6F9E-4AE8-976E-38A74E2844EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F1DB604-6F9E-4AE8-976E-38A74E2844EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8F1DB604-6F9E-4AE8-976E-38A74E2844EE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{344169A4-B3E0-4D42-BD60-D9932206365F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{344169A4-B3E0-4D42-BD60-D9932206365F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{344169A4-B3E0-4D42-BD60-D9932206365F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{344169A4-B3E0-4D42-BD60-D9932206365F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{BC2CA43B-A1A3-4F8A-AEF0-2EE7D23A3D3C} = {297D288E-B196-4903-A8F5-8B03BA413588}
@@ -81,5 +87,6 @@ Global
 		{7DCC2650-8B33-46A2-A87E-16128B131C68} = {297D288E-B196-4903-A8F5-8B03BA413588}
 		{94DC4B6D-DD6A-43D9-B1FC-8A11CDB3AEBD} = {297D288E-B196-4903-A8F5-8B03BA413588}
 		{8F1DB604-6F9E-4AE8-976E-38A74E2844EE} = {21C11B2B-FDDD-44CC-9978-81052EE235D3}
+		{344169A4-B3E0-4D42-BD60-D9932206365F} = {21C11B2B-FDDD-44CC-9978-81052EE235D3}
 	EndGlobalSection
 EndGlobal
