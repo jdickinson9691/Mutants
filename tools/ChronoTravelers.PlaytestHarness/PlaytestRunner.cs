@@ -27,7 +27,17 @@ public static class PlaytestRunner
     private const int TicksBeforeConsideringTravel = 20;
     private const double IdleTravelChance = 0.05;
 
-    public static RunReport Run(CharacterClass characterClass, long worldSeed, int maxTicks, string contentDirectory, IReadOnlyList<AbilityData> allAbilities)
+    /// <param name="aggression">
+    /// Scales down the bot's healing thresholds (1.0 = default caution;
+    /// 1.25 = 25% more aggressive, i.e. thresholds divided by 1.25). Low-HP
+    /// passives (Soldier "Second Wind"/"Unbreakable", Doctor "Trauma
+    /// Ward"'s ambush-negate roll only fires on an ambush at all, not HP —
+    /// see the class doc comment) need the bot to actually stay hurt for a
+    /// beat instead of topping off the instant it's off peak HP, which the
+    /// default caution rarely allows. Doesn't change fight-selection or
+    /// travel pacing — HP tolerance only.
+    /// </param>
+    public static RunReport Run(CharacterClass characterClass, long worldSeed, int maxTicks, string contentDirectory, IReadOnlyList<AbilityData> allAbilities, double aggression = 1.0)
     {
         var world = LoadWorld(contentDirectory, worldSeed);
         var random = new SystemRandomSource(new Random(unchecked((int)worldSeed)));
@@ -59,7 +69,7 @@ public static class PlaytestRunner
         PassiveActivationTracker.Listener = OnPassiveActivation;
         try
         {
-            RunLoop(bot, world, simulation, random, classAbilities, maxTicks, report);
+            RunLoop(bot, world, simulation, random, classAbilities, maxTicks, report, aggression);
         }
         finally
         {
@@ -83,7 +93,7 @@ public static class PlaytestRunner
         return report;
     }
 
-    private static void RunLoop(Traveler bot, TimeWorld world, WorldSimulation simulation, IRandomSource random, List<AbilityData> classAbilities, int maxTicks, RunReport report)
+    private static void RunLoop(Traveler bot, TimeWorld world, WorldSimulation simulation, IRandomSource random, List<AbilityData> classAbilities, int maxTicks, RunReport report, double aggression)
     {
         var maxHit = 0;
         var ticksSinceMonster = 0;
@@ -115,7 +125,7 @@ public static class PlaytestRunner
             else
             {
                 ticksSinceMonster++;
-                TryHealOrConsume(bot);
+                TryHealOrConsume(bot, aggression);
                 TryPickUpAndWieldBetterGear(bot, population);
                 TryShop(bot, year);
 
@@ -211,15 +221,15 @@ public static class PlaytestRunner
         return exits.Count == 0 ? null : exits[(int)(random.NextDouble() * exits.Count)];
     }
 
-    private static void TryHealOrConsume(Traveler bot)
+    private static void TryHealOrConsume(Traveler bot, double aggression)
     {
         var hpFraction = bot.Health.Max > 0 ? bot.Health.Current / (double)bot.Health.Max : 1.0;
-        if (hpFraction >= 0.9)
+        if (hpFraction >= 0.9 / aggression)
         {
             return;
         }
 
-        if (hpFraction < 0.5)
+        if (hpFraction < 0.5 / aggression)
         {
             var healItem = bot.Inventory.FirstOrDefault(i => i.IsUsable && i.ConsumableEffect == ConsumableEffectType.Heal);
             if (healItem is not null)
@@ -229,7 +239,7 @@ public static class PlaytestRunner
             }
         }
 
-        if (hpFraction < 0.7 && bot.Tachyons.Current > 5)
+        if (hpFraction < 0.7 / aggression && bot.Tachyons.Current > 5)
         {
             bot.Heal();
         }
