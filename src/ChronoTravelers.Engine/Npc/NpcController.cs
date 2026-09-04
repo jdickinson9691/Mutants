@@ -4,6 +4,7 @@ using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Time;
+using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Core.World;
 using ChronoTravelers.Engine.Combat;
 using ChronoTravelers.Engine.Content;
@@ -52,6 +53,24 @@ public static class NpcController
     /// <summary>An owner tops up maintenance once the store's reserve dips below this many Tachyons.</summary>
     private const int MaintenanceReserveTarget = 60;
 
+    /// <summary>Credits an owner deposits into its own store's Capital in one tending action — the funding half of the loop that lets the store later buy from travelers via <see cref="Store.BuyFromTraveler"/>. See <see cref="CapitalReserveTarget"/>.</summary>
+    private const int CapitalTopUpAmount = 150;
+
+    /// <summary>
+    /// An owner tops up its store's Capital once it dips below this floor,
+    /// and — the other half of the same fix — only ever collects profit
+    /// ABOVE this floor rather than sweeping the whole balance. Before this
+    /// existed, <see cref="TryTendOwnStore"/> would collect every last
+    /// Credit of Capital the moment there was any to collect and never
+    /// deposited anything back in, so an owned store's Capital sat at (or
+    /// returned to) 0 almost immediately — meaning it could sell listings
+    /// but could never actually buy anything from a traveler, since
+    /// <see cref="Store.BuyFromTraveler"/> refuses when Capital can't cover
+    /// the price. This is what actually reported as "NPCs aren't
+    /// depositing Credits for the store to function with."
+    /// </summary>
+    private const int CapitalReserveTarget = 300;
+
     /// <summary>How often, per tick, a ready NPC not pulling toward an anchor (not low on Tachyons/HP, either background-pool or already at the anchor) even considers jumping to another year — kept low so a year's population doesn't churn every tick.</summary>
     private const double TravelAttemptChance = 0.10;
 
@@ -61,6 +80,29 @@ public static class NpcController
     /// <summary>An NPC's per-jump reach, in years — it picks a random offset in ±[<see cref="MinTravelHop"/>, <see cref="MaxTravelHop"/>], clamped to the timeline.</summary>
     private const int MinTravelHop = 50;
     private const int MaxTravelHop = 300;
+
+    // --- CreatureTraitKind hooks (original tuning) ------------------------
+
+    /// <summary>Aggressive trait — only retreats far closer to death than the normal <see cref="LowHealthThreshold"/>.</summary>
+    private const double AggressiveLowHealthThreshold = 0.12;
+
+    /// <summary>Skittish trait — retreats far earlier than the normal <see cref="LowHealthThreshold"/>.</summary>
+    private const double SkittishLowHealthThreshold = 0.5;
+
+    /// <summary>Scavenger trait — bonus Credits kept on top of a sale, mirroring <see cref="Monsters.Monster"/>'s Scavenger Convert bonus.</summary>
+    private const double ScavengerSellBonusPct = 0.25;
+
+    /// <summary>Trader trait — multiplies <see cref="StorePurchaseChance"/> and <see cref="StoreTendChance"/>, so a Trader is far more likely to buy and tend a shopfront.</summary>
+    private const double TraderStoreActivityMultiplier = 2.5;
+
+    /// <summary>Trader trait — extra stocking headroom above <see cref="StoreStockSoftCap"/> per NPC level, so a Trader's shelf keeps growing as it levels up (per the user's original "continue to collect and stock their shops as they level up" request).</summary>
+    private const double TraderStockCapPerLevel = 0.4;
+
+    /// <summary>Wanderer trait — multiplies both <see cref="TravelAttemptChance"/> and <see cref="AnchorTravelAttemptChance"/>, so it considers a jump far more often.</summary>
+    private const double WandererTravelAttemptMultiplier = 2.5;
+
+    /// <summary>Wanderer trait — multiplies its per-jump reach (<see cref="MinTravelHop"/>/<see cref="MaxTravelHop"/>).</summary>
+    private const double WandererHopMultiplier = 1.5;
 
     /// <summary>
     /// Decides and executes one tick's action for <paramref name="npc"/>.
@@ -122,7 +164,14 @@ public static class NpcController
             // No fodder on hand - fall through to grinding, which is also how they'll find more.
         }
 
-        if (IsLow(npc.Health.Current, npc.Health.Max, LowHealthThreshold))
+        // Aggressive / Skittish traits — retreat much later or much earlier than the norm.
+        var retreatThreshold = npc.Trait switch
+        {
+            CreatureTraitKind.Aggressive => AggressiveLowHealthThreshold,
+            CreatureTraitKind.Skittish => SkittishLowHealthThreshold,
+            _ => LowHealthThreshold,
+        };
+        if (IsLow(npc.Health.Current, npc.Health.Max, retreatThreshold))
         {
             return new NpcTickResult(npc.Name, NpcGoal.Retreat);
         }
@@ -343,26 +392,35 @@ public static class NpcController
     private static NpcTickResult? TryTravel(Traveler npc, TimeWorld world, IRandomSource random, int? anchorYear, bool pullToAnchor)
     {
         int targetYear;
+        // Wanderer trait — considers a jump far more often, and reaches further when it does.
+        var isWanderer = npc.Trait == CreatureTraitKind.Wanderer;
+        var maxHop = isWanderer ? (int)(MaxTravelHop * WandererHopMultiplier) : MaxTravelHop;
 
         if (pullToAnchor && anchorYear is { } anchor && anchor != npc.CurrentYear)
         {
-            if (random.NextDouble() > AnchorTravelAttemptChance)
+            var anchorChance = isWanderer
+                ? Math.Min(1.0, AnchorTravelAttemptChance * WandererTravelAttemptMultiplier)
+                : AnchorTravelAttemptChance;
+            if (random.NextDouble() > anchorChance)
             {
                 return null;
             }
 
             targetYear = npc.Tachyons.CanAfford(TachyonEconomy.TimeTravelCost(npc.CurrentYear, anchor))
                 ? anchor
-                : ClosestAffordableHopToward(npc, anchor, random);
+                : ClosestAffordableHopToward(npc, anchor, random, maxHop);
         }
         else
         {
-            if (random.NextDouble() > TravelAttemptChance)
+            var travelChance = isWanderer
+                ? Math.Min(1.0, TravelAttemptChance * WandererTravelAttemptMultiplier)
+                : TravelAttemptChance;
+            if (random.NextDouble() > travelChance)
             {
                 return null;
             }
 
-            var hop = MinTravelHop + (int)(random.NextDouble() * (MaxTravelHop - MinTravelHop + 1));
+            var hop = MinTravelHop + (int)(random.NextDouble() * (maxHop - MinTravelHop + 1));
             var forward = random.NextDouble() < ForwardTravelBias;
             targetYear = Math.Clamp(npc.CurrentYear + (forward ? hop : -hop), TimeScale.MinYear, TimeScale.MaxYear);
         }
@@ -384,10 +442,10 @@ public static class NpcController
     }
 
     /// <summary>A hop of up to <see cref="MaxTravelHop"/> years toward <paramref name="anchor"/>, never overshooting past it — used when the full jump to the anchor isn't affordable yet, so a local-pool NPC still makes real progress this tick instead of doing nothing.</summary>
-    private static int ClosestAffordableHopToward(Traveler npc, int anchor, IRandomSource random)
+    private static int ClosestAffordableHopToward(Traveler npc, int anchor, IRandomSource random, int maxHop = MaxTravelHop)
     {
         var direction = anchor > npc.CurrentYear ? 1 : -1;
-        var hop = MinTravelHop + (int)(random.NextDouble() * (MaxTravelHop - MinTravelHop + 1));
+        var hop = MinTravelHop + (int)(random.NextDouble() * (maxHop - MinTravelHop + 1));
         var target = Math.Clamp(npc.CurrentYear + direction * hop, TimeScale.MinYear, TimeScale.MaxYear);
         return direction > 0 ? Math.Min(target, anchor) : Math.Max(target, anchor);
     }
@@ -485,8 +543,13 @@ public static class NpcController
     /// </summary>
     private static NpcTickResult? TryPurchaseStoreSlot(Traveler npc, IReadOnlyList<StoreSlot> storeSlots, IRandomSource random)
     {
+        // Trader trait — much more likely to consider buying a slot.
+        var purchaseChance = npc.Trait == CreatureTraitKind.Trader
+            ? Math.Min(1.0, StorePurchaseChance * TraderStoreActivityMultiplier)
+            : StorePurchaseChance;
+
         var vacant = storeSlots.Where(s => s.IsAvailableForPurchase).ToList();
-        if (vacant.Count < 2 || random.NextDouble() >= StorePurchaseChance)
+        if (vacant.Count < 2 || random.NextDouble() >= purchaseChance)
         {
             return null;
         }
@@ -522,10 +585,22 @@ public static class NpcController
     /// are still liquidated, just not showcased here — see
     /// <see cref="TryTrade"/>, which sells them at whichever store is at
     /// hand instead.
+    ///
+    /// One tending action does at most one of, in priority order: (1) pay
+    /// down Tachyon maintenance, since an unpaid store risks repossession;
+    /// (2) fund Capital toward <see cref="CapitalReserveTarget"/>, since an
+    /// under-capitalized store can't do its job — it can sell listings but
+    /// can't buy from a traveler — at all; (3) stock a class-relevant
+    /// surplus item; (4) mark down the oldest listing if over-stocked; (5)
+    /// collect profit ABOVE the Capital reserve floor into Credits.
     /// </remarks>
     private static NpcTickResult? TryTendOwnStore(Traveler npc, StoreSlot ownedSlot, IRandomSource random)
     {
-        if (random.NextDouble() >= StoreTendChance)
+        // Trader trait — much more likely to bother tending this tick.
+        var tendChance = npc.Trait == CreatureTraitKind.Trader
+            ? Math.Min(1.0, StoreTendChance * TraderStoreActivityMultiplier)
+            : StoreTendChance;
+        if (random.NextDouble() >= tendChance)
         {
             return null;
         }
@@ -538,7 +613,20 @@ public static class NpcController
             return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"paid maintenance at {store.Name}");
         }
 
-        if (store.Listings.Count < StoreStockSoftCap && SelectClassRelevantSurplus(npc) is { } surplus)
+        if (store.Capital < CapitalReserveTarget && npc.Credits >= CapitalTopUpAmount)
+        {
+            store.Deposit(npc, CapitalTopUpAmount);
+            return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"deposited {CapitalTopUpAmount} Credits into {store.Name}");
+        }
+
+        // Trader trait — a growing stocking ceiling as it levels up (per the
+        // user's original request), instead of the flat StoreStockSoftCap
+        // every other owner settles around.
+        var stockCap = npc.Trait == CreatureTraitKind.Trader
+            ? Math.Min(Store.MaxListings, StoreStockSoftCap + (int)(npc.Level * TraderStockCapPerLevel))
+            : StoreStockSoftCap;
+
+        if (store.Listings.Count < stockCap && SelectClassRelevantSurplus(npc) is { } surplus)
         {
             var price = EconomyPricing.DefaultAskingPrice(surplus);
             if (store.Deposit(npc, surplus, price))
@@ -553,15 +641,15 @@ public static class NpcController
         // staying there (playtest: NPC shopfronts only ever grew). Firing
         // at the cap (not just above it) means a maxed shelf keeps turning
         // over — old stock out, fresh surplus in — instead of freezing.
-        if (store.Listings.Count >= StoreStockSoftCap && random.NextDouble() < StoreClearanceChance
+        if (store.Listings.Count >= stockCap && random.NextDouble() < StoreClearanceChance
             && store.ClearOldestListing() is { } cleared)
         {
             return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"marked down unsold {cleared.Name} at {store.Name}");
         }
 
-        if (store.Capital > 0)
+        if (store.Capital > CapitalReserveTarget)
         {
-            var collected = store.CollectCapital(npc, store.Capital);
+            var collected = store.CollectCapital(npc, store.Capital - CapitalReserveTarget);
             return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"collected {collected} Credits from {store.Name}");
         }
 
@@ -603,8 +691,10 @@ public static class NpcController
     {
         var surplusGear = npc.Inventory.FirstOrDefault(i => i.IsWieldable && !i.IsTimeShard && !IsEquipped(npc, i));
         var junkCount = npc.Inventory.Count(i => i.Type == ItemType.Junk);
-        var wantsToSellGear = surplusGear is not null;
-        var wantsToSellJunk = junkCount > ExcessJunkThreshold;
+        // Hoarder trait — never voluntarily sells anything; keeps collecting instead.
+        var isHoarder = npc.Trait == CreatureTraitKind.Hoarder;
+        var wantsToSellGear = !isHoarder && surplusGear is not null;
+        var wantsToSellJunk = !isHoarder && junkCount > ExcessJunkThreshold;
         var wantsToBuyWeapon = npc.EquippedWeapon is null && npc.Credits > 0;
         var wantsToShop = npc.EquippedWeapon is not null && npc.Credits > 0
                           && npc.Inventory.Count < Traveler.MaxInventorySize;
@@ -621,6 +711,7 @@ public static class NpcController
             var price = store.BuyFromTraveler(npc, surplusGear!);
             if (price is not null)
             {
+                ApplyScavengerSellBonus(npc, price.Value);
                 return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"sold {surplusGear!.Name} to {store.Name} for {price} Credits");
             }
         }
@@ -631,6 +722,7 @@ public static class NpcController
             var price = store.BuyFromTraveler(npc, junk);
             if (price is not null)
             {
+                ApplyScavengerSellBonus(npc, price.Value);
                 return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"sold {junk.Name} to {store.Name} for {price} Credits");
             }
         }
@@ -671,6 +763,21 @@ public static class NpcController
         }
 
         return null; // wanted to trade but nothing worked out this tick
+    }
+
+    /// <summary>Scavenger trait — a bonus fraction of Credits kept on top of a store sale, on top of whatever the store paid — mirrors <see cref="Monsters.Monster"/>'s Scavenger Convert bonus.</summary>
+    private static void ApplyScavengerSellBonus(Traveler npc, int price)
+    {
+        if (npc.Trait != CreatureTraitKind.Scavenger || price <= 0)
+        {
+            return;
+        }
+
+        var bonus = (int)Math.Round(price * ScavengerSellBonusPct);
+        if (bonus > 0)
+        {
+            npc.AddCredits(bonus);
+        }
     }
 
     /// <summary>

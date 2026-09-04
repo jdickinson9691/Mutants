@@ -1,6 +1,7 @@
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Time;
+using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Core.World;
 
 namespace ChronoTravelers.Core.Tests.Time;
@@ -233,5 +234,35 @@ public class YearPopulationTests
 
         pop.RemoveMonster(extra);
         Assert.Equal(before, pop.Monsters.Count);
+    }
+
+    [Fact]
+    public void Seed_AssignsOnlyMonsterPoolTraitsOrNone_AcrossManySeededYears()
+    {
+        // No way to force a specific roll through the deterministic
+        // world-gen stream from a test, so this sweeps many (seed, year)
+        // combinations instead: every spawned monster's Trait must be
+        // either None or something from CreatureTraits.MonsterPool — never
+        // an NPC-only trait — and, across this many spawns, at least one
+        // should actually roll a trait (the 40% spawn chance isn't silently
+        // wired to 0%).
+        var sawATrait = false;
+
+        for (var seed = 0; seed < 25; seed++)
+        {
+            var pop = PopulationFor(seed, 3000);
+            foreach (var monster in pop.Monsters)
+            {
+                if (monster.Trait == CreatureTraitKind.None)
+                {
+                    continue;
+                }
+
+                sawATrait = true;
+                Assert.Contains(monster.Trait, CreatureTraits.MonsterPool);
+            }
+        }
+
+        Assert.True(sawATrait, "Across 25 seeded years' worth of monster spawns, at least one should have rolled a trait.");
     }
 }

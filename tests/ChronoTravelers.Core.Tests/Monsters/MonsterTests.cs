@@ -1,5 +1,6 @@
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
+using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Core.World;
 
 namespace ChronoTravelers.Core.Tests.Monsters;
@@ -255,5 +256,60 @@ public class MonsterTests
         monster.Enumerate(999); // should not overwrite the first callsign
 
         Assert.Equal("Beast-007", monster.Name);
+    }
+
+    // --- CreatureTraitKind ---------------------------------------------
+
+    [Fact]
+    public void Trait_DefaultsToNoneUntilAssigned()
+    {
+        var monster = Monster.Create("Beast", 1);
+        Assert.Equal(CreatureTraitKind.None, monster.Trait);
+    }
+
+    [Fact]
+    public void AssignTrait_SetsTheTrait()
+    {
+        var monster = Monster.Create("Beast", 1);
+
+        monster.AssignTrait(CreatureTraitKind.Aggressive);
+
+        Assert.Equal(CreatureTraitKind.Aggressive, monster.Trait);
+    }
+
+    [Fact]
+    public void AssignTrait_IsANoOpOnceAlreadyAssigned_EvenIfTheFirstRollWasNone()
+    {
+        var monster = Monster.Create("Beast", 1);
+
+        monster.AssignTrait(CreatureTraitKind.None); // a legitimate "missed the roll" result
+        monster.AssignTrait(CreatureTraitKind.Hoarder); // should not silently overwrite it
+
+        Assert.Equal(CreatureTraitKind.None, monster.Trait);
+    }
+
+    [Fact]
+    public void Convert_WithScavengerTrait_GainsABonusOverAPlainMonster()
+    {
+        // Explicit maxTachyons headroom so neither conversion caps out and
+        // masks the bonus (Monster.Create's tier-1 pool is far smaller) —
+        // but the pool still starts full (TachyonPool's constructor
+        // defaults Current to Max), so it has to be drained back to 0
+        // first or Convert's Add has no room to show a difference at all.
+        var plain = new Monster("Beast", 1, 30, 10, 2, 8, 40, maxTachyons: 10000);
+        var scavenger = new Monster("Scav Beast", 1, 30, 10, 2, 8, 40, maxTachyons: 10000);
+        scavenger.AssignTrait(CreatureTraitKind.Scavenger);
+        plain.Tachyons.Spend(plain.Tachyons.Current);
+        scavenger.Tachyons.Spend(scavenger.Tachyons.Current);
+
+        var item1 = Item.Create("Neon Shard", ItemType.Junk, 3, Rarity.Rare);
+        var item2 = Item.Create("Neon Shard", ItemType.Junk, 3, Rarity.Rare);
+        plain.AddToInventory(item1);
+        scavenger.AddToInventory(item2);
+
+        var plainGain = plain.Convert(item1);
+        var scavengerGain = scavenger.Convert(item2);
+
+        Assert.True(scavengerGain > plainGain);
     }
 }

@@ -1,5 +1,6 @@
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Time;
+using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Engine.Npc;
 
 namespace ChronoTravelers.Engine.Tests.Npc;
@@ -214,5 +215,33 @@ public class NpcPopulationTests
         var npc = NpcPopulation.RespawnScattered(0, World(), new StubRandomSource(0.3, 0.5, 0.7), weights);
 
         Assert.Equal(CharacterClass.Spy, npc.Class);
+    }
+
+    // --- CreatureTraitKind spawn roll ---------------------------------------
+
+    [Fact]
+    public void Spawn_TraitRollPasses_AssignsATraitFromTheNpcPool()
+    {
+        // First NextDouble() -> class pick; second (and repeated, since the
+        // stub replays its last value) -> the 40% trait gate, well under it.
+        var npcs = NpcPopulation.Spawn(10, World(), new StubRandomSource(0.5, 0.1));
+
+        Assert.All(npcs, npc => Assert.Contains(npc.Trait, CreatureTraits.NpcPool));
+    }
+
+    [Fact]
+    public void Spawn_TraitRollFails_LeavesTraitNone()
+    {
+        var npcs = NpcPopulation.Spawn(10, World(), new StubRandomSource(0.5, 0.9)); // 0.9 misses the 40% gate
+
+        Assert.All(npcs, npc => Assert.Equal(CreatureTraitKind.None, npc.Trait));
+    }
+
+    [Fact]
+    public void RespawnNear_AlsoRollsATrait()
+    {
+        var npc = NpcPopulation.RespawnNear(0, 3000, World(), new StubRandomSource(0.5, 0.1));
+
+        Assert.Contains(npc.Trait, CreatureTraits.NpcPool);
     }
 }

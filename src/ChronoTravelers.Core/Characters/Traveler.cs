@@ -5,6 +5,7 @@ using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Stats;
 using ChronoTravelers.Core.Time;
+using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Core.World;
 
 namespace ChronoTravelers.Core.Characters;
@@ -110,6 +111,31 @@ public sealed class Traveler
     /// </summary>
     public const int MaxInventorySize = 15;
 
+    /// <summary>
+    /// This NPC's rolled <see cref="CreatureTraitKind"/> — <c>None</c> until
+    /// <see cref="AssignTrait"/> is called. Only
+    /// <c>ChronoTravelers.Engine.Npc.NpcPopulation.Create</c> (spawn/respawn)
+    /// ever calls it, so the player's own Traveler never carries a trait —
+    /// see docs/GDD.md §7. NPCs are re-simulated fresh each session (never
+    /// persisted — see <c>ChronoTravelers.Engine.Persistence.CharacterSaveData</c>'s
+    /// doc comment), so this needed no save-format change.
+    /// </summary>
+    public CreatureTraitKind Trait { get; private set; } = CreatureTraitKind.None;
+
+    private bool _traitAssigned;
+
+    /// <summary>Assigns this NPC's <see cref="Trait"/> once — a no-op past the first call (mirrors <see cref="Monsters.Monster.AssignTrait"/>'s guard). A legitimate roll of <c>CreatureTraitKind.None</c> still counts as "assigned" so it can't be silently overwritten by a stray second call.</summary>
+    public void AssignTrait(CreatureTraitKind trait)
+    {
+        if (_traitAssigned)
+        {
+            return;
+        }
+
+        Trait = trait;
+        _traitAssigned = true;
+    }
+
     public Item? EquippedWeapon { get; private set; }
     public Item? EquippedArmor { get; private set; }
 
@@ -154,6 +180,9 @@ public sealed class Traveler
     /// BuffAttack potion. Original design — the GDD confirms "a primary
     /// attack" per class but not its formula.
     /// </summary>
+    /// <summary>Pack Leader trait (NPC-side hook — see <see cref="Traits.CreatureTraitKind.PackLeader"/>'s doc comment): a flat EffectiveAttackPower bonus, the NPC-flavored translation of the monster-side "rallies the room" mechanic — an NPC isn't a spatial pack animal, but it still fights like it's leading one.</summary>
+    private const double PackLeaderAttackBonusPct = 0.15;
+
     public int EffectiveAttackPower
     {
         get
@@ -164,6 +193,11 @@ public sealed class Traveler
                 : (int)Math.Round(EquippedWeapon.AttackBonus * EquippedWeapon.WieldEffectiveness(Class, OffClassPenaltyReduction));
 
             var passiveBonus = basePower + weaponBonus + TemporaryAttackBonus;
+
+            if (Trait == CreatureTraitKind.PackLeader)
+            {
+                passiveBonus += (int)Math.Round(passiveBonus * PackLeaderAttackBonusPct);
+            }
 
             // Scientist "Overcurrent" — bonus while flush with Tachyons
             // (docs/GDD.md §4.2.1). Read against the nominal pool max, not
@@ -221,6 +255,9 @@ public sealed class Traveler
     /// Magnitude, say). Multiplicative with the caller's multiplier, not
     /// additive with each other's percentages, to keep this simple.
     /// </summary>
+    /// <summary>Ambusher trait (NPC-side hook — see <see cref="Traits.CreatureTraitKind.Ambusher"/>'s doc comment): the opening-strike bonus against a still-undamaged target, the NPC-flavored translation of the monster-side ambush-hit bonus — a grind fight has no spatial ambush to land, but a fresh (full-HP) target is the closest equivalent to "caught it by surprise."</summary>
+    private const double AmbusherFreshTargetBonusPct = 0.20;
+
     public double AttackDamageMultiplierAgainst(Monster target)
     {
         var multiplier = 1.0;
@@ -237,6 +274,11 @@ public sealed class Traveler
             var bonus = PassiveTraits.Sum(Class, Level, PassiveHook.CasterDamageBonusPct);
             multiplier += bonus;
             PassiveActivationTracker.Record(Class, PassiveHook.CasterDamageBonusPct, bonus);
+        }
+
+        if (Trait == CreatureTraitKind.Ambusher && target.Health.Max > 0 && target.Health.Current == target.Health.Max)
+        {
+            multiplier += AmbusherFreshTargetBonusPct;
         }
 
         return multiplier;

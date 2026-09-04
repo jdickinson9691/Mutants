@@ -5,6 +5,7 @@ using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Time;
+using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Core.World;
 using ChronoTravelers.Engine.Combat;
 
@@ -72,6 +73,32 @@ public static class MonsterController
     /// approach.
     /// </summary>
     private const int AggroRange = 1;
+
+    // --- CreatureTraitKind hooks (original tuning) ------------------------
+
+    /// <summary>Aggressive trait — scales up every aggro gain, so it flips to Alert/Hostile off less provocation.</summary>
+    private const double AggressiveAggroMultiplier = 1.75;
+
+    /// <summary>Skittish trait — scales down every aggro gain, so it takes much more to provoke.</summary>
+    private const double SkittishAggroMultiplier = 0.4;
+
+    /// <summary>Hoarder trait — keeps greedily grabbing ground loot (see <see cref="TryGrabLoot"/>) until its inventory reaches this size, rather than only scavenging fuel/upgrades.</summary>
+    private const int HoarderInventoryCap = 8;
+
+    /// <summary>Pack Leader trait — treated as <see cref="Monster.PackHunting"/> for <see cref="RaiseAggroWithPack"/> even if its species profile didn't author it.</summary>
+    private const bool PackLeaderForcesPackHunting = true;
+
+    /// <summary>Ambusher trait — multiplies an ambush hit's damage on top of any species <see cref="Monster.AmbushDamageMultiplier"/>.</summary>
+    private const double AmbusherDamageMultiplier = 1.5;
+
+    /// <summary>Ambusher trait — added to Aggro purely for <see cref="AggroModel.MoodFor"/>'s mood read, so it reaches Hostile (and can ambush) sooner without actually inflating the stored <see cref="Monster.Aggro"/> value.</summary>
+    private const double AmbusherHostileThresholdBonus = 2.0;
+
+    /// <summary>Trader trait (monster-side hook — see <see cref="CreatureTraitKind.Trader"/>'s doc comment): a monster's not a shopkeeper, so this is the nearest equivalent — it scavenges a much stronger ground weapon than an ordinary monster would risk carrying, by widening <see cref="TryGrabLoot"/>'s <see cref="ScavengeWeaponAttackCap"/> for the duration of that check.</summary>
+    private const double TraderScavengeWeaponAttackCapMultiplier = 1.5;
+
+    /// <summary>Wanderer trait (monster-side hook — see <see cref="CreatureTraitKind.Wanderer"/>'s doc comment): a monster doesn't time-travel, so this is the nearest equivalent — it drifts through its year's map far more often than <see cref="WanderChance"/> alone would have it.</summary>
+    private const double WandererWanderChanceMultiplier = 2.5;
 
     /// <summary>
     /// Spawn grace: while the player is at or below this level, a freshly
@@ -169,6 +196,13 @@ public static class MonsterController
             // (docs/GDD.md §4.2.1). 1.0 (no change) when there's no player
             // in this year or the passive isn't unlocked.
             aggroScale *= playerHere ? player!.AggroGainMultiplier : 1.0;
+            // Aggressive / Skittish traits — scale every aggro gain up or down.
+            aggroScale *= monster.Trait switch
+            {
+                CreatureTraitKind.Aggressive => AggressiveAggroMultiplier,
+                CreatureTraitKind.Skittish => SkittishAggroMultiplier,
+                _ => 1.0,
+            };
 
             if (!playerHere || playerSafe || distance > effectiveAggroRange)
             {
@@ -187,7 +221,11 @@ public static class MonsterController
                 RaiseAggroWithPack(population, monster, AggroModel.AdjacentPerTick * aggroScale); // loitering next door
             }
 
-            var mood = AggroModel.MoodFor(monster.Aggro);
+            // Ambusher trait — reads as more hostile than its stored Aggro for mood purposes only.
+            var moodAggro = monster.Trait == CreatureTraitKind.Ambusher
+                ? monster.Aggro + AmbusherHostileThresholdBonus
+                : monster.Aggro;
+            var mood = AggroModel.MoodFor(moodAggro);
 
             // --- ranged-hit pursue/flee state (see RangedResolver.Fire) -----
             // Bypasses the passive proximity-aggro shadowing below: a
@@ -245,12 +283,13 @@ public static class MonsterController
                 {
                     monster.RestTicks--; // settled in place for a stretch
                 }
-                else if (random.NextDouble() < (monster.IsApex ? WanderChance * 0.5 : WanderChance))
+                else if (random.NextDouble() < EffectiveWanderChance(monster))
                 {
                     // An apex lurks — it drifts half as often, so it stays a
                     // findable landmark you can walk up to and take on.
                     Wander(map, monster, random, safeRooms);
-                    if (random.NextDouble() < RestAfterWanderChance)
+                    // Wanderer trait — never settles into a rest after moving; it just keeps covering ground.
+                    if (monster.Trait != CreatureTraitKind.Wanderer && random.NextDouble() < RestAfterWanderChance)
                     {
                         monster.RestTicks = RestTicksMin + (int)(random.NextDouble() * (RestTicksMax - RestTicksMin + 1));
                     }
@@ -362,6 +401,23 @@ public static class MonsterController
             return null;
         }
 
+        // Hoarder trait — keeps greedily collecting anything off the floor
+        // (never a Time Shard or stat elixir) until its inventory fills up,
+        // independent of the fuel/upgrade logic below. It carries far more
+        // than an ordinary monster ever would, so — combined with the
+        // existing "full inventory spills on death" behavior every monster
+        // already has (see ResolveInfighting / the Fight command) — a
+        // Hoarder's death drops a noticeably bigger pile.
+        if (monster.Trait == CreatureTraitKind.Hoarder && monster.Inventory.Count < HoarderInventoryCap)
+        {
+            var grabbed = population.TakeGroundLoot(monster.Position, i => !i.IsTimeShard && !i.IsStatElixir);
+            if (grabbed is not null)
+            {
+                monster.AddToInventory(grabbed);
+                return grabbed;
+            }
+        }
+
         // (a) Low on Tachyons → grab one thing to convert. Prefer junk/consumables
         // so a good weapon on the ground survives for the player. Never a
         // Time Shard or a stat elixir — those are the player's alone.
@@ -381,7 +437,11 @@ public static class MonsterController
         // ScavengeWeaponAttackCap× its base attack so it can't grab
         // something far above its weight class.
         var currentBonus = monster.EquippedWeapon?.AttackBonus ?? 0;
-        var scavengeCeiling = (int)Math.Round(monster.AttackPower * ScavengeWeaponAttackCap);
+        // Trader trait — trades up its gear far more readily than an ordinary monster would risk.
+        var scavengeCap = monster.Trait == CreatureTraitKind.Trader
+            ? ScavengeWeaponAttackCap * TraderScavengeWeaponAttackCapMultiplier
+            : ScavengeWeaponAttackCap;
+        var scavengeCeiling = (int)Math.Round(monster.AttackPower * scavengeCap);
         var upgrade = population.TakeGroundLoot(monster.Position,
             i => !i.IsTimeShard && i.Type == ItemType.Weapon
                  && i.AttackBonus > currentBonus && i.AttackBonus <= scavengeCeiling);
@@ -506,6 +566,18 @@ public static class MonsterController
         {
             monster.MoveTo(room);
         }
+    }
+
+    /// <summary>Effective per-tick wander chance for <paramref name="monster"/> — the base <see cref="WanderChance"/>, halved for an apex (see the Tick loop's own comment), then multiplied for a Wanderer-trait monster (<see cref="WandererWanderChanceMultiplier"/>) so both scalers stack rather than one overriding the other.</summary>
+    private static double EffectiveWanderChance(Monster monster)
+    {
+        var chance = monster.IsApex ? WanderChance * 0.5 : WanderChance;
+        if (monster.Trait == CreatureTraitKind.Wanderer)
+        {
+            chance *= WandererWanderChanceMultiplier;
+        }
+
+        return chance;
     }
 
     private static int ManhattanDistance(Coordinate a, Coordinate b) =>
@@ -681,7 +753,9 @@ public static class MonsterController
     private static void RaiseAggroWithPack(YearPopulation population, Monster monster, double amount)
     {
         monster.RaiseAggro(amount);
-        if (!monster.PackHunting)
+        // Pack Leader trait — rallies roommates of its own species even for a
+        // species profile that didn't author PackHunting itself.
+        if (!monster.PackHunting && !(PackLeaderForcesPackHunting && monster.Trait == CreatureTraitKind.PackLeader))
         {
             return;
         }
@@ -696,8 +770,9 @@ public static class MonsterController
 
     private static void ResolveInfighting(YearPopulation population, IRandomSource random, BroadcastChannel broadcast, int year)
     {
+        // Skittish trait — never picks a fight with its own kind either.
         var crowdedRooms = population.Monsters
-            .Where(m => !m.Health.IsDead && !m.NeverInfights)
+            .Where(m => !m.Health.IsDead && !m.NeverInfights && m.Trait != CreatureTraitKind.Skittish)
             .GroupBy(m => m.Position)
             .Where(g => g.Count() >= 2)
             .ToList();
@@ -711,6 +786,16 @@ public static class MonsterController
 
             var pair = room.OrderBy(m => m.Health.Current).Take(2).ToList();
             var winner = Duel(pair[0], pair[1], random);
+            if (winner is null)
+            {
+                // Hit DuelRoundCap with both still standing (two tanky,
+                // high-defense monsters grinding at the 1-damage floor) —
+                // nobody actually died, so there's nothing to loot, remove,
+                // or announce. Leave both alive; they'll get another shot
+                // at each other next tick if they're still in the same room.
+                continue;
+            }
+
             var loser = ReferenceEquals(winner, pair[0]) ? pair[1] : pair[0];
 
             foreach (var item in loser.Inventory.ToList())
@@ -728,8 +813,8 @@ public static class MonsterController
         }
     }
 
-    /// <summary>A compact auto-resolved fight between two monsters — reuses <see cref="CombatResolver.RollDamage"/>. Returns the survivor (the faster monster wins a mutual-kill tie, which can't actually happen since damage is always ≥ 1).</summary>
-    private static Monster Duel(Monster x, Monster y, IRandomSource random)
+    /// <summary>A compact auto-resolved fight between two monsters — reuses <see cref="CombatResolver.RollDamage"/>. Returns the survivor (the faster monster wins a mutual-kill tie, which can't actually happen since damage is always ≥ 1), or null if neither died within <see cref="DuelRoundCap"/> rounds (two tanky/high-defense monsters can grind at the 1-damage floor long enough that the cap is reached with both still standing — that's a draw, not a win for whoever happened to go first).</summary>
+    private static Monster? Duel(Monster x, Monster y, IRandomSource random)
     {
         var (first, second) = x.Speed >= y.Speed ? (x, y) : (y, x);
         var guard = 0;
@@ -743,6 +828,11 @@ public static class MonsterController
             }
 
             first.Health.Damage(CombatResolver.RollDamage(second.EffectiveAttackPower, first.Defense, random));
+        }
+
+        if (!first.Health.IsDead && !second.Health.IsDead)
+        {
+            return null; // hit DuelRoundCap — a draw, not a win
         }
 
         return first.Health.IsDead ? second : first;
@@ -797,7 +887,10 @@ public static class MonsterController
         // harder once Hostile than its base attack alone would — 1.0 for
         // every species that doesn't author one, i.e. unchanged.
         var raw = CombatResolver.RollDamage(attacker.EffectiveAttackPower, player.EffectiveDefense / 2, random);
-        var scaled = Math.Max(0, (int)Math.Round(raw * attacker.AmbushDamageMultiplier));
+        // Ambusher trait — an extra multiplier stacked on top of any species AmbushDamageMultiplier.
+        var ambushMultiplier = attacker.AmbushDamageMultiplier
+            * (attacker.Trait == CreatureTraitKind.Ambusher ? AmbusherDamageMultiplier : 1.0);
+        var scaled = Math.Max(0, (int)Math.Round(raw * ambushMultiplier));
         // Routes through TakeDamage rather than Health.Damage directly so
         // Soldier "Thick Hide" (ambush-specific) and Doctor "Resonant Calm"
         // (echo-specific) apply the same as everywhere else damage lands.
@@ -850,6 +943,7 @@ public static class MonsterController
 
         var monster = roster[(int)(random.NextDouble() * roster.Count)]();
         monster.Enumerate((int)(random.NextDouble() * 1000)); // gets its own "-###" callsign, like every other spatial monster
+        monster.AssignTrait(CreatureTraits.RollForSpawn(CreatureTraits.MonsterPool, random.NextDouble)); // 40% spawn chance
         monster.PlaceAt(freeRooms[(int)(random.NextDouble() * freeRooms.Count)]);
         population.AddMonster(monster);
     }

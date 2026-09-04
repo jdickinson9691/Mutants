@@ -1,6 +1,7 @@
 using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Stats;
+using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Core.World;
 
 namespace ChronoTravelers.Core.Monsters;
@@ -251,6 +252,31 @@ public sealed class Monster
 
     public bool HasTag(string tag) => Tags.Contains(tag, StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// This instance's rolled <see cref="CreatureTraitKind"/> — <c>None</c>
+    /// until <see cref="AssignTrait"/> is called by whichever spawn/respawn
+    /// site placed it (see <see cref="ChronoTravelers.Core.Time.YearPopulation.Seed"/>
+    /// and <c>ChronoTravelers.Engine.Npc.MonsterController.MaybeRespawn</c>) —
+    /// never the constructor, since a species' factory closure is reused for
+    /// every spawn (see <see cref="Enumerate"/>'s doc comment for the same
+    /// reasoning applied to instance names).
+    /// </summary>
+    public CreatureTraitKind Trait { get; private set; } = CreatureTraitKind.None;
+
+    private bool _traitAssigned;
+
+    /// <summary>Assigns this instance's <see cref="Trait"/> once — a no-op past the first call, mirroring <see cref="Enumerate"/>'s idempotency guard. A legitimate roll of <c>CreatureTraitKind.None</c> still counts as "assigned" so it can't be silently overwritten by a stray second call.</summary>
+    public void AssignTrait(CreatureTraitKind trait)
+    {
+        if (_traitAssigned)
+        {
+            return;
+        }
+
+        Trait = trait;
+        _traitAssigned = true;
+    }
+
     /// <summary>Builds a monster from <see cref="MonsterScaling"/>'s tier baselines instead of specifying stats directly.</summary>
     public static Monster Create(string name, int tier, IReadOnlyList<LootTableEntry>? lootTable = null, IReadOnlyList<string>? tags = null, bool isApex = false) =>
         new(name, tier,
@@ -307,7 +333,10 @@ public sealed class Monster
         return Health.Heal(ionsToSpend * TachyonEconomy.HpPerTachyonHealed);
     }
 
-    /// <summary>Destroys a carried item for Tachyons — same as <see cref="ChronoTravelers.Core.Characters.Traveler.Convert"/>. Returns the Tachyons actually gained (may be less than the item's convert value if the pool would overflow).</summary>
+    /// <summary>Scavenger trait bonus applied to <see cref="Convert"/>'s Tachyon payout — original tuning.</summary>
+    private const double ScavengerConvertValueBonusPct = 0.25;
+
+    /// <summary>Destroys a carried item for Tachyons — same as <see cref="ChronoTravelers.Core.Characters.Traveler.Convert"/>. Returns the Tachyons actually gained (may be less than the item's convert value if the pool would overflow). A Scavenger-trait monster (<see cref="Trait"/>) converts loot for <see cref="ScavengerConvertValueBonusPct"/> more.</summary>
     public int Convert(Item item)
     {
         if (!_inventory.Remove(item))
@@ -320,7 +349,13 @@ public sealed class Monster
             _equippedWeapon = null;
         }
 
-        return Tachyons.Add(item.ConvertValue());
+        var value = item.ConvertValue();
+        if (Trait == CreatureTraitKind.Scavenger)
+        {
+            value = (int)Math.Round(value * (1.0 + ScavengerConvertValueBonusPct));
+        }
+
+        return Tachyons.Add(value);
     }
 
     /// <summary>Passive Tachyon regen — one <see cref="TachyonPool.Add"/> of 1 every <paramref name="ticksPerRegen"/> ticks. Monsters get regen only (no drain — that's a player survival tax). Returns true if an Tachyon was added.</summary>

@@ -1,5 +1,6 @@
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
+using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Core.World;
 
 namespace ChronoTravelers.Core.Time;
@@ -114,6 +115,7 @@ public sealed class YearPopulation
         {
             var monster = roster[rng.Next(roster.Count)]();
             monster.Enumerate(rng.Next(1000)); // "Ashfall Echo-042" — see Monster.Enumerate
+            monster.AssignTrait(CreatureTraits.RollForSpawn(CreatureTraits.MonsterPool, rng.NextDouble)); // 40% spawn chance
             monster.PlaceAt(rooms[i]);
             monsters.Add(monster);
         }
@@ -133,6 +135,7 @@ public sealed class YearPopulation
             {
                 var apex = apexRoster[rng.Next(apexRoster.Count)]();
                 apex.Enumerate(rng.Next(1000));
+                apex.AssignTrait(CreatureTraits.RollForSpawn(CreatureTraits.MonsterPool, rng.NextDouble)); // 40% spawn chance
                 apex.PlaceAt(rooms[count + i]);
                 monsters.Add(apex);
             }

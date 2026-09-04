@@ -4,6 +4,7 @@ using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Time;
+using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Core.World;
 using ChronoTravelers.Engine.Content;
 using ChronoTravelers.Engine.Npc;
@@ -431,6 +432,56 @@ public class NpcControllerTests
         Assert.Contains(junk, npc.Inventory); // untouched - maintenance was paid instead
     }
 
+    /// <summary>
+    /// Regression test for the reported bug: NPC-owned stores could sell
+    /// listings (Capital going up via SellToTraveler) but the owner never
+    /// deposited Credits back in, and the old "collect whatever's there"
+    /// step swept the balance to 0 the moment there was anything to
+    /// collect — so an owned store's Capital sat at 0 and
+    /// Store.BuyFromTraveler could never afford to buy anything from a
+    /// traveler. Capital funding now runs right after maintenance, ahead
+    /// of stocking, whenever Capital is under the reserve target and the
+    /// owner can afford the top-up.
+    /// </summary>
+    [Fact]
+    public void Act_OwnsAStoreWithLowCapitalAndSpareCredits_FundsItBeforeStocking()
+    {
+        var npc = FreshNpc(CharacterClass.Soldier);
+        npc.AddCredits(1000);
+        var goodWeapon = Item.Create("Fine Blade", ItemType.Weapon, 5, Rarity.Rare);
+        npc.AddToInventory(goodWeapon);
+        npc.Wield(goodWeapon); // equipped - FindUpgrade won't touch the weaker surplus below
+        var surplusWeapon = Item.Create("Rusty Blade", ItemType.Weapon, 1, Rarity.Common, restrictedClass: CharacterClass.Soldier);
+        npc.AddToInventory(surplusWeapon); // would otherwise get stocked - capital funding should take priority
+        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingTachyonReserve: 100);
+        var slot = new StoreSlot("Vex's Store", Coordinate.Origin, homeLevel: 1, purchaseCost: 0, store);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [slot]);
+
+        Assert.Equal(NpcGoal.OwnStore, result.Goal);
+        Assert.Equal(150, store.Capital); // CapitalTopUpAmount deposited
+        Assert.Equal(850, npc.Credits);
+        Assert.Contains(surplusWeapon, npc.Inventory); // stocking deferred to a later tick
+        Assert.Empty(store.Listings);
+    }
+
+    /// <summary>The other half of the same fix: collecting profit now leaves the reserve floor intact instead of draining Capital to 0.</summary>
+    [Fact]
+    public void Act_OwnsAStoreWithCapitalAboveTheReserve_CollectsOnlyTheSurplus_LeavingTheReserveIntact()
+    {
+        var npc = FreshNpc(CharacterClass.Soldier);
+        var junk = Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common);
+        npc.AddToInventory(junk); // not class-relevant - won't get stocked, isolating this tick to the collect branch
+        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 500, npc, startingTachyonReserve: 100);
+        var slot = new StoreSlot("Vex's Store", Coordinate.Origin, homeLevel: 1, purchaseCost: 0, store);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [slot]);
+
+        Assert.Equal(NpcGoal.OwnStore, result.Goal);
+        Assert.Equal(300, store.Capital); // reserve floor kept, not drained to 0
+        Assert.Equal(200, npc.Credits);   // only the surplus above the reserve was collected
+    }
+
     [Fact]
     public void Act_OwnsAStoreWithAFullReserve_OnlyJunkSurplus_NeverStocksJunkAtOwnStore()
     {
@@ -667,5 +718,156 @@ public class NpcControllerTests
         Assert.Equal(NpcGoal.Grind, result.Goal);
         Assert.NotNull(result.Fight);
         Assert.Contains(result.Fight!.Log, line => line.Contains("hits", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // --- CreatureTraitKind hooks -----------------------------------------
+
+    [Fact]
+    public void Act_AggressiveNpc_DoesNotRetreatAtAHealthThatWouldRetreatAPlainNpc()
+    {
+        // 20% HP: below the normal LowHealthThreshold (0.30) but above the
+        // Aggressive trait's much lower threshold (0.12).
+        var npc = FreshNpc();
+        npc.Health.Damage((int)(npc.Health.Max * 0.8));
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5));
+
+        Assert.Equal(NpcGoal.Retreat, result.Goal);
+
+        var aggressive = FreshNpc();
+        aggressive.AssignTrait(CreatureTraitKind.Aggressive);
+        aggressive.Health.Damage((int)(aggressive.Health.Max * 0.8));
+
+        var aggressiveResult = NpcController.Act(aggressive, TestLevelMap, StubRandomSource.Fixed(0.5));
+
+        Assert.NotEqual(NpcGoal.Retreat, aggressiveResult.Goal);
+    }
+
+    [Fact]
+    public void Act_SkittishNpc_RetreatsAtAHealthThatWouldNotRetreatAPlainNpc()
+    {
+        // 40% HP: above the normal LowHealthThreshold (0.30), so a plain
+        // NPC doesn't retreat, but below the Skittish trait's much higher
+        // threshold (0.5).
+        var npc = FreshNpc();
+        npc.Health.Damage((int)(npc.Health.Max * 0.6));
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5));
+
+        Assert.NotEqual(NpcGoal.Retreat, result.Goal);
+
+        var skittish = FreshNpc();
+        skittish.AssignTrait(CreatureTraitKind.Skittish);
+        skittish.Health.Damage((int)(skittish.Health.Max * 0.6));
+
+        var skittishResult = NpcController.Act(skittish, TestLevelMap, StubRandomSource.Fixed(0.5));
+
+        Assert.Equal(NpcGoal.Retreat, skittishResult.Goal);
+    }
+
+    [Fact]
+    public void Act_HoarderNpc_NeverSellsSurplusGearOrExcessJunk()
+    {
+        var npc = FreshNpc();
+        npc.AssignTrait(CreatureTraitKind.Hoarder);
+        var goodWeapon = Item.Create("Fine Blade", ItemType.Weapon, 5, Rarity.Rare);
+        npc.AddToInventory(goodWeapon);
+        npc.Wield(goodWeapon);
+        var surplusWeapon = Item.Create("Rusty Blade", ItemType.Weapon, 1, Rarity.Common);
+        npc.AddToInventory(surplusWeapon);
+        for (var tier = 1; tier <= 4; tier++)
+        {
+            npc.AddToInventory(Item.Create($"Junk Tier {tier}", ItemType.Junk, tier, Rarity.Common));
+        }
+
+        var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(store)]);
+
+        Assert.Equal(NpcGoal.Grind, result.Goal); // nothing to trade -> falls through
+        Assert.Contains(surplusWeapon, npc.Inventory);
+        // Individually, not an exact count: falling through to Grind means
+        // Act also plays out a default-roster fight, which can drop its
+        // own loot (possibly more junk) into the pack on a win — that's
+        // incidental noise, not something Hoarder is supposed to prevent.
+        for (var tier = 1; tier <= 4; tier++)
+        {
+            Assert.Contains(npc.Inventory, i => i.Name == $"Junk Tier {tier}");
+        }
+        Assert.Empty(store.Listings);
+    }
+
+    [Fact]
+    public void Act_ScavengerNpc_SellingGearEarnsMoreCreditsThanAPlainNpc()
+    {
+        var npc = FreshNpc();
+        // Already-equipped and clearly better than the surplus item below,
+        // or FindUpgrade wields the "surplus" weapon itself (it's the only
+        // one, so it beats "nothing equipped") before TryTrade ever runs —
+        // then there's nothing left to sell and both NPCs earn 0 Credits.
+        var goodWeapon = Item.Create("Fine Blade", ItemType.Weapon, 5, Rarity.Rare);
+        npc.AddToInventory(goodWeapon);
+        npc.Wield(goodWeapon);
+        var surplusWeapon = Item.Create("Rusty Blade", ItemType.Weapon, 1, Rarity.Common);
+        npc.AddToInventory(surplusWeapon);
+        var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
+
+        NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(store)]);
+
+        var scavenger = FreshNpc();
+        scavenger.AssignTrait(CreatureTraitKind.Scavenger);
+        var scavengerGoodWeapon = Item.Create("Fine Blade", ItemType.Weapon, 5, Rarity.Rare);
+        scavenger.AddToInventory(scavengerGoodWeapon);
+        scavenger.Wield(scavengerGoodWeapon);
+        var scavengerSurplusWeapon = Item.Create("Rusty Blade", ItemType.Weapon, 1, Rarity.Common);
+        scavenger.AddToInventory(scavengerSurplusWeapon);
+        var scavengerStore = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
+
+        NpcController.Act(scavenger, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(scavengerStore)]);
+
+        Assert.True(scavenger.Credits > npc.Credits);
+    }
+
+    [Fact]
+    public void Act_TraderNpc_MuchMoreLikelyToBuyAVacantStoreSlot()
+    {
+        var vacantA = new StoreSlot("Vacant A", Coordinate.Origin, homeLevel: 1, purchaseCost: 100);
+        var vacantB = new StoreSlot("Vacant B", new Coordinate(1, 0), homeLevel: 1, purchaseCost: 100);
+
+        // 0.08 misses the plain StorePurchaseChance gate (0.05) ...
+        var npc = FreshNpc();
+        npc.AddCredits(500);
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.08),
+            [vacantA, vacantB]);
+        Assert.NotEqual(NpcGoal.OwnStore, result.Goal);
+
+        // ... but clears the Trader-boosted gate (0.05 * 2.5 = 0.125).
+        var vacantC = new StoreSlot("Vacant C", Coordinate.Origin, homeLevel: 1, purchaseCost: 100);
+        var vacantD = new StoreSlot("Vacant D", new Coordinate(1, 0), homeLevel: 1, purchaseCost: 100);
+        var trader = FreshNpc();
+        trader.AssignTrait(CreatureTraitKind.Trader);
+        trader.AddCredits(500);
+        var traderResult = NpcController.Act(trader, TestLevelMap, StubRandomSource.Fixed(0.08),
+            [vacantC, vacantD]);
+
+        Assert.Equal(NpcGoal.OwnStore, traderResult.Goal);
+    }
+
+    [Fact]
+    public void Act_WandererNpc_MuchMoreLikelyToAttemptATimeJump()
+    {
+        var world = TestTimeWorld.Build();
+
+        // 0.15 misses the plain TravelAttemptChance gate (0.10) ...
+        var npc = ReadyToTravelNpc();
+        var result = NpcController.Act(npc, TestLevelMap, new StubRandomSource(0.15, 0.5, 0.5, 0.5), world: world);
+        Assert.NotEqual(NpcGoal.Travel, result.Goal);
+
+        // ... but clears the Wanderer-boosted gate (0.10 * 2.5 = 0.25).
+        var wanderer = ReadyToTravelNpc();
+        wanderer.AssignTrait(CreatureTraitKind.Wanderer);
+        var wandererResult = NpcController.Act(wanderer, TestLevelMap, new StubRandomSource(0.15, 0.5, 0.5, 0.5), world: world);
+
+        Assert.Equal(NpcGoal.Travel, wandererResult.Goal);
     }
 }

@@ -1,6 +1,7 @@
 using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Time;
+using ChronoTravelers.Core.Traits;
 
 namespace ChronoTravelers.Engine.Npc;
 
@@ -125,6 +126,7 @@ public static class NpcPopulation
         var characterClass = PickClass(classWeights, random);
 
         var npc = new Traveler(name, characterClass, startingYear: startYear);
+        npc.AssignTrait(CreatureTraits.RollForSpawn(CreatureTraits.NpcPool, random.NextDouble)); // 40% spawn chance. Never rolled for the player.
         npc.PlaceAt(world.GetYear(startYear).Map.Start);
 
         var cap = TimeScale.SoftLevelCapForYear(startYear);

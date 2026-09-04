@@ -3,6 +3,7 @@ using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Stats;
+using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Core.World;
 
 namespace ChronoTravelers.Core.Tests.Characters;
@@ -853,5 +854,73 @@ public class TravelerTests
 
         Assert.True(traveler.HasDefeatedWarden(2));
         Assert.False(traveler.HasDefeatedWarden(3)); // per-level, not global
+    }
+
+    // --- CreatureTraitKind ---------------------------------------------
+
+    [Fact]
+    public void Trait_DefaultsToNoneUntilAssigned()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        Assert.Equal(CreatureTraitKind.None, traveler.Trait);
+    }
+
+    [Fact]
+    public void AssignTrait_SetsTheTrait()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+
+        traveler.AssignTrait(CreatureTraitKind.Trader);
+
+        Assert.Equal(CreatureTraitKind.Trader, traveler.Trait);
+    }
+
+    [Fact]
+    public void AssignTrait_IsANoOpOnceAlreadyAssigned_EvenIfTheFirstRollWasNone()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+
+        traveler.AssignTrait(CreatureTraitKind.None); // a legitimate "missed the roll" result
+        traveler.AssignTrait(CreatureTraitKind.Wanderer); // should not silently overwrite it
+
+        Assert.Equal(CreatureTraitKind.None, traveler.Trait);
+    }
+
+    [Fact]
+    public void EffectiveAttackPower_PackLeaderTrait_AddsAFlatBonusOnTopOfTheOrdinaryTotal()
+    {
+        var plain = new Traveler("Rook", CharacterClass.Soldier);
+        var leader = new Traveler("Wolf", CharacterClass.Soldier);
+        leader.AssignTrait(CreatureTraitKind.PackLeader);
+
+        // Same class/level/gear, so the only difference is the trait's flat 15% bonus.
+        Assert.Equal(plain.EffectiveAttackPower, leader.EffectiveAttackPower - (int)Math.Round(plain.EffectiveAttackPower * 0.15));
+        Assert.True(leader.EffectiveAttackPower > plain.EffectiveAttackPower);
+    }
+
+    [Fact]
+    public void AttackDamageMultiplierAgainst_AmbusherTrait_BonusOnlyAgainstAStillFullHealthTarget()
+    {
+        var ambusher = new Traveler("Nyx", CharacterClass.Spy);
+        ambusher.AssignTrait(CreatureTraitKind.Ambusher);
+
+        var freshTarget = new Monster("Guard", 1, maxHp: 30, attackPower: 5, defense: 2, speed: 5, xpReward: 10);
+        var damagedTarget = new Monster("Guard", 1, maxHp: 30, attackPower: 5, defense: 2, speed: 5, xpReward: 10);
+        damagedTarget.Health.Damage(1); // no longer full HP, but nowhere near the separate low-HP-target bonus's 40% threshold
+
+        var freshMultiplier = ambusher.AttackDamageMultiplierAgainst(freshTarget);
+        var damagedMultiplier = ambusher.AttackDamageMultiplierAgainst(damagedTarget);
+
+        Assert.Equal(1.2, freshMultiplier, precision: 5);
+        Assert.Equal(1.0, damagedMultiplier, precision: 5);
+    }
+
+    [Fact]
+    public void AttackDamageMultiplierAgainst_PlainTraveler_NeverGetsTheAmbusherBonus()
+    {
+        var plain = new Traveler("Rook", CharacterClass.Soldier);
+        var freshTarget = new Monster("Guard", 1, maxHp: 30, attackPower: 5, defense: 2, speed: 5, xpReward: 10);
+
+        Assert.Equal(1.0, plain.AttackDamageMultiplierAgainst(freshTarget), precision: 5);
     }
 }

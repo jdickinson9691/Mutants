@@ -4,6 +4,7 @@ using ChronoTravelers.Core.Events;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Time;
+using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Core.World;
 using ChronoTravelers.Engine.Npc;
 
@@ -474,6 +475,48 @@ public class MonsterControllerTests
         Assert.Contains(broadcast.Events, e => e.Message == "A Weakling was slain by a Bruiser.");
     }
 
+    /// <summary>
+    /// Regression test for a real bug: Duel used to force a winner even
+    /// when it hit its round cap with both monsters still alive (a fallback
+    /// ternary that read "not dead" as "won"), so ResolveInfighting would
+    /// loot, remove, and broadcast a "slain" event for a monster that was
+    /// never actually reduced to 0 HP. Two monsters here are built so every
+    /// hit floors to CombatResolver's 1-damage minimum (defense vastly
+    /// outweighing attack) and have enough HP that 200 rounds of that can't
+    /// kill either — guaranteeing the duel hits DuelRoundCap as a draw.
+    /// </summary>
+    [Fact]
+    public void Tick_AnInfightThatHitsTheRoundCapWithBothStillAlive_KillsNeitherMonster()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var spot = new Coordinate(1, 1);
+
+        // attackPower 1 vs. defense 100_000 floors every hit to 1 damage
+        // regardless of the ±15% variance roll; 100_000 max HP means 200
+        // rounds of 1-damage hits (the actual cap) can't come close to
+        // killing either side.
+        var tank1 = new Monster("Tank1", 5, maxHp: 100_000, attackPower: 1, defense: 100_000, speed: 5, xpReward: 500);
+        var tank2 = new Monster("Tank2", 5, maxHp: 100_000, attackPower: 1, defense: 100_000, speed: 5, xpReward: 500);
+        tank1.PlaceAt(spot);
+        tank2.PlaceAt(spot);
+        pop.AddMonster(tank1);
+        pop.AddMonster(tank2);
+        var broadcast = new BroadcastChannel();
+
+        // 0.9, 0.9 -> neither wanders off; 0.1 -> the infight fires; every
+        // damage-variance roll after that repeats 0.1 (StubRandomSource
+        // holds its last value), which still floors to 1 damage per hit.
+        Tick(pop, map, OffMapPlayer(), new StubRandomSource(0.9, 0.9, 0.1), broadcast: broadcast);
+
+        Assert.Contains(tank1, pop.Monsters);
+        Assert.Contains(tank2, pop.Monsters);
+        Assert.False(tank1.Health.IsDead);
+        Assert.False(tank2.Health.IsDead);
+        Assert.Empty(pop.LootAt(spot));
+        Assert.DoesNotContain(broadcast.Events, e => e.Kind == GameEventKind.Slain);
+    }
+
     // --- earned aggro -----------------------------------------------------
 
     [Fact]
@@ -858,5 +901,318 @@ public class MonsterControllerTests
         // Should not throw despite narration being null internally, and
         // obviously produces no player-local lines since there's no sink.
         MonsterController.TickUnattended(pop, map, [], year: 2400, StubRandomSource.Fixed(0.0), broadcast);
+    }
+
+    // --- CreatureTraitKind hooks ---------------------------------------
+
+    [Fact]
+    public void Tick_AggressiveMonster_AccruesAggroFasterThanAPlainMonster()
+    {
+        var map = FourRoomMap();
+
+        var plainPop = EmptyPopulation(map);
+        var plain = Monster.Create("Guard", tier: 1);
+        plain.PlaceAt(Coordinate.Origin);
+        plainPop.AddMonster(plain);
+
+        var aggressivePop = EmptyPopulation(map);
+        var aggressive = Monster.Create("Guard", tier: 1);
+        aggressive.AssignTrait(CreatureTraitKind.Aggressive);
+        aggressive.PlaceAt(Coordinate.Origin);
+        aggressivePop.AddMonster(aggressive);
+
+        var player = new Traveler("Pest", CharacterClass.Soldier);
+        player.PlaceAt(new Coordinate(1, 0)); // adjacent, not co-located
+
+        Tick(plainPop, map, player, StubRandomSource.Fixed(0.99));
+        Tick(aggressivePop, map, player, StubRandomSource.Fixed(0.99));
+
+        Assert.True(aggressive.Aggro > plain.Aggro);
+    }
+
+    [Fact]
+    public void Tick_SkittishMonster_AccruesAggroSlowerThanAPlainMonster()
+    {
+        var map = FourRoomMap();
+
+        var plainPop = EmptyPopulation(map);
+        var plain = Monster.Create("Guard", tier: 1);
+        plain.PlaceAt(Coordinate.Origin);
+        plainPop.AddMonster(plain);
+
+        var skittishPop = EmptyPopulation(map);
+        var skittish = Monster.Create("Guard", tier: 1);
+        skittish.AssignTrait(CreatureTraitKind.Skittish);
+        skittish.PlaceAt(Coordinate.Origin);
+        skittishPop.AddMonster(skittish);
+
+        var player = new Traveler("Pest", CharacterClass.Soldier);
+        player.PlaceAt(new Coordinate(1, 0));
+
+        Tick(plainPop, map, player, StubRandomSource.Fixed(0.99));
+        Tick(skittishPop, map, player, StubRandomSource.Fixed(0.99));
+
+        Assert.True(skittish.Aggro < plain.Aggro);
+    }
+
+    [Fact]
+    public void Tick_HoarderMonster_GrabsGroundLootEvenAtFullHealthAndTachyons()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var hoarder = Monster.Create("Packrat", tier: 1); // full HP, full Tachyons
+        hoarder.AssignTrait(CreatureTraitKind.Hoarder);
+        hoarder.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(hoarder);
+        pop.AddGroundLoot(Coordinate.Origin, Item.Create("Junk", ItemType.Junk, 1, Rarity.Common));
+
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99)); // 0.99 -> doesn't wander
+
+        Assert.Contains(hoarder.Inventory, i => i.Name == "Junk");
+        Assert.Empty(pop.LootAt(Coordinate.Origin));
+    }
+
+    [Fact]
+    public void Tick_HoarderMonster_StopsGrabbingOnceItsInventoryFillsUp()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var hoarder = Monster.Create("Packrat", tier: 1);
+        hoarder.AssignTrait(CreatureTraitKind.Hoarder);
+        hoarder.PlaceAt(Coordinate.Origin);
+        for (var i = 0; i < 8; i++) // at the HoarderInventoryCap already
+        {
+            hoarder.AddToInventory(Item.Create($"Trinket {i}", ItemType.Junk, 1, Rarity.Common));
+        }
+        pop.AddMonster(hoarder);
+        pop.AddGroundLoot(Coordinate.Origin, Item.Create("One More Thing", ItemType.Junk, 1, Rarity.Common));
+
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99));
+
+        Assert.DoesNotContain(hoarder.Inventory, i => i.Name == "One More Thing");
+        Assert.Contains(pop.LootAt(Coordinate.Origin), i => i.Name == "One More Thing");
+    }
+
+    [Fact]
+    public void Tick_SkittishMonsters_NeverInfightEvenWhenCoLocatedAndHostile()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+
+        var a = Lurker(Coordinate.Origin);
+        var b = Lurker(Coordinate.Origin);
+        a.AssignTrait(CreatureTraitKind.Skittish);
+        b.AssignTrait(CreatureTraitKind.Skittish);
+        a.RaiseAggro(AggroModel.Cap);
+        b.RaiseAggro(AggroModel.Cap);
+        pop.AddMonster(a);
+        pop.AddMonster(b);
+
+        // 0.9, 0.9 -> neither wanders off; the infight roll (0.1, below
+        // InfightChance) would normally fire here if either were eligible.
+        Tick(pop, map, OffMapPlayer(), new StubRandomSource(0.9, 0.9, 0.1));
+
+        Assert.Equal(2, pop.Monsters.Count(m => !m.Health.IsDead));
+    }
+
+    [Fact]
+    public void Tick_PackLeaderMonster_RallysARoommateFartherThanTheSameSetupWithoutTheTrait()
+    {
+        var map = FourRoomMap();
+
+        // Baseline: an ordinary (non-pack-hunting) leader and roommate of
+        // the same species, co-located with the player next door.
+        var baselinePop = EmptyPopulation(map);
+        var baselineLeader = Monster.Create("Wolf", tier: 1);
+        baselineLeader.PlaceAt(Coordinate.Origin);
+        var baselineRoommate = Monster.Create("Wolf", tier: 1);
+        baselineRoommate.PlaceAt(Coordinate.Origin);
+        baselinePop.AddMonster(baselineLeader);
+        baselinePop.AddMonster(baselineRoommate);
+
+        var leaderPop = EmptyPopulation(map);
+        var leader = Monster.Create("Wolf", tier: 1);
+        leader.AssignTrait(CreatureTraitKind.PackLeader);
+        leader.PlaceAt(Coordinate.Origin);
+        var roommate = Monster.Create("Wolf", tier: 1);
+        roommate.PlaceAt(Coordinate.Origin);
+        leaderPop.AddMonster(leader);
+        leaderPop.AddMonster(roommate);
+
+        var baselinePlayer = new Traveler("Pest", CharacterClass.Soldier);
+        baselinePlayer.PlaceAt(Coordinate.Origin);
+        var player = new Traveler("Pest", CharacterClass.Soldier);
+        player.PlaceAt(Coordinate.Origin);
+
+        Tick(baselinePop, map, baselinePlayer, StubRandomSource.Fixed(0.99));
+        Tick(leaderPop, map, player, StubRandomSource.Fixed(0.99));
+
+        // Both roommates get ordinary co-located aggro from sharing the
+        // player's room; only the PackLeader-trait version additionally
+        // gets rallied by RaiseAggroWithPack, so it ends up strictly higher.
+        Assert.True(roommate.Aggro > baselineRoommate.Aggro);
+    }
+
+    [Fact]
+    public void Tick_AmbusherMonster_HitsHarderOnAmbushThanAPlainMonster()
+    {
+        var map = FourRoomMap();
+
+        var plainPop = EmptyPopulation(map);
+        var player1 = new Traveler("Prey", CharacterClass.Soldier);
+        player1.PlaceAt(Coordinate.Origin);
+        var plain = Lurker(Coordinate.Origin);
+        plain.RaiseAggro(AggroModel.Cap);
+        plainPop.AddMonster(plain);
+
+        var ambusherPop = EmptyPopulation(map);
+        var player2 = new Traveler("Prey", CharacterClass.Soldier);
+        player2.PlaceAt(Coordinate.Origin);
+        var ambusher = Lurker(Coordinate.Origin);
+        ambusher.AssignTrait(CreatureTraitKind.Ambusher);
+        ambusher.RaiseAggro(AggroModel.Cap);
+        ambusherPop.AddMonster(ambusher);
+
+        var plainHpBefore = player1.Health.Current;
+        var ambusherHpBefore = player2.Health.Current;
+
+        Tick(plainPop, map, player1, StubRandomSource.Fixed(0.0), playerLingered: true);
+        Tick(ambusherPop, map, player2, StubRandomSource.Fixed(0.0), playerLingered: true);
+
+        var plainDamage = plainHpBefore - player1.Health.Current;
+        var ambusherDamage = ambusherHpBefore - player2.Health.Current;
+
+        Assert.True(ambusherDamage > plainDamage);
+    }
+
+    [Fact]
+    public void MaybeRespawn_AssignsOnlyMonsterPoolTraitsOrNone_AcrossManyRespawns()
+    {
+        var world = TestTimeWorld.Build(seed: 314);
+        var content = world.GetYear(2400);
+        var pop = content.Population;
+
+        var player = new Traveler("Bystander", CharacterClass.Soldier);
+        player.SetCurrentYear(2400);
+        player.PlaceAt(new Coordinate(99, 99));
+
+        foreach (var m in pop.Monsters.ToList())
+        {
+            m.Health.Damage(m.Health.Max);
+            pop.RemoveMonster(m);
+        }
+
+        // Varying rolls (not Fixed) so the trait-roll gate sometimes passes,
+        // sometimes doesn't, across the many respawns this refill triggers.
+        var random = new StubRandomSource(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.05, 0.15, 0.25);
+        for (var i = 0; i < 200; i++)
+        {
+            Tick(pop, content.Map, player, random, roster: content.MonsterRoster);
+        }
+
+        Assert.NotEmpty(pop.Monsters);
+        Assert.All(pop.Monsters, m => Assert.True(m.Trait == CreatureTraitKind.None || CreatureTraits.MonsterPool.Contains(m.Trait)));
+    }
+
+    [Fact]
+    public void Tick_TraderMonster_ScavengesAWeaponAPlainMonsterWouldIgnoreAsTooStrong()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var trader = Monster.Create("Brute", tier: 1); // full Tachyons -> only the weapon rule applies
+        trader.AssignTrait(CreatureTraitKind.Trader);
+        trader.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(trader);
+
+        // A tier-1 Brute's own AttackPower is 11 (MonsterScaling.BaseAttackPower):
+        // above the plain 1.4x cap (round(11*1.4) = 15) but within the
+        // Trader-boosted 1.5x-wider cap (11*1.4*1.5 = 23.1 -> 23). A tier-1
+        // Rare only reaches 9 (comfortably under even the plain cap), so
+        // the weapon needs a tier bump to actually land in that gap.
+        var weapon = Item.Create("Prime Blade", ItemType.Weapon, 2, Rarity.Rare);
+        Assert.True(weapon.AttackBonus is > 15 and <= 23);
+        pop.AddGroundLoot(Coordinate.Origin, weapon);
+
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99));
+
+        Assert.Same(weapon, trader.EquippedWeapon);
+    }
+
+    [Fact]
+    public void Tick_PlainMonster_IgnoresTheSameGroundWeaponATraderWouldTakeSince_ItsAboveTheOrdinaryWeightClass()
+    {
+        var map = FourRoomMap();
+        var pop = EmptyPopulation(map);
+        var plain = Monster.Create("Brute", tier: 1);
+        plain.PlaceAt(Coordinate.Origin);
+        pop.AddMonster(plain);
+
+        // See the sibling Trader test above for the cap arithmetic.
+        var weapon = Item.Create("Prime Blade", ItemType.Weapon, 2, Rarity.Rare);
+        Assert.True(weapon.AttackBonus is > 15 and <= 23);
+        pop.AddGroundLoot(Coordinate.Origin, weapon);
+
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.99));
+
+        Assert.Null(plain.EquippedWeapon);
+        Assert.Contains(weapon, pop.LootAt(Coordinate.Origin));
+    }
+
+    [Fact]
+    public void Tick_WandererMonster_StepsFarMoreOftenThanAPlainMonsterOverManyTicks()
+    {
+        var map = CorridorMap(8);
+
+        var plainPop = EmptyPopulation(map);
+        var plain = Monster.Create("Drifter", tier: 1);
+        plain.PlaceAt(new Coordinate(3, 0));
+        plainPop.AddMonster(plain);
+
+        var wandererPop = EmptyPopulation(map);
+        var wanderer = Monster.Create("Drifter", tier: 1);
+        wanderer.AssignTrait(CreatureTraitKind.Wanderer);
+        wanderer.PlaceAt(new Coordinate(3, 0));
+        wandererPop.AddMonster(wanderer);
+
+        var player = OffMapPlayer();
+        var random = new StubRandomSource(0.5); // between the plain WanderChance (0.28) and the Wanderer-boosted one (0.7)
+
+        int plainSteps = 0, wandererSteps = 0;
+        for (var i = 0; i < 20; i++)
+        {
+            var before = plain.Position;
+            Tick(plainPop, map, player, random);
+            if (!plain.Position.Equals(before))
+            {
+                plainSteps++;
+            }
+
+            var wBefore = wanderer.Position;
+            Tick(wandererPop, map, player, random);
+            if (!wanderer.Position.Equals(wBefore))
+            {
+                wandererSteps++;
+            }
+        }
+
+        Assert.True(wandererSteps > plainSteps);
+    }
+
+    [Fact]
+    public void Tick_WandererMonster_NeverPausesToRestAfterMoving()
+    {
+        var map = CorridorMap(8);
+        var pop = EmptyPopulation(map);
+        var wanderer = Monster.Create("Drifter", tier: 1);
+        wanderer.AssignTrait(CreatureTraitKind.Wanderer);
+        wanderer.PlaceAt(new Coordinate(3, 0));
+        pop.AddMonster(wanderer);
+
+        // 0.0 both clears the (boosted) wander-chance gate and would clear
+        // RestAfterWanderChance too, if the Wanderer trait didn't skip that
+        // roll entirely.
+        Tick(pop, map, OffMapPlayer(), StubRandomSource.Fixed(0.0));
+
+        Assert.Equal(0, wanderer.RestTicks);
     }
 }
