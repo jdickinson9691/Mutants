@@ -90,7 +90,20 @@ public static class PlaytestRunner
     {
         var world = LoadWorld(contentDirectory, worldSeed);
         var random = new SystemRandomSource(new Random(unchecked((int)worldSeed)));
-        var simulation = new WorldSimulation(world, new List<Traveler>(), random, abilities: allAbilities);
+
+        // A small NPC population so NPC-side traits (Hoarder, Scavenger,
+        // Trader, ...) have anyone to run on at all — the harness ran with
+        // zero NPCs before. Excludes the class under test entirely: NPCs
+        // run through the same PassiveActivationTracker call sites as the
+        // player, and OnPassiveActivation below only filters by class, not
+        // by "is this actually my bot" — an NPC of the same class would
+        // silently blend its own passive activations into the report.
+        var npcClassWeights = Enum.GetValues<CharacterClass>()
+            .Where(c => c != characterClass)
+            .ToDictionary(c => c, _ => 1.0);
+        var npcs = NpcPopulation.Spawn(NpcPopulation.LocalPopulationTarget, world, random, npcClassWeights).ToList();
+
+        var simulation = new WorldSimulation(world, npcs, random, npcClassWeights: npcClassWeights, abilities: allAbilities);
 
         var bot = new Traveler($"{characterClass}Bot", characterClass);
         GiveStarterKit(bot);
@@ -130,6 +143,11 @@ public static class PlaytestRunner
         report.FurthestYearReached = bot.FurthestYearReached;
         report.FinalCredits = bot.Credits;
         report.FinalTachyons = bot.Tachyons.Current;
+
+        foreach (var npc in npcs)
+        {
+            report.NpcTraitsObserved[npc.Trait] = report.NpcTraitsObserved.GetValueOrDefault(npc.Trait) + 1;
+        }
 
         foreach (var passive in PassiveTraits.Unlocked(characterClass, bot.Level))
         {

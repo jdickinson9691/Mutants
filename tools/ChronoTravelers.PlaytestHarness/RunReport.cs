@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Characters;
+using ChronoTravelers.Core.Traits;
 
 namespace ChronoTravelers.PlaytestHarness;
 
@@ -66,4 +67,10 @@ public sealed class RunReport
 
     /// <summary>Passives this character had unlocked by <see cref="FinalLevel"/> that never got a recorded activation this run (either genuinely never triggered, or one of the "continuous, not observed" hooks — see ReportPrinter).</summary>
     public List<string> UnlockedButUnobserved { get; } = [];
+
+    /// <summary>How many fights (regardless of outcome) the bot had against a monster with each <see cref="CreatureTraitKind"/> — recorded by FightBot.Fight. <c>None</c> is the ~60% trait-free baseline every other kind is compared against.</summary>
+    public Dictionary<CreatureTraitKind, int> MonsterTraitsFought { get; } = [];
+
+    /// <summary>The trait each NPC in the harness's spawned population carries, sampled at the end of the run (a respawned NPC rerolls, so this reflects current composition, not full-run history).</summary>
+    public Dictionary<CreatureTraitKind, int> NpcTraitsObserved { get; } = [];
 }

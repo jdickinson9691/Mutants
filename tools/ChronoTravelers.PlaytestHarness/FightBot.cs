@@ -43,6 +43,8 @@ public static class FightBot
 
     public static void Fight(Traveler bot, Monster monster, IReadOnlyList<AbilityData> classAbilities, IRandomSource random, RunReport report, YearPopulation population, bool verboseFatal = false)
     {
+        report.MonsterTraitsFought[monster.Trait] = report.MonsterTraitsFought.GetValueOrDefault(monster.Trait) + 1;
+
         var castable = classAbilities
             .Where(a => a.Level <= bot.Level && !string.Equals(a.Effect, "None", StringComparison.OrdinalIgnoreCase))
             .ToList();

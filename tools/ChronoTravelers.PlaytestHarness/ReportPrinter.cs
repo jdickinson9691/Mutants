@@ -1,5 +1,6 @@
 using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
+using ChronoTravelers.Core.Traits;
 
 namespace ChronoTravelers.PlaytestHarness;
 
@@ -36,6 +37,7 @@ public static class ReportPrinter
 
         PrintAggregateAbilityUsage(runs);
         PrintAggregatePassiveUsage(characterClass, runs);
+        PrintAggregateTraitCounts(runs);
     }
 
     private static void PrintRun(int index, RunReport r)
@@ -81,6 +83,25 @@ public static class ReportPrinter
         if (r.UnlockedButUnobserved.Count > 0)
         {
             Console.WriteLine($"  Unlocked but never observed: {string.Join(", ", r.UnlockedButUnobserved)}");
+        }
+
+        PrintTraitCounts("  Monster traits fought:", r.MonsterTraitsFought);
+        PrintTraitCounts("  NPC population traits:", r.NpcTraitsObserved);
+    }
+
+    private static void PrintTraitCounts(string label, IReadOnlyDictionary<CreatureTraitKind, int> counts)
+    {
+        Console.WriteLine(label);
+        if (counts.Count == 0)
+        {
+            Console.WriteLine("    (none)");
+            return;
+        }
+
+        var total = counts.Values.Sum();
+        foreach (var (kind, count) in counts.OrderByDescending(kv => kv.Value))
+        {
+            Console.WriteLine($"    {kind,-12} {count,-4} ({100.0 * count / total:F0}%)");
         }
     }
 
@@ -133,5 +154,29 @@ public static class ReportPrinter
                 Console.WriteLine($"    {hook}{note}");
             }
         }
+    }
+
+    private static void PrintAggregateTraitCounts(IReadOnlyList<RunReport> runs)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- Aggregate creature traits across all runs ---");
+
+        var monsterTotals = new Dictionary<CreatureTraitKind, int>();
+        var npcTotals = new Dictionary<CreatureTraitKind, int>();
+        foreach (var r in runs)
+        {
+            foreach (var (kind, count) in r.MonsterTraitsFought)
+            {
+                monsterTotals[kind] = monsterTotals.GetValueOrDefault(kind) + count;
+            }
+
+            foreach (var (kind, count) in r.NpcTraitsObserved)
+            {
+                npcTotals[kind] = npcTotals.GetValueOrDefault(kind) + count;
+            }
+        }
+
+        PrintTraitCounts("Monsters fought, by trait (expect ~60% None, ~5% each other kind):", monsterTotals);
+        PrintTraitCounts("NPC population, by trait (sampled once per run, so small samples are noisy):", npcTotals);
     }
 }
