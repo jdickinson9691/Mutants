@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Characters;
+using ChronoTravelers.Core.Diagnostics;
 using ChronoTravelers.Core.Items;
 
 namespace ChronoTravelers.Core.Economy;
@@ -132,12 +133,14 @@ public sealed class Store
     {
         // Spy "Light Fingers" / "Silent Partner" — a bonus on top of the
         // store's normal buy price when selling to it (docs/GDD.md §4.2.1).
-        var price = (int)Math.Round(EconomyPricing.BuyPrice(item) * (1 + seller.StoreDiscountBonus));
+        var basePrice = EconomyPricing.BuyPrice(item);
+        var price = (int)Math.Round(basePrice * (1 + seller.StoreDiscountBonus));
         if (Capital < price || _listings.Count >= MaxListings)
         {
             return null;
         }
 
+        PassiveActivationTracker.Record(seller.Class, PassiveHook.StoreDiscountBonusPct, price - basePrice);
         seller.Sell(item, price);
         Capital -= price;
         Stock(item, EconomyPricing.DefaultAskingPrice(item));
@@ -164,6 +167,7 @@ public sealed class Store
         // Spy "Light Fingers" / "Silent Partner" — a discount off the
         // listed asking price when buying (docs/GDD.md §4.2.1).
         var price = (int)Math.Round(listing.AskingPrice * (1 - buyer.StoreDiscountBonus));
+        PassiveActivationTracker.Record(buyer.Class, PassiveHook.StoreDiscountBonusPct, listing.AskingPrice - price);
 
         _listings.Remove(listing);
         buyer.SpendCredits(price);

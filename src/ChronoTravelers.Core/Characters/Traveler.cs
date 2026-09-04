@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Classes;
+using ChronoTravelers.Core.Diagnostics;
 using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
@@ -169,12 +170,19 @@ public sealed class Traveler
             // Current alone, since the player's pool is uncapped.
             if (Tachyons.Max > 0 && Tachyons.Current >= Tachyons.Max * 0.5)
             {
-                passiveBonus += (int)Math.Round(passiveBonus * PassiveTraits.Sum(Class, Level, PassiveHook.HighTachyonAttackBonusPct));
+                var overcurrentBonus = (int)Math.Round(passiveBonus * PassiveTraits.Sum(Class, Level, PassiveHook.HighTachyonAttackBonusPct));
+                passiveBonus += overcurrentBonus;
+                PassiveActivationTracker.Record(Class, PassiveHook.HighTachyonAttackBonusPct, overcurrentBonus);
             }
 
             // Soldier "Juggernaut Momentum" — grows with consecutive rounds
             // landed this fight; see RecordAttackLanded/ResetPerFightState.
-            passiveBonus += (int)Math.Round(passiveBonus * _consecutiveHitStacks * PassiveTraits.Sum(Class, Level, PassiveHook.ConsecutiveHitAttackBonusPct));
+            var juggernautBonus = (int)Math.Round(passiveBonus * _consecutiveHitStacks * PassiveTraits.Sum(Class, Level, PassiveHook.ConsecutiveHitAttackBonusPct));
+            passiveBonus += juggernautBonus;
+            if (_consecutiveHitStacks > 0)
+            {
+                PassiveActivationTracker.Record(Class, PassiveHook.ConsecutiveHitAttackBonusPct, juggernautBonus);
+            }
 
             return passiveBonus;
         }
@@ -219,12 +227,16 @@ public sealed class Traveler
 
         if (target.Health.Max > 0 && target.Health.Current <= target.Health.Max * 0.4)
         {
-            multiplier += PassiveTraits.Sum(Class, Level, PassiveHook.LowHpTargetAttackBonusPct);
+            var bonus = PassiveTraits.Sum(Class, Level, PassiveHook.LowHpTargetAttackBonusPct);
+            multiplier += bonus;
+            PassiveActivationTracker.Record(Class, PassiveHook.LowHpTargetAttackBonusPct, bonus);
         }
 
         if (target.HasTag("caster"))
         {
-            multiplier += PassiveTraits.Sum(Class, Level, PassiveHook.CasterDamageBonusPct);
+            var bonus = PassiveTraits.Sum(Class, Level, PassiveHook.CasterDamageBonusPct);
+            multiplier += bonus;
+            PassiveActivationTracker.Record(Class, PassiveHook.CasterDamageBonusPct, bonus);
         }
 
         return multiplier;
@@ -502,7 +514,8 @@ public sealed class Traveler
         var vitalReservesRate = PassiveTraits.Sum(Class, Level, PassiveHook.MaxHpRegenPerTickPct);
         if (vitalReservesRate > 0 && !Health.IsDead)
         {
-            Health.Heal((int)Math.Round(Health.Max * vitalReservesRate));
+            var healed = Health.Heal((int)Math.Round(Health.Max * vitalReservesRate));
+            PassiveActivationTracker.Record(Class, PassiveHook.MaxHpRegenPerTickPct, healed);
         }
 
         if (_activeEffects.Count == 0)
@@ -555,17 +568,23 @@ public sealed class Traveler
 
         if (Health.Max > 0 && Health.Current <= Health.Max * 0.3)
         {
-            amount -= amount * PassiveTraits.Sum(Class, Level, PassiveHook.LowHpDamageReductionPct);
+            var reduction = amount * PassiveTraits.Sum(Class, Level, PassiveHook.LowHpDamageReductionPct);
+            amount -= reduction;
+            PassiveActivationTracker.Record(Class, PassiveHook.LowHpDamageReductionPct, reduction);
         }
 
         if (attackerIsEcho)
         {
-            amount -= amount * PassiveTraits.Sum(Class, Level, PassiveHook.EchoDamageReductionPct);
+            var reduction = amount * PassiveTraits.Sum(Class, Level, PassiveHook.EchoDamageReductionPct);
+            amount -= reduction;
+            PassiveActivationTracker.Record(Class, PassiveHook.EchoDamageReductionPct, reduction);
         }
 
         if (isAmbush)
         {
-            amount -= amount * PassiveTraits.Sum(Class, Level, PassiveHook.AmbushDamageReductionPct);
+            var reduction = amount * PassiveTraits.Sum(Class, Level, PassiveHook.AmbushDamageReductionPct);
+            amount -= reduction;
+            PassiveActivationTracker.Record(Class, PassiveHook.AmbushDamageReductionPct, reduction);
         }
 
         var mitigated = Math.Max(0, (int)Math.Round(amount));
@@ -576,6 +595,7 @@ public sealed class Traveler
         {
             _deathProofUsedThisFight = true;
             mitigated = Health.Current - 1;
+            PassiveActivationTracker.Record(Class, PassiveHook.DeathProofOncePerFight, 1);
         }
 
         return Health.Damage(mitigated);
@@ -621,7 +641,9 @@ public sealed class Traveler
             return baseCost;
         }
 
-        return Math.Max(0, (int)Math.Round(baseCost * (1 - discount)));
+        var reduced = Math.Max(0, (int)Math.Round(baseCost * (1 - discount)));
+        PassiveActivationTracker.Record(Class, PassiveHook.LowTachyonCastDiscountPct, baseCost - reduced);
+        return reduced;
     }
 
     /// <summary>Places the Traveler at a specific grid position — e.g. spawning them at a level's start room.</summary>
@@ -687,8 +709,12 @@ public sealed class Traveler
     public int Convert(Item item)
     {
         RemoveFromInventoryOrThrow(item);
-        var bonus = PassiveTraits.Sum(Class, Level, PassiveHook.ConvertValueBonusPct) + JunkValueBonus(item);
+        var convertBonus = PassiveTraits.Sum(Class, Level, PassiveHook.ConvertValueBonusPct);
+        var junkBonus = JunkValueBonus(item);
+        var bonus = convertBonus + junkBonus;
         var value = bonus <= 0 ? item.ConvertValue() : (int)Math.Round(item.ConvertValue() * (1 + bonus));
+        PassiveActivationTracker.Record(Class, PassiveHook.ConvertValueBonusPct, (int)Math.Round(item.ConvertValue() * convertBonus));
+        PassiveActivationTracker.Record(Class, PassiveHook.JunkValueBonusPct, (int)Math.Round(item.ConvertValue() * junkBonus));
         return Tachyons.Add(value);
     }
 
@@ -747,12 +773,21 @@ public sealed class Traveler
         switch (item.ConsumableEffect)
         {
             case ConsumableEffectType.Heal:
-                return Health.Heal((int)Math.Round(item.EffectMagnitude * (1 + ConsumableHealBonus)));
+            {
+                var healBonus = ConsumableHealBonus;
+                var healed = Health.Heal((int)Math.Round(item.EffectMagnitude * (1 + healBonus)));
+                PassiveActivationTracker.Record(Class, PassiveHook.ConsumableHealBonusPct, (int)Math.Round(item.EffectMagnitude * healBonus));
+                return healed;
+            }
 
             case ConsumableEffectType.HealOverTime:
+            {
                 // Doctor "Steady Hands" bumps the per-tick heal amount too.
-                _activeEffects.Add(new ActiveEffect(item.ConsumableEffect, item.EffectMagnitude * (1 + ConsumableHealBonus), item.EffectDurationTicks));
+                var healBonus = ConsumableHealBonus;
+                _activeEffects.Add(new ActiveEffect(item.ConsumableEffect, item.EffectMagnitude * (1 + healBonus), item.EffectDurationTicks));
+                PassiveActivationTracker.Record(Class, PassiveHook.ConsumableHealBonusPct, item.EffectMagnitude * healBonus);
                 return 0;
+            }
 
             case ConsumableEffectType.BuffAttack:
             case ConsumableEffectType.BuffDefense:
@@ -822,8 +857,11 @@ public sealed class Traveler
         }
 
         Tachyons.Spend(ionsToSpend);
-        var hpPerIon = TachyonEconomy.HpPerTachyonHealed * (1 + PassiveTraits.Sum(Class, Level, PassiveHook.HealRatioBonusPct));
-        return Health.Heal((int)Math.Round(ionsToSpend * hpPerIon));
+        var healBonus = PassiveTraits.Sum(Class, Level, PassiveHook.HealRatioBonusPct);
+        var hpPerIon = TachyonEconomy.HpPerTachyonHealed * (1 + healBonus);
+        var healed = Health.Heal((int)Math.Round(ionsToSpend * hpPerIon));
+        PassiveActivationTracker.Record(Class, PassiveHook.HealRatioBonusPct, (int)Math.Round(ionsToSpend * TachyonEconomy.HpPerTachyonHealed * healBonus));
+        return healed;
     }
 
     /// <summary>

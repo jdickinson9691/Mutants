@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Characters;
+using ChronoTravelers.Core.Diagnostics;
 using ChronoTravelers.Core.Events;
 using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Items;
@@ -780,11 +781,13 @@ public static class MonsterController
         // roll here, before any damage is even calculated.
         if (player.AmbushDodgeChance > 0 && random.NextDouble() < player.AmbushDodgeChance)
         {
+            PassiveActivationTracker.Record(player.Class, PassiveHook.AmbushDodgeChancePct, 1);
             return false;
         }
 
         if (player.AmbushNegateChance > 0 && random.NextDouble() < player.AmbushNegateChance)
         {
+            PassiveActivationTracker.Record(player.Class, PassiveHook.AmbushNegateChancePct, 1);
             return false;
         }
 

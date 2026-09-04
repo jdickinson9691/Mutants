@@ -1,5 +1,6 @@
 using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
+using ChronoTravelers.Core.Diagnostics;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Engine.Content;
@@ -133,6 +134,10 @@ public sealed class CombatSession
         // (docs/GDD.md §4.2.1), rolled before Engineer "Failsafe
         // Capacitor"'s discount even gets a chance to apply.
         var freeCast = Traveler.FreeCastChance > 0 && _random.NextDouble() < Traveler.FreeCastChance;
+        if (freeCast)
+        {
+            PassiveActivationTracker.Record(Traveler.Class, PassiveHook.FreeCastChancePct, ability.TachyonCost > 0 ? ability.TachyonCost : 1);
+        }
         var cost = freeCast ? 0 : Traveler.EffectiveCastCost(ability.TachyonCost);
 
         if (!Traveler.Tachyons.CanAfford(cost))
