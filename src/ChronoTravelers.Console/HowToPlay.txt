@@ -93,4 +93,29 @@ STAYING ALIVE
   - Overreaching downstream is a gamble, not a mistake. Grab better gear
     and jump back if it gets hot.
 
+MULTIPLAYER - a shared, live timeline
+  Chrono Travelers can also run as one persistent world other Travelers
+  join at the same time, ticking on a real clock instead of only while
+  you're typing. Someone has to start the server once (any Windows/.NET
+  machine that stays reachable):
+    dotnet run --project src/ChronoTravelers.Server -- [--port N] [--http-port N]
+  Defaults: telnet on port 4000, the game client on port 5000 - both
+  configurable, along with the DB path/tick rate/world seed
+  (docs/SERVER.md has the full flag list).
+
+  Everyone else connects to that machine. From this same exe:
+    ChronoTravelers.exe --connect http://<server-address>:5000
+  or, from any telnet client:
+    telnet <server-address> 4000
+  Either way you'll create/pick an account and Traveler (a new one is
+  offered only the classes that account hasn't played), then land in the
+  shared world alongside every other connected Traveler and the NPC
+  population.  say <message>  talks to everyone else online.
+
+  It's the same timeline, Tachyons, and monsters, but not full command
+  parity yet: fights auto-resolve there rather than round-by-round
+  attack/cast, and class abilities and ranged weapons aren't wired in
+  over the wire. For the complete single-player command set, just launch
+  the exe with no arguments instead.
+
 Type  help  in game for the full command list.

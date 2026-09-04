@@ -2898,4 +2898,14 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("[grey]  Owning a store costs Tachyon upkeep every world tick (the government store is[/]");
     AnsiConsole.MarkupLine("[grey]  exempt) — keep it funded with [yellow]charge[/], or go unpaid too long and it's[/]");
     AnsiConsole.MarkupLine("[grey]  repossessed: the slot, and whatever's still on its shelves, go back up for sale.[/]");
+    AnsiConsole.WriteLine();
+    AnsiConsole.MarkupLine("[yellow]Multiplayer:[/]");
+    AnsiConsole.MarkupLine("[grey]  This is the single-player game — the timeline only advances while you type.[/]");
+    AnsiConsole.MarkupLine("[grey]  There's also a shared, live version other Travelers can join at once. Someone[/]");
+    AnsiConsole.MarkupLine("[grey]  starts a server ([yellow]dotnet run --project src/ChronoTravelers.Server[/]), then you[/]");
+    AnsiConsole.MarkupLine("[grey]  connect with [yellow]ChronoTravelers.exe --connect http://<server-address>:5000[/][/]");
+    AnsiConsole.MarkupLine("[grey]  (or [yellow]telnet <server-address> 4000[/] from any telnet client) instead of launching[/]");
+    AnsiConsole.MarkupLine("[grey]  normally. See docs/SERVER.md for the full setup. Command parity isn't complete[/]");
+    AnsiConsole.MarkupLine("[grey]  there yet (fights auto-resolve, no [yellow]cast[/]/[yellow]shoot[/] over the wire) — this[/]");
+    AnsiConsole.MarkupLine("[grey]  single-player game stays the fuller experience for now.[/]");
 }
