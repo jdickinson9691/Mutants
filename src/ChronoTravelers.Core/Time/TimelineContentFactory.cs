@@ -71,7 +71,7 @@ public static class TimelineContentFactory
         var behavior = species.EffectiveBehaviorProfile;
 
         var loot = BuildLootTable(worldSeed, year, species.Id, lootPool);
-        var starterWeapon = MaybeStarterWeapon(worldSeed, year, species.Id, tier, displayTier);
+        var starterWeapon = MaybeStarterWeapon(worldSeed, year, species.Id, tier, displayTier, attack);
 
         return () =>
         {
@@ -94,6 +94,19 @@ public static class TimelineContentFactory
     /// <summary>Tier at/above which a regular monster may spawn already armed (year ≈ 2750+).</summary>
     private const double ArmedTierThreshold = 4.0;
 
+    /// <summary>
+    /// A spawn-armed monster's weapon can't push its
+    /// <see cref="Monster.EffectiveAttackPower"/> past this multiple of its
+    /// own base <see cref="Monster.AttackPower"/> — the same ceiling
+    /// <see cref="ChronoTravelers.Engine.Npc.MonsterController"/> applies
+    /// to a monster scavenging a weapon off the ground. Without it,
+    /// <c>EquipBonusFor</c>'s flat power range (0.55–1.25) roughly doubled a
+    /// tier-9 monster's hit regardless of how strong that tier's base
+    /// attack already was — deep-game armed spikes of 40-108 damage against
+    /// a base of ~45 (playtest feedback, deep-tier session 2026-09-01).
+    /// </summary>
+    private const double StarterWeaponAttackCap = 1.4;
+
     private static readonly string[] ArmNouns =
         ["Cleaver", "Spike", "Rebar", "Shiv", "Maul", "Cutter", "Prod", "Hook", "Lash", "Bar"];
 
@@ -101,12 +114,13 @@ public static class TimelineContentFactory
     /// A deterministic starter weapon for a deep-tier monster, or null.
     /// Below <see cref="ArmedTierThreshold"/> always null (early/mid game
     /// is untouched); above it the chance ramps from ~15% to ~85% with
-    /// tier, and the weapon is a modest one (mostly Common/Uncommon power)
+    /// tier, and the weapon is a modest one (mostly Common/Uncommon power,
+    /// capped at <see cref="StarterWeaponAttackCap"/>× <paramref name="monsterAttackPower"/>)
     /// that lands as loot when the monster dies. Keyed on
     /// <paramref name="worldSeed"/>/<paramref name="year"/>/<paramref name="speciesId"/>
     /// so every spawn of that species in that year is armed the same way.
     /// </summary>
-    private static Item? MaybeStarterWeapon(long worldSeed, int year, string speciesId, double tier, int displayTier)
+    private static Item? MaybeStarterWeapon(long worldSeed, int year, string speciesId, double tier, int displayTier, int monsterAttackPower)
     {
         if (tier < ArmedTierThreshold)
         {
@@ -123,6 +137,8 @@ public static class TimelineContentFactory
         var power = 0.55 + rng.NextDouble() * 0.7; // 0.55–1.25 → Common..low-Rare
         var rarity = RarityExtensions.ForPower(power);
         var noun = ArmNouns[rng.Next(ArmNouns.Length)];
+        var attackCeiling = (int)Math.Round(monsterAttackPower * StarterWeaponAttackCap);
+        var attackBonus = Math.Min((int)Math.Round(LootScaling.EquipBonusFor(tier, power)), attackCeiling);
 
         return new Item(
             $"Scavenged {noun}",
@@ -130,7 +146,7 @@ public static class TimelineContentFactory
             displayTier,
             rarity,
             Value: (int)Math.Round(LootScaling.ValueFor(tier, rarity)),
-            AttackBonus: (int)Math.Round(LootScaling.EquipBonusFor(tier, power)));
+            AttackBonus: attackBonus);
     }
 
     /// <summary>

@@ -339,6 +339,26 @@ public class TimelineContentFactoryTests
     }
 
     [Fact]
+    public void ForSpecies_StarterWeaponNeverPushesEffectiveAttackPastTheScavengeCap()
+    {
+        // Same ceiling MonsterController.TryGrabLoot enforces when a
+        // monster scavenges a weapon off the ground: a spawn-armed
+        // monster's hit can arm up but can't exceed 2.4x its own base
+        // attack (1.0 + the 1.4x cap on the weapon's bonus).
+        const double cap = 2.4;
+
+        for (var year = 2750; year <= 5000; year += 125)
+        {
+            for (var seed = 1; seed <= 20; seed++)
+            {
+                var m = TimelineContentFactory.ForSpecies(seed, Baseline, year, Pool)();
+                Assert.True(m.EffectiveAttackPower <= m.AttackPower * cap + 1, // +1 for rounding
+                    $"year={year} seed={seed}: {m.EffectiveAttackPower} > {m.AttackPower}*{cap}");
+            }
+        }
+    }
+
+    [Fact]
     public void ForSpecies_DeepTierMonstersSpawnArmed_EarlyOnesNever()
     {
         // Early years (tier < 4): a monster's hit is always just its base.
