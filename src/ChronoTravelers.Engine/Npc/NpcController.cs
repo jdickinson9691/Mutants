@@ -642,9 +642,13 @@ public static class NpcController
                 .OrderBy(l => l.AskingPrice)
                 .FirstOrDefault();
 
-            if (affordable is not null)
+            // SellToTraveler can fail without buying anything (pack already
+            // full) — must check it before Wield, same as the wantsToShop
+            // branch below, or Wield throws for an item that was never
+            // actually added to the NPC's inventory (this crashed the game:
+            // "'Rusted Shiv' is not in <npc>'s inventory.").
+            if (affordable is not null && store.SellToTraveler(npc, affordable))
             {
-                store.SellToTraveler(npc, affordable);
                 npc.Wield(affordable.Item);
                 return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"bought and wielded {affordable.Item.Name} from {store.Name}");
             }

@@ -138,6 +138,41 @@ public class NpcControllerTests
         Assert.Equal(50, npc.Credits);
     }
 
+    /// <summary>
+    /// Regression test for a real crash (crash-20260903-142248-724.log,
+    /// crash-20260904-081415-156.log): Store.SellToTraveler silently
+    /// refuses (no charge, nothing added) when the buyer's pack is
+    /// already full, but TryTrade's "buy a weapon" branch used to call
+    /// Wield unconditionally afterward, throwing InvalidOperationException
+    /// for an item that was never actually added to the NPC's inventory
+    /// and taking the whole process down. Fill the pack with non-junk,
+    /// non-wieldable filler so neither of TryTrade's earlier branches
+    /// (sell surplus gear / sell excess junk) fires and frees up space
+    /// before the buy-weapon branch is reached.
+    /// </summary>
+    [Fact]
+    public void Act_UnarmedWithCreditsButAFullPack_DoesNotCrash_AndDoesNotWieldAnUnpurchasedWeapon()
+    {
+        var npc = FreshNpc();
+        npc.AddCredits(100);
+        for (var i = 0; i < Traveler.MaxInventorySize; i++)
+        {
+            npc.AddToInventory(Item.Create($"Ration {i}", ItemType.Consumable, 1, Rarity.Common));
+        }
+
+        var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
+        var weapon = Item.Create("Rusted Shiv", ItemType.Weapon, 1, Rarity.Common);
+        store.Stock(weapon, askingPrice: 50);
+
+        var exception = Record.Exception(() =>
+            NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(store)]));
+
+        Assert.Null(exception);
+        Assert.Null(npc.EquippedWeapon);
+        Assert.Equal(100, npc.Credits); // the sale never charged anything
+        Assert.Single(store.Listings); // and never left the store either
+    }
+
     [Fact]
     public void Act_ArmedWithCredits_BuysAListedUpgradeAndDrainsTheListing()
     {
