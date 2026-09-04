@@ -19,6 +19,17 @@ namespace ChronoTravelers.PlaytestHarness;
 /// </summary>
 public static class FightBot
 {
+    /// <summary>
+    /// Safety valve mirroring <c>NpcController.AbilityFightMaxRounds</c> —
+    /// <see cref="CombatSession"/> itself has no round cap. Without one, a
+    /// Heal-type ability (which deals no damage the round it's cast) can
+    /// stall a fight forever if the ability policy keeps re-picking it: a
+    /// high-aggression run once produced a single fight that ran ~197,000
+    /// rounds because the bot's HP hovered in Heal-priority range every
+    /// round without ever landing enough attacks to finish the monster.
+    /// </summary>
+    private const int MaxRounds = 300;
+
     public static void Fight(Traveler bot, Monster monster, IReadOnlyList<AbilityData> classAbilities, IRandomSource random, RunReport report, YearPopulation population)
     {
         var castable = classAbilities
@@ -26,10 +37,20 @@ public static class FightBot
             .ToList();
 
         var session = new CombatSession(bot, monster, random);
+        var rounds = 0;
+        var justHealed = false;
 
-        while (!session.IsOver)
+        while (!session.IsOver && rounds < MaxRounds)
         {
-            var chosen = castable.Count > 0 ? ChooseAbility(bot, monster, castable) : null;
+            rounds++;
+
+            // Never heal two rounds in a row — landing at least one attack
+            // every other round guarantees the fight actually progresses
+            // instead of stalemating on a Heal-vs-chip-damage equilibrium
+            // (see MaxRounds' doc comment).
+            var chosen = castable.Count > 0 && !justHealed ? ChooseAbility(bot, monster, castable) : null;
+            justHealed = false;
+
             if (chosen is not null)
             {
                 var usage = report.AbilityUsage.TryGetValue(chosen.Name, out var u) ? u : report.AbilityUsage[chosen.Name] = new AbilityUsage();
@@ -39,6 +60,7 @@ public static class FightBot
                 if (result.Success)
                 {
                     usage.Successes++;
+                    justHealed = string.Equals(chosen.Effect, "Heal", StringComparison.OrdinalIgnoreCase);
                     continue;
                 }
 
