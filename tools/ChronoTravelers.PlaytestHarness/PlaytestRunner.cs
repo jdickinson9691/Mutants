@@ -27,6 +27,19 @@ public static class PlaytestRunner
     private const int TicksBeforeConsideringTravel = 20;
     private const double IdleTravelChance = 0.05;
 
+    /// <summary>
+    /// Chance, on a no-monster tick, that the bot takes a genuine idle turn
+    /// (like a human pausing on `look`/`status`/`wait`) instead of moving,
+    /// healing, or shopping. Without this, <c>idle</c> was false on
+    /// essentially every tick — fighting, moving, and traveling are all
+    /// real actions — so <c>WorldSimulation.Tick</c>'s ambush check
+    /// (<c>playerActedIdly &amp;&amp; lingered</c>) could never actually
+    /// fire: zero ambushes across every battery run so far, which means
+    /// Thick Hide, Fleet-Footed/Redundant Systems, and Trauma Ward were
+    /// structurally unreachable regardless of aggression.
+    /// </summary>
+    private const double IdleTurnChance = 0.15;
+
     /// <param name="aggression">
     /// Scales down the bot's healing thresholds (1.0 = default caution;
     /// 1.25 = 25% more aggressive, i.e. thresholds divided by 1.25). Low-HP
@@ -121,6 +134,12 @@ public static class PlaytestRunner
                 {
                     population.RemoveMonster(monster);
                 }
+            }
+            else if (random.NextDouble() < IdleTurnChance)
+            {
+                // A deliberate no-op turn — idle stays true and nothing else
+                // happens this tick. See IdleTurnChance's doc comment.
+                ticksSinceMonster++;
             }
             else
             {
