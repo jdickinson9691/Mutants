@@ -85,7 +85,8 @@ public static class PlaytestRunner
     /// default caution rarely allows. Doesn't change fight-selection or
     /// travel pacing — HP tolerance only.
     /// </param>
-    public static RunReport Run(CharacterClass characterClass, long worldSeed, int maxTicks, string contentDirectory, IReadOnlyList<AbilityData> allAbilities, double aggression = 1.0)
+    /// <param name="verboseFatal">Dumps the monster's stats and the full combat log to stderr for whichever fight actually kills the bot — see FightBot.Fight.</param>
+    public static RunReport Run(CharacterClass characterClass, long worldSeed, int maxTicks, string contentDirectory, IReadOnlyList<AbilityData> allAbilities, double aggression = 1.0, bool verboseFatal = false)
     {
         var world = LoadWorld(contentDirectory, worldSeed);
         var random = new SystemRandomSource(new Random(unchecked((int)worldSeed)));
@@ -117,7 +118,7 @@ public static class PlaytestRunner
         PassiveActivationTracker.Listener = OnPassiveActivation;
         try
         {
-            RunLoop(bot, world, simulation, random, classAbilities, maxTicks, report, aggression);
+            RunLoop(bot, world, simulation, random, classAbilities, maxTicks, report, aggression, verboseFatal);
         }
         finally
         {
@@ -141,9 +142,8 @@ public static class PlaytestRunner
         return report;
     }
 
-    private static void RunLoop(Traveler bot, TimeWorld world, WorldSimulation simulation, IRandomSource random, List<AbilityData> classAbilities, int maxTicks, RunReport report, double aggression)
+    private static void RunLoop(Traveler bot, TimeWorld world, WorldSimulation simulation, IRandomSource random, List<AbilityData> classAbilities, int maxTicks, RunReport report, double aggression, bool verboseFatal)
     {
-        var maxHit = 0;
         var ticksSinceMonster = 0;
         Monster? shadowTarget = null;
         var shadowTicks = 0;
@@ -160,7 +160,6 @@ public static class PlaytestRunner
             var population = year.Population;
             var idle = true;
 
-            var hpBeforeAction = bot.Health.Current;
             var monster = population.MonstersAt(bot.Position).FirstOrDefault(m => !m.Health.IsDead);
 
             // Below MonsterController.StartRoomGraceMaxLevel a fresh
@@ -193,7 +192,7 @@ public static class PlaytestRunner
                 idle = false;
                 ticksSinceMonster = 0;
                 shadowTarget = null;
-                FightBot.Fight(bot, monster, classAbilities, random, report, population);
+                FightBot.Fight(bot, monster, classAbilities, random, report, population, verboseFatal);
                 if (monster.Health.IsDead)
                 {
                     population.RemoveMonster(monster);
@@ -233,35 +232,26 @@ public static class PlaytestRunner
                 }
             }
 
+            // Any damage from the fight branch above is already recorded
+            // per-round inside FightBot.Fight itself (see RunReport.RecordHit's
+            // doc comment); nothing else this tick deals damage, so this is
+            // purely for the ambush check below.
             var hpAfterAction = bot.Health.Current;
-            RecordHit(hpBeforeAction - hpAfterAction, ref maxHit);
 
             simulation.Tick(bot, playerActedIdly: idle);
 
-            var hpAfterTick = bot.Health.Current;
-            var tickDamage = hpAfterAction - hpAfterTick;
+            var tickDamage = hpAfterAction - bot.Health.Current;
             if (tickDamage > 0)
             {
                 report.AmbushesObserved++;
+                report.RecordHit(tickDamage);
             }
-
-            RecordHit(tickDamage, ref maxHit);
 
             report.TicksRun = tick + 1;
             if (!bot.Health.IsDead)
             {
                 report.TicksSurvived = tick + 1;
             }
-        }
-
-        report.MaxHitTaken = maxHit;
-    }
-
-    private static void RecordHit(int damage, ref int maxHit)
-    {
-        if (damage > maxHit)
-        {
-            maxHit = damage;
         }
     }
 

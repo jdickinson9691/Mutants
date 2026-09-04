@@ -38,8 +38,25 @@ public sealed class RunReport
 
     public int Kills { get; set; }
     public int TotalXp { get; set; }
-    public int MaxHitTaken { get; set; }
+    public int MaxHitTaken { get; private set; }
     public int AmbushesObserved { get; set; }
+
+    /// <summary>
+    /// Updates <see cref="MaxHitTaken"/> if <paramref name="damage"/> is a
+    /// new high — callers report the damage from one concrete blow (one
+    /// combat round, one ambush), never a coarser span like "before this
+    /// fight vs. after it," which would silently sum every round's damage
+    /// into what reads as a single spike (a real bug this once caused:
+    /// seven ordinary 4-6 damage hits across a whole fight reported as one
+    /// 35-damage hit).
+    /// </summary>
+    public void RecordHit(int damage)
+    {
+        if (damage > MaxHitTaken)
+        {
+            MaxHitTaken = damage;
+        }
+    }
 
     public int FinalCredits { get; set; }
     public int FinalTachyons { get; set; }

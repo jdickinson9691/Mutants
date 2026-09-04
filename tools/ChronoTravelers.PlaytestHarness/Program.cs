@@ -10,7 +10,7 @@ using ChronoTravelers.PlaytestHarness;
 // observed active-ability cast counts and passive-trait activation counts
 // (see ChronoTravelers.Core.Diagnostics.PassiveActivationTracker).
 //
-// Usage: dotnet run --project tools/ChronoTravelers.PlaytestHarness -- <Class|all> [runs] [ticksPerRun] [seed] [aggression]
+// Usage: dotnet run --project tools/ChronoTravelers.PlaytestHarness -- <Class|all> [runs] [ticksPerRun] [seed] [aggression] [verboseFatal]
 //   Class:       Soldier | Doctor | Spy | Scientist | Engineer | all
 //   runs:        bot playthroughs per class (default 3)
 //   ticksPerRun: world-tick budget per run (default 3000)
@@ -19,6 +19,9 @@ using ChronoTravelers.PlaytestHarness;
 //                cautiously (default 1.0) — see PlaytestRunner.Run's doc
 //                comment; useful for surfacing low-HP passives (Second
 //                Wind, Unbreakable) the default caution rarely triggers.
+//   verboseFatal: 1/true dumps the killing monster's stats + full combat
+//                log to stderr for whichever fight kills the bot in each
+//                run — useful for tracing a suspicious death (default off).
 
 if (args.Length < 1)
 {
@@ -31,6 +34,7 @@ var runs = args.Length > 1 ? int.Parse(args[1]) : 3;
 var maxTicks = args.Length > 2 ? int.Parse(args[2]) : 3000;
 var baseSeed = args.Length > 3 ? long.Parse(args[3]) : 1000;
 var aggression = args.Length > 4 ? double.Parse(args[4]) : 1.0;
+var verboseFatal = args.Length > 5 && args[5] is "1" or "true";
 
 var contentDirectory = Path.Combine(AppContext.BaseDirectory, "Content");
 var abilities = LoadAbilities(contentDirectory);
@@ -44,7 +48,7 @@ foreach (var characterClass in classes)
     var battery = new List<RunReport>();
     for (var i = 0; i < runs; i++)
     {
-        battery.Add(PlaytestRunner.Run(characterClass, baseSeed + i, maxTicks, contentDirectory, abilities, aggression));
+        battery.Add(PlaytestRunner.Run(characterClass, baseSeed + i, maxTicks, contentDirectory, abilities, aggression, verboseFatal));
     }
 
     ReportPrinter.Print(characterClass, battery);
@@ -79,5 +83,5 @@ static IReadOnlyList<AbilityData> LoadAbilities(string contentDirectory)
 
 static void PrintUsage()
 {
-    Console.WriteLine("Usage: PlaytestHarness <Soldier|Doctor|Spy|Scientist|Engineer|all> [runs] [ticksPerRun] [seed] [aggression]");
+    Console.WriteLine("Usage: PlaytestHarness <Soldier|Doctor|Spy|Scientist|Engineer|all> [runs] [ticksPerRun] [seed] [aggression] [verboseFatal]");
 }
