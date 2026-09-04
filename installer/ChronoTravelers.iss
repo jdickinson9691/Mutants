@@ -13,6 +13,11 @@
 ;   iscc installer\ChronoTravelers.iss
 ; The finished installer lands in installer\Output\.
 ;
+; Or just run installer\Build-Installer.ps1, which does both of the above
+; plus two extra things: it archives whatever installer was already in
+; Output into Output\LKG (last-known-good) before overwriting it, and it
+; copies the freshly built installer out to the shared Google Drive folder.
+;
 ; "iscc" here means ISCC.exe. A winget install (JRSoftware.InnoSetup)
 ; puts it under %LOCALAPPDATA%\Programs\Inno Setup 6\ (per-user, not on
 ; PATH by default); the choco install the CI uses puts it under
