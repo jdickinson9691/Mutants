@@ -876,4 +876,55 @@ public class NpcControllerTests
 
         Assert.Equal(NpcGoal.Travel, wandererResult.Goal);
     }
+
+    [Fact]
+    public void Act_WithADepletedRangedWeaponEquipped_StillWieldsAWeakerButLiveReplacement()
+    {
+        // Regression: FindUpgrade used to compare a fresh pickup's
+        // AttackBonus against the equipped ranged weapon's AttackBonus even
+        // when that weapon was already out of ammo — a strong-but-spent
+        // weapon could permanently block wielding any weaker-but-still-
+        // usable replacement, leaving the NPC melee-only forever despite
+        // carrying a perfectly good ranged weapon.
+        var npc = FreshNpc();
+        var spent = Item.CreateRanged("Vault-Piercer Rifle", tier: 5, Rarity.Epic, RangedKind.Gun, ammoCapacity: 5);
+        spent.AmmoRemaining = 0;
+        npc.AddToInventory(spent);
+        npc.Wield(spent);
+
+        var fresh = Item.CreateRanged("Nail Launcher", tier: 1, Rarity.Common, RangedKind.Gun, ammoCapacity: 6);
+        npc.AddToInventory(fresh);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5));
+
+        Assert.Equal(NpcGoal.Upgrade, result.Goal);
+        Assert.Equal(fresh, npc.EquippedRanged);
+    }
+
+    [Fact]
+    public void Act_ShoppingWithADepletedRangedWeaponEquipped_StillBuysALiveReplacement()
+    {
+        // Same regression as the FindUpgrade test above, but for the other
+        // call site — PickPurchase's store-buying comparison had the
+        // identical bug.
+        var npc = FreshNpc();
+        var weapon = Item.Create("Rusty Blade", ItemType.Weapon, tier: 1, Rarity.Common);
+        npc.AddToInventory(weapon);
+        npc.Wield(weapon); // wantsToShop requires a weapon already equipped
+
+        var spentRanged = Item.CreateRanged("Vault-Piercer Rifle", tier: 5, Rarity.Epic, RangedKind.Gun, ammoCapacity: 5);
+        spentRanged.AmmoRemaining = 0;
+        npc.AddToInventory(spentRanged);
+        npc.Wield(spentRanged);
+        npc.AddCredits(1000);
+
+        var freshRanged = Item.CreateRanged("Nail Launcher", tier: 1, Rarity.Common, RangedKind.Gun, ammoCapacity: 6);
+        var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
+        store.Stock(freshRanged, askingPrice: 10);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.1), [OccupiedSlot(store)]);
+
+        Assert.Equal(NpcGoal.Trade, result.Goal);
+        Assert.Equal(freshRanged, npc.EquippedRanged);
+    }
 }

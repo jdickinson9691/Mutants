@@ -2103,31 +2103,13 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
     var map = yearContent.Map;
     var population = yearContent.Population;
 
-    var current = traveler.Position;
-    var found = false;
-    for (var step = 0; step < weapon.Range; step++)
-    {
-        var move = map.TryMove(current, direction.Value);
-        if (!move.Success)
-        {
-            break; // the corridor doesn't reach any farther that way
-        }
-
-        current = move.Destination!.Value;
-        if (target.Position.Equals(current))
-        {
-            found = true;
-            break;
-        }
-    }
-
-    if (!found)
+    if (!RangedTargeting.HasClearShot(map, traveler.Position, direction.Value, weapon.Range, target.Position))
     {
         AnsiConsole.MarkupLine($"[grey]No clear shot at {Markup.Escape(target.Name)} that way.[/] (no shot spent)");
         return;
     }
 
-    var targetRoom = current;
+    var targetRoom = target.Position;
     var targetIsWarden = ReferenceEquals(target, population.Warden);
 
     var levelBefore = traveler.Level;

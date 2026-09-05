@@ -478,8 +478,14 @@ public static class NpcController
     /// WieldEffectiveness-scaled bonus combat actually uses (so an
     /// off-class find has to clear a higher bar) — at most one per tick,
     /// same "one action" rule as everything else here. A depleted ranged
-    /// weapon never counts; an empty slot counts as a current value of 0,
-    /// so anything wieldable and not-worse always wins an empty slot.
+    /// weapon never counts as a candidate, AND counts as a current value of
+    /// 0 (same as an empty slot) when it's the one currently equipped — a
+    /// spent weapon can't fire, so it must never out-rank a fresh pickup
+    /// just for having a bigger AttackBonus (a real bug: an NPC that
+    /// depleted a strong ranged weapon would sit there melee-only forever,
+    /// never re-arming with a weaker-but-live one). An empty slot counts as
+    /// a current value of 0 too, so anything wieldable and not-worse always
+    /// wins an empty slot.
     /// </summary>
     private static Item? FindUpgrade(Traveler npc)
     {
@@ -497,7 +503,7 @@ public static class NpcController
             {
                 ItemType.Weapon => npc.EquippedWeapon is { } w ? w.AttackBonus * w.WieldEffectiveness(npc.Class) : 0,
                 ItemType.Armor => npc.EquippedArmor is { } a ? a.DefenseBonus * a.WieldEffectiveness(npc.Class) : 0,
-                ItemType.Ranged => npc.EquippedRanged is { } r ? r.AttackBonus * r.WieldEffectiveness(npc.Class) : 0,
+                ItemType.Ranged => npc.EquippedRanged is { IsDepleted: false } r ? r.AttackBonus * r.WieldEffectiveness(npc.Class) : 0,
                 _ => double.MaxValue, // not a slot we manage here - never "an upgrade"
             };
             var candidate = item.Type switch
@@ -818,11 +824,14 @@ public static class NpcController
                 if (item.IsWieldable && !item.IsTimeShard && item.IsClassCompatible(npc.Class)
                     && !(item.IsRanged && item.IsDepleted))
                 {
+                    // A depleted currently-equipped ranged weapon counts as
+                    // a current value of 0 (same as FindUpgrade) — it can't
+                    // fire, so it must never out-rank a fresh, live listing.
                     var current = item.Type switch
                     {
                         ItemType.Weapon => npc.EquippedWeapon is { } w ? w.AttackBonus * w.WieldEffectiveness(npc.Class) : 0,
                         ItemType.Armor => npc.EquippedArmor is { } a ? a.DefenseBonus * a.WieldEffectiveness(npc.Class) : 0,
-                        ItemType.Ranged => npc.EquippedRanged is { } r ? r.AttackBonus * r.WieldEffectiveness(npc.Class) : 0,
+                        ItemType.Ranged => npc.EquippedRanged is { IsDepleted: false } r ? r.AttackBonus * r.WieldEffectiveness(npc.Class) : 0,
                         _ => double.MaxValue,
                     };
                     var offered = (item.Type == ItemType.Armor ? item.DefenseBonus : item.AttackBonus)

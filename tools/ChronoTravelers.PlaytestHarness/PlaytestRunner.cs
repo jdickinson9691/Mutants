@@ -6,6 +6,7 @@ using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Core.World;
 using ChronoTravelers.Engine;
+using ChronoTravelers.Engine.Combat;
 using ChronoTravelers.Engine.Content;
 using ChronoTravelers.Engine.Npc;
 using ChronoTravelers.Engine.Simulation;
@@ -157,6 +158,9 @@ public static class PlaytestRunner
         report.FurthestYearReached = bot.FurthestYearReached;
         report.FinalCredits = bot.Credits;
         report.FinalTachyons = bot.Tachyons.Current;
+        report.EquippedWeaponAtEnd = DescribeItem(bot.EquippedWeapon);
+        report.EquippedArmorAtEnd = DescribeItem(bot.EquippedArmor);
+        report.EquippedRangedAtEnd = DescribeItem(bot.EquippedRanged);
 
         var ownedStoreOwners = world.VisitedYears
             .SelectMany(y => world.GetYear(y).StoreSlots)
@@ -187,6 +191,15 @@ public static class PlaytestRunner
         Monster? shadowTarget = null;
         var shadowTicks = 0;
 
+        // A monster this run already gave up chasing a shot on (weapon ran
+        // dry mid-chase, or ShadowGiveUpTicks elapsed without ever lining
+        // up) — melee it like normal from here on instead of retrying
+        // ranged forever against a monster that keeps drifting back into
+        // the bot's room. Reference-keyed since Monster has no natural id.
+        var rangedGaveUpOn = new HashSet<Monster>(ReferenceEqualityComparer.Instance);
+        Monster? rangedTarget = null;
+        var rangedChaseTicks = 0;
+
         for (var tick = 0; tick < maxTicks; tick++)
         {
             if (bot.Health.IsDead)
@@ -201,72 +214,154 @@ public static class PlaytestRunner
 
             var monster = population.MonstersAt(bot.Position).FirstOrDefault(m => !m.Health.IsDead);
 
-            // Below MonsterController.StartRoomGraceMaxLevel a fresh
-            // character has ~28-30 HP and no gear — the same window the
-            // game itself protects from monster movement into safe rooms.
-            // Letting the bot deliberately court an ambush on top of that
-            // organic early hazard (rather than fight/flee immediately)
-            // turned every class's early runs into a near-certain instawipe
-            // (verified: 4/5 classes died within ~40 ticks on every single
-            // run of a battery). Only shadow once past that window.
-            if (monster is not null && !ReferenceEquals(monster, shadowTarget) && shadowTarget is null
-                && bot.Level > MonsterController.StartRoomGraceMaxLevel && random.NextDouble() >= EngageChance)
-            {
-                shadowTarget = monster;
-                shadowTicks = 0;
-            }
-
-            var hpFraction = bot.Health.Max > 0 ? bot.Health.Current / (double)bot.Health.Max : 1.0;
-            if (monster is not null && ReferenceEquals(monster, shadowTarget) && shadowTicks < ShadowGiveUpTicks && hpFraction > ShadowAbortHpFraction)
-            {
-                // Deliberately leaving this specific monster alone — stays
-                // put (doesn't even roll movement) so its aggro can climb
-                // toward Hostile instead of the bot wandering off and
-                // resetting the clock. See EngageChance's doc comment.
-                shadowTicks++;
-                ticksSinceMonster++;
-            }
-            else if (monster is not null)
+            // Mid-chase: already locked a ranged target (see below) and no
+            // longer sharing a room with anything — try for a clear shot
+            // this tick, or reposition and try again next tick. Takes
+            // priority over the ordinary shadow/fight/grind branching
+            // below, which only ever sees an empty room while this runs.
+            if (rangedTarget is { Health.IsDead: false } && monster is null && bot.EquippedRanged is { IsDepleted: false } chaseWeapon)
             {
                 idle = false;
                 ticksSinceMonster = 0;
-                shadowTarget = null;
-                FightBot.Fight(bot, monster, classAbilities, random, report, population, verboseFatal);
-                if (monster.Health.IsDead)
-                {
-                    population.RemoveMonster(monster);
-                }
-            }
-            else if (random.NextDouble() < IdleTurnChance)
-            {
-                // A deliberate no-op turn — idle stays true and nothing else
-                // happens this tick. See IdleTurnChance's doc comment.
-                ticksSinceMonster++;
-            }
-            else
-            {
-                ticksSinceMonster++;
-                TryHealOrConsume(bot, aggression);
-                TryPickUpAndWieldBetterGear(bot, population);
-                TryShop(bot, year);
 
-                if (bot.CurrentYear < TimeScale.MaxYear && ShouldTravel(bot, ticksSinceMonster, random))
+                var shotDirection = RangedTargeting.FindClearShotDirection(year.Map, bot.Position, chaseWeapon.Range, rangedTarget.Position);
+                if (shotDirection is not null)
                 {
-                    var target = Math.Min(TimeScale.MaxYear, bot.CurrentYear + TravelStepMin + (int)(random.NextDouble() * (TravelStepMax - TravelStepMin)));
-                    if (TimeTravelResolver.Travel(bot, world, target, random).Success)
+                    FireRangedWeapon(bot, rangedTarget, chaseWeapon, random, report, population);
+                    rangedChaseTicks = 0;
+                    if (rangedTarget.Health.IsDead || chaseWeapon.IsDepleted)
                     {
-                        idle = false;
-                        ticksSinceMonster = 0;
+                        if (rangedTarget.Health.IsDead)
+                        {
+                            population.RemoveMonster(rangedTarget);
+                        }
+                        else
+                        {
+                            rangedGaveUpOn.Add(rangedTarget); // out of ammo, not dead — melee it if paths cross again
+                        }
+
+                        bot.SetRangedTarget(null);
+                        rangedTarget = null;
                     }
                 }
-
-                if (idle)
+                else
                 {
+                    rangedChaseTicks++;
                     var direction = PickExit(year.Map, bot.Position, random);
                     if (direction is { } d && year.Map.TryMove(bot.Position, d) is { Success: true, Destination: { } dest })
                     {
                         bot.MoveTo(dest);
-                        idle = false;
+                    }
+
+                    if (rangedChaseTicks > ShadowGiveUpTicks)
+                    {
+                        rangedGaveUpOn.Add(rangedTarget);
+                        bot.SetRangedTarget(null);
+                        rangedTarget = null;
+                    }
+                }
+            }
+            else
+            {
+                if (rangedTarget is not null)
+                {
+                    // Weapon depleted or target died by other means between
+                    // ticks (ambush, off-year churn can't reach it, but a
+                    // stray FightBot melee against a *different* co-located
+                    // monster this tick could still leave a stale lock) —
+                    // clear it so the branches below see a clean slate.
+                    bot.SetRangedTarget(null);
+                    rangedTarget = null;
+                }
+
+                // Below MonsterController.StartRoomGraceMaxLevel a fresh
+                // character has ~28-30 HP and no gear — the same window the
+                // game itself protects from monster movement into safe rooms.
+                // Letting the bot deliberately court an ambush on top of that
+                // organic early hazard (rather than fight/flee immediately)
+                // turned every class's early runs into a near-certain instawipe
+                // (verified: 4/5 classes died within ~40 ticks on every single
+                // run of a battery). Only shadow once past that window.
+                if (monster is not null && !ReferenceEquals(monster, shadowTarget) && shadowTarget is null
+                    && bot.Level > MonsterController.StartRoomGraceMaxLevel && random.NextDouble() >= EngageChance)
+                {
+                    shadowTarget = monster;
+                    shadowTicks = 0;
+                }
+
+                var hpFraction = bot.Health.Max > 0 ? bot.Health.Current / (double)bot.Health.Max : 1.0;
+                if (monster is not null && ReferenceEquals(monster, shadowTarget) && shadowTicks < ShadowGiveUpTicks && hpFraction > ShadowAbortHpFraction)
+                {
+                    // Deliberately leaving this specific monster alone — stays
+                    // put (doesn't even roll movement) so its aggro can climb
+                    // toward Hostile instead of the bot wandering off and
+                    // resetting the clock. See EngageChance's doc comment.
+                    shadowTicks++;
+                    ticksSinceMonster++;
+                }
+                else if (monster is not null)
+                {
+                    idle = false;
+                    ticksSinceMonster = 0;
+                    shadowTarget = null;
+
+                    // Armed with a live ranged weapon and haven't already
+                    // written this specific monster off — lock it and back
+                    // off one room to open a firing lane instead of meleeing
+                    // this tick (mirrors ChronoTravelers.Console's HandleFight:
+                    // 'fight' with a ranged weapon readied locks the target
+                    // rather than swinging).
+                    if (bot.EquippedRanged is { IsDepleted: false } freshWeapon && !rangedGaveUpOn.Contains(monster))
+                    {
+                        bot.SetRangedTarget(monster);
+                        rangedTarget = monster;
+                        rangedChaseTicks = 0;
+                        var direction = PickExit(year.Map, bot.Position, random);
+                        if (direction is { } d && year.Map.TryMove(bot.Position, d) is { Success: true, Destination: { } dest })
+                        {
+                            bot.MoveTo(dest);
+                        }
+                    }
+                    else
+                    {
+                        FightBot.Fight(bot, monster, classAbilities, random, report, population, verboseFatal);
+                        if (monster.Health.IsDead)
+                        {
+                            population.RemoveMonster(monster);
+                        }
+                    }
+                }
+                else if (random.NextDouble() < IdleTurnChance)
+                {
+                    // A deliberate no-op turn — idle stays true and nothing else
+                    // happens this tick. See IdleTurnChance's doc comment.
+                    ticksSinceMonster++;
+                }
+                else
+                {
+                    ticksSinceMonster++;
+                    TryHealOrConsume(bot, aggression, report);
+                    TryPickUpAndWieldBetterGear(bot, population);
+                    TryShop(bot, year);
+
+                    if (bot.CurrentYear < TimeScale.MaxYear && ShouldTravel(bot, ticksSinceMonster, random))
+                    {
+                        var target = Math.Min(TimeScale.MaxYear, bot.CurrentYear + TravelStepMin + (int)(random.NextDouble() * (TravelStepMax - TravelStepMin)));
+                        if (TimeTravelResolver.Travel(bot, world, target, random).Success)
+                        {
+                            idle = false;
+                            ticksSinceMonster = 0;
+                        }
+                    }
+
+                    if (idle)
+                    {
+                        var direction = PickExit(year.Map, bot.Position, random);
+                        if (direction is { } d && year.Map.TryMove(bot.Position, d) is { Success: true, Destination: { } dest })
+                        {
+                            bot.MoveTo(dest);
+                            idle = false;
+                        }
                     }
                 }
             }
@@ -321,6 +416,41 @@ public static class PlaytestRunner
         return ticksSinceMonster > TicksBeforeConsideringTravel || random.NextDouble() < IdleTravelChance;
     }
 
+    /// <summary>
+    /// One shot at an already-lined-up target — the harness's counterpart
+    /// to ChronoTravelers.Console's HandleShoot (command parsing/messages
+    /// aside; the caller in RunLoop already found the firing direction via
+    /// RangedTargeting). Awards XP/Credits and grounds loot on a kill,
+    /// same as a melee win via FightBot.Fight.
+    /// </summary>
+    private static void FireRangedWeapon(Traveler bot, Monster target, Item weapon, IRandomSource random, RunReport report, YearPopulation population)
+    {
+        report.RangedShotsFired++;
+        var result = RangedResolver.Fire(bot, target, weapon, random);
+        if (result.Damage > 0)
+        {
+            report.RangedShotsHit++;
+        }
+
+        if (!result.Killed)
+        {
+            return;
+        }
+
+        report.RangedKills++;
+        report.Kills++;
+        var xpAwarded = MonsterScaling.KillXp(target.XpReward, target.Tier, bot.Level);
+        bot.GainXp(xpAwarded);
+        report.TotalXp += xpAwarded;
+        var creditsAwarded = MonsterScaling.KillCredits(target.CreditReward, target.Tier, bot.Level);
+        bot.AddCredits(creditsAwarded);
+
+        foreach (var drop in LootDropRoller.RollForKill(target, random).Concat(target.Inventory))
+        {
+            population.AddGroundLoot(target.Position, drop);
+        }
+    }
+
     private static Direction? PickExit(LevelMap map, Coordinate at, IRandomSource random)
     {
         var room = map.TryGetRoom(at);
@@ -333,7 +463,7 @@ public static class PlaytestRunner
         return exits.Count == 0 ? null : exits[(int)(random.NextDouble() * exits.Count)];
     }
 
-    private static void TryHealOrConsume(Traveler bot, double aggression)
+    private static void TryHealOrConsume(Traveler bot, double aggression, RunReport report)
     {
         var hpFraction = bot.Health.Max > 0 ? bot.Health.Current / (double)bot.Health.Max : 1.0;
         if (hpFraction >= 0.9 / aggression)
@@ -347,6 +477,7 @@ public static class PlaytestRunner
             if (healItem is not null)
             {
                 bot.Consume(healItem);
+                report.RecordConsumableUse(ConsumableEffectType.Heal, inCombat: false);
                 return;
             }
         }
@@ -390,6 +521,18 @@ public static class PlaytestRunner
         if (armorUpgrade is not null)
         {
             bot.Wield(armorUpgrade);
+        }
+
+        // Without this, a looted ranged weapon just rides in the pack
+        // forever — RunLoop's ranged-kiting branch only ever fires once
+        // something's actually equipped in the slot.
+        var rangedUpgrade = bot.Inventory
+            .Where(i => i.Type == ItemType.Ranged && !i.IsDepleted && (bot.EquippedRanged is null || i.AttackBonus > bot.EquippedRanged.AttackBonus))
+            .OrderByDescending(i => i.AttackBonus)
+            .FirstOrDefault();
+        if (rangedUpgrade is not null)
+        {
+            bot.Wield(rangedUpgrade);
         }
 
         if (bot.Inventory.Count < Traveler.MaxInventorySize - 2)
@@ -446,6 +589,26 @@ public static class PlaytestRunner
         {
             bot.Wield(weaponListing.Item);
         }
+    }
+
+    /// <summary>Human-readable equipped-item summary for <see cref="RunReport"/> — null for an empty slot.</summary>
+    private static string? DescribeItem(Item? item)
+    {
+        if (item is null)
+        {
+            return null;
+        }
+
+        var bonus = item.Type switch
+        {
+            ItemType.Weapon or ItemType.Ranged => $"+{item.AttackBonus} atk",
+            ItemType.Armor => $"+{item.DefenseBonus} def",
+            _ => "",
+        };
+        var ammo = item.Type == ItemType.Ranged ? $", {item.AmmoRemaining}/{item.AmmoCapacity} ammo" : "";
+        var shard = item.IsTimeShard ? " [Time Shard]" : "";
+
+        return $"{item.Name} (tier {item.Tier}, {item.Rarity}, {bonus}{ammo}){shard}";
     }
 
     private static void GiveStarterKit(Traveler bot)

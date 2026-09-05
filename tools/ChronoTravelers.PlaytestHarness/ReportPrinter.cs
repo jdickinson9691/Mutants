@@ -37,6 +37,8 @@ public static class ReportPrinter
 
         PrintAggregateAbilityUsage(runs);
         PrintAggregatePassiveUsage(characterClass, runs);
+        PrintAggregateConsumableUsage(runs);
+        PrintAggregateRangedUsage(runs);
         PrintAggregateTraitCounts(runs);
     }
 
@@ -48,11 +50,16 @@ public static class ReportPrinter
         Console.WriteLine($"  Level reached:  {r.FinalLevel}");
         Console.WriteLine($"  Year reached:   {r.FinalYear} (furthest {r.FurthestYearReached})");
         Console.WriteLine($"  Ticks run:      {r.TicksRun}");
-        Console.WriteLine($"  Kills:          {r.Kills}");
+        Console.WriteLine($"  Kills:          {r.Kills} ({r.RangedKills} ranged)");
+        Console.WriteLine($"  Ranged shots:   {r.RangedShotsFired} fired, {r.RangedShotsHit} hit");
         Console.WriteLine($"  Total XP:       {r.TotalXp}");
         Console.WriteLine($"  Max hit taken:  {r.MaxHitTaken}");
         Console.WriteLine($"  Ambushes seen:  {r.AmbushesObserved}");
         Console.WriteLine($"  Credits/Tachyons at end: {r.FinalCredits} / {r.FinalTachyons}");
+        Console.WriteLine($"  Equipped {(r.DiedDuringRun ? "on death" : "at end")}:");
+        Console.WriteLine($"    Weapon: {r.EquippedWeaponAtEnd ?? "(none)"}");
+        Console.WriteLine($"    Armor:  {r.EquippedArmorAtEnd ?? "(none)"}");
+        Console.WriteLine($"    Ranged: {r.EquippedRangedAtEnd ?? "(none)"}");
 
         Console.WriteLine("  Ability usage:");
         if (r.AbilityUsage.Count == 0)
@@ -83,6 +90,19 @@ public static class ReportPrinter
         if (r.UnlockedButUnobserved.Count > 0)
         {
             Console.WriteLine($"  Unlocked but never observed: {string.Join(", ", r.UnlockedButUnobserved)}");
+        }
+
+        Console.WriteLine("  Consumable usage:");
+        if (r.ConsumableUsage.Count == 0)
+        {
+            Console.WriteLine("    (none used this run)");
+        }
+        else
+        {
+            foreach (var (effect, usage) in r.ConsumableUsage.OrderByDescending(kv => kv.Value.InCombat + kv.Value.OutOfCombat))
+            {
+                Console.WriteLine($"    {effect,-28} inCombat={usage.InCombat,-4} outOfCombat={usage.OutOfCombat}");
+            }
         }
 
         PrintTraitCounts("  Monster traits fought:", r.MonsterTraitsFought);
@@ -154,6 +174,47 @@ public static class ReportPrinter
                 Console.WriteLine($"    {hook}{note}");
             }
         }
+    }
+
+    private static void PrintAggregateConsumableUsage(IReadOnlyList<RunReport> runs)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- Aggregate consumable usage across all runs ---");
+        var byEffect = runs.SelectMany(r => r.ConsumableUsage)
+            .GroupBy(kv => kv.Key)
+            .Select(g => (Effect: g.Key, InCombat: g.Sum(kv => kv.Value.InCombat), OutOfCombat: g.Sum(kv => kv.Value.OutOfCombat)))
+            .OrderByDescending(x => x.InCombat + x.OutOfCombat)
+            .ToList();
+
+        if (byEffect.Count == 0)
+        {
+            Console.WriteLine("  (no consumable was ever used across any run)");
+            return;
+        }
+
+        foreach (var (effect, inCombat, outOfCombat) in byEffect)
+        {
+            Console.WriteLine($"  {effect,-28} inCombat={inCombat,-4} outOfCombat={outOfCombat}");
+        }
+    }
+
+    private static void PrintAggregateRangedUsage(IReadOnlyList<RunReport> runs)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- Aggregate ranged weapon usage across all runs ---");
+        var fired = runs.Sum(r => r.RangedShotsFired);
+        var hit = runs.Sum(r => r.RangedShotsHit);
+        var kills = runs.Sum(r => r.RangedKills);
+        var runsThatFired = runs.Count(r => r.RangedShotsFired > 0);
+
+        if (fired == 0)
+        {
+            Console.WriteLine("  (no ranged weapon was ever fired across any run)");
+            return;
+        }
+
+        Console.WriteLine($"  Shots fired: {fired}   Shots that landed: {hit} ({100.0 * hit / fired:F0}%)   Kills: {kills}");
+        Console.WriteLine($"  Runs that fired at least one shot: {runsThatFired}/{runs.Count}");
     }
 
     private static void PrintAggregateTraitCounts(IReadOnlyList<RunReport> runs)

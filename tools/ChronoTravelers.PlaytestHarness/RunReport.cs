@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Characters;
+using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Traits;
 
 namespace ChronoTravelers.PlaytestHarness;
@@ -22,6 +23,18 @@ public sealed class PassiveUsage
 {
     public int Activations { get; set; }
     public double TotalMagnitude { get; set; }
+}
+
+/// <summary>
+/// Uses of one <see cref="ConsumableEffectType"/>, for one run, split by
+/// whether it happened mid-fight (<see cref="ChronoTravelers.Engine.Combat.CombatSession.UseItem"/>,
+/// spending the round the way an attack/cast would) or between fights
+/// (<c>PlaytestRunner.TryHealOrConsume</c>'s plain <c>Traveler.Consume</c>).
+/// </summary>
+public sealed class ConsumableUsage
+{
+    public int InCombat { get; set; }
+    public int OutOfCombat { get; set; }
 }
 
 /// <summary>
@@ -58,6 +71,11 @@ public sealed class RunReport
     public int MaxHitTaken { get; private set; }
     public int AmbushesObserved { get; set; }
 
+    /// <summary>Shots actually fired via <see cref="ChronoTravelers.Engine.Combat.RangedResolver.Fire"/> — <see cref="RangedKills"/> is a subset (already folded into <see cref="Kills"/> too, for the true melee+ranged total).</summary>
+    public int RangedShotsFired { get; set; }
+    public int RangedShotsHit { get; set; }
+    public int RangedKills { get; set; }
+
     /// <summary>
     /// Updates <see cref="MaxHitTaken"/> if <paramref name="damage"/> is a
     /// new high — callers report the damage from one concrete blow (one
@@ -78,8 +96,27 @@ public sealed class RunReport
     public int FinalCredits { get; set; }
     public int FinalTachyons { get; set; }
 
+    /// <summary>Weapon/armor/ranged wielded at run's end (on death, that's exactly what the bot went down holding) — null for an empty slot. See <c>PlaytestRunner.DescribeItem</c>.</summary>
+    public string? EquippedWeaponAtEnd { get; set; }
+    public string? EquippedArmorAtEnd { get; set; }
+    public string? EquippedRangedAtEnd { get; set; }
+
     public Dictionary<string, AbilityUsage> AbilityUsage { get; } = [];
     public Dictionary<PassiveHook, PassiveUsage> PassiveUsage { get; } = [];
+    public Dictionary<ConsumableEffectType, ConsumableUsage> ConsumableUsage { get; } = [];
+
+    public void RecordConsumableUse(ConsumableEffectType effect, bool inCombat)
+    {
+        var usage = ConsumableUsage.TryGetValue(effect, out var u) ? u : ConsumableUsage[effect] = new ConsumableUsage();
+        if (inCombat)
+        {
+            usage.InCombat++;
+        }
+        else
+        {
+            usage.OutOfCombat++;
+        }
+    }
 
     /// <summary>Passives this character had unlocked by <see cref="FinalLevel"/> that never got a recorded activation this run (either genuinely never triggered, or one of the "continuous, not observed" hooks — see ReportPrinter).</summary>
     public List<string> UnlockedButUnobserved { get; } = [];
