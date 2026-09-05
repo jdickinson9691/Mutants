@@ -86,8 +86,8 @@ public sealed class OwnedStoreSaveData
     public int Year { get; set; }
     public int Capital { get; set; }
 
-    /// <summary>The store's Tachyon maintenance reserve (see Core.Economy.Store.TachyonReserve). Additive — old blobs deserialize as 0, meaning maintenance starts unfunded next session.</summary>
-    public int TachyonReserve { get; set; }
+    /// <summary>The store's Credit maintenance reserve (see Core.Economy.Store.CreditReserve). Originally a Tachyon reserve; renamed alongside the currency switch (docs/GDD.md §6.2). Additive — old blobs deserialize as 0, meaning maintenance starts unfunded next session.</summary>
+    public int CreditReserve { get; set; }
     public List<StoreListingSaveData> Listings { get; set; } = [];
 }
 

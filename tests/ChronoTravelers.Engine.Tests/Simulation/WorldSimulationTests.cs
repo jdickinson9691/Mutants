@@ -300,7 +300,7 @@ public class WorldSimulationTests
         var player = OffGridPlayer("Player", world, 2000);
         var npc = NewTraveler("Vex", world, 2000);
         var slot = world.GetYear(2000).StoreSlots.First(s => s.IsAvailableForPurchase);
-        var store = slot.RestoreOwnership(npc, capital: 0, tachyonReserve: 50);
+        var store = slot.RestoreOwnership(npc, capital: 0, creditReserve: 50);
 
         // 0.99 misses every optional NPC roll (travel/purchase/tend), so this
         // isolates the maintenance pass itself from any NPC store-tending action.
@@ -308,7 +308,7 @@ public class WorldSimulationTests
 
         simulation.Tick(player);
 
-        Assert.True(store.TachyonReserve < 50);
+        Assert.True(store.CreditReserve < 50);
         Assert.Equal(0, store.MissedMaintenanceTicks);
     }
 
@@ -323,7 +323,7 @@ public class WorldSimulationTests
         var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.99));
         simulation.Tick(player);
 
-        Assert.Equal(0, government.TachyonReserve);
+        Assert.Equal(0, government.CreditReserve);
         Assert.Equal(capitalBefore, government.Capital);
     }
 
@@ -333,9 +333,9 @@ public class WorldSimulationTests
         var world = World();
         var player = OffGridPlayer("Player", world, 2000);
         var npc = NewTraveler("Vex", world, 2000);
-        npc.Tachyons.Spend(npc.Tachyons.Current); // can't self-fund maintenance either
+        // npc has 0 Credits by default - can't self-fund maintenance either.
         var slot = world.GetYear(2000).StoreSlots.First(s => s.IsAvailableForPurchase);
-        slot.RestoreOwnership(npc, capital: 0, tachyonReserve: 0);
+        slot.RestoreOwnership(npc, capital: 0, creditReserve: 0);
 
         var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.99));
 

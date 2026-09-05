@@ -68,7 +68,7 @@ public static class CharacterMapper
                 {
                     Year = pair.Key,
                     Capital = pair.Value.Capital,
-                    TachyonReserve = pair.Value.TachyonReserve,
+                    CreditReserve = pair.Value.CreditReserve,
                     Listings = pair.Value.Listings
                         .Select(l => new StoreListingSaveData { Item = ToItemSaveData(l.Item), AskingPrice = l.AskingPrice })
                         .ToList(),
@@ -102,7 +102,7 @@ public static class CharacterMapper
                 continue;
             }
 
-            var store = slot.RestoreOwnership(player, saved.Capital, saved.TachyonReserve);
+            var store = slot.RestoreOwnership(player, saved.Capital, saved.CreditReserve);
             foreach (var listing in saved.Listings)
             {
                 // enforceCap: false — same reasoning as FromSaveData above:

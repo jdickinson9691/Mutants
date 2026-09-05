@@ -20,7 +20,7 @@ public enum NpcGoal
     /// <summary>Visited a store this tick — sold excess junk or surplus gear, or bought a needed weapon.</summary>
     Trade,
 
-    /// <summary>Bought an empty store slot, or tended one already owned — paid Tachyon maintenance, stocked surplus gear, or collected Capital. Docs/GDD.md §6.2/§7.</summary>
+    /// <summary>Bought an empty store slot, or tended one already owned — paid Credit maintenance, stocked surplus gear, or collected Capital. Docs/GDD.md §6.2/§7.</summary>
     OwnStore,
 
     /// <summary>Swapped to a better weapon/armor/ranged item already sitting in the pack (looted, not bought) — no store needed.</summary>

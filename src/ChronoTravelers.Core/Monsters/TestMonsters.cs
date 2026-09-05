@@ -49,7 +49,8 @@ public static class TestMonsters
         defense: MonsterScaling.BaseDefense(tier),
         speed: MonsterScaling.BaseSpeed(tier),
         xpReward: MonsterScaling.XpReward(tier) * 5,
-        lootTable: [new LootTableEntry(Item.Create("Warden's Trophy", ItemType.Weapon, tier, Rarity.Rare), dropChance: 1.0)]);
+        lootTable: [new LootTableEntry(Item.Create("Warden's Trophy", ItemType.Weapon, tier, Rarity.Rare), dropChance: 1.0)],
+        creditReward: MonsterScaling.CreditReward(tier) * 5);
 
     /// <summary>Tier-1 roster — the exact set this project has used since milestone 3, unchanged.</summary>
     public static IReadOnlyList<Func<Monster>> All { get; } = [() => Scavenger(), () => JunkGolem(), () => FeralDog()];

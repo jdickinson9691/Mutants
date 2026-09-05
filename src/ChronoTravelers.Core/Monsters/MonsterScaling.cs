@@ -223,34 +223,74 @@ public static class MonsterScaling
     /// <summary>XP reward for defeating a tier-N monster — deliberately generous relative to <see cref="Stats.Leveling.CumulativeXpForLevel"/> so a handful of kills advances a level.</summary>
     public static double XpReward(double tier) => Require(tier, 40 * tier);
 
-    /// <summary>Fraction of kill XP lost per character level past a tier's band cap (<c>10 × tier</c> — the top of what that content is meant for).</summary>
+    /// <summary>
+    /// Credit reward for defeating a tier-N monster — original tuning,
+    /// added alongside a matching per-kill scale (there was previously no
+    /// Credit reward for a kill at all; Credits came only from selling
+    /// loot). Deliberately modest relative to loot-selling income (a
+    /// single tier-1 junk item alone sells for more, per
+    /// <see cref="Items.LootScaling.TierBaseValue(double)"/>/
+    /// <see cref="Economy.EconomyPricing.SellRateMultiplier"/>) — this is a
+    /// small, always-available trickle on top of that, not a replacement
+    /// for it. Scaled 1:4 against <see cref="XpReward(double)"/> (10 vs.
+    /// 40 per tier) and, not coincidentally, close to
+    /// <see cref="Economy.EconomyPricing.MaintenanceCostPerTick"/>'s own
+    /// per-tier rate ×10 — a single kill roughly covers ten ticks of a
+    /// same-tier store's upkeep, so switching store maintenance to Credits
+    /// (docs/GDD.md §6.2) gives grinding a direct, if modest, way to fund it.
+    /// </summary>
+    public const double CreditRewardPerTier = 10.0;
+
+    /// <summary>Credit reward for defeating a tier-N monster — see <see cref="CreditRewardPerTier"/>.</summary>
+    public static double CreditReward(double tier) => Require(tier, CreditRewardPerTier * tier);
+
+    /// <summary>Fraction of kill XP/Credits lost per character level past a tier's band cap (<c>10 × tier</c> — the top of what that content is meant for). Shared by <see cref="KillXp"/> and <see cref="KillCredits"/> — grinding a trivial year for either reward should trickle the same way.</summary>
     public const double OutlevelXpFalloffPerLevel = 0.08;
 
-    /// <summary>A kill never yields less than this fraction of its base XP, however far you've outgrown the content.</summary>
+    /// <summary>A kill never yields less than this fraction of its base XP/Credits, however far you've outgrown the content. Shared by <see cref="KillXp"/> and <see cref="KillCredits"/>.</summary>
     public const double MinKillXpFraction = 0.10;
 
     /// <summary>
-    /// Kill XP actually granted to a level-<paramref name="killerLevel"/>
-    /// character for defeating a tier-<paramref name="monsterTier"/> monster
-    /// worth <paramref name="baseXp"/>. Full value while the killer is
-    /// within (or below) the band that tier is meant for — a tier-N monster
-    /// is a fair fight up to about level <c>10 × N</c> (see the type
-    /// summary) — then it falls off <see cref="OutlevelXpFalloffPerLevel"/>
-    /// per level past that cap, down to a <see cref="MinKillXpFraction"/>
-    /// floor. So grinding a year long after you've outgrown it trickles,
-    /// and the XP is out where the fight is still real. Never below 1.
+    /// The shared outlevel falloff <see cref="KillXp"/> and
+    /// <see cref="KillCredits"/> both apply: full value while
+    /// <paramref name="killerLevel"/> is within (or below) the band
+    /// <paramref name="monsterTier"/> is meant for — a tier-N monster is a
+    /// fair fight up to about level <c>10 × N</c> (see the type summary) —
+    /// then it falls off <see cref="OutlevelXpFalloffPerLevel"/> per level
+    /// past that cap, down to a <see cref="MinKillXpFraction"/> floor.
     /// </summary>
-    public static int KillXp(int baseXp, int monsterTier, int killerLevel)
+    private static int ApplyOutlevelFalloff(double baseAmount, int monsterTier, int killerLevel)
     {
         var over = killerLevel - 10 * monsterTier;
         if (over <= 0)
         {
-            return baseXp;
+            return Math.Max(1, (int)Math.Round(baseAmount));
         }
 
         var factor = Math.Clamp(1.0 - OutlevelXpFalloffPerLevel * over, MinKillXpFraction, 1.0);
-        return Math.Max(1, (int)Math.Round(baseXp * factor));
+        return Math.Max(1, (int)Math.Round(baseAmount * factor));
     }
+
+    /// <summary>
+    /// Kill XP actually granted to a level-<paramref name="killerLevel"/>
+    /// character for defeating a tier-<paramref name="monsterTier"/> monster
+    /// worth <paramref name="baseXp"/> — see <see cref="ApplyOutlevelFalloff"/>.
+    /// So grinding a year long after you've outgrown it trickles, and the
+    /// XP is out where the fight is still real. Never below 1.
+    /// </summary>
+    public static int KillXp(int baseXp, int monsterTier, int killerLevel) =>
+        ApplyOutlevelFalloff(baseXp, monsterTier, killerLevel);
+
+    /// <summary>
+    /// Kill Credits actually granted to a level-<paramref name="killerLevel"/>
+    /// character for defeating a tier-<paramref name="monsterTier"/> monster
+    /// worth <paramref name="baseCredits"/> — the same outlevel falloff as
+    /// <see cref="KillXp"/> (see <see cref="ApplyOutlevelFalloff"/>), so
+    /// farming a trivial year doesn't become a better Credit source than a
+    /// fair fight. Never below 1.
+    /// </summary>
+    public static int KillCredits(int baseCredits, int monsterTier, int killerLevel) =>
+        ApplyOutlevelFalloff(baseCredits, monsterTier, killerLevel);
 
     /// <summary>Tachyon pool for a tier-N monster — deliberately smaller than a player's (a monster uses it for the odd <c>heal</c>, not as a deep resource). Original tuning.</summary>
     public static double BaseTachyons(double tier) => Require(tier, 8 + 4 * tier);
@@ -264,6 +304,8 @@ public static class MonsterScaling
     public static int BaseSpeed(int tier) => Round(BaseSpeed((double)tier));
 
     public static int XpReward(int tier) => Round(XpReward((double)tier));
+
+    public static int CreditReward(int tier) => Round(CreditReward((double)tier));
 
     public static int BaseTachyons(int tier) => Round(BaseTachyons((double)tier));
 

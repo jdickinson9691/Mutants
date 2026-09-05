@@ -39,6 +39,10 @@ public sealed class Monster
     public int Defense { get; }
     public int Speed { get; }
     public int XpReward { get; }
+
+    /// <summary>Credits awarded for defeating this monster — see <see cref="MonsterScaling.CreditReward(int)"/>. Defaults to 0 for a hand-built monster that doesn't pass it (e.g. an existing test fixture predating this reward); every species built through <see cref="Create"/> gets a real value.</summary>
+    public int CreditReward { get; }
+
     public IReadOnlyList<LootTableEntry> LootTable { get; }
 
     /// <summary>
@@ -189,7 +193,8 @@ public sealed class Monster
         bool packHunting = false,
         bool neverInfights = false,
         int aggroRangeBonus = 0,
-        double ambushDamageMultiplier = 1.0)
+        double ambushDamageMultiplier = 1.0,
+        int creditReward = 0)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -218,6 +223,7 @@ public sealed class Monster
         NeverInfights = neverInfights;
         AggroRangeBonus = Math.Max(0, aggroRangeBonus);
         AmbushDamageMultiplier = Math.Max(0, ambushDamageMultiplier);
+        CreditReward = creditReward;
     }
 
     private bool _enumerated;
@@ -287,7 +293,8 @@ public sealed class Monster
             xpReward: MonsterScaling.XpReward(tier),
             lootTable: lootTable,
             tags: tags,
-            isApex: isApex);
+            isApex: isApex,
+            creditReward: MonsterScaling.CreditReward(tier));
 
     /// <summary>Places the monster at a grid position — e.g. when its year's population is seeded.</summary>
     public void PlaceAt(Coordinate coordinate) => Position = coordinate;

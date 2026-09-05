@@ -21,12 +21,16 @@ public sealed class Store
     public int Capital { get; private set; }
 
     /// <summary>
-    /// Tachyons on hand to pay this store's per-tick maintenance — docs/GDD.md
-    /// §6.2's new "charge" command tops this up (<see cref="Charge"/>);
+    /// Credits on hand to pay this store's per-tick maintenance — docs/GDD.md
+    /// §6.2's "charge" command tops this up (<see cref="Charge"/>);
     /// <see cref="ApplyMaintenanceTick"/> draws it down each world tick.
     /// Always 0 and unused for a government store (<see cref="IsGovernmentRun"/>).
+    /// Originally a Tachyon reserve; switched to Credits so upkeep draws on
+    /// the same currency a store's own Capital/sales already deal in,
+    /// rather than the owner's separate survival/travel/heal Tachyon
+    /// budget.
     /// </summary>
-    public int TachyonReserve { get; private set; }
+    public int CreditReserve { get; private set; }
 
     /// <summary>Consecutive world ticks this store's maintenance has gone unpaid — resets to 0 the moment a tick is fully covered. See <see cref="ApplyMaintenanceTick"/> and <see cref="ForeclosureThreshold"/>.</summary>
     public int MissedMaintenanceTicks { get; private set; }
@@ -49,7 +53,7 @@ public sealed class Store
     private readonly List<StoreListing> _listings = [];
     public IReadOnlyList<StoreListing> Listings => _listings;
 
-    public Store(string name, int homeLevel, int startingCapital, Traveler? owner = null, int startingTachyonReserve = 0)
+    public Store(string name, int homeLevel, int startingCapital, Traveler? owner = null, int startingCreditReserve = 0)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -66,16 +70,16 @@ public sealed class Store
             throw new ArgumentOutOfRangeException(nameof(startingCapital), startingCapital, "Starting capital cannot be negative.");
         }
 
-        if (startingTachyonReserve < 0)
+        if (startingCreditReserve < 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(startingTachyonReserve), startingTachyonReserve, "Starting Tachyon reserve cannot be negative.");
+            throw new ArgumentOutOfRangeException(nameof(startingCreditReserve), startingCreditReserve, "Starting Credit reserve cannot be negative.");
         }
 
         Name = name;
         HomeLevel = homeLevel;
         Capital = startingCapital;
         Owner = owner;
-        TachyonReserve = startingTachyonReserve;
+        CreditReserve = startingCreditReserve;
     }
 
     /// <summary>A government store — docs/GDD.md §6.1. Effectively unlimited capital, representing government backing.</summary>
@@ -270,30 +274,34 @@ public sealed class Store
     }
 
     /// <summary>
-    /// Owner tops up <see cref="TachyonReserve"/> with their own Tachyons —
+    /// Owner tops up <see cref="CreditReserve"/> with their own Credits —
     /// docs/GDD.md §6.2's "charge" command, the counterpart to
     /// <see cref="ApplyMaintenanceTick"/> drawing it down. Owner-only.
-    /// Spends the owner's Tachyons directly (throws if they can't afford
-    /// it — callers should check <c>owner.Tachyons.CanAfford</c> first, the
-    /// same convention as everywhere else Tachyons are spent).
+    /// Spends the owner's Credits directly (throws if they can't afford
+    /// it — callers should check <c>owner.Credits</c> first, the same
+    /// convention as everywhere else Credits are spent). Originally spent
+    /// Tachyons; switched to Credits (docs/GDD.md §6.2) so a store's
+    /// upkeep no longer competes with its owner's own survival/travel/heal
+    /// Tachyon budget — the store now lives entirely on the Credit economy
+    /// it already sells into.
     /// </summary>
-    public void Charge(Traveler owner, int tachyons)
+    public void Charge(Traveler owner, int credits)
     {
         RequireOwner(owner);
-        if (tachyons <= 0)
+        if (credits <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(tachyons), tachyons, "Must charge a positive amount.");
+            throw new ArgumentOutOfRangeException(nameof(credits), credits, "Must charge a positive amount.");
         }
 
-        owner.Tachyons.Spend(tachyons);
-        TachyonReserve += tachyons;
+        owner.SpendCredits(credits);
+        CreditReserve += credits;
     }
 
     /// <summary>
     /// One world tick's maintenance draw — docs/GDD.md §6.2. A government
     /// store (<see cref="IsGovernmentRun"/>) is exempt and this is always a
-    /// no-op for one. Otherwise <paramref name="cost"/> Tachyons come out
-    /// of <see cref="TachyonReserve"/>; if the reserve can't cover it, it's
+    /// no-op for one. Otherwise <paramref name="cost"/> Credits come out
+    /// of <see cref="CreditReserve"/>; if the reserve can't cover it, it's
     /// drained to 0 and a missed tick is recorded instead of a partial
     /// payment. Paying a tick in full resets <see cref="MissedMaintenanceTicks"/>
     /// back to 0. Returns true once <see cref="ForeclosureThreshold"/>
@@ -308,14 +316,14 @@ public sealed class Store
             return false;
         }
 
-        if (TachyonReserve >= cost)
+        if (CreditReserve >= cost)
         {
-            TachyonReserve -= cost;
+            CreditReserve -= cost;
             MissedMaintenanceTicks = 0;
             return false;
         }
 
-        TachyonReserve = 0;
+        CreditReserve = 0;
         MissedMaintenanceTicks++;
         return MissedMaintenanceTicks >= ForeclosureThreshold;
     }

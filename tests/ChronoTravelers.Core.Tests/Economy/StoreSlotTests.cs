@@ -88,14 +88,14 @@ public class StoreSlotTests
     }
 
     [Fact]
-    public void RestoreOwnership_RestoresTheTachyonReserveToo()
+    public void RestoreOwnership_RestoresTheCreditReserveToo()
     {
         var slot = new StoreSlot("Vacant Storefront", Coordinate.Origin, homeLevel: 2600, purchaseCost: 400);
         var owner = new Traveler("Rook", CharacterClass.Soldier);
 
-        var store = slot.RestoreOwnership(owner, capital: 0, tachyonReserve: 42);
+        var store = slot.RestoreOwnership(owner, capital: 0, creditReserve: 42);
 
-        Assert.Equal(42, store.TachyonReserve);
+        Assert.Equal(42, store.CreditReserve);
     }
 
     [Fact]

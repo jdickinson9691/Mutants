@@ -1644,7 +1644,7 @@ static void HandleBuyStore(Traveler traveler, TimeWorld world)
 
     var hadAbandonedInventory = slot.HasAbandonedInventory;
     slot.Purchase(traveler);
-    AnsiConsole.MarkupLine($"[green]You now own a store here: {Markup.Escape(slot.Store!.Name)}![/] Use [yellow]stock[/]/[yellow]withdraw[/]/[yellow]reprice[/] to manage listings, [yellow]deposit[/]/[yellow]charge[/]/[yellow]collect[/] to move Credits/Tachyons in and out. It'll still be yours next session — but only if you keep [yellow]charge[/]-ing its Tachyon maintenance.");
+    AnsiConsole.MarkupLine($"[green]You now own a store here: {Markup.Escape(slot.Store!.Name)}![/] Use [yellow]stock[/]/[yellow]withdraw[/]/[yellow]reprice[/] to manage listings, [yellow]deposit[/]/[yellow]charge[/]/[yellow]collect[/] to move Credits in and out. It'll still be yours next session — but only if you keep [yellow]charge[/]-ing its Credit maintenance.");
     if (hadAbandonedInventory)
     {
         AnsiConsole.MarkupLine($"[cyan]The previous owner's old stock came with it — {slot.Store.Listings.Count} item(s) already for sale.[/]");
@@ -1781,20 +1781,20 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
 
         case "charge":
         {
-            if (!int.TryParse(argument.Trim(), out var tachyons) || tachyons < 1)
+            if (!int.TryParse(argument.Trim(), out var credits) || credits < 1)
             {
-                AnsiConsole.MarkupLine("[red]Usage: charge <tachyons>[/] - pays down your store's maintenance reserve so it isn't repossessed.");
+                AnsiConsole.MarkupLine("[red]Usage: charge <credits>[/] - pays down your store's maintenance reserve so it isn't repossessed.");
                 return;
             }
 
-            if (!traveler.Tachyons.CanAfford(tachyons))
+            if (traveler.Credits < credits)
             {
-                AnsiConsole.MarkupLine($"[red]You don't have {tachyons} Tachyons ({Markup.Escape(TachyonText(traveler))}).[/]");
+                AnsiConsole.MarkupLine($"[red]You don't have {credits} Credits (you have {traveler.Credits}).[/]");
                 return;
             }
 
-            store.Charge(traveler, tachyons);
-            AnsiConsole.MarkupLine($"[green]Charged {tachyons} Tachyons to {Markup.Escape(store.Name)}'s maintenance reserve (now {store.TachyonReserve}).[/]");
+            store.Charge(traveler, credits);
+            AnsiConsole.MarkupLine($"[green]Charged {credits} Credits to {Markup.Escape(store.Name)}'s maintenance reserve (now {store.CreditReserve}).[/]");
             break;
         }
 
@@ -1942,7 +1942,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
 
     if (session.TravelerWon)
     {
-        AnsiConsole.MarkupLine($"[green]You defeated {Markup.Escape(foe)}! +{session.XpAwarded} XP.[/]");
+        AnsiConsole.MarkupLine($"[green]You defeated {Markup.Escape(foe)}! +{session.XpAwarded} XP, +{session.CreditsAwarded} Credits.[/]");
         broadcast.Publish(GameEvent.Slain(monster.Name, traveler.Name, year, victimIsCreature: true));
 
         // Loot never auto-enters the pack — it falls where the fight was
@@ -2092,6 +2092,8 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
     broadcast.Publish(GameEvent.Slain(target.Name, traveler.Name, traveler.CurrentYear, victimIsCreature: true));
     var xpAwarded = MonsterScaling.KillXp(target.XpReward, target.Tier, traveler.Level);
     traveler.GainXp(xpAwarded);
+    var creditsAwarded = MonsterScaling.KillCredits(target.CreditReward, target.Tier, traveler.Level);
+    traveler.AddCredits(creditsAwarded);
 
     var drops = LootDropRoller.RollForKill(target, random).Concat(target.Inventory).ToList();
 
@@ -2103,7 +2105,7 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
             population.AddGroundLoot(targetRoom, drop);
         }
 
-        AnsiConsole.MarkupLine($"[bold yellow]You drop the Warden of {traveler.CurrentYear} from afar — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{xpAwarded} XP.");
+        AnsiConsole.MarkupLine($"[bold yellow]You drop the Warden of {traveler.CurrentYear} from afar — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{xpAwarded} XP, +{creditsAwarded} Credits.");
     }
     else
     {
@@ -2114,8 +2116,8 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
         }
 
         AnsiConsole.MarkupLine(drops.Count > 0
-            ? $"[green]The {Markup.Escape(target.Name)} drops. +{xpAwarded} XP. Its loot is on the floor to the {direction.Value.Name()} — walk in and [yellow]take[/] it.[/]"
-            : $"[green]The {Markup.Escape(target.Name)} drops. +{xpAwarded} XP.[/]");
+            ? $"[green]The {Markup.Escape(target.Name)} drops. +{xpAwarded} XP, +{creditsAwarded} Credits. Its loot is on the floor to the {direction.Value.Name()} — walk in and [yellow]take[/] it.[/]"
+            : $"[green]The {Markup.Escape(target.Name)} drops. +{xpAwarded} XP, +{creditsAwarded} Credits.[/]");
     }
 
     if (traveler.Level > levelBefore)
@@ -2551,7 +2553,7 @@ static void RenderStores(IReadOnlyList<StoreSlot> storeSlots)
         var items = slot.Store?.Listings.Count.ToString() ?? "-";
         var status = slot.IsAvailableForPurchase
             ? $"[yellow]for sale ({slot.PurchaseCost} Credits{(slot.HasAbandonedInventory ? ", pre-stocked" : "")})[/]"
-            : slot.Store!.IsGovernmentRun ? "occupied" : $"occupied ({slot.Store.TachyonReserve} Tachyon reserve)";
+            : slot.Store!.IsGovernmentRun ? "occupied" : $"occupied ({slot.Store.CreditReserve} Credit reserve)";
 
         table.AddRow(Markup.Escape(slot.Name), Markup.Escape(slot.Location.ToString()), owner, items, status);
     }
@@ -2876,7 +2878,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]withdraw <item>[/]    - pull a listing back into your inventory");
     AnsiConsole.MarkupLine("  [green]reprice <item> <price>[/] - change a listing's asking price");
     AnsiConsole.MarkupLine("  [green]deposit <credits>[/]  - fund your store's Capital from your own Credits");
-    AnsiConsole.MarkupLine("  [green]charge <tachyons>[/]  - pay your store's Tachyon maintenance so it isn't repossessed");
+    AnsiConsole.MarkupLine("  [green]charge <credits>[/]  - pay your store's Credit maintenance so it isn't repossessed");
     AnsiConsole.MarkupLine("  [green]collect[/]             - withdraw your store's earnings into your Credits");
     AnsiConsole.MarkupLine("  [green]save[/]                - save your character now");
     AnsiConsole.MarkupLine("  [green]leaderboard[/] (or board) - show the leaderboards, your best highlighted");
@@ -2895,17 +2897,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("[grey]  leaving your room, with its direction; [yellow]monsters[/] shows each one's position.[/]");
     AnsiConsole.MarkupLine("[grey]  A few years hold an [red](apex)[/] — much tougher, barely provokable, better loot.[/]");
     AnsiConsole.MarkupLine("[grey]  It leaves you alone; [yellow]fight <name>[/] it only if you want what it's carrying.[/]");
-    AnsiConsole.MarkupLine("[grey]  Owning a store costs Tachyon upkeep every world tick (the government store is[/]");
+    AnsiConsole.MarkupLine("[grey]  Owning a store costs Credit upkeep every world tick (the government store is[/]");
     AnsiConsole.MarkupLine("[grey]  exempt) — keep it funded with [yellow]charge[/], or go unpaid too long and it's[/]");
     AnsiConsole.MarkupLine("[grey]  repossessed: the slot, and whatever's still on its shelves, go back up for sale.[/]");
-    AnsiConsole.WriteLine();
-    AnsiConsole.MarkupLine("[yellow]Multiplayer:[/]");
-    AnsiConsole.MarkupLine("[grey]  This is the single-player game — the timeline only advances while you type.[/]");
-    AnsiConsole.MarkupLine("[grey]  There's also a shared, live version other Travelers can join at once. Someone[/]");
-    AnsiConsole.MarkupLine("[grey]  starts a server ([yellow]dotnet run --project src/ChronoTravelers.Server[/]), then you[/]");
-    AnsiConsole.MarkupLine("[grey]  connect with [yellow]ChronoTravelers.exe --connect http://<server-address>:5000[/][/]");
-    AnsiConsole.MarkupLine("[grey]  (or [yellow]telnet <server-address> 4000[/] from any telnet client) instead of launching[/]");
-    AnsiConsole.MarkupLine("[grey]  normally. See docs/SERVER.md for the full setup. Command parity isn't complete[/]");
-    AnsiConsole.MarkupLine("[grey]  there yet (fights auto-resolve, no [yellow]cast[/]/[yellow]shoot[/] over the wire) — this[/]");
-    AnsiConsole.MarkupLine("[grey]  single-player game stays the fuller experience for now.[/]");
 }

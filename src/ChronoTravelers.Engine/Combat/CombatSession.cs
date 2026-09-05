@@ -32,6 +32,7 @@ public sealed class CombatSession
     public bool IsOver => Traveler.Health.IsDead || Monster.Health.IsDead;
     public bool TravelerWon => Monster.Health.IsDead && !Traveler.Health.IsDead;
     public int XpAwarded { get; private set; }
+    public int CreditsAwarded { get; private set; }
     public IReadOnlyList<Item> ItemsDropped { get; private set; } = [];
 
     private readonly IRandomSource _random;
@@ -193,8 +194,9 @@ public sealed class CombatSession
             _rewardsGranted = true;
             // The player's kills drop to the ground (the console grounds
             // ItemsDropped at the player's tile); nothing auto-enters the pack.
-            ItemsDropped = CombatResolver.AwardVictory(Traveler, Monster, _random, _log, out var xp, addToInventory: false);
+            ItemsDropped = CombatResolver.AwardVictory(Traveler, Monster, _random, _log, out var xp, out var credits, addToInventory: false);
             XpAwarded = xp;
+            CreditsAwarded = credits;
         }
     }
 

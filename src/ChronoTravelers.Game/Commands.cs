@@ -282,7 +282,7 @@ internal static class Commands
 
         if (result.TravelerWon)
         {
-            session.Send($"You defeated the {target.Name}! +{result.XpAwarded} XP.");
+            session.Send($"You defeated the {target.Name}! +{result.XpAwarded} XP, +{result.CreditsAwarded} Credits.");
             game.Broadcast.Publish(GameEvent.Slain(target.Name, p.Name, year, victimIsCreature: true));
 
             // Loot never stays in the pack — CombatResolver.Fight auto-added
@@ -431,7 +431,7 @@ internal static class Commands
             var items = slot.Store?.Listings.Count.ToString() ?? "-";
             var status = slot.IsAvailableForPurchase
                 ? $"for sale ({slot.PurchaseCost} Credits{(slot.HasAbandonedInventory ? ", pre-stocked" : "")})"
-                : slot.Store!.IsGovernmentRun ? "occupied" : $"occupied ({slot.Store.TachyonReserve} Tachyon reserve)";
+                : slot.Store!.IsGovernmentRun ? "occupied" : $"occupied ({slot.Store.CreditReserve} Credit reserve)";
             session.Send($"  {slot.Name} @ {slot.Location} — owner: {owner}, items: {items}, {status}");
         }
     }
@@ -580,7 +580,7 @@ internal static class Commands
 
         var hadAbandonedInventory = slot.HasAbandonedInventory;
         slot.Purchase(p);
-        session.Send($"You now own a store here: {slot.Store!.Name}! Use stock/withdraw/reprice to manage listings, deposit/charge/collect to move Credits/Tachyons in and out. It'll still be yours next session — but only if you keep charge-ing its Tachyon maintenance.");
+        session.Send($"You now own a store here: {slot.Store!.Name}! Use stock/withdraw/reprice to manage listings, deposit/charge/collect to move Credits in and out. It'll still be yours next session — but only if you keep charge-ing its Credit maintenance.");
         if (hadAbandonedInventory)
         {
             session.Send($"The previous owner's old stock came with it — {slot.Store.Listings.Count} item(s) already for sale.");
@@ -702,20 +702,20 @@ internal static class Commands
 
             case "charge":
             {
-                if (!int.TryParse(arg.Trim(), out var tachyons) || tachyons < 1)
+                if (!int.TryParse(arg.Trim(), out var credits) || credits < 1)
                 {
-                    session.Send("Usage: charge <tachyons> - pays down your store's maintenance reserve so it isn't repossessed.");
+                    session.Send("Usage: charge <credits> - pays down your store's maintenance reserve so it isn't repossessed.");
                     return;
                 }
 
-                if (!p.Tachyons.CanAfford(tachyons))
+                if (p.Credits < credits)
                 {
-                    session.Send($"You don't have {tachyons} Tachyons.");
+                    session.Send($"You don't have {credits} Credits.");
                     return;
                 }
 
-                store.Charge(p, tachyons);
-                session.Send($"Charged {tachyons} Tachyons to {store.Name}'s maintenance reserve (now {store.TachyonReserve}).");
+                store.Charge(p, credits);
+                session.Send($"Charged {credits} Credits to {store.Name}'s maintenance reserve (now {store.CreditReserve}).");
                 break;
             }
 
@@ -790,7 +790,7 @@ internal static class Commands
         session.Send("Commands: look [dir] · n/s/e/w · monsters · status · inventory · heal · take [all] · fight [name]");
         session.Send("          wield <item> · convert|con <item> · travel <year|+N|-N> · news · who · say <msg> · wait · quit");
         session.Send("Stores:   stores · shop · buy <item> · sell <item>|all · buy-store · stock <item> <price> · withdraw <item>");
-        session.Send("          reprice <item> <price> · deposit <credits> · charge <tachyons> · collect");
+        session.Send("          reprice <item> <price> · deposit <credits> · charge <credits> · collect");
         session.Send("Fights auto-resolve; loot drops on the floor — 'take' it. Type 'quit' to disconnect.");
     }
 

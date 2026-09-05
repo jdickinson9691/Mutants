@@ -12,6 +12,7 @@ public class MonsterScalingTests
         Assert.True(MonsterScaling.BaseDefense(5) > MonsterScaling.BaseDefense(1));
         Assert.True(MonsterScaling.BaseSpeed(5) > MonsterScaling.BaseSpeed(1));
         Assert.True(MonsterScaling.XpReward(5) > MonsterScaling.XpReward(1));
+        Assert.True(MonsterScaling.CreditReward(5) > MonsterScaling.CreditReward(1));
         Assert.True(MonsterScaling.BaseTachyons(5) > MonsterScaling.BaseTachyons(1));
     }
 
@@ -61,6 +62,7 @@ public class MonsterScalingTests
             Assert.Equal(MonsterScaling.BaseHp(tier), (int)System.Math.Round(MonsterScaling.BaseHp((double)tier)));
             Assert.Equal(MonsterScaling.BaseAttackPower(tier), (int)System.Math.Round(MonsterScaling.BaseAttackPower((double)tier)));
             Assert.Equal(MonsterScaling.XpReward(tier), (int)System.Math.Round(MonsterScaling.XpReward((double)tier)));
+            Assert.Equal(MonsterScaling.CreditReward(tier), (int)System.Math.Round(MonsterScaling.CreditReward((double)tier)));
         }
     }
 
@@ -96,6 +98,7 @@ public class MonsterScalingTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => MonsterScaling.BaseHp(0.9));
         Assert.Throws<ArgumentOutOfRangeException>(() => MonsterScaling.XpReward(0.0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => MonsterScaling.CreditReward(0.0));
     }
 
     [Theory]
@@ -116,5 +119,26 @@ public class MonsterScalingTests
     public void KillXp_NeverReturnsZeroForARealReward()
     {
         Assert.Equal(1, MonsterScaling.KillXp(baseXp: 4, monsterTier: 1, killerLevel: 99));
+    }
+
+    [Theory]
+    [InlineData(1, 1, 100)]   // level 1 vs tier 1 — well within the band, full Credits
+    [InlineData(1, 10, 100)]  // exactly at the tier-1 band cap — still full
+    [InlineData(1, 15, 60)]   // 5 levels past the cap — 8%/level off
+    [InlineData(1, 20, 20)]   // 10 past
+    [InlineData(1, 25, 10)]   // hit the 10% floor
+    [InlineData(1, 40, 10)]   // never below the floor
+    [InlineData(5, 40, 100)]  // level 40 vs tier 5 (cap 50) — still in-band, full
+    [InlineData(5, 60, 20)]   // 10 past the tier-5 cap
+    public void KillCredits_FullWithinTheBand_ThenFallsOffPastTheCapToAFloor(int tier, int killerLevel, int expected)
+    {
+        // Same outlevel falloff curve as KillXp (see ApplyOutlevelFalloff) — shared, so identical inputs give identical percentages.
+        Assert.Equal(expected, MonsterScaling.KillCredits(baseCredits: 100, monsterTier: tier, killerLevel: killerLevel));
+    }
+
+    [Fact]
+    public void KillCredits_NeverReturnsZeroForARealReward()
+    {
+        Assert.Equal(1, MonsterScaling.KillCredits(baseCredits: 4, monsterTier: 1, killerLevel: 99));
     }
 }

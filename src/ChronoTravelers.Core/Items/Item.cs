@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Classes;
+using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Tachyons;
 
 namespace ChronoTravelers.Core.Items;
@@ -138,10 +139,11 @@ public sealed record Item(
     /// <summary>
     /// Credits gained by selling this item. docs/GDD.md §6 ties real sell
     /// price to the store (level, negotiation) — that store-pricing system
-    /// is future work. This flat 1:1-with-Value placeholder is scaled by
+    /// is future work. Scaled by <see cref="EconomyPricing.SellRateMultiplier"/>
+    /// (originally a flat 1:1-with-Value placeholder) and by
     /// <see cref="ValueFraction"/> for spent ranged weapons.
     /// </summary>
-    public int SellValue() => EffectiveValue;
+    public int SellValue() => Math.Max(1, (int)Math.Round(EffectiveValue * EconomyPricing.SellRateMultiplier));
 
     /// <summary>
     /// Weapon / Armor / Ranged are wieldable. docs/GDD.md §4.3: non-class

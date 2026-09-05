@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Classes;
+using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Tachyons;
 
@@ -109,10 +110,11 @@ public class ItemTests
     }
 
     [Fact]
-    public void SellValue_EqualsItemValue()
+    public void SellValue_IsItemValueScaledByTheSellRateMultiplier()
     {
         var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // value 20
-        Assert.Equal(item.Value, item.SellValue());
+        var expected = Math.Max(1, (int)Math.Round(item.Value * EconomyPricing.SellRateMultiplier));
+        Assert.Equal(expected, item.SellValue());
     }
 
     [Fact]

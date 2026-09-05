@@ -77,25 +77,27 @@ public static class CombatResolver
 
         if (!travelerWon)
         {
-            return new FightResult(TravelerWon: false, rounds, XpAwarded: 0, ItemsDropped: [], log);
+            return new FightResult(TravelerWon: false, Rounds: rounds, XpAwarded: 0, CreditsAwarded: 0, ItemsDropped: [], Log: log);
         }
 
-        var loot = AwardVictory(traveler, monster, random, log, out var xpAwarded);
-        return new FightResult(TravelerWon: true, rounds, XpAwarded: xpAwarded, ItemsDropped: loot, log);
+        var loot = AwardVictory(traveler, monster, random, log, out var xpAwarded, out var creditsAwarded);
+        return new FightResult(TravelerWon: true, Rounds: rounds, XpAwarded: xpAwarded, CreditsAwarded: creditsAwarded, ItemsDropped: loot, Log: log);
     }
 
     /// <summary>
-    /// Grants XP and rolls loot for defeating <paramref name="monster"/> —
-    /// shared with CombatSession's interactive fights. XP is the
-    /// outlevel-scaled amount (<see cref="MonsterScaling.KillXp"/>), surfaced
-    /// via <paramref name="xpAwarded"/> so callers report what was actually
-    /// granted. When <paramref name="addToInventory"/> is true (the abstract
-    /// NPC path) the loot goes straight into the winner's pack; when false
-    /// (the player's interactive fight) it's just returned, and the caller
-    /// drops it on the ground for the player to <c>take</c>.
+    /// Grants XP, Credits, and rolls loot for defeating
+    /// <paramref name="monster"/> — shared with CombatSession's interactive
+    /// fights. XP and Credits are both the outlevel-scaled amount
+    /// (<see cref="MonsterScaling.KillXp"/>/<see cref="MonsterScaling.KillCredits"/>),
+    /// surfaced via <paramref name="xpAwarded"/>/<paramref name="creditsAwarded"/>
+    /// so callers report what was actually granted. When
+    /// <paramref name="addToInventory"/> is true (the abstract NPC path) the
+    /// loot goes straight into the winner's pack; when false (the player's
+    /// interactive fight) it's just returned, and the caller drops it on the
+    /// ground for the player to <c>take</c>.
     /// </summary>
     internal static IReadOnlyList<Core.Items.Item> AwardVictory(
-        Traveler traveler, Monster monster, IRandomSource random, List<string> log, out int xpAwarded, bool addToInventory = true)
+        Traveler traveler, Monster monster, IRandomSource random, List<string> log, out int xpAwarded, out int creditsAwarded, bool addToInventory = true)
     {
         xpAwarded = MonsterScaling.KillXp(monster.XpReward, monster.Tier, traveler.Level);
         var levelsGained = traveler.GainXp(xpAwarded);
@@ -103,6 +105,9 @@ public static class CombatResolver
         {
             log.Add($"{traveler.Name} gained {levelsGained} level(s)!");
         }
+
+        creditsAwarded = MonsterScaling.KillCredits(monster.CreditReward, monster.Tier, traveler.Level);
+        traveler.AddCredits(creditsAwarded);
 
         var loot = LootDropRoller.RollForKill(monster, random);
         if (addToInventory)

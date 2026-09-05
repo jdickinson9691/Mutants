@@ -120,7 +120,7 @@ public sealed class WorldSimulation
     }
 
     /// <summary>
-    /// One world tick's Tachyon maintenance draw for every player/NPC-owned
+    /// One world tick's Credit maintenance draw for every player/NPC-owned
     /// store across every year visited this session — docs/GDD.md §6.2.
     /// Independent of anyone's location (like passive Tachyon drain, unlike
     /// the spatial monster sim): an owner off exploring still owes upkeep.

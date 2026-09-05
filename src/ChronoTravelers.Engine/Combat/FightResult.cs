@@ -7,5 +7,6 @@ public sealed record FightResult(
     bool TravelerWon,
     int Rounds,
     int XpAwarded,
+    int CreditsAwarded,
     IReadOnlyList<Item> ItemsDropped,
     IReadOnlyList<string> Log);

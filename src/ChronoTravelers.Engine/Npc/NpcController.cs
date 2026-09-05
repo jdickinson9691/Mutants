@@ -47,10 +47,10 @@ public static class NpcController
     /// <summary>How often, per tick, an owner tending a shopfront that's OVER <see cref="StoreStockSoftCap"/> marks down its oldest unsold listing (<see cref="Store.ClearOldestListing"/>) — a buyer-independent drain so an over-producing owner settles around the soft cap instead of pinning at the hard cap.</summary>
     private const double StoreClearanceChance = 0.35;
 
-    /// <summary>Tachyons an owner pays into its store's maintenance reserve in one tending action.</summary>
-    private const int MaintenanceTopUpTachyons = 30;
+    /// <summary>Credits an owner pays into its store's maintenance reserve in one tending action. Originally Tachyons; switched to Credits alongside <see cref="Store.CreditReserve"/> (docs/GDD.md §6.2) so a store's upkeep no longer competes with its owner's own survival/travel/heal Tachyon budget.</summary>
+    private const int MaintenanceTopUpCredits = 30;
 
-    /// <summary>An owner tops up maintenance once the store's reserve dips below this many Tachyons.</summary>
+    /// <summary>An owner tops up maintenance once the store's reserve dips below this many Credits.</summary>
     private const int MaintenanceReserveTarget = 60;
 
     /// <summary>Credits an owner deposits into its own store's Capital in one tending action — the funding half of the loop that lets the store later buy from travelers via <see cref="Store.BuyFromTraveler"/>. See <see cref="CapitalReserveTarget"/>.</summary>
@@ -278,7 +278,7 @@ public static class NpcController
             }
         }
 
-        return new FightResult(session.TravelerWon, session.Rounds, session.XpAwarded, session.ItemsDropped, session.Log);
+        return new FightResult(session.TravelerWon, session.Rounds, session.XpAwarded, session.CreditsAwarded, session.ItemsDropped, session.Log);
     }
 
     /// <summary>
@@ -566,7 +566,7 @@ public static class NpcController
 
     /// <summary>
     /// An NPC that already owns a store here occasionally pays down its
-    /// Tachyon maintenance (<see cref="Store.ApplyMaintenanceTick"/> is
+    /// Credit maintenance (<see cref="Store.ApplyMaintenanceTick"/> is
     /// what actually draws it down each world tick — this just tops the
     /// reserve up so foreclosure doesn't creep closer), lists a piece of
     /// its own class-relevant surplus gear for sale (only while the shelf
@@ -587,7 +587,7 @@ public static class NpcController
     /// hand instead.
     ///
     /// One tending action does at most one of, in priority order: (1) pay
-    /// down Tachyon maintenance, since an unpaid store risks repossession;
+    /// down Credit maintenance, since an unpaid store risks repossession;
     /// (2) fund Capital toward <see cref="CapitalReserveTarget"/>, since an
     /// under-capitalized store can't do its job — it can sell listings but
     /// can't buy from a traveler — at all; (3) stock a class-relevant
@@ -607,9 +607,9 @@ public static class NpcController
 
         var store = ownedSlot.Store!;
 
-        if (store.TachyonReserve < MaintenanceReserveTarget && npc.Tachyons.CanAfford(MaintenanceTopUpTachyons))
+        if (store.CreditReserve < MaintenanceReserveTarget && npc.Credits >= MaintenanceTopUpCredits)
         {
-            store.Charge(npc, MaintenanceTopUpTachyons);
+            store.Charge(npc, MaintenanceTopUpCredits);
             return new NpcTickResult(npc.Name, NpcGoal.OwnStore, Detail: $"paid maintenance at {store.Name}");
         }
 

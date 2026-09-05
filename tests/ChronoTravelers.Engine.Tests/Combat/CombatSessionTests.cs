@@ -15,8 +15,8 @@ public class CombatSessionTests
 
     private static Traveler Soldier(string name = "Rook") => new(name, CharacterClass.Soldier);
 
-    private static Core.Monsters.Monster TankMonster(string name = "Dummy", int hp = 200, int attack = 5, int defense = 2, int speed = 5, IReadOnlyList<string>? tags = null) =>
-        new(name, tier: 1, maxHp: hp, attackPower: attack, defense: defense, speed: speed, xpReward: 40, tags: tags);
+    private static Core.Monsters.Monster TankMonster(string name = "Dummy", int hp = 200, int attack = 5, int defense = 2, int speed = 5, IReadOnlyList<string>? tags = null, int creditReward = 10) =>
+        new(name, tier: 1, maxHp: hp, attackPower: attack, defense: defense, speed: speed, xpReward: 40, tags: tags, creditReward: creditReward);
 
     private static AbilityData MakeAbility(
         string @class, int level, string name, string effect, double magnitude,
@@ -419,6 +419,8 @@ public class CombatSessionTests
         Assert.True(session.TravelerWon);
         Assert.Equal(monster.XpReward, session.XpAwarded);
         Assert.True(traveler.Xp >= monster.XpReward);
+        Assert.Equal(monster.CreditReward, session.CreditsAwarded);
+        Assert.Equal(monster.CreditReward, traveler.Credits);
     }
 
     [Fact]
@@ -449,6 +451,7 @@ public class CombatSessionTests
         Assert.True(session.IsOver);
         Assert.False(session.TravelerWon);
         Assert.Equal(0, session.XpAwarded);
+        Assert.Equal(0, session.CreditsAwarded);
         Assert.Empty(session.ItemsDropped);
     }
 }

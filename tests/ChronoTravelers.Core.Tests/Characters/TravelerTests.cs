@@ -508,14 +508,14 @@ public class TravelerTests
     public void Sell_RemovesItemAndAddsCredits()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);
-        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // value 34
+        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // value 34, SellValue 34*1.3 = 44.2 -> 44
         traveler.AddToInventory(item);
 
         var gained = traveler.Sell(item);
 
-        Assert.Equal(34, gained);
+        Assert.Equal(44, gained);
         Assert.DoesNotContain(item, traveler.Inventory);
-        Assert.Equal(34, traveler.Credits);
+        Assert.Equal(44, traveler.Credits);
     }
 
     [Fact]

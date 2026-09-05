@@ -232,6 +232,16 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
   falls off 8% per level over, down to a 10% floor
   (`MonsterScaling.KillXp`). So grinding a year long after you've outgrown
   it trickles — the XP is out where the fight is still real.
+- **Credits from monster kills too** (original addition — previously a kill
+  paid only XP, with Credits coming solely from selling loot). Scaled 1:4
+  against XP (`MonsterScaling.CreditRewardPerTier` = 10 vs. `XpReward`'s 40
+  per tier), and deliberately modest next to loot-selling income — a small,
+  always-available trickle on top of it, not a replacement. Shares XP's
+  exact outlevel falloff curve (`MonsterScaling.KillCredits`), so farming a
+  trivial year never becomes a better Credit source than a fair fight.
+  Sized so a single kill roughly covers ten ticks of a same-tier store's
+  own Credit maintenance (§6.2) — grinding gives a direct, if modest, way
+  to fund one.
 - Soft level cap tied to progress: `character_level ≈ 10 * tier`, where
   `tier` is the scaling tier for the **furthest year the character has
   reached** (`TimeScale.SoftLevelCapForYear`, clamped to 10–60). Keeps
@@ -462,6 +472,14 @@ area/group to a capstone — is the standard every class follows.)
 - Prices scale with the **year** (a year-4000 store deals in year-4000-tier
   goods and pays/charges accordingly) — this is how "an economy based on
   the time travel level" gets implemented against the timeline.
+- Selling to a store nets +30% over an item's own value
+  (`EconomyPricing.SellRateMultiplier`, original tuning — the GDD leaves
+  the exact sell price "store-and-negotiation-dependent," per §5) — selling
+  loot is the primary Credit faucet, so it's tuned above a flat 1:1. The
+  same multiplier also scales what a store pays buying surplus from a
+  passing traveler and what it then asks reselling it
+  (`Store.BuyFromTraveler`/`DefaultAskingPrice`), keeping their relative
+  spread — and the §6.3 Credit-sink margin it depends on — unchanged.
 
 ### 6.2 Player-owned stores `[SOURCE: players can buy the NPC stores]`
 - Every year offers, beyond its always-open depot store, a limited number
@@ -474,12 +492,16 @@ area/group to a capstone — is the standard every class follows.)
   inventory at an asking price, **withdraw** it back, or **reprice** a
   listing.
 - **Maintenance & foreclosure**: a player/NPC-owned store (the depot store
-  is exempt) costs Tachyons per world tick to stay open, drawn from a
+  is exempt) costs Credits per world tick to stay open, drawn from a
   dedicated maintenance reserve the owner tops up with **charge**. Go
   unfunded for 10 consecutive ticks (`Store.ForeclosureThreshold`) and the
   store is repossessed — the slot goes back up for sale, and its unsold
   listings stay attached for whoever buys it next rather than vanishing, so
-  a lapsed owner doesn't erase a stranger's future find.
+  a lapsed owner doesn't erase a stranger's future find. Originally a
+  Tachyon cost; switched to Credits (`EconomyPricing.MaintenanceCostPerTick`)
+  so a store's upkeep draws on the same currency its Capital/sales already
+  deal in, rather than competing with the owner's own separate
+  survival/travel/heal Tachyon budget.
 - **deposit** funds a store's Capital (the pool it buys from other
   Travelers with) directly from the owner's own Credits — the funding
   counterpart to **stock**'s item-listing side.
@@ -508,8 +530,8 @@ cap per visit, sale prices are clamped to a level-appropriate band (no
 selling level-1 junk into a level-10 store for level-10 money), and Credit
 sinks exist (store purchase cost, restocking depot inventory, repair costs)
 so currency doesn't purely inflate. Store maintenance (§6.2) is another such
-sink, this time in Tachyons rather than Credits — an owned store nobody ever
-funds eventually stops being an asset at all.
+sink, drawn from the same Credit economy — an owned store nobody ever funds
+eventually stops being an asset at all.
 
 ## 7. NPC simulation ("simulated players")
 
@@ -536,7 +558,7 @@ Since v1 has no network multiplayer, the world needs to feel alive:
   conversion fodder or a store if low), assess HP (retreat/heal if low),
   otherwise pursue its current goal — wear a better weapon/armor/ranged item
   already sitting in its pack the instant it's looted (no store needed),
-  tend a store it already owns here (pay down Tachyon maintenance, stock
+  tend a store it already owns here (pay down Credit maintenance, stock
   surplus gear, collect Capital — §6.2), occasionally buy an open store slot
   if it doesn't own one (never the year's last one), trade at a year's store
   (selling genuine surplus gear it can't use before falling back to excess

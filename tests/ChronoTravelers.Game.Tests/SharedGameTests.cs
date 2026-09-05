@@ -349,11 +349,11 @@ public class SharedGameTests
         Assert.True(rec.Any("Deposited 20"));
         Assert.Equal(creditsBefore - 20, session.Player.Credits);
 
-        var tachyonsBefore = session.Player.Tachyons.Current;
+        var creditsBeforeCharge = session.Player.Credits;
         rec.Clear();
         game.Execute(session, "charge 5");
-        Assert.True(rec.Any("Charged 5 Tachyons"));
-        Assert.Equal(tachyonsBefore - 5, session.Player.Tachyons.Current);
+        Assert.True(rec.Any("Charged 5 Credits"));
+        Assert.Equal(creditsBeforeCharge - 5, session.Player.Credits);
     }
 
     [Fact]

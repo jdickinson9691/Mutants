@@ -252,23 +252,23 @@ public class StoreTests
     }
 
     [Fact]
-    public void Charge_MovesOwnerTachyonsIntoTheMaintenanceReserve()
+    public void Charge_MovesOwnerCreditsIntoTheMaintenanceReserve()
     {
         var owner = NewTraveler("Owner");
-        var tachyonsBefore = owner.Tachyons.Current;
+        owner.AddCredits(50);
+        var creditsBefore = owner.Credits;
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
 
         store.Charge(owner, 5);
 
-        Assert.Equal(tachyonsBefore - 5, owner.Tachyons.Current);
-        Assert.Equal(5, store.TachyonReserve);
+        Assert.Equal(creditsBefore - 5, owner.Credits);
+        Assert.Equal(5, store.CreditReserve);
     }
 
     [Fact]
     public void Charge_ThrowsIfOwnerCantAffordIt()
     {
         var owner = NewTraveler("Owner");
-        owner.Tachyons.Spend(owner.Tachyons.Current);
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
 
         Assert.Throws<InvalidOperationException>(() => store.Charge(owner, 1));
@@ -289,16 +289,16 @@ public class StoreTests
     public void ApplyMaintenanceTick_SufficientReserve_DrawsTheCostAndResetsTheMissStreak()
     {
         var owner = NewTraveler("Owner");
-        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner, startingTachyonReserve: 10);
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner, startingCreditReserve: 10);
         store.ApplyMaintenanceTick(3); // one miss first, to prove a paid tick resets it
-        var underfunded = new Store("Underfunded", homeLevel: 1, startingCapital: 0, owner, startingTachyonReserve: 0);
+        var underfunded = new Store("Underfunded", homeLevel: 1, startingCapital: 0, owner, startingCreditReserve: 0);
         underfunded.ApplyMaintenanceTick(1);
         Assert.Equal(1, underfunded.MissedMaintenanceTicks);
 
         var foreclosed = store.ApplyMaintenanceTick(3);
 
         Assert.False(foreclosed);
-        Assert.Equal(4, store.TachyonReserve);
+        Assert.Equal(4, store.CreditReserve);
         Assert.Equal(0, store.MissedMaintenanceTicks);
     }
 
@@ -306,12 +306,12 @@ public class StoreTests
     public void ApplyMaintenanceTick_InsufficientReserve_DrainsItAndRecordsAMiss()
     {
         var owner = NewTraveler("Owner");
-        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner, startingTachyonReserve: 2);
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner, startingCreditReserve: 2);
 
         var foreclosed = store.ApplyMaintenanceTick(5);
 
         Assert.False(foreclosed);
-        Assert.Equal(0, store.TachyonReserve);
+        Assert.Equal(0, store.CreditReserve);
         Assert.Equal(1, store.MissedMaintenanceTicks);
     }
 
@@ -319,7 +319,7 @@ public class StoreTests
     public void ApplyMaintenanceTick_ReachingTheForeclosureThreshold_ReturnsTrue()
     {
         var owner = NewTraveler("Owner");
-        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner, startingTachyonReserve: 0);
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner, startingCreditReserve: 0);
 
         var foreclosed = false;
         for (var i = 0; i < Store.ForeclosureThreshold; i++)
@@ -351,35 +351,6 @@ public class StoreTests
 
         Assert.False(added);
         Assert.Equal(Store.MaxListings, store.Listings.Count);
-    }
-
-    [Fact]
-    public void ClearOldestListing_RemovesAndReturnsTheFirstListing_LeavingCapitalUntouched()
-    {
-        var store = Store.CreateGovernmentStore("Depot", homeLevel: 1);
-        var oldest = Item.Create("Stale Blade", ItemType.Weapon, 1, Rarity.Common);
-        store.Stock(oldest, askingPrice: 10);
-        store.Stock(Item.Create("Newer Blade", ItemType.Weapon, 1, Rarity.Common), askingPrice: 12);
-        var capitalBefore = store.Capital;
-
-        var cleared = store.ClearOldestListing();
-
-        Assert.Equal(oldest, cleared);
-        Assert.Single(store.Listings);
-        Assert.DoesNotContain(store.Listings, l => l.Item == oldest);
-        Assert.Equal(capitalBefore, store.Capital);
-    }
-
-    [Fact]
-    public void ClearOldestListing_OnAnEmptyShelf_ReturnsNull()
-    {
-        var store = Store.CreateGovernmentStore("Depot", homeLevel: 1);
-        while (store.Listings.Count > 0)
-        {
-            store.ClearOldestListing();
-        }
-
-        Assert.Null(store.ClearOldestListing());
     }
 
     [Fact]

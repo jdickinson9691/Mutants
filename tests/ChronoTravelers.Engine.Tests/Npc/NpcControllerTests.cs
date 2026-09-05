@@ -420,15 +420,16 @@ public class NpcControllerTests
     public void Act_OwnsAStoreWithALowReserve_PaysMaintenanceBeforeStocking()
     {
         var npc = FreshNpc();
+        npc.AddCredits(30);
         var junk = Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common);
         npc.AddToInventory(junk);
         var slot = new StoreSlot("Vex's Store", Coordinate.Origin, homeLevel: 1, purchaseCost: 0,
-            new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingTachyonReserve: 0));
+            new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingCreditReserve: 0));
 
         var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [slot]);
 
         Assert.Equal(NpcGoal.OwnStore, result.Goal);
-        Assert.Equal(30, slot.Store!.TachyonReserve);
+        Assert.Equal(30, slot.Store!.CreditReserve);
         Assert.Contains(junk, npc.Inventory); // untouched - maintenance was paid instead
     }
 
@@ -453,7 +454,7 @@ public class NpcControllerTests
         npc.Wield(goodWeapon); // equipped - FindUpgrade won't touch the weaker surplus below
         var surplusWeapon = Item.Create("Rusty Blade", ItemType.Weapon, 1, Rarity.Common, restrictedClass: CharacterClass.Soldier);
         npc.AddToInventory(surplusWeapon); // would otherwise get stocked - capital funding should take priority
-        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingTachyonReserve: 100);
+        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingCreditReserve: 100);
         var slot = new StoreSlot("Vex's Store", Coordinate.Origin, homeLevel: 1, purchaseCost: 0, store);
 
         var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [slot]);
@@ -472,7 +473,7 @@ public class NpcControllerTests
         var npc = FreshNpc(CharacterClass.Soldier);
         var junk = Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common);
         npc.AddToInventory(junk); // not class-relevant - won't get stocked, isolating this tick to the collect branch
-        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 500, npc, startingTachyonReserve: 100);
+        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 500, npc, startingCreditReserve: 100);
         var slot = new StoreSlot("Vex's Store", Coordinate.Origin, homeLevel: 1, purchaseCost: 0, store);
 
         var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [slot]);
@@ -496,12 +497,12 @@ public class NpcControllerTests
         var npc = FreshNpc();
         var junk = Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common);
         npc.AddToInventory(junk);
-        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingTachyonReserve: 100);
+        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingCreditReserve: 100);
         var slot = new StoreSlot("Vex's Store", Coordinate.Origin, homeLevel: 1, purchaseCost: 0, store);
 
         var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [slot]);
 
-        Assert.Equal(100, store.TachyonReserve); // unchanged - reserve was already at target
+        Assert.Equal(100, store.CreditReserve); // unchanged - reserve was already at target
         Assert.Contains(junk, npc.Inventory); // never stocked at the NPC's own store
         Assert.Empty(store.Listings);
     }
@@ -519,7 +520,7 @@ public class NpcControllerTests
         // its class" surplus TryTendOwnStore is meant to feature.
         var surplusWeapon = Item.Create("Rusty Blade", ItemType.Weapon, 1, Rarity.Common, restrictedClass: CharacterClass.Soldier);
         npc.AddToInventory(surplusWeapon);
-        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingTachyonReserve: 100);
+        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingCreditReserve: 100);
         var slot = new StoreSlot("Vex's Store", Coordinate.Origin, homeLevel: 1, purchaseCost: 0, store);
 
         var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [slot]);
@@ -540,7 +541,7 @@ public class NpcControllerTests
         var npc = FreshNpc(CharacterClass.Soldier);
         var offClassWeapon = Item.Create("Arcane Rod", ItemType.Weapon, 1, Rarity.Common, restrictedClass: CharacterClass.Scientist);
         npc.AddToInventory(offClassWeapon);
-        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingTachyonReserve: 100);
+        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingCreditReserve: 100);
         var slot = new StoreSlot("Vex's Store", Coordinate.Origin, homeLevel: 1, purchaseCost: 0, store);
 
         var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.01), [slot]);
@@ -556,7 +557,7 @@ public class NpcControllerTests
         var goodWeapon = Item.Create("Fine Blade", ItemType.Weapon, 5, Rarity.Rare);
         npc.AddToInventory(goodWeapon);
         npc.Wield(goodWeapon); // so FindUpgrade won't auto-wield the weaker surplus below
-        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingTachyonReserve: 100);
+        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingCreditReserve: 100);
         for (var i = 0; i < Store.MaxListings; i++)
         {
             store.Stock(Item.Create($"Filler {i}", ItemType.Junk, 1, Rarity.Common), askingPrice: 1);
@@ -582,7 +583,7 @@ public class NpcControllerTests
         var goodWeapon = Item.Create("Fine Blade", ItemType.Weapon, 5, Rarity.Rare);
         npc.AddToInventory(goodWeapon);
         npc.Wield(goodWeapon); // so FindUpgrade won't auto-wield the weaker surplus below
-        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingTachyonReserve: 100);
+        var store = new Store("Vex's Store", homeLevel: 1, startingCapital: 0, npc, startingCreditReserve: 100);
         store.Stock(Item.Create("Filler", ItemType.Junk, 1, Rarity.Common), askingPrice: 1);
 
         var surplusWeapon = Item.Create("Rusty Blade", ItemType.Weapon, 1, Rarity.Common, restrictedClass: CharacterClass.Soldier);

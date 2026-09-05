@@ -57,6 +57,7 @@ public static class TimelineContentFactory
         var tier = TimeScale.TierForYear(year);
         var (hp, attack, defense, speed) = StatsFor(species.Archetype, tier, species.EffectivePowerProfile);
         var xp = (int)Math.Round(MonsterScaling.XpReward(tier));
+        var credits = (int)Math.Round(MonsterScaling.CreditReward(tier));
         var tachyons = (int)Math.Round(MonsterScaling.BaseTachyons(tier));
         var displayTier = DisplayTier(year);
         // "caster" is derived here (not content-authored) so Scientist's
@@ -81,7 +82,8 @@ public static class TimelineContentFactory
                 packHunting: behavior.PackHunting,
                 neverInfights: behavior.NeverInfights,
                 aggroRangeBonus: behavior.AggroRangeBonus,
-                ambushDamageMultiplier: behavior.AmbushDamageMultiplier);
+                ambushDamageMultiplier: behavior.AmbushDamageMultiplier,
+                creditReward: credits);
             if (starterWeapon is not null)
             {
                 monster.EquipWeapon(starterWeapon); // adds its bonus to EffectiveAttackPower; drops on death
@@ -169,6 +171,7 @@ public static class TimelineContentFactory
         var apexAttack = Math.Max(1, (int)Math.Round(attack * ApexAttackMultiplier));
         var apexDefense = Math.Max(0, (int)Math.Round(defense * ApexDefenseMultiplier));
         var apexXp = (int)Math.Round(MonsterScaling.XpReward(tier) * ApexXpMultiplier);
+        var apexCredits = (int)Math.Round(MonsterScaling.CreditReward(tier) * ApexXpMultiplier);
         var apexTachyons = (int)Math.Round(MonsterScaling.BaseTachyons(tier) * ApexTachyonMultiplier);
         var displayTier = DisplayTier(year);
         var tags = species.Tags;
@@ -176,7 +179,7 @@ public static class TimelineContentFactory
 
         var loot = BuildApexLootTable(worldSeed, year, species.Id, lootPool);
 
-        return () => new Monster(name, displayTier, apexHp, apexAttack, apexDefense, speed, apexXp, loot, tags, maxTachyons: apexTachyons, isApex: true);
+        return () => new Monster(name, displayTier, apexHp, apexAttack, apexDefense, speed, apexXp, loot, tags, maxTachyons: apexTachyons, isApex: true, creditReward: apexCredits);
     }
 
     /// <summary>The Time Shard's damage is this much more than the year's best weapon.</summary>
@@ -322,7 +325,8 @@ public static class TimelineContentFactory
             xpReward: (int)Math.Round(MonsterScaling.XpReward(tier) * 5),
             lootTable: [new LootTableEntry(trophy, dropChance: 1.0)],
             tags: [],
-            maxTachyons: (int)Math.Round(MonsterScaling.BaseTachyons(tier) * 2));
+            maxTachyons: (int)Math.Round(MonsterScaling.BaseTachyons(tier) * 2),
+            creditReward: (int)Math.Round(MonsterScaling.CreditReward(tier) * 5));
     }
 
     /// <summary>A concrete item from <paramref name="archetype"/> as it would drop / be stocked in <paramref name="year"/>.</summary>

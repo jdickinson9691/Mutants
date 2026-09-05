@@ -17,6 +17,7 @@ public class MonsterTests
         Assert.Equal(MonsterScaling.BaseDefense(2), monster.Defense);
         Assert.Equal(MonsterScaling.BaseSpeed(2), monster.Speed);
         Assert.Equal(MonsterScaling.XpReward(2), monster.XpReward);
+        Assert.Equal(MonsterScaling.CreditReward(2), monster.CreditReward);
         Assert.Equal(MonsterScaling.BaseTachyons(2), monster.Tachyons.Max);
         Assert.Equal(monster.Tachyons.Max, monster.Tachyons.Current);
     }

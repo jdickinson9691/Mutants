@@ -21,7 +21,8 @@ public class CombatResolverTests
     // fresh level-1 Traveler — that's covered by the scaling tests.)
     private static Monster WeakMonster() =>
         new("Feral Dog", tier: 1, maxHp: 28, attackPower: 5, defense: 2, speed: 6, xpReward: 40,
-            lootTable: [new LootTableEntry(Item.Create("Torn Hide", ItemType.Junk, 1, Rarity.Common), dropChance: 0.7)]);
+            lootTable: [new LootTableEntry(Item.Create("Torn Hide", ItemType.Junk, 1, Rarity.Common), dropChance: 0.7)],
+            creditReward: 10);
 
     [Fact]
     public void Fight_TravelerDefeatsWeakMonster_AwardsXpAndLoot()
@@ -36,6 +37,8 @@ public class CombatResolverTests
         Assert.True(monster.Health.IsDead);
         Assert.Equal(monster.XpReward, result.XpAwarded);
         Assert.True(traveler.Xp >= monster.XpReward);
+        Assert.Equal(monster.CreditReward, result.CreditsAwarded);
+        Assert.Equal(monster.CreditReward, traveler.Credits);
         Assert.NotEmpty(result.Log);
     }
 
@@ -62,8 +65,10 @@ public class CombatResolverTests
         Assert.False(result.TravelerWon);
         Assert.True(traveler.Health.IsDead);
         Assert.Equal(0, result.XpAwarded);
+        Assert.Equal(0, result.CreditsAwarded);
         Assert.Empty(result.ItemsDropped);
         Assert.Equal(0, traveler.Xp);
+        Assert.Equal(0, traveler.Credits);
         Assert.Empty(traveler.Inventory);
     }
 

@@ -1,3 +1,4 @@
+using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Items;
 
@@ -80,6 +81,8 @@ public class RangedItemTests
     {
         var plate = Item.Create("Plating", ItemType.Armor, 3, Rarity.Uncommon);
         Assert.Equal(1.0, plate.ValueFraction, precision: 6);
-        Assert.Equal(plate.Value, plate.SellValue());
+        // Not scaled DOWN for a non-ranged item (ValueFraction is 1) — but
+        // still scaled by EconomyPricing.SellRateMultiplier like every sale.
+        Assert.Equal((int)Math.Round(plate.Value * EconomyPricing.SellRateMultiplier), plate.SellValue());
     }
 }

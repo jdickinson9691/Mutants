@@ -62,7 +62,7 @@ classes that account hasn't played. Then you're in the shared world.
 this year's slots) · `shop` (browse the one in your room) · `buy <item>` ·
 `sell <item>` / `sell all` (dump junk) · `buy-store` (claim a vacant slot)
 · `stock <item> <price>` · `withdraw <item>` · `reprice <item> <price>` ·
-`deposit <credits>` · `charge <tachyons>` · `collect` (owner-only verbs
+`deposit <credits>` · `charge <credits>` · `collect` (owner-only verbs
 require standing at a store you own; `collect` alone reaches every store
 you own across every year the shared world has visited).
 

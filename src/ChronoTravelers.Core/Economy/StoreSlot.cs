@@ -64,7 +64,7 @@ public sealed class StoreSlot
     /// depositing more Credits into an existing store isn't modeled yet).
     /// Throws if the slot is already occupied.
     /// </summary>
-    public Store Purchase(Traveler buyer, int startingCapital = 100, int startingTachyonReserve = 50)
+    public Store Purchase(Traveler buyer, int startingCapital = 100, int startingCreditReserve = 50)
     {
         if (Store is not null)
         {
@@ -72,7 +72,7 @@ public sealed class StoreSlot
         }
 
         buyer.SpendCredits(PurchaseCost);
-        Store = new Store($"{buyer.Name}'s Store", HomeLevel, startingCapital, buyer, startingTachyonReserve);
+        Store = new Store($"{buyer.Name}'s Store", HomeLevel, startingCapital, buyer, startingCreditReserve);
 
         foreach (var listing in _abandonedListings)
         {
@@ -85,14 +85,14 @@ public sealed class StoreSlot
 
     /// <summary>
     /// Reclaims this slot after its owner falls <see cref="Store.ForeclosureThreshold"/>
-    /// consecutive ticks behind on Tachyon maintenance (see
+    /// consecutive ticks behind on Credit maintenance (see
     /// <see cref="Store.ApplyMaintenanceTick"/>, driven by
     /// ChronoTravelers.Engine.Simulation.WorldSimulation's maintenance pass) — docs/GDD.md
     /// §6.2: unpaid upkeep eventually "causes stores, and their
     /// inventories, to become for sale." The slot goes back up for
     /// purchase; its former listings are held (<see cref="HasAbandonedInventory"/>)
     /// and re-stocked into whoever buys it next via <see cref="Purchase"/>
-    /// rather than lost outright. Capital and any leftover Tachyon reserve
+    /// rather than lost outright. Capital and any leftover Credit reserve
     /// are forfeited. Throws on a government store (exempt from
     /// maintenance — see <see cref="Store.IsGovernmentRun"/>) or an
     /// already-vacant slot.
@@ -110,21 +110,21 @@ public sealed class StoreSlot
 
     /// <summary>
     /// Re-attaches a store <paramref name="owner"/> bought in a previous
-    /// session — no Credit charge, capital and Tachyon reserve restored
+    /// session — no Credit charge, capital and Credit reserve restored
     /// as-is. Persistence only (see
     /// ChronoTravelers.Engine.Persistence.CharacterMapper); players buy
     /// in through <see cref="Purchase"/>. The caller re-stocks listings
     /// via <see cref="Store.Stock"/> afterward. Throws if the slot is
     /// already occupied.
     /// </summary>
-    public Store RestoreOwnership(Traveler owner, int capital, int tachyonReserve = 0)
+    public Store RestoreOwnership(Traveler owner, int capital, int creditReserve = 0)
     {
         if (Store is not null)
         {
             throw new InvalidOperationException($"'{Name}' is already occupied.");
         }
 
-        Store = new Store($"{owner.Name}'s Store", HomeLevel, Math.Max(0, capital), owner, Math.Max(0, tachyonReserve));
+        Store = new Store($"{owner.Name}'s Store", HomeLevel, Math.Max(0, capital), owner, Math.Max(0, creditReserve));
         return Store;
     }
 }
