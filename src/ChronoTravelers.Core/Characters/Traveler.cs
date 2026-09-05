@@ -743,6 +743,16 @@ public sealed class Traveler
     }
 
     /// <summary>
+    /// Scavenger trait (NPC-side hook, mirroring <see cref="Monsters.Monster"/>'s
+    /// own Scavenger Convert bonus) — junk is convert-only now (no store
+    /// ever buys it), so this is the trait's whole payoff for an NPC that
+    /// used to also get a cut from <em>selling</em> junk before that path
+    /// was removed. Never rolled for the player (<see cref="Trait"/> stays
+    /// <c>None</c>), so this is a no-op there.
+    /// </summary>
+    private const double ScavengerConvertValueBonusPct = 0.25;
+
+    /// <summary>
     /// Destroys an item from inventory for Tachyons — docs/GDD.md §2/§5.
     /// Returns the number of Tachyons gained (the item's full convert value —
     /// the player's pool is uncapped, so nothing overflows). Unequips the
@@ -753,7 +763,8 @@ public sealed class Traveler
         RemoveFromInventoryOrThrow(item);
         var convertBonus = PassiveTraits.Sum(Class, Level, PassiveHook.ConvertValueBonusPct);
         var junkBonus = JunkValueBonus(item);
-        var bonus = convertBonus + junkBonus;
+        var scavengerBonus = Trait == CreatureTraitKind.Scavenger ? ScavengerConvertValueBonusPct : 0;
+        var bonus = convertBonus + junkBonus + scavengerBonus;
         var value = bonus <= 0 ? item.ConvertValue() : (int)Math.Round(item.ConvertValue() * (1 + bonus));
         PassiveActivationTracker.Record(Class, PassiveHook.ConvertValueBonusPct, (int)Math.Round(item.ConvertValue() * convertBonus));
         PassiveActivationTracker.Record(Class, PassiveHook.JunkValueBonusPct, (int)Math.Round(item.ConvertValue() * junkBonus));
@@ -911,13 +922,22 @@ public sealed class Traveler
     /// Unequips the item first if it was wielded. Pass
     /// <paramref name="credits"/> for a store-negotiated price (see
     /// ChronoTravelers.Core.Economy.Store.BuyFromTraveler); omitted, it falls back
-    /// to <see cref="Item.SellValue"/>'s flat rate.
+    /// to <see cref="Item.SellValue"/>'s flat rate. Throws for a Junk item —
+    /// junk is convert-only now (see <see cref="Convert"/>), never sellable
+    /// to any store; <see cref="Economy.Store.BuyFromTraveler"/> /
+    /// <see cref="Economy.Store.Deposit(Traveler, Item, int)"/> both refuse
+    /// it too, so this is a backstop against a caller reaching Sell
+    /// directly with one.
     /// </summary>
     public int Sell(Item item, int? credits = null)
     {
+        if (item.Type == ItemType.Junk)
+        {
+            throw new InvalidOperationException($"'{item.Name}' is junk — it can only be converted for Tachyons, not sold.");
+        }
+
         RemoveFromInventoryOrThrow(item);
-        var junkBonus = JunkValueBonus(item);
-        var amount = credits ?? (junkBonus <= 0 ? item.SellValue() : (int)Math.Round(item.SellValue() * (1 + junkBonus)));
+        var amount = credits ?? item.SellValue();
         AddCredits(amount);
         return amount;
     }

@@ -75,10 +75,12 @@ TRAVELLING
   but never blocks it - a raid on a year above your level can pay off big.
 
 STORES
-  Every year has a supply depot. Sell loot there for Credits, buy staples
-  (heals, boosters, a weapon, armour, a ranged option). "sell all" dumps
-  every junk item at once. You can also buy an empty storefront and run
-  it - it earns Credits from NPC shoppers while you're away.
+  Every year has a supply depot. Sell gear/consumables there for Credits,
+  buy staples (heals, boosters, a weapon, armour, a ranged option). No
+  store buys junk, ever - "sell all" converts every junk item in your
+  pack into Tachyons instead (works anywhere, not just at a store). You
+  can also buy an empty storefront and run it - it earns Credits from NPC
+  shoppers while you're away.
 
 WARDENS
   Every 50-100 years a Warden stands watch over a pre-collapse tech cache

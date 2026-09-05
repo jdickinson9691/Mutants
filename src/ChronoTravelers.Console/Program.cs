@@ -1564,40 +1564,25 @@ static void HandleBuyFromStore(Traveler traveler, TimeWorld world, string argume
 
 static void HandleSellToStore(Traveler traveler, TimeWorld world, string argument)
 {
-    var storeSlots = world.GetYear(traveler.CurrentYear).StoreSlots;
-    var slot = FindStoreSlotAt(storeSlots, traveler.Position);
-    if (slot?.Store is not { } store)
-    {
-        AnsiConsole.MarkupLine("[red]You need to be at a store to sell.[/] Try [yellow]convert[/] to destroy an item for Tachyons instead, or [yellow]stores[/] to find one.");
-        return;
-    }
-
-    // 'sell all' / 'sell junk' — clears the vendor trash (Junk items only;
-    // gear and consumables you keep unless you name them).
+    // 'sell all' / 'sell junk' — converts every Junk item for Tachyons.
+    // Junk is convert-only now (no store ever buys it), so — unlike a
+    // named-item sale below — this needs no store and works anywhere.
     if (argument.Trim() is "all" or "junk" or "*")
     {
         var junk = traveler.Inventory.Where(i => i.Type == ItemType.Junk).ToList();
         if (junk.Count == 0)
         {
-            AnsiConsole.MarkupLine("[grey]No junk to sell.[/] Name an item to sell that instead.");
+            AnsiConsole.MarkupLine("[grey]No junk to convert.[/] Name an item to sell that instead.");
             return;
         }
 
         var total = 0;
-        var count = 0;
         foreach (var j in junk)
         {
-            var got = store.BuyFromTraveler(traveler, j);
-            if (got is null)
-            {
-                break;
-            }
-
-            total += got.Value;
-            count++;
+            total += traveler.Convert(j);
         }
 
-        AnsiConsole.MarkupLine($"[yellow]Sold {count} junk item(s) to {Markup.Escape(store.Name)} for {total} Credits.[/]");
+        AnsiConsole.MarkupLine($"[yellow]Converted {junk.Count} junk item(s) for {total} Tachyons.[/]");
         return;
     }
 
@@ -1605,8 +1590,22 @@ static void HandleSellToStore(Traveler traveler, TimeWorld world, string argumen
     if (item is null)
     {
         AnsiConsole.MarkupLine(argument.Length == 0
-            ? "[red]Sell what?[/] Type [yellow]inventory[/] to see what you're carrying, or [yellow]sell all[/] to dump junk."
+            ? "[red]Sell what?[/] Type [yellow]inventory[/] to see what you're carrying, or [yellow]sell all[/] to convert junk."
             : $"[red]No item matching '{Markup.Escape(argument)}' in your inventory.[/]");
+        return;
+    }
+
+    if (item.Type == ItemType.Junk)
+    {
+        AnsiConsole.MarkupLine($"[red]{Markup.Escape(item.Name)} is junk[/] — it can only be converted for Tachyons, not sold. Try [yellow]convert {Markup.Escape(item.Name)}[/] or [yellow]sell all[/].");
+        return;
+    }
+
+    var storeSlots = world.GetYear(traveler.CurrentYear).StoreSlots;
+    var slot = FindStoreSlotAt(storeSlots, traveler.Position);
+    if (slot?.Store is not { } store)
+    {
+        AnsiConsole.MarkupLine("[red]You need to be at a store to sell.[/] Try [yellow]convert[/] to destroy an item for Tachyons instead, or [yellow]stores[/] to find one.");
         return;
     }
 
@@ -2865,14 +2864,15 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]inventory[/] (or inv, i, bag) - list what you're carrying");
     AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Travelers out in the timeline");
     AnsiConsole.MarkupLine("  [green]news[/] (or broadcast) - show recent kill-feed events");
-    AnsiConsole.MarkupLine("  [green]convert[/] (or con) [green]<item>[/] - destroy an item for Tachyons (a spent ranged weapon is worth a fraction)");
+    AnsiConsole.MarkupLine("  [green]convert[/] (or con) [green]<item>[/] - destroy an item for Tachyons (junk items are convert-only; a spent ranged weapon is worth a fraction)");
     AnsiConsole.MarkupLine("  [green]wield <item>[/]       - equip a weapon, armor, or ranged (wand/bow/gun) item");
     AnsiConsole.MarkupLine("  [green]use[/]/[green]eat[/]/[green]drink <item>[/] - consume a potion or food item");
     AnsiConsole.MarkupLine("    ('<item>' is either its inventory number or its name)");
     AnsiConsole.MarkupLine("  [green]stores[/]              - list every store this year");
     AnsiConsole.MarkupLine("  [green]shop[/]                - browse the store in your current room");
     AnsiConsole.MarkupLine("  [green]buy <item>[/]         - buy a listed item (must be at a store)");
-    AnsiConsole.MarkupLine("  [green]sell <item>[/] / [green]sell all[/] - sell one item, or dump all junk, to the store here");
+    AnsiConsole.MarkupLine("  [green]sell <item>[/]        - sell one non-junk item to the store here (no store buys junk - use convert)");
+    AnsiConsole.MarkupLine("  [green]sell all[/]            - convert every junk item in your pack for Tachyons (works anywhere)");
     AnsiConsole.MarkupLine("  [green]buy-store[/]           - purchase an empty store slot you're standing in");
     AnsiConsole.MarkupLine("  [green]stock <item> <price>[/] - list your own item for sale at your store");
     AnsiConsole.MarkupLine("  [green]withdraw <item>[/]    - pull a listing back into your inventory");

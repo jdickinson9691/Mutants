@@ -105,22 +105,27 @@ public class NpcControllerTests
     }
 
     [Fact]
-    public void Act_ExcessJunkWithAStoreAvailable_SellsOneItem()
+    public void Act_ExcessJunk_ConvertsOneItemInsteadOfSelling()
     {
+        // Major economy change: junk is convert-only — no store ever buys
+        // it, so this no longer needs a store slot at all (kept here only
+        // to prove it goes unused).
         var npc = FreshNpc();
         for (var tier = 1; tier <= 4; tier++)
         {
             npc.AddToInventory(Item.Create($"Junk Tier {tier}", ItemType.Junk, tier, Rarity.Common));
         }
+        var tachyonsBefore = npc.Tachyons.Current;
 
         var store = Store.CreateGovernmentStore("Test Store", homeLevel: 1);
 
         var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(store)]);
 
-        Assert.Equal(NpcGoal.Trade, result.Goal);
+        Assert.Equal(NpcGoal.SeekTachyons, result.Goal);
         Assert.Equal(3, npc.Inventory.Count(i => i.Type == ItemType.Junk));
-        Assert.True(npc.Credits > 0);
-        Assert.Single(store.Listings);
+        Assert.True(npc.Tachyons.Current > tachyonsBefore);
+        Assert.Equal(0, npc.Credits);
+        Assert.Empty(store.Listings);
     }
 
     [Fact]

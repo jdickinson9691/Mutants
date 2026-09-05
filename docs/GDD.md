@@ -92,11 +92,14 @@ stay capped.)
   minimum of 1. `rate` is **0.4 for a normal item** (weapon / armour /
   consumable) — kept strictly worse than selling for Credits when a store is
   reachable, but better than nothing when it isn't — and **2.4 for trash
-  loot** (`ItemType.Junk`), i.e. +500%. Junk exists only to be burned or
-  sold; at the old flat 0.4 it was a poor trickle next to the travel bills a
-  downstream push runs up, so clearing the floor after a fight now actually
-  refuels you. Still replicates the "quasi semi-flawed but usable" economy
-  the original was known for, without the exploitable parts.
+  loot** (`ItemType.Junk`), i.e. +500%. **Junk is convert-only** — no store
+  buys it (`Store.BuyFromTraveler`/`Deposit` both refuse it outright; a
+  `sell`/gear-sale path never applies to it) — so `convert`/`sell all` is
+  the one and only way to turn it into anything, and at the old flat 0.4
+  it was a poor trickle next to the travel bills a downstream push runs
+  up, so clearing the floor after a fight now actually refuels you. Still
+  replicates the "quasi semi-flawed but usable" economy the original was
+  known for, without the exploitable parts.
 - **Tachyon pool size** was scaled up end-to-end for the downstream push: the
   starting pool (`ClassDefinition.BaseTachyons`) tripled (+200%, Soldier
   20→60 … Scientist 34→102) and per-level growth (`TachyonsPerLevel`) ×6
@@ -386,8 +389,10 @@ area/group to a capstone — is the standard every class follows.)
 - **Disposition**: every lootable item supports the same three verbs as the
   original — `wield` (equip if class-compatible), `sell <item>` (at any
   store, price is store-and-negotiation-dependent, see §6), `convert <item>`
-  (destroy for Tachyons, value per §2.1). `sell`/`convert` work on any item
-  regardless of type; `wield` makes sense for Weapon/Armor/Ranged.
+  (destroy for Tachyons, value per §2.1). `convert` works on any item
+  regardless of type; `sell` works on anything **except Junk** — no store
+  buys it, so `convert`/`sell all` (which now converts rather than sells)
+  is its only disposal path; `wield` makes sense for Weapon/Armor/Ranged.
 - **Ranged weapons** (original addition, enabled by §7.1's spatial
   monsters): wands, bows, and — in later years — guns occupy their own
   equip slot alongside the melee weapon. `wield` one, then `fight <name>`
@@ -479,7 +484,10 @@ area/group to a capstone — is the standard every class follows.)
   same multiplier also scales what a store pays buying surplus from a
   passing traveler and what it then asks reselling it
   (`Store.BuyFromTraveler`/`DefaultAskingPrice`), keeping their relative
-  spread — and the §6.3 Credit-sink margin it depends on — unchanged.
+  spread — and the §6.3 Credit-sink margin it depends on — unchanged. **No
+  store buys or lists a Junk item, ever** (`BuyFromTraveler`/`Deposit`
+  both refuse it outright) — junk is convert-only (§2.1/§5); this doesn't
+  apply to any other item type.
 
 ### 6.2 Player-owned stores `[SOURCE: players can buy the NPC stores]`
 - Every year offers, beyond its always-open depot store, a limited number
@@ -510,9 +518,12 @@ area/group to a capstone — is the standard every class follows.)
 - **NPC shoppers** periodically path to player-owned stores and buy/sell
   based on their own needs (an NPC low on a class-appropriate weapon will buy
   one if the store has it and the price is within their budget heuristic; an
-  NPC over-encumbered with junk will sell to a store with open capital) —
+  NPC with genuine surplus gear will sell it to a store with open capital) —
   this is the "NPCs will sometimes visit and buy and sell from the player
-  stores" requirement, made concrete.
+  stores" requirement, made concrete. An NPC over-encumbered with junk
+  converts it for Tachyons instead (`NpcController.Act`'s standalone
+  excess-junk check) — no store ever buys junk, so this doesn't need a
+  store visit at all.
 - **NPCs also buy and run stores themselves**, same as a human player:
   buying an open slot, charging its maintenance, stocking surplus gear, and
   collecting Capital (`NpcController.TryPurchaseStoreSlot` /

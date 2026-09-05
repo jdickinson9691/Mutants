@@ -132,9 +132,17 @@ public sealed class Store
     /// null (and does nothing) if the store's Capital can't cover the
     /// price — the §6.3 Credit-sink safeguard in action; government
     /// stores' huge Capital means this practically never happens to them.
+    /// Also null (and does nothing) for a Junk item — junk is convert-only,
+    /// never sellable to any store (<see cref="Traveler.Convert"/> is the
+    /// only disposal path for it now).
     /// </summary>
     public int? BuyFromTraveler(Traveler seller, Item item)
     {
+        if (item.Type == ItemType.Junk)
+        {
+            return null;
+        }
+
         // Spy "Light Fingers" / "Silent Partner" — a bonus on top of the
         // store's normal buy price when selling to it (docs/GDD.md §4.2.1).
         var basePrice = EconomyPricing.BuyPrice(item);
@@ -185,12 +193,14 @@ public sealed class Store
     /// docs/GDD.md §6.2's "stock" command (the item-listing half of what
     /// used to be called "deposit"). Owner-only. Returns false (leaving
     /// the item in the owner's inventory) if the store is already at
-    /// <see cref="MaxListings"/>.
+    /// <see cref="MaxListings"/>, or if <paramref name="item"/> is Junk —
+    /// junk is convert-only, never sellable at any store, owner's own
+    /// shopfront included.
     /// </summary>
     public bool Deposit(Traveler owner, Item item, int askingPrice)
     {
         RequireOwner(owner);
-        if (_listings.Count >= MaxListings)
+        if (_listings.Count >= MaxListings || item.Type == ItemType.Junk)
         {
             return false;
         }

@@ -135,14 +135,16 @@ public class WorldSimulationTests
         {
             npc.AddToInventory(Item.Create($"Junk Tier {tier}", ItemType.Junk, tier, Rarity.Common));
         }
+        var tachyonsBefore = npc.Tachyons.Current;
 
         var simulation = new WorldSimulation(world, [npc], StubRandomSource.Fixed(0.5));
 
         simulation.Tick(player);
 
-        // Sold at least one junk item to the year's government store.
+        // Junk is convert-only now — no store buys it — so excess junk
+        // gets converted for Tachyons rather than sold (see NpcController.Act).
         Assert.True(npc.Inventory.Count(i => i.Type == ItemType.Junk) < 4);
-        Assert.True(npc.Credits > 0);
+        Assert.True(npc.Tachyons.Current > tachyonsBefore);
     }
 
     [Fact]

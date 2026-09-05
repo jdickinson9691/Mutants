@@ -105,6 +105,17 @@ public static class CharacterMapper
             var store = slot.RestoreOwnership(player, saved.Capital, saved.CreditReserve);
             foreach (var listing in saved.Listings)
             {
+                // A save from before junk became convert-only could still
+                // carry a Junk listing (bought or deposited under the old
+                // rules) — drop it rather than restore a listing Deposit/
+                // BuyFromTraveler would now refuse to create in the first
+                // place. No refund; this is a one-time migration for a rule
+                // change, not a live transaction.
+                if (Enum.TryParse<ItemType>(listing.Item.Type, out var itemType) && itemType == ItemType.Junk)
+                {
+                    continue;
+                }
+
                 // enforceCap: false — same reasoning as FromSaveData above:
                 // a save from before Store.MaxListings existed must not
                 // lose stock on load.
@@ -174,6 +185,16 @@ public static class CharacterMapper
         if (data.EquippedRangedIndex is { } rangedIndex && rangedIndex >= 0 && rangedIndex < items.Count)
         {
             traveler.Wield(items[rangedIndex]);
+        }
+
+        // A save from before junk became convert-only may still be
+        // carrying it — junk's never equippable, so this can't disturb any
+        // of the Wield calls above regardless of order. Convert it into
+        // Tachyons on load rather than just deleting it for nothing, since
+        // that's still the item's one legitimate use going forward.
+        foreach (var junk in traveler.Inventory.Where(i => i.Type == ItemType.Junk).ToList())
+        {
+            traveler.Convert(junk);
         }
 
         return traveler;

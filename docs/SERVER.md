@@ -60,7 +60,7 @@ classes that account hasn't played. Then you're in the shared world.
 
 **Stores** (docs/GDD.md §6, full parity with the console): `stores` (list
 this year's slots) · `shop` (browse the one in your room) · `buy <item>` ·
-`sell <item>` / `sell all` (dump junk) · `buy-store` (claim a vacant slot)
+`sell <item>` (no store buys junk) / `sell all` (converts junk for Tachyons, works anywhere) · `buy-store` (claim a vacant slot)
 · `stock <item> <price>` · `withdraw <item>` · `reprice <item> <price>` ·
 `deposit <credits>` · `charge <credits>` · `collect` (owner-only verbs
 require standing at a store you own; `collect` alone reaches every store

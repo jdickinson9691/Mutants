@@ -495,44 +495,30 @@ internal static class Commands
         session.Send($"Bought {listing.Item.Name} for {listing.AskingPrice} Credits.");
     }
 
-    /// <summary>Sells an item (or dumps junk) to the store in the player's current room — console parity (Program.cs's <c>HandleSellToStore</c>).</summary>
+    /// <summary>Sells an item (or converts junk) to/for the player — console parity (Program.cs's <c>HandleSellToStore</c>).</summary>
     private static void SellToStore(SharedGame game, Session session, string arg)
     {
-        var slot = StoreSlotHere(game, session);
-        if (slot?.Store is not { } store)
-        {
-            session.Send("You need to be at a store to sell. Try 'convert' to destroy an item for Tachyons instead, or 'stores' to find one.");
-            return;
-        }
-
         var p = session.Player;
 
-        // 'sell all' / 'sell junk' — clears the vendor trash (Junk items
-        // only; gear and consumables you keep unless you name them).
+        // 'sell all' / 'sell junk' — converts every Junk item for Tachyons.
+        // Junk is convert-only now (no store ever buys it), so — unlike a
+        // named-item sale below — this needs no store and works anywhere.
         if (arg.Trim() is "all" or "junk" or "*")
         {
             var junk = p.Inventory.Where(i => i.Type == ItemType.Junk).ToList();
             if (junk.Count == 0)
             {
-                session.Send("No junk to sell. Name an item to sell that instead.");
+                session.Send("No junk to convert. Name an item to sell that instead.");
                 return;
             }
 
             var total = 0;
-            var count = 0;
             foreach (var j in junk)
             {
-                var got = store.BuyFromTraveler(p, j);
-                if (got is null)
-                {
-                    break;
-                }
-
-                total += got.Value;
-                count++;
+                total += p.Convert(j);
             }
 
-            session.Send($"Sold {count} junk item(s) to {store.Name} for {total} Credits.");
+            session.Send($"Converted {junk.Count} junk item(s) for {total} Tachyons.");
             return;
         }
 
@@ -540,8 +526,21 @@ internal static class Commands
         if (item is null)
         {
             session.Send(arg.Length == 0
-                ? "Sell what? Type 'inventory' to see what you're carrying, or 'sell all' to dump junk."
+                ? "Sell what? Type 'inventory' to see what you're carrying, or 'sell all' to convert junk."
                 : $"No item matching '{arg}' in your inventory.");
+            return;
+        }
+
+        if (item.Type == ItemType.Junk)
+        {
+            session.Send($"{item.Name} is junk — it can only be converted for Tachyons, not sold. Try 'convert {item.Name}' or 'sell all'.");
+            return;
+        }
+
+        var slot = StoreSlotHere(game, session);
+        if (slot?.Store is not { } store)
+        {
+            session.Send("You need to be at a store to sell. Try 'convert' to destroy an item for Tachyons instead, or 'stores' to find one.");
             return;
         }
 

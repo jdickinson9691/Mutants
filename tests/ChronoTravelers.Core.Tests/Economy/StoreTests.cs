@@ -36,7 +36,7 @@ public class StoreTests
     {
         var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
         var seller = NewTraveler();
-        var item = Item.Create("Scrap", ItemType.Junk, tier: 2, Rarity.Common); // value 20
+        var item = Item.Create("Scrap Blade", ItemType.Weapon, tier: 2, Rarity.Common); // value 20
         seller.AddToInventory(item);
 
         var price = store.BuyFromTraveler(seller, item);
@@ -48,11 +48,29 @@ public class StoreTests
     }
 
     [Fact]
+    public void BuyFromTraveler_RefusesJunk()
+    {
+        // Major economy change: junk is convert-only — no store, government
+        // or player-owned, will ever buy it.
+        var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
+        var seller = NewTraveler();
+        var item = Item.Create("Scrap", ItemType.Junk, 2, Rarity.Common);
+        seller.AddToInventory(item);
+
+        var price = store.BuyFromTraveler(seller, item);
+
+        Assert.Null(price);
+        Assert.Equal(0, seller.Credits);
+        Assert.Contains(item, seller.Inventory);
+        Assert.Empty(store.Listings);
+    }
+
+    [Fact]
     public void BuyFromTraveler_ReturnsNullAndDoesNothingWhenStoreCantAfford()
     {
         var store = new Store("Corner Shop", homeLevel: 1, startingCapital: 0);
         var seller = NewTraveler();
-        var item = Item.Create("Scrap", ItemType.Junk, 2, Rarity.Common);
+        var item = Item.Create("Scrap Blade", ItemType.Weapon, 2, Rarity.Common);
         seller.AddToInventory(item);
 
         var price = store.BuyFromTraveler(seller, item);
@@ -109,13 +127,30 @@ public class StoreTests
     {
         var owner = NewTraveler("Owner");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
-        var item = Item.Create("Widget", ItemType.Junk, 1, Rarity.Common);
+        var item = Item.Create("Widget", ItemType.Weapon, 1, Rarity.Common);
         owner.AddToInventory(item);
 
         store.Deposit(owner, item, askingPrice: 10);
 
         Assert.DoesNotContain(item, owner.Inventory);
         Assert.Contains(store.Listings, l => l.Item == item && l.AskingPrice == 10);
+    }
+
+    [Fact]
+    public void Deposit_RefusesJunk()
+    {
+        // Major economy change: junk is convert-only — an owner can't even
+        // list it at their own store.
+        var owner = NewTraveler("Owner");
+        var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
+        var item = Item.Create("Widget", ItemType.Junk, 1, Rarity.Common);
+        owner.AddToInventory(item);
+
+        var deposited = store.Deposit(owner, item, askingPrice: 10);
+
+        Assert.False(deposited);
+        Assert.Contains(item, owner.Inventory);
+        Assert.Empty(store.Listings);
     }
 
     [Fact]
@@ -370,9 +405,11 @@ public class StoreTests
     [Fact]
     public void BuyFromTraveler_StoreAtMaxListings_ReturnsNullAndDoesNothing()
     {
+        // Non-junk item: this test isolates the max-listings guard, not the
+        // separate (and unconditional) junk refusal — see BuyFromTraveler_RefusesJunk.
         var store = FullStore();
         var seller = NewTraveler();
-        var item = Item.Create("Scrap", ItemType.Junk, 2, Rarity.Common);
+        var item = Item.Create("Scrap Blade", ItemType.Weapon, 2, Rarity.Common);
         seller.AddToInventory(item);
 
         var price = store.BuyFromTraveler(seller, item);
@@ -386,6 +423,10 @@ public class StoreTests
     [Fact]
     public void Deposit_StoreAtMaxListings_ReturnsFalseAndLeavesItemWithOwner()
     {
+        // Non-junk item: this test isolates the max-listings guard, not the
+        // separate (and unconditional) junk refusal — see Deposit_RefusesJunk.
+        // Filler listings stay Junk-typed since Stock (a low-level primitive
+        // also used for persistence restore) never gates on item type.
         var owner = NewTraveler("Owner");
         var store = new Store("Owner's Store", homeLevel: 1, startingCapital: 100, owner);
         for (var i = 0; i < Store.MaxListings; i++)
@@ -393,7 +434,7 @@ public class StoreTests
             store.Stock(Item.Create($"Filler {i}", ItemType.Junk, 1, Rarity.Common), askingPrice: 1);
         }
 
-        var item = Item.Create("Widget", ItemType.Junk, 1, Rarity.Common);
+        var item = Item.Create("Widget", ItemType.Weapon, 1, Rarity.Common);
         owner.AddToInventory(item);
 
         var deposited = store.Deposit(owner, item, askingPrice: 10);

@@ -86,7 +86,7 @@ public enum PassiveHook
     /// <summary>Engineer "Improvised Plating" — flat bonus to Defense.</summary>
     FlatDefenseBonus,
 
-    /// <summary>Engineer "Salvage Sense" — % bonus to sell/convert value for Junk-type items (a Junk item is this game's "scrap" — see docs/GDD.md §4.2.1's implementation note).</summary>
+    /// <summary>Engineer "Salvage Sense" — % bonus to convert value for Junk-type items (a Junk item is this game's "scrap" — see docs/GDD.md §4.2.1's implementation note). Junk is convert-only (no store buys it), so this only ever applies via <see cref="Characters.Traveler.Convert"/>.</summary>
     JunkValueBonusPct,
 
     /// <summary>Engineer "Failsafe Capacitor" — fraction by which a cast's Tachyon cost is reduced when paying full price would drop the pool below 10% of nominal max.</summary>
@@ -158,7 +158,7 @@ public static class PassiveTraits
         new(CharacterClass.Engineer, 4, "Overclocked Reflexes", "+3 Speed.", PassiveHook.FlatSpeedBonus, 3),
         new(CharacterClass.Engineer, 7, "Redundant Systems", "20% chance to dodge an ambush entirely.", PassiveHook.AmbushDodgeChancePct, 0.20),
         new(CharacterClass.Engineer, 11, "Improvised Plating", "+3 flat Defense.", PassiveHook.FlatDefenseBonus, 3),
-        new(CharacterClass.Engineer, 15, "Salvage Sense", "+15% value for Junk items, sold or converted.", PassiveHook.JunkValueBonusPct, 0.15),
+        new(CharacterClass.Engineer, 15, "Salvage Sense", "+15% value converting Junk items.", PassiveHook.JunkValueBonusPct, 0.15),
         new(CharacterClass.Engineer, 19, "Failsafe Capacitor", "Halves a cast's Tachyon cost when paying full price would drop the pool below 10% of nominal max.", PassiveHook.LowTachyonCastDiscountPct, 0.5),
     ];
 

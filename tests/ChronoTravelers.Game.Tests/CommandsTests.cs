@@ -527,17 +527,20 @@ public class CommandsTests
     [Fact]
     public void SellToStore_AwayFromAnyStore_SuggestsConvertOrFindingOne()
     {
+        // Non-junk item: a named Junk sale is refused outright regardless of
+        // location (see SellToStore_RefusesNamedJunk) — this test isolates
+        // the separate "need to be at a store" guard for a sellable item.
         var game = NewGame(out var world);
         var rec = new Recorder();
         var player = NewSoldier();
-        player.AddToInventory(Item.Create("Scrap Bit", ItemType.Junk, 1, Rarity.Common));
+        player.AddToInventory(Item.Create("Rusty Gear", ItemType.Weapon, 1, Rarity.Common));
         var session = game.Join("a", player, rec);
         var storeLocations = world.GetYear(session.Player.CurrentYear).StoreSlots.Select(s => s.Location).ToHashSet();
         var empty = world.GetYear(session.Player.CurrentYear).Map.Rooms.Keys.First(c => !storeLocations.Contains(c));
         session.Player.PlaceAt(empty);
 
         rec.Clear();
-        game.Execute(session, "sell Scrap Bit");
+        game.Execute(session, "sell Rusty Gear");
 
         Assert.True(rec.Any("need to be at a store to sell"));
     }

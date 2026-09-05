@@ -206,6 +206,22 @@ public static class NpcController
             }
         }
 
+        // Junk is convert-only now — no store buys it (Store.BuyFromTraveler/
+        // Deposit both refuse it) — so disposing of a full pack of it no
+        // longer needs a store visit at all, unlike TryTrade's old
+        // sell-surplus-gear check just above. Hoarder never disposes of
+        // anything, junk included.
+        if (npc.Trait != CreatureTraitKind.Hoarder)
+        {
+            var excessJunk = npc.Inventory.Where(i => i.Type == ItemType.Junk).ToList();
+            if (excessJunk.Count > ExcessJunkThreshold)
+            {
+                var converted = excessJunk[0];
+                npc.Convert(converted);
+                return new NpcTickResult(npc.Name, NpcGoal.SeekTachyons, Detail: $"converted excess {converted.Name}");
+            }
+        }
+
         Wander(npc, level, random);
 
         var roster = monsterRoster ?? TestMonsters.All;
@@ -581,10 +597,11 @@ public static class NpcController
     /// Unlike the old behavior, junk and off-class gear are never stocked
     /// here — an NPC's own shopfront should read as "themed" to its class
     /// (see <see cref="SelectClassRelevantSurplus"/>), not a dumping ground
-    /// for whatever it happens to be carrying. Junk and off-class surplus
-    /// are still liquidated, just not showcased here — see
-    /// <see cref="TryTrade"/>, which sells them at whichever store is at
-    /// hand instead.
+    /// for whatever it happens to be carrying. Off-class surplus is still
+    /// liquidated, just not showcased here — see <see cref="TryTrade"/>,
+    /// which sells it at whichever store is at hand instead. Junk is never
+    /// sold anywhere (convert-only) — see <see cref="Act"/>'s standalone
+    /// excess-junk check.
     ///
     /// One tending action does at most one of, in priority order: (1) pay
     /// down Credit maintenance, since an unpaid store risks repossession;
@@ -676,30 +693,28 @@ public static class NpcController
     /// Sells one piece of surplus gear (a looted Weapon/Armor/Ranged item
     /// that isn't equipped — <see cref="Act"/> already claimed anything
     /// that would've been an upgrade, so what's left is genuine dead
-    /// weight) or excess junk, or — the demand side of the economy — buys
-    /// one listed item it can afford: a real upgrade for a slot, or
-    /// (sometimes) a consumable. At most one action, at a randomly picked
-    /// store. Selling gear is tried first: it's what actually makes a store
-    /// worth browsing, junk is just Credit filler. Buying is what keeps
-    /// listing counts from climbing forever — <see cref="Store.SellToTraveler"/>
-    /// removes the listing. Null if there was nothing worth doing (falls
-    /// through to grinding). Called by <see cref="TryStoreVisit"/> with
-    /// every occupied store here — this itself has no notion of
-    /// ownership/vacancy.
+    /// weight), or — the demand side of the economy — buys one listed item
+    /// it can afford: a real upgrade for a slot, or (sometimes) a
+    /// consumable. At most one action, at a randomly picked store. Junk is
+    /// never sold here (or anywhere) — it's convert-only, see <see cref="Act"/>'s
+    /// standalone excess-junk check, which doesn't need a store at all.
+    /// Buying is what keeps listing counts from climbing forever —
+    /// <see cref="Store.SellToTraveler"/> removes the listing. Null if
+    /// there was nothing worth doing (falls through to grinding). Called
+    /// by <see cref="TryStoreVisit"/> with every occupied store here — this
+    /// itself has no notion of ownership/vacancy.
     /// </summary>
     private static NpcTickResult? TryTrade(Traveler npc, IReadOnlyList<Store> stores, IRandomSource random)
     {
         var surplusGear = npc.Inventory.FirstOrDefault(i => i.IsWieldable && !i.IsTimeShard && !IsEquipped(npc, i));
-        var junkCount = npc.Inventory.Count(i => i.Type == ItemType.Junk);
         // Hoarder trait — never voluntarily sells anything; keeps collecting instead.
         var isHoarder = npc.Trait == CreatureTraitKind.Hoarder;
         var wantsToSellGear = !isHoarder && surplusGear is not null;
-        var wantsToSellJunk = !isHoarder && junkCount > ExcessJunkThreshold;
         var wantsToBuyWeapon = npc.EquippedWeapon is null && npc.Credits > 0;
         var wantsToShop = npc.EquippedWeapon is not null && npc.Credits > 0
                           && npc.Inventory.Count < Traveler.MaxInventorySize;
 
-        if (!wantsToSellGear && !wantsToSellJunk && !wantsToBuyWeapon && !wantsToShop)
+        if (!wantsToSellGear && !wantsToBuyWeapon && !wantsToShop)
         {
             return null;
         }
@@ -713,17 +728,6 @@ public static class NpcController
             {
                 ApplyScavengerSellBonus(npc, price.Value);
                 return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"sold {surplusGear!.Name} to {store.Name} for {price} Credits");
-            }
-        }
-
-        if (wantsToSellJunk)
-        {
-            var junk = npc.Inventory.First(i => i.Type == ItemType.Junk);
-            var price = store.BuyFromTraveler(npc, junk);
-            if (price is not null)
-            {
-                ApplyScavengerSellBonus(npc, price.Value);
-                return new NpcTickResult(npc.Name, NpcGoal.Trade, Detail: $"sold {junk.Name} to {store.Name} for {price} Credits");
             }
         }
 

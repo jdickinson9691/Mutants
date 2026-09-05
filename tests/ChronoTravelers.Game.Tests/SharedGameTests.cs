@@ -259,22 +259,41 @@ public class SharedGameTests
         var game = NewGame(out var world);
         var rec = new Recorder();
         var player = NewSoldier();
-        var junk = Item.Create("Circuit Scrap", ItemType.Junk, 1, Rarity.Common);
-        player.AddToInventory(junk);
+        var gear = Item.Create("Rusty Blade", ItemType.Weapon, 1, Rarity.Common);
+        player.AddToInventory(gear);
         var session = game.Join("a", player, rec);
         var govSlot = world.GetYear(session.Player.CurrentYear).StoreSlots.Single(s => s.Store is { IsGovernmentRun: true });
         session.Player.PlaceAt(govSlot.Location);
 
         rec.Clear();
-        game.Execute(session, "sell Circuit Scrap");
+        game.Execute(session, "sell Rusty Blade");
 
-        Assert.DoesNotContain(player.Inventory, i => i.Name == "Circuit Scrap");
+        Assert.DoesNotContain(player.Inventory, i => i.Name == "Rusty Blade");
         Assert.True(player.Credits > 0);
-        Assert.True(rec.Any("Sold Circuit Scrap"));
+        Assert.True(rec.Any("Sold Rusty Blade"));
     }
 
     [Fact]
-    public void SellToStore_SellAll_DumpsOnlyJunk()
+    public void SellToStore_RefusesNamedJunk()
+    {
+        // Major economy change: junk is convert-only — no store buys it,
+        // and the named-item sale path refuses one even without a store.
+        var game = NewGame(out _);
+        var rec = new Recorder();
+        var player = NewSoldier();
+        var junk = Item.Create("Circuit Scrap", ItemType.Junk, 1, Rarity.Common);
+        player.AddToInventory(junk);
+        var session = game.Join("a", player, rec);
+
+        rec.Clear();
+        game.Execute(session, "sell Circuit Scrap");
+
+        Assert.Contains(player.Inventory, i => i.Name == "Circuit Scrap");
+        Assert.Equal(0, player.Credits);
+    }
+
+    [Fact]
+    public void SellToStore_SellAll_ConvertsOnlyJunk()
     {
         var game = NewGame(out var world);
         var rec = new Recorder();
@@ -286,13 +305,15 @@ public class SharedGameTests
         var session = game.Join("a", player, rec);
         var govSlot = world.GetYear(session.Player.CurrentYear).StoreSlots.Single(s => s.Store is { IsGovernmentRun: true });
         session.Player.PlaceAt(govSlot.Location);
+        var tachyonsBefore = player.Tachyons.Current;
 
         rec.Clear();
         game.Execute(session, "sell all");
 
         Assert.DoesNotContain(player.Inventory, i => i.Name == "Scrap");
         Assert.Contains(player.Inventory, i => i.Name == "Kept Blade");
-        Assert.True(rec.Any("Sold 1 junk item"));
+        Assert.True(player.Tachyons.Current > tachyonsBefore);
+        Assert.True(rec.Any("Converted 1 junk item"));
     }
 
     [Fact]

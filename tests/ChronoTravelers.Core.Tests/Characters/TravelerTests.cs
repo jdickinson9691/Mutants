@@ -508,7 +508,7 @@ public class TravelerTests
     public void Sell_RemovesItemAndAddsCredits()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);
-        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // value 34, SellValue 34*1.3 = 44.2 -> 44
+        var item = Item.Create("Scrap Metal", ItemType.Weapon, tier: 2, Rarity.Common); // value 34, SellValue 34*1.3 = 44.2 -> 44
         traveler.AddToInventory(item);
 
         var gained = traveler.Sell(item);
@@ -522,13 +522,28 @@ public class TravelerTests
     public void Sell_WithExplicitPrice_OverridesTheFlatRate()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);
-        var item = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common); // flat value 20
+        var item = Item.Create("Scrap Metal", ItemType.Weapon, tier: 2, Rarity.Common); // flat value 20
         traveler.AddToInventory(item);
 
         var gained = traveler.Sell(item, credits: 7);
 
         Assert.Equal(7, gained);
         Assert.Equal(7, traveler.Credits);
+    }
+
+    [Fact]
+    public void Sell_ThrowsForJunk()
+    {
+        // Major economy change: junk is convert-only now — no store buys
+        // it, and Sell itself refuses one as a backstop even without a
+        // store involved.
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        var junk = Item.Create("Scrap Metal", ItemType.Junk, tier: 2, Rarity.Common);
+        traveler.AddToInventory(junk);
+
+        Assert.Throws<InvalidOperationException>(() => traveler.Sell(junk));
+        Assert.Contains(junk, traveler.Inventory); // rejected before removal
+        Assert.Equal(0, traveler.Credits);
     }
 
     [Fact]
@@ -563,7 +578,7 @@ public class TravelerTests
     public void Sell_ThrowsIfItemNotInInventory()
     {
         var traveler = new Traveler("Rook", CharacterClass.Soldier);
-        var item = Item.Create("Ghost Item", ItemType.Junk, 1, Rarity.Common);
+        var item = Item.Create("Ghost Item", ItemType.Weapon, 1, Rarity.Common);
 
         Assert.Throws<InvalidOperationException>(() => traveler.Sell(item));
     }
@@ -922,5 +937,30 @@ public class TravelerTests
         var freshTarget = new Monster("Guard", 1, maxHp: 30, attackPower: 5, defense: 2, speed: 5, xpReward: 10);
 
         Assert.Equal(1.0, plain.AttackDamageMultiplierAgainst(freshTarget), precision: 5);
+    }
+
+    [Fact]
+    public void Convert_WithScavengerTrait_GainsABonusOverAPlainTraveler()
+    {
+        // Mirrors MonsterTests' Convert_WithScavengerTrait_GainsABonusOverAPlainMonster —
+        // junk is convert-only now, so Scavenger's sell bonus moved onto
+        // Convert instead (see Traveler.Convert's ScavengerConvertValueBonusPct).
+        // Tachyons.Current defaults to Max, so it has to be drained back to 0
+        // first or Convert's Add has no room to show a difference at all.
+        var plain = new Traveler("Rook", CharacterClass.Soldier);
+        var scavenger = new Traveler("Nyx", CharacterClass.Soldier);
+        scavenger.AssignTrait(CreatureTraitKind.Scavenger);
+        plain.Tachyons.Spend(plain.Tachyons.Current);
+        scavenger.Tachyons.Spend(scavenger.Tachyons.Current);
+
+        var item1 = Item.Create("Neon Shard", ItemType.Junk, 3, Rarity.Rare);
+        var item2 = Item.Create("Neon Shard", ItemType.Junk, 3, Rarity.Rare);
+        plain.AddToInventory(item1);
+        scavenger.AddToInventory(item2);
+
+        var plainGain = plain.Convert(item1);
+        var scavengerGain = scavenger.Convert(item2);
+
+        Assert.True(scavengerGain > plainGain);
     }
 }
