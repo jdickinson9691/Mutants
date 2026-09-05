@@ -24,6 +24,16 @@ public sealed class PassiveUsage
     public double TotalMagnitude { get; set; }
 }
 
+/// <summary>
+/// One NPC's final state at the end of a run, tagged by its trait at that
+/// point (a respawned NPC rerolls, so this is "whatever it currently is,"
+/// not its full-run history) — the raw material for comparing a trait's
+/// actual effect against the None baseline rather than just how often it
+/// spawns. <c>OwnsStore</c> is true if it holds any store slot across any
+/// year the world has visited by run's end.
+/// </summary>
+public sealed record NpcOutcome(CreatureTraitKind Trait, int Level, int Credits, int InventoryCount, int FurthestYearReached, bool OwnsStore);
+
 /// <summary>Everything the harness recorded for one bot playthrough of one class.</summary>
 public sealed class RunReport
 {
@@ -73,4 +83,7 @@ public sealed class RunReport
 
     /// <summary>The trait each NPC in the harness's spawned population carries, sampled at the end of the run (a respawned NPC rerolls, so this reflects current composition, not full-run history).</summary>
     public Dictionary<CreatureTraitKind, int> NpcTraitsObserved { get; } = [];
+
+    /// <summary>Each spawned NPC's final state, for measuring a trait's actual effect (Credits, Level, inventory, store ownership) rather than just its spawn rate.</summary>
+    public List<NpcOutcome> NpcOutcomes { get; } = [];
 }

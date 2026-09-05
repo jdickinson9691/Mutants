@@ -43,6 +43,7 @@ var classes = string.Equals(classArg, "all", StringComparison.OrdinalIgnoreCase)
     ? Enum.GetValues<CharacterClass>().ToList()
     : [ParseClass(classArg)];
 
+var allReports = new List<RunReport>();
 foreach (var characterClass in classes)
 {
     var battery = new List<RunReport>();
@@ -53,6 +54,16 @@ foreach (var characterClass in classes)
 
     ReportPrinter.Print(characterClass, battery);
     Console.WriteLine();
+    allReports.AddRange(battery);
+}
+
+// NPC trait effects need pooling across every class's battery to get a
+// real per-trait sample — each individual battery's NPC population
+// excludes the class under test and is small (LocalPopulationTarget
+// NPCs per run), so printing it once per class would mostly be noise.
+if (classes.Count > 1)
+{
+    ReportPrinter.PrintNpcTraitEffects(allReports);
 }
 
 return 0;

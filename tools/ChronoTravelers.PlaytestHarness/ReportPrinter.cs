@@ -179,4 +179,88 @@ public static class ReportPrinter
         PrintTraitCounts("Monsters fought, by trait (expect ~60% None, ~5% each other kind):", monsterTotals);
         PrintTraitCounts("NPC population, by trait (sampled once per run, so small samples are noisy):", npcTotals);
     }
+
+    /// <summary>
+    /// Compares each trait's actual final-state averages (Level, Credits,
+    /// inventory size, furthest year, store ownership) against the None
+    /// baseline — distribution alone (<see cref="PrintAggregateTraitCounts"/>)
+    /// only shows a trait spawns at the right rate, not that it does
+    /// anything. Combines NpcOutcomes across every class's battery (the
+    /// NPC population excludes whichever class is under test in each one,
+    /// so pooling all of them is the only way to get a real sample per
+    /// trait instead of ~3 NPCs).
+    /// </summary>
+    public static void PrintNpcTraitEffects(IReadOnlyList<RunReport> allReportsAcrossEveryClass)
+    {
+        var outcomes = allReportsAcrossEveryClass.SelectMany(r => r.NpcOutcomes).ToList();
+
+        Console.WriteLine();
+        Console.WriteLine("========================================================");
+        Console.WriteLine(" NPC trait effects (pooled across every class's battery)");
+        Console.WriteLine("========================================================");
+
+        if (outcomes.Count == 0)
+        {
+            Console.WriteLine("  (no NPC outcomes recorded)");
+            return;
+        }
+
+        var baseline = outcomes.Where(o => o.Trait == CreatureTraitKind.None).ToList();
+        if (baseline.Count == 0)
+        {
+            Console.WriteLine("  (no None-trait NPCs to use as a baseline)");
+            return;
+        }
+
+        var baseLevel = baseline.Average(o => o.Level);
+        var baseCredits = baseline.Average(o => o.Credits);
+        var baseInventory = baseline.Average(o => o.InventoryCount);
+        var baseFurthestYear = baseline.Average(o => o.FurthestYearReached);
+        var baseStorePct = 100.0 * baseline.Count(o => o.OwnsStore) / baseline.Count;
+
+        Console.WriteLine($"  {"Trait",-12} {"n",-5} {"AvgLevel",-10} {"AvgCredits",-12} {"AvgInv",-8} {"AvgFurthestYr",-14} {"OwnsStore%"}");
+        Console.WriteLine($"  {"None",-12} {baseline.Count,-5} {baseLevel,-10:F1} {baseCredits,-12:F0} {baseInventory,-8:F1} {baseFurthestYear,-14:F0} {baseStorePct:F0}%  (baseline)");
+
+        foreach (var kind in Enum.GetValues<CreatureTraitKind>())
+        {
+            if (kind == CreatureTraitKind.None)
+            {
+                continue;
+            }
+
+            var group = outcomes.Where(o => o.Trait == kind).ToList();
+            if (group.Count == 0)
+            {
+                Console.WriteLine($"  {kind,-12} 0     (no NPCs with this trait spawned)");
+                continue;
+            }
+
+            var level = group.Average(o => o.Level);
+            var credits = group.Average(o => o.Credits);
+            var inventory = group.Average(o => o.InventoryCount);
+            var furthestYear = group.Average(o => o.FurthestYearReached);
+            var storePct = 100.0 * group.Count(o => o.OwnsStore) / group.Count;
+
+            Console.WriteLine($"  {kind,-12} {group.Count,-5} {level,-10:F1} {credits,-12:F0} {inventory,-8:F1} {furthestYear,-14:F0} {storePct:F0}%" +
+                $"  (Credits {PercentDelta(credits, baseCredits)}, Level {PercentDelta(level, baseLevel)}, Inv {PercentDelta(inventory, baseInventory)})");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("  Expected directions: Hoarder — higher inventory, lower Credits (never sells).");
+        Console.WriteLine("  Scavenger — higher Credits (25% sell/convert bonus). Trader — more likely to");
+        Console.WriteLine("  own a store. PackLeader/Ambusher — combat-power bonuses, so higher Level/");
+        Console.WriteLine("  furthest year if anything. Aggressive/Skittish/Wanderer have no direct stat");
+        Console.WriteLine("  hook here — their effect is in fight/retreat/travel frequency, not final state.");
+    }
+
+    private static string PercentDelta(double value, double baseline)
+    {
+        if (baseline == 0)
+        {
+            return value == 0 ? "n/a" : "n/a (baseline is 0)";
+        }
+
+        var pct = 100.0 * (value - baseline) / baseline;
+        return $"{(pct >= 0 ? "+" : "")}{pct:F0}% vs None";
+    }
 }

@@ -144,9 +144,16 @@ public static class PlaytestRunner
         report.FinalCredits = bot.Credits;
         report.FinalTachyons = bot.Tachyons.Current;
 
+        var ownedStoreOwners = world.VisitedYears
+            .SelectMany(y => world.GetYear(y).StoreSlots)
+            .Select(s => s.Store?.Owner)
+            .Where(owner => owner is not null)
+            .ToHashSet();
+
         foreach (var npc in npcs)
         {
             report.NpcTraitsObserved[npc.Trait] = report.NpcTraitsObserved.GetValueOrDefault(npc.Trait) + 1;
+            report.NpcOutcomes.Add(new NpcOutcome(npc.Trait, npc.Level, npc.Credits, npc.Inventory.Count, npc.FurthestYearReached, ownedStoreOwners.Contains(npc)));
         }
 
         foreach (var passive in PassiveTraits.Unlocked(characterClass, bot.Level))
