@@ -124,35 +124,33 @@ public static class MonsterScaling
         ((ClassDefinition.All.Count - 1) * Leveling.SecondaryStatGainPerLevel + Leveling.PrimaryStatGainPerLevel)
         / (double)ClassDefinition.All.Count;
 
-    /// <summary>The tier at which <see cref="ReferenceLevel"/>'s gentle early slope hands off to its steeper late slope.</summary>
-    private const double ReferenceLevelKneeTier = 3.0;
-
-    /// <summary>The character level <see cref="ReferenceLevel"/> reaches at <see cref="ReferenceLevelKneeTier"/> — its two linear segments meet here.</summary>
-    private const double ReferenceLevelKneeLevel = 8.0;
-
     /// <summary>
     /// The character level a tier-<paramref name="tier"/> monster is
-    /// calibrated against. Anchored at tier 1.0 (year 2000) → level 1
-    /// (a fresh Traveler's actual starting level, so the arrival year is
-    /// fightable) and tier 9.0 (year 5000) → the hard cap. Between, it is
-    /// piecewise-linear with a knee at
-    /// (<see cref="ReferenceLevelKneeTier"/>, <see cref="ReferenceLevelKneeLevel"/>):
-    /// a gentle early slope so the tier-1→2 hop — a character that has just
-    /// reached ~level 5 in year 2000 and travels straight to year 2250 —
-    /// lands roughly in-band instead of three levels under content sized
-    /// for it (playtest: that gap read as a wall), then a steeper slope
-    /// from the knee on so the far future still scales all the way to a
-    /// capped character. A first cut ramped this linearly the whole way
-    /// (and an earlier one pinned it at <c>10·tier</c>, the soft-cap
-    /// pairing, which made even year 2000 expect a level-10 character).
+    /// calibrated against. Anchored at tier 1.0 (year 2000) → level 1 (a
+    /// fresh Traveler's actual starting level, so the arrival year is
+    /// fightable) and tier 9.0 (year 5000) → the hard cap, linearly in
+    /// between — every input term feeding <see cref="ReferencePlayerAttack"/>/
+    /// <see cref="ReferencePlayerDefense"/> is itself linear in level, so a
+    /// uniform slope keeps monster stats rising at a constant rate across
+    /// the whole timeline rather than kinking at an arbitrary tier.
+    ///
+    /// A prior version of this curve used a piecewise knee (a gentle early
+    /// slope through tier 3, then steeper) specifically to soften the
+    /// tier-1→2 hop for a character that had just reached ~level 5 in year
+    /// 2000 and traveled straight to year 2250 — that playtest finding
+    /// still applies here: linearizing raises the reference level at
+    /// tier ~2-4 well above what the old curve anchored to (tier 3 nearly
+    /// doubles, level 8 → ~15.75), making early-to-mid content noticeably
+    /// tougher relative to a level-matched character than before. An even
+    /// earlier version pinned this at flat <c>10·tier</c>, the soft-cap
+    /// pairing, which made even year 2000 expect a level-10 character —
+    /// this linear anchor (tier 1 → level 1, tier 9 → the cap) doesn't
+    /// repeat that specific problem, but reintroduces the mid-tier
+    /// steepness the knee existed to smooth over.
     /// </summary>
     private static double ReferenceLevel(double tier)
     {
-        var level = tier <= ReferenceLevelKneeTier
-            ? 1 + (tier - 1) * (ReferenceLevelKneeLevel - 1) / (ReferenceLevelKneeTier - 1)
-            : ReferenceLevelKneeLevel
-              + (tier - ReferenceLevelKneeTier)
-                * (Leveling.MaxCharacterLevel - ReferenceLevelKneeLevel) / (9.0 - ReferenceLevelKneeTier);
+        var level = 1 + (tier - 1) * (Leveling.MaxCharacterLevel - 1) / (9.0 - 1.0);
         return Math.Clamp(level, 1, Leveling.MaxCharacterLevel);
     }
 
