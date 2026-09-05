@@ -1356,7 +1356,11 @@ static bool TryHandleItemCommand(Traveler traveler, string command, string argum
         _ => null,
     };
 
-    var item = FindInventoryItem(traveler, argument, prefer);
+    // `convert` is destructive — when the name matches more than one item
+    // (e.g. more than one Time Shard, picked up in different years), pick
+    // the weakest copy rather than an arbitrary one, so a duplicate never
+    // costs the player their best gear (see ItemSelection.Weakest).
+    var item = FindInventoryItem(traveler, argument, prefer, weakestFirst: command == "convert");
     if (item is null)
     {
         AnsiConsole.MarkupLine(argument.Length == 0
@@ -1448,7 +1452,7 @@ static bool TryHandleItemCommand(Traveler traveler, string command, string argum
     return true;
 }
 
-static Item? FindInventoryItem(Traveler traveler, string argument, Func<Item, bool>? prefer = null)
+static Item? FindInventoryItem(Traveler traveler, string argument, Func<Item, bool>? prefer = null, bool weakestFirst = false)
 {
     if (argument.Length == 0)
     {
@@ -1465,23 +1469,34 @@ static Item? FindInventoryItem(Traveler traveler, string argument, Func<Item, bo
     // inventory table and carry apostrophes, so exact-only is a trap).
     // When several contain it, `prefer` breaks the tie toward one the
     // caller can use (e.g. a wieldable "Time Shard" over junk "Salvage Shard").
-    var exact = traveler.Inventory.FirstOrDefault(i => string.Equals(i.Name, argument, StringComparison.OrdinalIgnoreCase));
-    if (exact is not null)
+    //
+    // `weakestFirst` (destructive commands like `convert`): don't just take
+    // the first exact/substring match — a player can carry more than one
+    // item sharing a name (e.g. a Time Shard per visited year), so pick the
+    // weakest of the matches via ItemSelection.Weakest, never an arbitrary
+    // one that could be the player's best copy.
+    var exactMatches = traveler.Inventory.Where(i => string.Equals(i.Name, argument, StringComparison.OrdinalIgnoreCase)).ToList();
+    if (exactMatches.Count > 0)
     {
-        return exact;
+        return weakestFirst ? ItemSelection.Weakest(exactMatches) : exactMatches[0];
     }
 
     var matches = traveler.Inventory.Where(i => i.Name.Contains(argument, StringComparison.OrdinalIgnoreCase)).ToList();
     if (prefer is not null)
     {
-        var preferred = matches.FirstOrDefault(prefer);
-        if (preferred is not null)
+        var preferredMatches = matches.Where(prefer).ToList();
+        if (preferredMatches.Count > 0)
         {
-            return preferred;
+            return weakestFirst ? ItemSelection.Weakest(preferredMatches) : preferredMatches[0];
         }
     }
 
-    return matches.FirstOrDefault();
+    if (matches.Count == 0)
+    {
+        return null;
+    }
+
+    return weakestFirst ? ItemSelection.Weakest(matches) : matches[0];
 }
 
 static StoreListing? FindListing(Store store, string argument)

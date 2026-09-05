@@ -400,6 +400,28 @@ public class CommandsTests
     }
 
     [Fact]
+    public void Convert_WithSeveralSameNamedItems_DestroysTheLowestTierOne()
+    {
+        // A player who's visited more than one year can carry more than one
+        // Time Shard; `convert time shard` must never gamble away the best
+        // one — see ItemSelection.Weakest / ItemSelectionTests.cs.
+        var game = NewGame(out _);
+        var rec = new Recorder();
+        var player = NewSoldier();
+        var weak = Item.Create("Time Shard", ItemType.Weapon, tier: 1, Rarity.Common);
+        var strong = Item.Create("Time Shard", ItemType.Weapon, tier: 5, Rarity.Common);
+        player.AddToInventory(strong); // added first — would win under plain FirstOrDefault
+        player.AddToInventory(weak);
+        var session = game.Join("a", player, rec);
+
+        rec.Clear();
+        game.Execute(session, "convert Time Shard");
+
+        Assert.DoesNotContain(player.Inventory, i => ReferenceEquals(i, weak));
+        Assert.Contains(player.Inventory, i => ReferenceEquals(i, strong));
+    }
+
+    [Fact]
     public void Convert_WithNoMatchingItem_SaysSo()
     {
         var game = NewGame(out _);

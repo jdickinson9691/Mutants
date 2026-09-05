@@ -355,7 +355,11 @@ internal static class Commands
 
     private static void Convert(Session session, string arg)
     {
-        var item = FindItem(session, arg);
+        // Destructive — when the name matches more than one item (e.g. more
+        // than one Time Shard, picked up in different years), pick the
+        // weakest copy rather than an arbitrary one, so a duplicate never
+        // costs the player their best gear (see ItemSelection.Weakest).
+        var item = FindItem(session, arg, weakestFirst: true);
         if (item is null)
         {
             session.Send($"No item matching '{arg}' in your inventory.");
@@ -825,7 +829,7 @@ internal static class Commands
         return (string.Join(' ', tokens[..^1]), price);
     }
 
-    private static Item? FindItem(Session session, string arg, Func<Item, bool>? prefer = null)
+    private static Item? FindItem(Session session, string arg, Func<Item, bool>? prefer = null, bool weakestFirst = false)
     {
         if (arg.Length == 0)
         {
@@ -838,14 +842,33 @@ internal static class Commands
             return inv[n - 1];
         }
 
-        var exact = inv.FirstOrDefault(i => string.Equals(i.Name, arg, StringComparison.OrdinalIgnoreCase));
-        if (exact is not null)
+        // `weakestFirst` (destructive commands like `convert`): a player can
+        // carry more than one item sharing a name (e.g. a Time Shard per
+        // visited year), so among the matches pick the weakest via
+        // ItemSelection.Weakest rather than an arbitrary one that could be
+        // the player's best copy.
+        var exactMatches = inv.Where(i => string.Equals(i.Name, arg, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (exactMatches.Count > 0)
         {
-            return exact;
+            return weakestFirst ? ItemSelection.Weakest(exactMatches) : exactMatches[0];
         }
 
         var matches = inv.Where(i => i.Name.Contains(arg, StringComparison.OrdinalIgnoreCase)).ToList();
-        return (prefer is not null ? matches.FirstOrDefault(prefer) : null) ?? matches.FirstOrDefault();
+        if (prefer is not null)
+        {
+            var preferredMatches = matches.Where(prefer).ToList();
+            if (preferredMatches.Count > 0)
+            {
+                return weakestFirst ? ItemSelection.Weakest(preferredMatches) : preferredMatches[0];
+            }
+        }
+
+        if (matches.Count == 0)
+        {
+            return null;
+        }
+
+        return weakestFirst ? ItemSelection.Weakest(matches) : matches[0];
     }
 
     private static Direction Opposite(Direction d) => d switch
