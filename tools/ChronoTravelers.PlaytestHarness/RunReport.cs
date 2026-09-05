@@ -30,9 +30,15 @@ public sealed class PassiveUsage
 /// not its full-run history) — the raw material for comparing a trait's
 /// actual effect against the None baseline rather than just how often it
 /// spawns. <c>OwnsStore</c> is true if it holds any store slot across any
-/// year the world has visited by run's end.
+/// year the world has visited by run's end. <c>KillCount</c> is scoped the
+/// same way as everything else here — kills since this NPC's current
+/// incarnation spawned/respawned, via WorldSimulation.OnNpcAct — added
+/// specifically to check whether a trait's Credits/Level gap comes from
+/// fighting more/less, or from the same fight count paying off
+/// differently (see the "PackLeader/Ambusher progress well but earn
+/// less" finding this was built to chase down).
 /// </summary>
-public sealed record NpcOutcome(CreatureTraitKind Trait, int Level, int Credits, int InventoryCount, int FurthestYearReached, bool OwnsStore);
+public sealed record NpcOutcome(CreatureTraitKind Trait, int Level, int Credits, int InventoryCount, int FurthestYearReached, bool OwnsStore, int KillCount);
 
 /// <summary>Everything the harness recorded for one bot playthrough of one class.</summary>
 public sealed class RunReport

@@ -46,6 +46,18 @@ public sealed class WorldSimulation
     /// </summary>
     public IReadOnlyList<string> LastTickNarration => _narration;
 
+    /// <summary>
+    /// Opt-in observation hook: fired once per living NPC, right after its
+    /// <see cref="NpcController.Act"/> call resolves, with the exact
+    /// <see cref="NpcTickResult"/> that produced (goal, fight outcome,
+    /// travel, etc.) — for a tuning tool that wants to correlate an NPC's
+    /// per-tick behavior with its identity (e.g. trait) without
+    /// duplicating this tick's Tachyon-drain/respawn/store-maintenance
+    /// bookkeeping just to get at it. Null (the default) costs nothing;
+    /// no production caller sets one. Not invoked by <see cref="TickMultiplayer"/>.
+    /// </summary>
+    public Action<Traveler, NpcTickResult>? OnNpcAct;
+
     private readonly IRandomSource _random;
     private readonly List<string> _narration = [];
     private readonly IReadOnlyDictionary<CharacterClass, double>? _npcClassWeights;
@@ -213,6 +225,7 @@ public sealed class WorldSimulation
             var yearBefore = npc.CurrentYear;
             var pullToAnchor = i < NpcPopulation.LocalPopulationTarget;
             var result = NpcController.Act(npc, yearContent.Map, _random, yearContent.StoreSlots, yearContent.MonsterRoster, World, playerAnchorYear, pullToAnchor, _abilities);
+            OnNpcAct?.Invoke(npc, result);
 
             if (result.Fight is { } fight)
             {

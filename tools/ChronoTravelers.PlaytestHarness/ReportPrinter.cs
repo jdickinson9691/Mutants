@@ -217,9 +217,11 @@ public static class ReportPrinter
         var baseInventory = baseline.Average(o => o.InventoryCount);
         var baseFurthestYear = baseline.Average(o => o.FurthestYearReached);
         var baseStorePct = 100.0 * baseline.Count(o => o.OwnsStore) / baseline.Count;
+        var baseKills = baseline.Average(o => o.KillCount);
+        var baseCreditsPerKill = baseKills > 0 ? baseCredits / baseKills : 0;
 
-        Console.WriteLine($"  {"Trait",-12} {"n",-5} {"AvgLevel",-10} {"AvgCredits",-12} {"AvgInv",-8} {"AvgFurthestYr",-14} {"OwnsStore%"}");
-        Console.WriteLine($"  {"None",-12} {baseline.Count,-5} {baseLevel,-10:F1} {baseCredits,-12:F0} {baseInventory,-8:F1} {baseFurthestYear,-14:F0} {baseStorePct:F0}%  (baseline)");
+        Console.WriteLine($"  {"Trait",-12} {"n",-5} {"AvgLevel",-10} {"AvgCredits",-12} {"AvgKills",-9} {"Cr/Kill",-9} {"AvgInv",-8} {"AvgFurthestYr",-14} {"OwnsStore%"}");
+        Console.WriteLine($"  {"None",-12} {baseline.Count,-5} {baseLevel,-10:F1} {baseCredits,-12:F0} {baseKills,-9:F1} {baseCreditsPerKill,-9:F1} {baseInventory,-8:F1} {baseFurthestYear,-14:F0} {baseStorePct:F0}%  (baseline)");
 
         foreach (var kind in Enum.GetValues<CreatureTraitKind>())
         {
@@ -240,10 +242,17 @@ public static class ReportPrinter
             var inventory = group.Average(o => o.InventoryCount);
             var furthestYear = group.Average(o => o.FurthestYearReached);
             var storePct = 100.0 * group.Count(o => o.OwnsStore) / group.Count;
+            var kills = group.Average(o => o.KillCount);
+            var creditsPerKill = kills > 0 ? credits / kills : 0;
 
-            Console.WriteLine($"  {kind,-12} {group.Count,-5} {level,-10:F1} {credits,-12:F0} {inventory,-8:F1} {furthestYear,-14:F0} {storePct:F0}%" +
-                $"  (Credits {PercentDelta(credits, baseCredits)}, Level {PercentDelta(level, baseLevel)}, Inv {PercentDelta(inventory, baseInventory)})");
+            Console.WriteLine($"  {kind,-12} {group.Count,-5} {level,-10:F1} {credits,-12:F0} {kills,-9:F1} {creditsPerKill,-9:F1} {inventory,-8:F1} {furthestYear,-14:F0} {storePct:F0}%" +
+                $"  (Credits {PercentDelta(credits, baseCredits)}, Kills {PercentDelta(kills, baseKills)}, Level {PercentDelta(level, baseLevel)})");
         }
+
+        Console.WriteLine();
+        Console.WriteLine("  AvgKills/Cr-per-Kill split out specifically to tell apart \"fights less\" from");
+        Console.WriteLine("  \"fights the same but each kill pays off differently\" (kill count is scoped to");
+        Console.WriteLine("  the NPC's current incarnation, same as everything else here — a respawn resets it).");
 
         Console.WriteLine();
         Console.WriteLine("  Expected directions: Hoarder — higher inventory, lower Credits (never sells).");

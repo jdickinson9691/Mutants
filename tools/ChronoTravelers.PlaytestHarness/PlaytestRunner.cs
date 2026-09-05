@@ -105,6 +105,20 @@ public static class PlaytestRunner
 
         var simulation = new WorldSimulation(world, npcs, random, npcClassWeights: npcClassWeights, abilities: allAbilities);
 
+        // Keyed by reference: a respawned NPC is a brand-new Traveler
+        // instance (WorldSimulation.RespawnDeadNpcs replaces the slot, it
+        // doesn't reset one in place), so this naturally starts a dead
+        // NPC's replacement back at 0 kills — matching how its Trait/Level/
+        // Credits already reflect only its current incarnation.
+        var npcKillCounts = new Dictionary<Traveler, int>();
+        simulation.OnNpcAct = (npc, result) =>
+        {
+            if (result.Fight is { TravelerWon: true })
+            {
+                npcKillCounts[npc] = npcKillCounts.GetValueOrDefault(npc) + 1;
+            }
+        };
+
         var bot = new Traveler($"{characterClass}Bot", characterClass);
         GiveStarterKit(bot);
         bot.PlaceAt(world.GetYear(bot.CurrentYear).Map.Start);
@@ -153,7 +167,7 @@ public static class PlaytestRunner
         foreach (var npc in npcs)
         {
             report.NpcTraitsObserved[npc.Trait] = report.NpcTraitsObserved.GetValueOrDefault(npc.Trait) + 1;
-            report.NpcOutcomes.Add(new NpcOutcome(npc.Trait, npc.Level, npc.Credits, npc.Inventory.Count, npc.FurthestYearReached, ownedStoreOwners.Contains(npc)));
+            report.NpcOutcomes.Add(new NpcOutcome(npc.Trait, npc.Level, npc.Credits, npc.Inventory.Count, npc.FurthestYearReached, ownedStoreOwners.Contains(npc), npcKillCounts.GetValueOrDefault(npc)));
         }
 
         foreach (var passive in PassiveTraits.Unlocked(characterClass, bot.Level))
