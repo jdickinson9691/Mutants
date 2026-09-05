@@ -38,6 +38,8 @@ FIGHTING
   fight <name>          engage a monster in your room (attack / a also work)
   in a fight, type      attack  - swing
                         cast <ability>  - spend Tachyons on a class ability
+                        use <item>  - drink/eat a consumable (same effect as
+                        outside combat) instead of attacking that round
   Loot from a kill falls on the floor where it died - nothing lands in
   your pack automatically. Pick it up with  take <item>  or  take all.
   shoot <dir> / point <dir>   fire a readied ranged weapon one room away

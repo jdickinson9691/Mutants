@@ -9,8 +9,9 @@ namespace ChronoTravelers.Engine.Combat;
 
 /// <summary>
 /// An interactive, round-by-round fight — the player chooses each round
-/// to make a normal attack (<see cref="Attack"/>) or cast an ability
-/// (<see cref="Cast"/>), unlike <see cref="CombatResolver.Fight"/>'s
+/// to make a normal attack (<see cref="Attack"/>), cast an ability
+/// (<see cref="Cast"/>), or use a consumable (<see cref="UseItem"/>),
+/// unlike <see cref="CombatResolver.Fight"/>'s
 /// instant, fully-automated resolution (still used as-is for NPC auto-
 /// combat and warden fights - see ChronoTravelers.Console's file header for
 /// what's wired to which). Buffs/debuffs from abilities last for the
@@ -92,6 +93,57 @@ public sealed class CombatSession
 
         ResolveRound(null, AbilityEffectType.None);
     }
+
+    /// <summary>
+    /// Uses a consumable this round instead of attacking or casting — same
+    /// item, same <see cref="Traveler.Consume(Item, PrimaryStat?)"/> effect
+    /// as outside combat (heal, timed buff, Tachyon refill, a Meridian
+    /// Serum's permanent stat boost), just spent as this round's action:
+    /// the monster still gets its turn afterward, same as a cast. A timed
+    /// buff (BuffAttack/BuffDefense/BuffSpeed) applies immediately — the
+    /// very next attack/speed check this fight reads the live bonus off
+    /// <see cref="Traveler"/>, no separate combat-scoped tracking needed.
+    /// </summary>
+    /// <param name="chosenStat">Required (and only meaningful) for a choose-on-drink Meridian Serum — see <see cref="Item.NeedsStatChoice"/>.</param>
+    private (Item Item, PrimaryStat? ChosenStat)? _pendingItemUse;
+
+    public ItemUseResult UseItem(Item item, PrimaryStat? chosenStat = null)
+    {
+        if (IsOver)
+        {
+            return new ItemUseResult(false, "The fight is already over.");
+        }
+
+        if (!item.IsUsable)
+        {
+            return new ItemUseResult(false, $"{item.Name} can't be used.");
+        }
+
+        if (item.NeedsStatChoice && chosenStat is null)
+        {
+            return new ItemUseResult(false, $"{item.Name} needs a stat to boost — ask the player which one first.");
+        }
+
+        // Consumption itself happens inside TravelerTurn (deferred via this
+        // field) so a slower Traveler who dies to the monster's turn first
+        // never actually spends the item — same speed-order rule Attack/
+        // Cast already follow.
+        _pendingItemUse = (item, chosenStat);
+        ResolveRound(null, AbilityEffectType.None);
+        return new ItemUseResult(true, $"{Traveler.Name} uses {item.Name}.");
+    }
+
+    private string DescribeItemUse(Item item, int amount, PrimaryStat? chosenStat) => item.ConsumableEffect switch
+    {
+        ConsumableEffectType.Heal => $"{Traveler.Name} uses {item.Name} and heals for {amount} HP.",
+        ConsumableEffectType.HealOverTime => $"{Traveler.Name} uses {item.Name} — HP will recover steadily.",
+        ConsumableEffectType.BuffAttack => $"{Traveler.Name} uses {item.Name} — attack bolstered.",
+        ConsumableEffectType.BuffDefense => $"{Traveler.Name} uses {item.Name} — defenses bolstered.",
+        ConsumableEffectType.BuffSpeed => $"{Traveler.Name} uses {item.Name} — feels quickened.",
+        ConsumableEffectType.RestoreTachyons => $"{Traveler.Name} uses {item.Name} and restores {amount} Tachyons.",
+        _ when chosenStat is { } stat => $"{Traveler.Name} drinks {item.Name} — {stat} +{item.EffectMagnitude:0}, permanently.",
+        _ => $"{Traveler.Name} uses {item.Name}.",
+    };
 
     /// <summary>
     /// Casts an ability this round. Validates class, level-unlock, and
@@ -202,6 +254,14 @@ public sealed class CombatSession
 
     private void TravelerTurn(AbilityData? ability, AbilityEffectType effectType)
     {
+        if (_pendingItemUse is { } pending)
+        {
+            _pendingItemUse = null;
+            var amount = Traveler.Consume(pending.Item, pending.ChosenStat);
+            _log.Add(DescribeItemUse(pending.Item, amount, pending.ChosenStat));
+            return;
+        }
+
         if (ability is null)
         {
             PerformTravelerAttack();
