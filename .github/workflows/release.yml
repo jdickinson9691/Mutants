@@ -41,8 +41,12 @@ jobs:
       - name: Restore
         run: dotnet restore ChronoTravelers.sln
 
+      # -m:1 serializes the solution's test projects — see ci.yml's Test
+      # step for why (ChronoTravelers.Server.Tests's real-socket
+      # TelnetConnectionTests flaking under cross-project CPU contention).
+      # Same fix here so a release isn't blocked by that flake either.
       - name: Test
-        run: dotnet test ChronoTravelers.sln -c Release
+        run: dotnet test ChronoTravelers.sln -c Release -m:1
 
       - name: Publish self-contained win-x64 build
         run: dotnet publish src/ChronoTravelers.Console/ChronoTravelers.Console.csproj -c Release -r win-x64 -o publish/win-x64 -p:Version=${{ steps.version.outputs.version }}

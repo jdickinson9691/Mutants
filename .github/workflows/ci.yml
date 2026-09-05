@@ -32,8 +32,18 @@ jobs:
       - name: Build
         run: dotnet build ChronoTravelers.sln --no-restore -c Release
 
+      # -m:1 forces MSBuild to run the solution's test projects one at a time
+      # instead of its default of one concurrent process per project (Core,
+      # Engine, Game, Server.Tests all launching testhosts simultaneously).
+      # On windows-latest's constrained core count that concurrency starved
+      # ChronoTravelers.Server.Tests's real-socket TelnetConnectionTests,
+      # which races a wall-clock timeout against actual TCP round-trips
+      # (see that test file's own comments) — it flaked repeatedly in CI
+      # (2026-09-05) while always passing run alone or locally. Serializing
+      # here removes the CPU contention at its source; TelnetConnectionTests'
+      # own timeout was also bumped 30s -> 60s as a second line of defense.
       - name: Test
-        run: dotnet test ChronoTravelers.sln --no-build -c Release --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+        run: dotnet test ChronoTravelers.sln --no-build -c Release -m:1 --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
 
       - name: Upload test results
         if: always()

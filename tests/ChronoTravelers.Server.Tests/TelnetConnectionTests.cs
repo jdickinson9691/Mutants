@@ -25,8 +25,15 @@ public class TelnetConnectionTests : IDisposable
     // blocking session loop. 5s was tight enough that a full-solution
     // `dotnet test` run (every assembly in parallel, CPU saturated) would
     // intermittently trip the timeout on the longer scripts even though the
-    // session completes fine when the test runs in isolation.
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+    // session completes fine when the test runs in isolation. Bumped
+    // 30s -> 60s (2026-09-05): even 30s still intermittently flaked in CI
+    // (windows-latest, shared/constrained cores) under that same
+    // cross-assembly contention — see .github/workflows/ci.yml's `-m:1` on
+    // the Test step, which addresses the actual cause (dotnet test running
+    // every test *project* in the solution as concurrent processes); this
+    // wider margin is just a belt-and-suspenders on top of that fix, since
+    // a real-socket test racing a wall clock should stay generous regardless.
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
 
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"ct-telnettest-{Guid.NewGuid():N}.db");
     private readonly ServerStore _store;
