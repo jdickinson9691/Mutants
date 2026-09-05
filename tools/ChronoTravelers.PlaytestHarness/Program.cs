@@ -14,7 +14,11 @@ using ChronoTravelers.PlaytestHarness;
 //   Class:       Soldier | Doctor | Spy | Scientist | Engineer | all
 //   runs:        bot playthroughs per class (default 3)
 //   ticksPerRun: world-tick budget per run (default 3000)
-//   seed:        base world seed; run N uses seed+N (default 1000)
+//   seed:        base world seed; run N uses seed+N (default 1000). For
+//                "all", each class also gets its own +100000-per-class
+//                offset so classes don't replay the exact same seeds
+//                (see the SeedStridePerClass comment below for why that
+//                mattered for pooled NPC trait sampling).
 //   aggression:  healing-threshold multiplier, >1 = heals later/less
 //                cautiously (default 1.0) — see PlaytestRunner.Run's doc
 //                comment; useful for surfacing low-HP passives (Second
@@ -43,13 +47,27 @@ var classes = string.Equals(classArg, "all", StringComparison.OrdinalIgnoreCase)
     ? Enum.GetValues<CharacterClass>().ToList()
     : [ParseClass(classArg)];
 
+// Each class gets its own non-overlapping seed range (a large stride per
+// class index) rather than every class replaying the exact same baseSeed
+// .. baseSeed+runs-1 sequence. That reuse was silently correlating the
+// "independent" NPC samples PrintNpcTraitEffects pools across classes:
+// NpcPopulation.Spawn's RNG consumption turned out to be class-agnostic,
+// so the same seed produced nearly the same NPC trait rolls regardless of
+// which class was under test — an n=125 pooled sample was really only
+// ~25 distinct outcomes replicated five times. A distinct seed range per
+// class makes every class's world (and its NPCs) genuinely independent.
+const long SeedStridePerClass = 100_000;
+
 var allReports = new List<RunReport>();
-foreach (var characterClass in classes)
+for (var classIndex = 0; classIndex < classes.Count; classIndex++)
 {
+    var characterClass = classes[classIndex];
+    var classBaseSeed = baseSeed + classIndex * SeedStridePerClass;
+
     var battery = new List<RunReport>();
     for (var i = 0; i < runs; i++)
     {
-        battery.Add(PlaytestRunner.Run(characterClass, baseSeed + i, maxTicks, contentDirectory, abilities, aggression, verboseFatal));
+        battery.Add(PlaytestRunner.Run(characterClass, classBaseSeed + i, maxTicks, contentDirectory, abilities, aggression, verboseFatal));
     }
 
     ReportPrinter.Print(characterClass, battery);
