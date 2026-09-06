@@ -65,7 +65,11 @@ public class PassiveTraitTests
         traveler.Wield(armor);
         var withHardened = traveler.EffectiveDefense;
 
-        var expectedArmorBonus = armor.DefenseBonus + (int)Math.Round(armor.DefenseBonus * 0.10);
+        // Folded into one continuous calculation before a single final round
+        // (see Traveler.EffectiveDefense) — not armor.DefenseBonus rounded
+        // once and then 20% of that already-rounded int rounded again,
+        // which is what let Hardened silently vanish at real armor values.
+        var expectedArmorBonus = (int)Math.Round(armor.DefenseBonus * 1.20);
         var bareDefense = new Traveler("Bare", CharacterClass.Soldier).EffectiveDefense;
         Assert.Equal(bareDefense + expectedArmorBonus, withHardened);
     }

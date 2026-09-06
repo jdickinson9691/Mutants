@@ -22,7 +22,22 @@ public static class TimelineContentFactory
     // purchase, and now and then you get armed.
     private const double SellFodderDropChance = 1.0;
     private const double SecondSellFodderDropChance = 0.35;
+
+    // Weapon/Ranged and Armor roll independently (playtest finding,
+    // 2026-09-05 battery): a single combined "gear" roll across all three
+    // equippable types picks exactly one item per (species, year) and bakes
+    // it into that species' loot table for the rest of the year — so a
+    // species either "is a weapon species" or "is an armor species" for its
+    // entire lifetime that year, never both. Since the item-archetypes.json
+    // catalog itself skewed hard toward Weapon/Ranged, that single roll
+    // landed on Armor only a small fraction of the time, and most species
+    // could never drop armor at all. Splitting into two independent rolls
+    // means every species has its own standing chance at each category —
+    // GearDropChance is kept for the weapon/ranged roll (unchanged feel for
+    // the far more common case) and ArmorDropChance is a smaller, separate
+    // chance rather than competing with weapon/ranged for the same slot.
     private const double GearDropChance = 0.35;
+    private const double ArmorDropChance = 0.25;
     private const double ConsumableDropChance = 0.20;
 
     /// <summary>The <c>powerMultiplier</c> of a Warden's guaranteed weapon trophy — deep in the Legendary band (see <see cref="Rarity.ForPower"/>).</summary>
@@ -410,7 +425,8 @@ public static class TimelineContentFactory
 
         AddFrom(lootPool.Where(a => a.Type == ItemType.Junk), SellFodderDropChance);
         AddFrom(lootPool.Where(a => a.Type == ItemType.Junk), SecondSellFodderDropChance);
-        AddFrom(lootPool.Where(a => a.IsEquippable), GearDropChance);
+        AddFrom(lootPool.Where(a => a.Type is ItemType.Weapon || a.IsRanged), GearDropChance);
+        AddFrom(lootPool.Where(a => a.Type == ItemType.Armor), ArmorDropChance);
         AddFrom(lootPool.Where(a => a.Type == ItemType.Consumable), ConsumableDropChance);
 
         if (entries.Count == 0)
@@ -444,9 +460,9 @@ public static class TimelineContentFactory
         var rng = DeterministicRandom.For(worldSeed, year, $"apexloot:{speciesId}");
         var entries = new List<LootTableEntry>();
 
-        void AddGear(double dropChance)
+        void AddGear(IEnumerable<ItemArchetypeDefinition> candidates, double dropChance)
         {
-            var pool = lootPool.Where(a => a.IsEquippable).ToList();
+            var pool = candidates.ToList();
             if (pool.Count == 0)
             {
                 return;
@@ -470,8 +486,13 @@ public static class TimelineContentFactory
         }
 
         AddFrom(lootPool.Where(a => a.Type == ItemType.Junk), 1.0);
-        AddGear(1.0);
-        AddGear(0.4);
+        AddGear(lootPool.Where(a => a.Type is ItemType.Weapon || a.IsRanged), 1.0);
+        AddGear(lootPool.Where(a => a.Type is ItemType.Weapon || a.IsRanged), 0.4);
+        // Armor gets its own guaranteed-odds roll too (same split-roll fix
+        // as the regular loot table, see GearDropChance's doc comment) —
+        // an apex fight is a serious optional payoff, so it's worth a good
+        // standing chance at a piece of armor, not just weapons/ranged.
+        AddGear(lootPool.Where(a => a.Type == ItemType.Armor), 0.5);
         AddFrom(lootPool.Where(a => a.Type == ItemType.Consumable), 0.6);
 
         if (entries.Count == 0)

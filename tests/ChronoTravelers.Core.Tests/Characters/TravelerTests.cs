@@ -643,7 +643,7 @@ public class TravelerTests
     public void EffectiveDefense_AddsArmorBonus()
     {
         // Scientist + unrestricted armor: no class has an armor/defense
-        // passive at Lv1 except the Soldier ("Hardened", +10% — covered by
+        // passive at Lv1 except the Soldier ("Hardened", +20% — covered by
         // PassiveTraitTests), so this isolates the plain armor contribution.
         var traveler = new Traveler("Rook", CharacterClass.Scientist);
         var unarmoredDefense = traveler.EffectiveDefense;

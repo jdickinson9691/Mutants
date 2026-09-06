@@ -122,7 +122,7 @@ public static class PassiveTraits
     public static readonly IReadOnlyList<PassiveTrait> All =
     [
         // --- Soldier (passives at 1/8/13/18/23/28, between active levels 5/10/15/20/25/30) ---
-        new(CharacterClass.Soldier, 1, "Hardened", "+10% Defense from equipped armor.", PassiveHook.ArmorDefenseBonusPct, 0.10),
+        new(CharacterClass.Soldier, 1, "Hardened", "+20% Defense from equipped armor.", PassiveHook.ArmorDefenseBonusPct, 0.20),
         new(CharacterClass.Soldier, 8, "Second Wind", "-10% damage taken while below 30% HP.", PassiveHook.LowHpDamageReductionPct, 0.10),
         new(CharacterClass.Soldier, 13, "Juggernaut Momentum", "+2% attack per consecutive round landed this fight, capped at 10 stacks.", PassiveHook.ConsecutiveHitAttackBonusPct, 0.02),
         new(CharacterClass.Soldier, 18, "Thick Hide", "-25% damage taken from an ambush.", PassiveHook.AmbushDamageReductionPct, 0.25),
@@ -130,7 +130,7 @@ public static class PassiveTraits
         new(CharacterClass.Soldier, 28, "Unbreakable", "Once per fight, a killing blow leaves 1 HP instead.", PassiveHook.DeathProofOncePerFight, 1.0),
 
         // --- Doctor (passives at 1/8/13/18/23/28, between active levels 5/10/15/20/25/30) ---
-        new(CharacterClass.Doctor, 1, "Bedside Manner", "+15% HP restored by Heal.", PassiveHook.HealRatioBonusPct, 0.15),
+        new(CharacterClass.Doctor, 1, "Bedside Manner", "+25% HP restored by Heal.", PassiveHook.HealRatioBonusPct, 0.25),
         new(CharacterClass.Doctor, 8, "Resonant Calm", "-15% damage taken from an echo.", PassiveHook.EchoDamageReductionPct, 0.15),
         new(CharacterClass.Doctor, 13, "Steady Hands", "+20% HP restored by consumables.", PassiveHook.ConsumableHealBonusPct, 0.20),
         new(CharacterClass.Doctor, 18, "Overwatch", "+15% Tachyon regen rate.", PassiveHook.TachyonRegenRateBonusPct, 0.15),

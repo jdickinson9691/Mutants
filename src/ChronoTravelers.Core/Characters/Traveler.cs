@@ -297,12 +297,21 @@ public sealed class Traveler
         get
         {
             var baseDefense = (int)(Stats.Agility / MonsterScaling.AgilityToDefenseDivisor);
-            var armorBonus = EquippedArmor is null
-                ? 0
-                : (int)Math.Round(EquippedArmor.DefenseBonus * EquippedArmor.WieldEffectiveness(Class, OffClassPenaltyReduction));
 
-            // Soldier "Hardened" — bonus on top of armor's own DefenseBonus contribution (docs/GDD.md §4.2.1).
-            armorBonus += (int)Math.Round(armorBonus * PassiveTraits.Sum(Class, Level, PassiveHook.ArmorDefenseBonusPct));
+            // Soldier "Hardened" — % bonus on top of armor's own DefenseBonus
+            // contribution (docs/GDD.md §4.2.1), folded into one continuous
+            // calculation before a single final round. Rounding the base
+            // armor contribution first and then separately rounding the
+            // passive's cut of that already-rounded int (the previous
+            // approach) silently zeroed Hardened out at realistic early-game
+            // armor values — 10% of a +3 armor piece is 0.3, which rounds to
+            // 0 (playtest finding, 2026-09-05 battery: Hardened never
+            // registered for a Soldier wearing anything below roughly +8).
+            var rawArmorBonus = EquippedArmor is null
+                ? 0.0
+                : EquippedArmor.DefenseBonus * EquippedArmor.WieldEffectiveness(Class, OffClassPenaltyReduction);
+            rawArmorBonus *= 1 + PassiveTraits.Sum(Class, Level, PassiveHook.ArmorDefenseBonusPct);
+            var armorBonus = (int)Math.Round(rawArmorBonus);
 
             // Engineer "Improvised Plating" — flat Defense bonus.
             var flatBonus = (int)PassiveTraits.Sum(Class, Level, PassiveHook.FlatDefenseBonus);
