@@ -51,8 +51,8 @@
   { "class": "Scientist", "tier": 6, "level": 30, "name": "Rupture", "description": "Capstone: tear a local seam open on top of everything. Long cooldown.", "source": "original",
     "tachyonCost": 30, "effect": "Damage", "magnitude": 3.0 },
 
-  { "class": "Engineer", "tier": 1, "level": 2, "name": "Dampener", "description": "Clamp a field brake on the target - its Speed drops for several rounds.", "source": "original",
-    "tachyonCost": 8, "effect": "DebuffTargetSpeed", "magnitude": 5 },
+  { "class": "Engineer", "tier": 1, "level": 2, "name": "Dampener", "description": "Overload the target's own systems with a field brake - a jolting burst of feedback damage.", "source": "original",
+    "tachyonCost": 8, "effect": "Damage", "magnitude": 1.5 },
   { "class": "Engineer", "tier": 2, "level": 5, "name": "Jump Rig", "description": "A rigged micro-jump - short teleport to escape or reposition.", "source": "original",
     "tachyonCost": 0, "effect": "None" },
   { "class": "Engineer", "tier": 3, "level": 9, "name": "Sabotage", "description": "Foul the target's gear; its attack power stays down all fight.", "source": "original",
