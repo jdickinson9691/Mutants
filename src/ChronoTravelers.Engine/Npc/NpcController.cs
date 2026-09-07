@@ -422,9 +422,23 @@ public static class NpcController
                 return null;
             }
 
-            targetYear = npc.Tachyons.CanAfford(TachyonEconomy.TimeTravelCost(npc.CurrentYear, anchor))
-                ? anchor
-                : ClosestAffordableHopToward(npc, anchor, random, maxHop);
+            if (npc.Tachyons.CanAfford(TachyonEconomy.TimeTravelCost(npc.CurrentYear, anchor)))
+            {
+                // Cap a full anchor jump so it never crosses
+                // Traveler.ChargeTravelThresholdYears in one hop: NPCs are
+                // designed to resolve travel instantly and never enter the
+                // charged-jump path (docs/ENDGAME_STRATEGY.md recommendation 5).
+                // A more distant anchor is approached one big affordable hop
+                // at a time on successive ticks.
+                var gap = anchor - npc.CurrentYear;
+                targetYear = Math.Abs(gap) <= Traveler.ChargeTravelThresholdYears
+                    ? anchor
+                    : npc.CurrentYear + Math.Sign(gap) * Traveler.ChargeTravelThresholdYears;
+            }
+            else
+            {
+                targetYear = ClosestAffordableHopToward(npc, anchor, random, maxHop);
+            }
         }
         else
         {

@@ -70,6 +70,50 @@ public class WorldSimulationTests
     }
 
     [Fact]
+    public void Tick_CompletesAChargedJumpAfterItsTicksElapse()
+    {
+        // docs/ENDGAME_STRATEGY.md recommendation 5 — WorldSimulation.Tick's
+        // shared per-traveler loop advances a charging player's pending
+        // travel and, once it resolves, actually moves them.
+        var world = World();
+        var player = OffGridPlayer("Player", world, 2000);
+        player.BeginChargingTravel(4900, ticksRequired: 3);
+        var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.5));
+
+        simulation.Tick(player);
+        Assert.True(player.IsChargingTravel);
+        Assert.Equal(2000, player.CurrentYear);
+
+        simulation.Tick(player);
+        Assert.True(player.IsChargingTravel);
+        Assert.Equal(2000, player.CurrentYear);
+
+        simulation.Tick(player);
+        Assert.False(player.IsChargingTravel);
+        Assert.Equal(4900, player.CurrentYear);
+    }
+
+    [Fact]
+    public void Tick_NeverStartsChargingForAnNpc_OnlyAPlayerInitiatedJumpCan()
+    {
+        // NpcController.MaxTravelHop tops out at 300 (450 for a Wanderer),
+        // well under Traveler.ChargeTravelThresholdYears (750), so no NPC
+        // travel decision can ever call BeginChargingTravel — confirmed
+        // here by observing many ticks never put any NPC into a charge.
+        var world = World();
+        var player = OffGridPlayer("Player", world, 2000);
+        var npcs = Enumerable.Range(0, 5).Select(i => NewTraveler($"Npc{i}", world, 2000)).ToList<Traveler>();
+        var simulation = new WorldSimulation(world, npcs, StubRandomSource.Fixed(0.5));
+
+        for (var i = 0; i < 25; i++)
+        {
+            simulation.Tick(player);
+        }
+
+        Assert.All(npcs, npc => Assert.False(npc.IsChargingTravel));
+    }
+
+    [Fact]
     public void Tick_StillNetDrainsTachyonsDeepInTheFuture()
     {
         var world = World();

@@ -14,6 +14,16 @@ namespace ChronoTravelers.Core.Time;
 /// tough guaranteed encounter guarding a year-scaled Legendary trophy
 /// (see <see cref="TimelineContentFactory.Warden"/>) until beaten
 /// once.
+///
+/// <see cref="TimeScale.MaxYear"/> (year 5000) is always a Warden year,
+/// regardless of where the random walk above happens to land — a
+/// guaranteed capstone at the very end of the timeline
+/// (docs/ENDGAME_STRATEGY.md recommendation 4:
+/// <see cref="TimelineContentFactory.FinalWarden"/> builds a distinctly
+/// stronger, unique encounter for it, not just another randomly-scaled
+/// Warden). This can make the final gap into 5000 fall outside
+/// [<see cref="MinGap"/>, <see cref="MaxGap"/>] — a deliberate exception,
+/// not a bug — see <c>WardenScheduleTests</c>.
 /// </summary>
 public sealed class WardenSchedule
 {
@@ -37,6 +47,11 @@ public sealed class WardenSchedule
 
             _years.Add(year);
         }
+
+        // Guaranteed capstone (docs/ENDGAME_STRATEGY.md recommendation 4):
+        // year 5000 is always a Warden year, whether or not the random walk
+        // above happened to land on it.
+        _years.Add(TimeScale.MaxYear);
     }
 
     /// <summary>Every Warden year, ascending.</summary>

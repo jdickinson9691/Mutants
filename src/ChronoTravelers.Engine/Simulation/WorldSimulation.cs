@@ -198,6 +198,18 @@ public sealed class WorldSimulation
             traveler.AdvanceTachyonDrainTick(TachyonEconomy.TicksPerTachyonDrain(scalingTier, drainMultiplier));
             traveler.AdvanceTachyonRegenTick(TachyonEconomy.TicksPerTachyonRegen(scalingTier, drainMultiplier));
             traveler.AdvanceEffectTicks();
+
+            // docs/ENDGAME_STRATEGY.md recommendation 5: complete a charged
+            // jump once its ticks run out. NPCs can never start charging
+            // (see Traveler.ChargeTravelThresholdYears's doc comment), so
+            // this is a permanent no-op for every entry in Npcs — only a
+            // player-initiated long jump ever reaches it.
+            if (traveler.AdvancePendingTravel() is { } arrivedYear)
+            {
+                traveler.SetCurrentYear(arrivedYear);
+                traveler.PlaceAt(World.GetYear(arrivedYear).Map.Start);
+                Broadcast.Publish(GameEvent.TimeTraveled(traveler.Name, arrivedYear));
+            }
         }
 
         ApplyStoreMaintenance();
@@ -338,6 +350,14 @@ public sealed class WorldSimulation
             traveler.AdvanceTachyonDrainTick(TachyonEconomy.TicksPerTachyonDrain(scalingTier, drainMultiplier));
             traveler.AdvanceTachyonRegenTick(TachyonEconomy.TicksPerTachyonRegen(scalingTier, drainMultiplier));
             traveler.AdvanceEffectTicks();
+
+            // docs/ENDGAME_STRATEGY.md recommendation 5 — see Tick's identical block above.
+            if (traveler.AdvancePendingTravel() is { } arrivedYear)
+            {
+                traveler.SetCurrentYear(arrivedYear);
+                traveler.PlaceAt(World.GetYear(arrivedYear).Map.Start);
+                Broadcast.Publish(GameEvent.TimeTraveled(traveler.Name, arrivedYear));
+            }
         }
 
         // A rotating occupied-year anchor, computed before the NPC pass so

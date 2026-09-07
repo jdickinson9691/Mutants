@@ -1841,8 +1841,8 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
 /// room (or that year's Warden, stationed at the map's start room in
 /// a Warden year the player hasn't cleared). <paramref name="targetName"/>
 /// picks one when several share the room; empty takes the first.
-/// Interactive and round-by-round via CombatSession — "attack", "cast
-/// <ability>", or "use <item>" each round. On a win the monster is removed from the year's
+/// Interactive and round-by-round via CombatSession — "attack" or "cast
+/// <ability>" each round. On a win the monster is removed from the year's
 /// live population and its loot (table roll + anything it had scavenged)
 /// goes to the player. Returns false if the Traveler was defeated (caller
 /// ends the session). End-of-input mid-fight auto-attacks each remaining
@@ -1911,7 +1911,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
 
     while (!session.IsOver)
     {
-        AnsiConsole.Markup("[green]  (attack)[/], [green]cast <ability>[/], or [green]use <item>[/]? > ");
+        AnsiConsole.Markup("[green]  (attack)[/] or [green]cast <ability>[/]? > ");
         var rawInput = Console.ReadLine();
 
         if (rawInput is not null)
@@ -1941,46 +1941,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
                     continue;
                 }
 
-                if (trimmed.StartsWith("use", StringComparison.OrdinalIgnoreCase)
-                    || trimmed.StartsWith("eat", StringComparison.OrdinalIgnoreCase)
-                    || trimmed.StartsWith("drink", StringComparison.OrdinalIgnoreCase))
-                {
-                    var verbLength = trimmed.StartsWith("eat", StringComparison.OrdinalIgnoreCase) ? 3
-                        : trimmed.StartsWith("use", StringComparison.OrdinalIgnoreCase) ? 3
-                        : 5;
-                    var itemName = trimmed.Length > verbLength ? trimmed[verbLength..].Trim() : "";
-                    var item = FindInventoryItem(traveler, itemName, static i => i.IsUsable);
-                    if (item is null || !item.IsUsable)
-                    {
-                        AnsiConsole.MarkupLine(itemName.Length == 0
-                            ? "[red]Use what?[/] Type 'inventory' to see what you're carrying."
-                            : $"[red]No usable item matching '{Markup.Escape(itemName)}' in your inventory.[/]");
-                        continue;
-                    }
-
-                    PrimaryStat? chosenStat = null;
-                    if (item.NeedsStatChoice)
-                    {
-                        chosenStat = ReadStatChoice(item.Name);
-                        if (chosenStat is null)
-                        {
-                            AnsiConsole.MarkupLine($"[grey]Left {Markup.Escape(item.Name)} untouched.[/]");
-                            continue;
-                        }
-                    }
-
-                    var useResult = session.UseItem(item, chosenStat);
-                    AnsiConsole.MarkupLine(useResult.Success ? $"[blue]{Markup.Escape(useResult.Message)}[/]" : $"[red]{Markup.Escape(useResult.Message)}[/]");
-                    if (!useResult.Success)
-                    {
-                        continue;
-                    }
-
-                    PrintNewLogLines(session, ref loggedSoFar);
-                    continue;
-                }
-
-                AnsiConsole.MarkupLine("[red]Type 'attack', 'cast <ability name>', or 'use <item name>'.[/]");
+                AnsiConsole.MarkupLine("[red]Type 'attack' or 'cast <ability name>'.[/]");
                 continue;
             }
         }
@@ -2011,9 +1972,12 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
         {
             traveler.RecordWardenDefeat(year);
             var trophy = session.ItemsDropped.FirstOrDefault();
+            // monster.Name rather than a hardcoded "Warden of {year}" — the
+            // year-5000 capstone (docs/ENDGAME_STRATEGY.md recommendation 4)
+            // is named "The Convergence," not "The Warden of 5000."
             AnsiConsole.MarkupLine(trophy is not null
-                ? $"[bold yellow]The Warden of {year} falls. Its {Markup.Escape(trophy.Name)} lies at your feet — [yellow]take[/] it.[/]"
-                : $"[bold]The Warden of {year} is broken. This year is yours.[/]");
+                ? $"[bold yellow]{Markup.Escape(monster.Name)} falls. Its {Markup.Escape(trophy.Name)} lies at your feet — [yellow]take[/] it.[/]"
+                : $"[bold]{Markup.Escape(monster.Name)} is broken. This year is yours.[/]");
         }
         else
         {
@@ -2103,13 +2067,31 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
     var map = yearContent.Map;
     var population = yearContent.Population;
 
-    if (!RangedTargeting.HasClearShot(map, traveler.Position, direction.Value, weapon.Range, target.Position))
+    var current = traveler.Position;
+    var found = false;
+    for (var step = 0; step < weapon.Range; step++)
+    {
+        var move = map.TryMove(current, direction.Value);
+        if (!move.Success)
+        {
+            break; // the corridor doesn't reach any farther that way
+        }
+
+        current = move.Destination!.Value;
+        if (target.Position.Equals(current))
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found)
     {
         AnsiConsole.MarkupLine($"[grey]No clear shot at {Markup.Escape(target.Name)} that way.[/] (no shot spent)");
         return;
     }
 
-    var targetRoom = target.Position;
+    var targetRoom = current;
     var targetIsWarden = ReferenceEquals(target, population.Warden);
 
     var levelBefore = traveler.Level;
@@ -2140,7 +2122,10 @@ static void HandleShoot(Traveler traveler, TimeWorld world, IRandomSource random
             population.AddGroundLoot(targetRoom, drop);
         }
 
-        AnsiConsole.MarkupLine($"[bold yellow]You drop the Warden of {traveler.CurrentYear} from afar — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{xpAwarded} XP, +{creditsAwarded} Credits.");
+        // target.Name rather than a hardcoded "Warden of {year}" — the
+        // year-5000 capstone (docs/ENDGAME_STRATEGY.md recommendation 4)
+        // is named "The Convergence," not "The Warden of 5000."
+        AnsiConsole.MarkupLine($"[bold yellow]You drop {Markup.Escape(target.Name)} from afar — its trophy lies to the {direction.Value.Name()} ({Markup.Escape(targetRoom.ToString())}).[/] +{xpAwarded} XP, +{creditsAwarded} Credits.");
     }
     else
     {
@@ -2297,6 +2282,18 @@ static void HandleTravel(Traveler traveler, TimeWorld world, IRandomSource rando
 
     var levelBefore = traveler.Level;
     var result = TimeTravelResolver.Travel(traveler, world, targetYear, random);
+
+    if (result.IsCharging)
+    {
+        // docs/ENDGAME_STRATEGY.md recommendation 5: a jump past
+        // Traveler.ChargeTravelThresholdYears doesn't arrive immediately —
+        // Tachyons are already spent, and WorldSimulation.Tick's
+        // AdvancePendingTravel call completes the jump a few ticks later.
+        AnsiConsole.MarkupLine(
+            $"[yellow]Charging a jump to {result.ChargingTargetYear} A.D.[/] " +
+            $"[grey]Arrival in {result.ChargingTicksRequired} tick(s). ({result.TachyonsSpent} Tachyons)[/]");
+        return;
+    }
 
     if (!result.Success)
     {
@@ -2888,7 +2885,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room (monsters here / nearby, ground loot)");
     AnsiConsole.MarkupLine("  [green]look <dir>[/]          - peek into the adjacent room (what's there, on the floor) without moving");
     AnsiConsole.MarkupLine("  [green]fight[/] (or f, attack, a) [green]<name>[/] - fight a monster in this room (or the Warden at the year's start)");
-    AnsiConsole.MarkupLine("    (each round, type [green]attack[/], [green]cast <ability>[/], or [green]use <item>[/])");
+    AnsiConsole.MarkupLine("    (each round, type [green]attack[/] or [green]cast <ability>[/])");
     AnsiConsole.MarkupLine("  [green]shoot[/]/[green]point <dir>[/] - fire your readied ranged weapon one room away (finite built-in ammo)");
     AnsiConsole.MarkupLine("  [green]take[/] (or grab) [green]<item>[/] - pick up loot off the ground here ('take all' works)");
     AnsiConsole.MarkupLine("  [green]monsters[/] (or mobs)  - list the monsters roaming this year");

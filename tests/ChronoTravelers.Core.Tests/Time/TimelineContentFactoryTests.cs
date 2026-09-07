@@ -60,6 +60,18 @@ public class TimelineContentFactoryTests
     }
 
     [Fact]
+    public void ForSpecies_TagsParadoxOnlyWhenTheEraFlagIsSet()
+    {
+        // docs/ENDGAME_STRATEGY.md recommendation 3 — the paradox tag comes
+        // from the era, not the species, same append pattern as "caster".
+        var untagged = TimelineContentFactory.ForSpecies(1, Baseline, 4800, Pool, eraHasParadoxTheme: false)();
+        var tagged = TimelineContentFactory.ForSpecies(1, Baseline, 4800, Pool, eraHasParadoxTheme: true)();
+
+        Assert.False(untagged.HasTag("paradox"));
+        Assert.True(tagged.HasTag("paradox"));
+    }
+
+    [Fact]
     public void ForSpecies_LootTableDrawsOnlyFromTheGivenPoolAndIsDeterministic()
     {
         var a = TimelineContentFactory.ForSpecies(55, Baseline, 2600, Pool)();
@@ -261,6 +273,38 @@ public class TimelineContentFactoryTests
         var a = TimelineContentFactory.Warden(worldSeed: 3, 2600);
         var b = TimelineContentFactory.Warden(worldSeed: 3, 2600);
         Assert.Equal(a.LootTable[0].Item.Name, b.LootTable[0].Item.Name);
+    }
+
+    [Fact]
+    public void Warden_AtMaxYear_RoutesToTheStrongerUniqueFinalWarden()
+    {
+        // docs/ENDGAME_STRATEGY.md recommendation 4.
+        var regular = TimelineContentFactory.Warden(worldSeed: 5, 3210);
+        var final = TimelineContentFactory.Warden(worldSeed: 5, TimeScale.MaxYear);
+        var direct = TimelineContentFactory.FinalWarden(worldSeed: 5);
+
+        Assert.Equal("The Convergence", final.Name);
+        Assert.Equal(direct.Name, final.Name);
+        Assert.True(final.HasTag("paradox"));
+        Assert.True(final.HasTag("capstone"));
+
+        var regularTier = TimeScale.TierForYear(3210);
+        var finalTier = TimeScale.TierForYear(TimeScale.MaxYear);
+        // A regular Warden is 3x base HP at its own tier; the final one is
+        // 5x at the (higher) max-year tier, so it's decisively tougher.
+        Assert.True(final.Health.Max > (int)Math.Round(MonsterScaling.BaseHp(regularTier) * 3));
+        Assert.True(final.Health.Max > regular.Health.Max);
+        _ = finalTier; // documents which tier final.Health.Max is computed at, above
+    }
+
+    [Fact]
+    public void FinalWarden_TrophyOutclassesARegularWardensTrophy()
+    {
+        var regularTrophy = TimelineContentFactory.Warden(worldSeed: 5, 3210).LootTable[0].Item;
+        var finalTrophy = TimelineContentFactory.FinalWarden(worldSeed: 5).LootTable[0].Item;
+
+        Assert.Equal(Rarity.Legendary, finalTrophy.Rarity);
+        Assert.True(finalTrophy.AttackBonus > regularTrophy.AttackBonus);
     }
 
     [Fact]

@@ -104,6 +104,15 @@ public class TimeWorldContentTests
         var previous = TimeScale.MinYear;
         foreach (var year in years)
         {
+            // Year 5000 is a guaranteed capstone (docs/ENDGAME_STRATEGY.md
+            // recommendation 4) forced in regardless of the random walk's
+            // gap, so it's deliberately exempt from the 50-100 gap rule —
+            // see WardenScheduleTests.Year5000IsAlwaysAWardenYearRegardlessOfSeed.
+            if (year == TimeScale.MaxYear)
+            {
+                continue;
+            }
+
             Assert.InRange(year - previous, WardenSchedule.MinGap, WardenSchedule.MaxGap);
             previous = year;
         }

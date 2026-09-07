@@ -64,12 +64,15 @@ public class TimeTravelResolverTests
         var traveler = RichTraveler(2000);
         var before = traveler.Tachyons.Current;
 
-        var result = TimeTravelResolver.Travel(traveler, World(), targetYear: 4200, NeutralRandom());
+        // Within Traveler.ChargeTravelThresholdYears (750) so it resolves
+        // immediately — the charged-jump path has its own tests (see
+        // TravelerTests.ChargeTravel_* / WorldSimulationTests.Tick_CompletesAChargedJump*).
+        var result = TimeTravelResolver.Travel(traveler, World(), targetYear: 2700, NeutralRandom());
 
         Assert.True(result.Success);
-        Assert.Equal(4200, result.NewYear);
-        Assert.Equal(4200, traveler.CurrentYear);
-        Assert.Equal(4200, traveler.FurthestYearReached);
+        Assert.Equal(2700, result.NewYear);
+        Assert.Equal(2700, traveler.CurrentYear);
+        Assert.Equal(2700, traveler.FurthestYearReached);
         Assert.Equal(before - result.TachyonsSpent, traveler.Tachyons.Current);
     }
 
@@ -77,12 +80,13 @@ public class TimeTravelResolverTests
     public void Travel_Retreat_MovesCurrentYearButNotFurthestYearReached()
     {
         var traveler = RichTraveler(2000);
-        TimeTravelResolver.Travel(traveler, World(), targetYear: 4000, NeutralRandom());
+        // Both hops stay within the charge threshold (750) so they resolve immediately.
+        TimeTravelResolver.Travel(traveler, World(), targetYear: 2700, NeutralRandom());
 
         TimeTravelResolver.Travel(traveler, World(), targetYear: 2300, NeutralRandom());
 
         Assert.Equal(2300, traveler.CurrentYear);
-        Assert.Equal(4000, traveler.FurthestYearReached);
+        Assert.Equal(2700, traveler.FurthestYearReached);
     }
 
     [Fact]

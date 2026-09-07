@@ -105,6 +105,14 @@ file I/O.
       Reaches, The Frostbound Vaults, The Glacier Deeps, The Shattered
       Orbital, The Vacuum Reaches, The Chronofracture, The Long Now, The
       Final Instant.
+      **The `"paradox"` theme (The Chronofracture onward, years 4600+) now
+      has a mechanical hook**, not just flavor text: `TimeWorld.Build`
+      checks whether the year's era's `itemThemeTags` includes `"paradox"`
+      and, if so, threads that through `TimelineContentFactory.ForSpecies`
+      so every monster spawned there also carries a `"paradox"` tag
+      (same append pattern as the existing `"caster"` tag) — read by
+      Soldier's *Anomaly Killer* passive and worn by the year-5000 capstone
+      (docs/ENDGAME_STRATEGY.md recommendation 3).
 
 - [x] **Store template** — `store-templates.json`: `{ playerSlotBaseCost,
       playerSlotCostPerTier, playerSlotCount }`. Every year gets one supply
@@ -121,6 +129,15 @@ file I/O.
       `YearContent.Warden` is a ~3×-HP bullet sponge with a
       guaranteed year-scaled Legendary weapon trophy
       (`Warden of <year>'s <noun>`). Gates nothing (GDD §3.2).
+      **Year 5000 is always a Warden year** regardless of the random walk
+      (`WardenSchedule` force-adds `TimeScale.MaxYear`, which can put that
+      one final gap outside the usual 50–100-year rule) and routes to
+      `TimelineContentFactory.FinalWarden` instead of the regular
+      3×-HP/5×-reward formula: a unique, guaranteed capstone — "The
+      Convergence" — at 5× HP, 10× XP/Credit reward, a higher-power
+      Legendary trophy, and the `"paradox"`/`"capstone"` tags (see the
+      paradox-theme entry below) — docs/ENDGAME_STRATEGY.md
+      recommendation 4.
 
 - [x] **NPC count & class distribution** — `npc-population.json`: `{
       "totalCount": N, "classWeights"? }`. `NpcPopulation.Spawn` scatters
@@ -135,14 +152,35 @@ file I/O.
       (`RespawnNear`/`RespawnScattered`) so a replaced NPC keeps drawing
       from the same distribution the initial population did.
 
-- [x] **Ability tables** — `abilities.json` (unchanged by the timeline
-      rework). Soldier/Doctor are docs/GDD.md §4.2-sourced; Spy/Scientist/
-      Engineer are original design (`source` field per entry). Mechanical
-      fields (`effect`, `magnitude`, `tachyonCost`, `condition`, `tag`,
+- [x] **Ability tables** — `abilities.json`. Soldier/Doctor's first six
+      tiers are docs/GDD.md §4.2-sourced; Spy/Scientist/Engineer's are
+      original design (`source` field per entry). Mechanical fields
+      (`effect`, `magnitude`, `tachyonCost`, `condition`, `tag`,
       `durationRounds`) drive `ChronoTravelers.Engine.Combat.CombatSession`.
       Three abilities with no honest 1v1 translation (Crash Cart, Black
       Market Contacts, Jump Rig) are `effect: "None"` and refused at cast
-      time.
+      time. **A 7th tier per class** (`source: "endgame"`) was added for
+      the year-3500-5000 endgame — level 35 for Soldier/Doctor/Spy/
+      Scientist, level 25 for Engineer's compressed cadence — each a
+      stronger variant of that class's existing kit (higher `tachyonCost`
+      and `magnitude` than tier 6): Soldier's *Executioner's Volley*,
+      Doctor's *Field Sanctuary*, Spy's *Vanishing Act*, Scientist's
+      *Cataclysm*, Engineer's *Overload Discharge*
+      (docs/ENDGAME_STRATEGY.md recommendation 2). `Leveling.AbilityTierCount`
+      is now 7 (`TopAbilityLevel` 35) to match.
+
+- [x] **Passive traits** — no file, in-code data
+      (`ChronoTravelers.Core.Characters.PassiveTrait`/`PassiveTraits`),
+      since passives need no cast-time resolution or NPC casting decision.
+      Each class has 12: a first wave (levels 1–28, Engineer 1–19) and a
+      second wave (levels 31–60, Engineer 31–56, roughly evenly spaced)
+      added for the year-3500-5000 endgame — smaller top-ups on the same
+      hooks as their first-wave sibling (so the two stack), reusing only
+      pre-existing `PassiveHook` values except one new hook: Soldier's
+      level-58 *Anomaly Killer* (`PassiveHook.ParadoxDamageBonusPct`) —
+      bonus damage vs. a `"paradox"`-tagged monster, the mechanical hook
+      for the paradox theme below (docs/ENDGAME_STRATEGY.md
+      recommendations 1 and 3).
 
 ## Validation
 
@@ -150,7 +188,9 @@ file I/O.
 catalogs and checks: every era/species/theme cross-reference resolves;
 sampled years across 2000–5000 generate well-formed, fully-connected maps;
 monster/loot power rises with the year; Warden years are 50–100 years
-apart and each yields a Legendary weapon trophy; every year's government
+apart (except the final, forced gap into the guaranteed year-5000
+capstone — see `WardenScheduleTests.Year5000IsAlwaysAWardenYearRegardlessOfSeed`)
+and each yields a Legendary weapon trophy; every year's government
 store stocks all staple kinds. `EraTable` / `TimeWorld` constructor
 validation is surfaced as `ContentException` by the loader.
 
@@ -165,5 +205,9 @@ Not new plumbing — tuning and polish:
   affordable early hop now lands in a meaningfully harder year. The `8`
   floor stops a near-free decade-creep that farmed every year on the way;
   only a full cross-timeline leap is still an end-game Tachyon commit.
+  **Jumps past `Traveler.ChargeTravelThresholdYears` (750 years) now
+  "charge" over several world ticks instead of resolving instantly** —
+  docs/ENDGAME_STRATEGY.md recommendation 5; see docs/GDD.md §12 for the
+  full mechanic.
 - **More / finer era bands** for tighter thematic progression.
 - **Denser rosters / catalogs** if the game wants more variety per year.

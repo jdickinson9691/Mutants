@@ -87,9 +87,11 @@ public class LevelingTests
     [InlineData(4, false)]
     [InlineData(6, false)]
     [InlineData(31, false)]
-    // Levels past the 6th ability tier are valid (cap is 60) but unlock no
-    // new abilities — stats/HP only — so a fifth-multiple past 30 is false.
-    [InlineData(35, false)]
+    // The 7th ability tier unlocks at level 35 (docs/ENDGAME_STRATEGY.md
+    // recommendation 2). Levels past it are valid (cap is 60) but unlock no
+    // new abilities — stats/HP only — so a fifth-multiple past 35 is false.
+    [InlineData(35, true)]
+    [InlineData(40, false)]
     [InlineData(60, false)]
     public void UnlocksAbilityTier_OnlyOnMultiplesOfFiveUpToTopAbilityLevel(int level, bool expected)
     {
@@ -100,6 +102,7 @@ public class LevelingTests
     [InlineData(5, 1)]
     [InlineData(10, 2)]
     [InlineData(30, 6)]
+    [InlineData(35, 7)]
     public void AbilityTierUnlockedAt_MapsLevelToTierIndex(int level, int expectedTier)
     {
         Assert.Equal(expectedTier, Leveling.AbilityTierUnlockedAt(level));
@@ -117,7 +120,8 @@ public class LevelingTests
     [InlineData(5, 1)]
     [InlineData(24, 4)]
     [InlineData(30, 6)]
-    [InlineData(60, 6)]
+    [InlineData(35, 7)]
+    [InlineData(60, 7)]
     public void UnlockedAbilityTierCount_TracksFloorDivisionByFive(int level, int expectedCount)
     {
         Assert.Equal(expectedCount, Leveling.UnlockedAbilityTierCount(level));

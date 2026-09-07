@@ -118,8 +118,13 @@ public sealed class TimeWorld
         // of the era, which only supplies room text and loot theming here.
         var generationSpecies = _generations.GenerationForYear(year).Species;
 
+        // docs/ENDGAME_STRATEGY.md recommendation 3: every monster in a
+        // "paradox"-themed era (years 4600+ — see eras.json) carries a
+        // "paradox" tag, the mechanical hook for that theme.
+        var eraHasParadoxTheme = era.ItemThemeTags.Contains("paradox", StringComparer.OrdinalIgnoreCase);
+
         var roster = generationSpecies
-            .Select(sp => TimelineContentFactory.ForSpecies(WorldSeed, sp, year, LootPoolFor(sp, era)))
+            .Select(sp => TimelineContentFactory.ForSpecies(WorldSeed, sp, year, LootPoolFor(sp, era), eraHasParadoxTheme))
             .ToList();
 
         var apexRoster = generationSpecies

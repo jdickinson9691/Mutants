@@ -77,6 +77,22 @@ public sealed class CharacterSaveData
     /// <summary>The player-owned stores, one per year the player has bought into. Re-attached on load (see CharacterMapper.ApplyOwnedStores). Additive — old blobs deserialize as an empty list.</summary>
     public List<OwnedStoreSaveData> OwnedStores { get; set; } = [];
 
+    /// <summary>
+    /// docs/ENDGAME_STRATEGY.md recommendation 5's "charge a jump" mechanic —
+    /// mirrors <c>Core.Characters.Traveler</c>'s in-flight charged-jump
+    /// state so a save mid-charge round-trips instead of silently dropping
+    /// progress. All three null (the default) means "not charging" —
+    /// correct both for an old blob predating the mechanic and for a save
+    /// taken while not mid-charge.
+    /// </summary>
+    public int? ChargingTargetYear { get; set; }
+
+    /// <summary>Total ticks the in-flight charge (if any) needs — see <see cref="ChargingTargetYear"/>.</summary>
+    public int? ChargingTicksRequired { get; set; }
+
+    /// <summary>Ticks remaining on the in-flight charge (if any) — see <see cref="ChargingTargetYear"/>.</summary>
+    public int? ChargingTicksRemaining { get; set; }
+
     public DateTime SavedAtUtc { get; set; }
 }
 

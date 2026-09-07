@@ -27,12 +27,12 @@ public class PassiveTraitTests
     }
 
     [Fact]
-    public void All_HasThirtyEntries_SixPerClass()
+    public void All_HasSixtyEntries_TwelvePerClass()
     {
-        Assert.Equal(30, PassiveTraits.All.Count);
+        Assert.Equal(60, PassiveTraits.All.Count);
         foreach (CharacterClass characterClass in Enum.GetValues<CharacterClass>())
         {
-            Assert.Equal(6, PassiveTraits.All.Count(p => p.Class == characterClass));
+            Assert.Equal(12, PassiveTraits.All.Count(p => p.Class == characterClass));
         }
     }
 
@@ -43,6 +43,8 @@ public class PassiveTraitTests
         Assert.Single(PassiveTraits.Unlocked(CharacterClass.Soldier, 1));
         Assert.Equal(2, PassiveTraits.Unlocked(CharacterClass.Soldier, 8).Count());
         Assert.Equal(6, PassiveTraits.Unlocked(CharacterClass.Soldier, 30).Count());
+        // Second wave (docs/ENDGAME_STRATEGY.md rec. 1): all 12 are unlocked by the level cap.
+        Assert.Equal(12, PassiveTraits.Unlocked(CharacterClass.Soldier, 60).Count());
     }
 
     [Fact]
@@ -179,6 +181,18 @@ public class PassiveTraitTests
 
         Assert.Equal(1.0, scientist.AttackDamageMultiplierAgainst(baseline), precision: 5);
         Assert.Equal(1.20, scientist.AttackDamageMultiplierAgainst(caster), precision: 5);
+    }
+
+    [Fact]
+    public void AttackDamageMultiplierAgainst_SoldierAnomalyKiller_BonusesParadoxTaggedMonster()
+    {
+        // Second wave (docs/ENDGAME_STRATEGY.md rec. 1/3): Soldier's Lv58 "Anomaly Killer".
+        var soldier = LeveledTraveler(CharacterClass.Soldier, 58);
+        var baseline = new Monster("Drone", 1, maxHp: 20, attackPower: 5, defense: 2, speed: 5, xpReward: 5);
+        var paradox = new Monster("Echo of Itself", 1, maxHp: 20, attackPower: 5, defense: 2, speed: 5, xpReward: 5, tags: ["paradox"]);
+
+        Assert.Equal(1.0, soldier.AttackDamageMultiplierAgainst(baseline), precision: 5);
+        Assert.Equal(1.18, soldier.AttackDamageMultiplierAgainst(paradox), precision: 5);
     }
 
     [Fact]

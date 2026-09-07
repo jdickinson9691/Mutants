@@ -58,6 +58,9 @@ public static class CharacterMapper
             PositionNorth = traveler.Position.North,
             DefeatedWardens = traveler.DefeatedWardenYears.OrderBy(y => y).ToList(),
             ElixirUsesByStat = traveler.ElixirUsesByStat.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value),
+            ChargingTargetYear = traveler.ChargingTargetYear,
+            ChargingTicksRequired = traveler.ChargingTicksRequired,
+            ChargingTicksRemaining = traveler.ChargingTicksRemaining,
             Inventory = inventory,
             EquippedWeaponIndex = equippedWeaponIndex >= 0 ? equippedWeaponIndex : null,
             EquippedArmorIndex = equippedArmorIndex >= 0 ? equippedArmorIndex : null,
@@ -159,7 +162,8 @@ public static class CharacterMapper
             data.CurrentHp, data.MaxHp, data.CurrentTachyons, data.MaxTachyons, data.Credits,
             currentYear, furthestYear,
             new Coordinate(data.PositionEast, data.PositionNorth),
-            defeatedWardenYears, elixirUsesByStat);
+            defeatedWardenYears, elixirUsesByStat,
+            data.ChargingTargetYear, data.ChargingTicksRequired, data.ChargingTicksRemaining);
 
         var items = data.Inventory.Select(FromItemSaveData).ToList();
         foreach (var item in items)

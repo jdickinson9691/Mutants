@@ -12,14 +12,25 @@ public static class Leveling
     /// The character-level ceiling. Raised 30 → 60 so a Traveler keeps
     /// growing across the whole 2000–5000 A.D. timeline instead of maxing
     /// out at year ~2500 (see <see cref="Time.TimeScale.SoftLevelCapForYear"/>,
-    /// docs/GDD.md §4.1). Levels 31–60 grant stat + HP/Tachyon growth; the
-    /// ability trees still stop at their 6th tier (level 30 / Engineer 21)
-    /// until they're extended — docs/GDD.md §4.2.
+    /// docs/GDD.md §4.1). Levels 36–60 (Engineer 26–60) grant stat +
+    /// HP/Tachyon growth only; the ability trees now reach a 7th tier at
+    /// level 35 (Engineer 25 — docs/ENDGAME_STRATEGY.md recommendation 2)
+    /// but no further — docs/GDD.md §4.2.
     /// </summary>
     public const int MaxCharacterLevel = 60;
 
     public const int LevelsPerAbilityTier = 5;
-    public const int AbilityTierCount = 6;
+
+    /// <summary>
+    /// 7 tiers as of docs/ENDGAME_STRATEGY.md recommendation 2 (was 6) —
+    /// see <see cref="TopAbilityLevel"/>. This constant (and the uniform
+    /// "every 5th level" formula below) only exactly matches
+    /// Soldier/Doctor/Spy/Scientist's schedule; Engineer's own accelerated
+    /// schedule (levels 2/5/9/13/17/21/25 — see
+    /// <c>src/ChronoTravelers.Content/abilities.json</c>) was already an
+    /// exception to it before this change and still is.
+    /// </summary>
+    public const int AbilityTierCount = 7;
 
     /// <summary>The last level that unlocks an ability tier — <see cref="AbilityTierCount"/> × <see cref="LevelsPerAbilityTier"/>. Levels past this grow stats but no new abilities (yet).</summary>
     public const int TopAbilityLevel = AbilityTierCount * LevelsPerAbilityTier;
@@ -106,15 +117,15 @@ public static class Leveling
         return Math.Min(MaxCharacterLevel, 10 * unlockedTimeLevel);
     }
 
-    /// <summary>True on levels 5, 10, 15, 20, 25, 30 — a new ability tier unlocks. Levels past <see cref="TopAbilityLevel"/> grow stats only, so they return false even though they're valid levels.</summary>
+    /// <summary>True on levels 5, 10, 15, 20, 25, 30, 35 — a new ability tier unlocks. Levels past <see cref="TopAbilityLevel"/> grow stats only, so they return false even though they're valid levels.</summary>
     public static bool UnlocksAbilityTier(int level) =>
         level > 0 && level <= TopAbilityLevel && level % LevelsPerAbilityTier == 0;
 
-    /// <summary>Which ability tier (1–6) a level unlocks, or null if it doesn't unlock one.</summary>
+    /// <summary>Which ability tier (1–7) a level unlocks, or null if it doesn't unlock one.</summary>
     public static int? AbilityTierUnlockedAt(int level) =>
         UnlocksAbilityTier(level) ? level / LevelsPerAbilityTier : null;
 
-    /// <summary>How many ability tiers (0–6) are unlocked for a character at this level.</summary>
+    /// <summary>How many ability tiers (0–7) are unlocked for a character at this level.</summary>
     public static int UnlockedAbilityTierCount(int level) =>
         Math.Clamp(level / LevelsPerAbilityTier, 0, AbilityTierCount);
 }

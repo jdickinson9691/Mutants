@@ -43,6 +43,14 @@ public static class TimelineContentFactory
     /// <summary>The <c>powerMultiplier</c> of a Warden's guaranteed weapon trophy — deep in the Legendary band (see <see cref="Rarity.ForPower"/>).</summary>
     private const double WardenTrophyPower = 2.8;
 
+    /// <summary>
+    /// The <c>powerMultiplier</c> of the year-5000 capstone's guaranteed
+    /// trophy (docs/ENDGAME_STRATEGY.md recommendation 4) — meaningfully
+    /// above a regular Warden's <see cref="WardenTrophyPower"/>, the
+    /// single best-in-game weapon.
+    /// </summary>
+    private const double FinalWardenTrophyPower = 4.0;
+
     // How much tougher an apex (Monster.IsApex, seeded a few to a year by
     // YearPopulation) is than the same species at the same year — a serious
     // optional fight, not a boss. Speed is untouched so the player can
@@ -62,12 +70,22 @@ public static class TimelineContentFactory
     /// the set of item archetypes whose themes the species can drop —
     /// resolved by the caller (<see cref="TimeWorld"/>); a deterministic
     /// subset is baked into the returned factory's loot table.
+    /// <paramref name="eraHasParadoxTheme"/> is true when the current
+    /// era's <see cref="EraDefinition.ItemThemeTags"/> includes "paradox"
+    /// (years 4600+ — The Chronofracture onward, see <c>eras.json</c>);
+    /// every monster spawned there also carries a "paradox" tag, the
+    /// mechanical hook docs/ENDGAME_STRATEGY.md recommendation 3 asked for
+    /// (Soldier's "Anomaly Killer" passive reads it — see
+    /// <see cref="Characters.Traveler.AttackDamageMultiplierAgainst"/>).
+    /// Defaults to false so existing callers (and every pre-existing test)
+    /// are unaffected.
     /// </summary>
     public static Func<Monster> ForSpecies(
         long worldSeed,
         SpeciesDefinition species,
         int year,
-        IReadOnlyList<ItemArchetypeDefinition> lootPool)
+        IReadOnlyList<ItemArchetypeDefinition> lootPool,
+        bool eraHasParadoxTheme = false)
     {
         var tier = TimeScale.TierForYear(year);
         var (hp, attack, defense, speed) = StatsFor(species.Archetype, tier, species.EffectivePowerProfile);
@@ -83,6 +101,15 @@ public static class TimelineContentFactory
         IReadOnlyList<string> tags = species.Archetype == MonsterArchetype.Caster
             ? [.. species.Tags, "caster"]
             : species.Tags;
+        // "paradox" is likewise derived here, from the era rather than the
+        // species — docs/ENDGAME_STRATEGY.md recommendation 3 — so every
+        // monster in a paradox-themed era/year carries it, same append
+        // pattern as "caster" above.
+        if (eraHasParadoxTheme)
+        {
+            tags = [.. tags, "paradox"];
+        }
+
         var name = species.Name;
         var behavior = species.EffectiveBehaviorProfile;
 
@@ -314,9 +341,15 @@ public static class TimelineContentFactory
     /// regular monster's HP at the year's tier, same attack/defense/speed,
     /// a generous XP payout, and a guaranteed year-scaled Legendary
     /// weapon trophy. It blocks nothing; it just guards good loot until
-    /// beaten once.
+    /// beaten once. Year <see cref="TimeScale.MaxYear"/> is special-cased
+    /// to <see cref="FinalWarden"/> — a guaranteed, unique, stronger
+    /// capstone (docs/ENDGAME_STRATEGY.md recommendation 4) rather than a
+    /// mechanically-identical Warden scaled only by tier.
     /// </summary>
-    public static Monster Warden(long worldSeed, int year)
+    public static Monster Warden(long worldSeed, int year) =>
+        year == TimeScale.MaxYear ? FinalWarden(worldSeed) : RegularWarden(worldSeed, year);
+
+    private static Monster RegularWarden(long worldSeed, int year)
     {
         var tier = TimeScale.TierForYear(year);
         var rng = DeterministicRandom.For(worldSeed, year, "warden");
@@ -342,6 +375,52 @@ public static class TimelineContentFactory
             tags: [],
             maxTachyons: (int)Math.Round(MonsterScaling.BaseTachyons(tier) * 2),
             creditReward: (int)Math.Round(MonsterScaling.CreditReward(tier) * 5));
+    }
+
+    /// <summary>
+    /// The guaranteed, unique capstone encounter at year
+    /// <see cref="TimeScale.MaxYear"/> (docs/ENDGAME_STRATEGY.md
+    /// recommendation 4) — "The Convergence," named for The Final
+    /// Instant's own room text ("something is standing very still in the
+    /// white, and has been, forever" — <c>eras.json</c>). Meaningfully
+    /// stronger than a regular <see cref="RegularWarden"/> at the same
+    /// tier (5× base HP vs. 3×, 10× XP/Credit reward vs. 5×, a higher
+    /// <see cref="FinalWardenTrophyPower"/> trophy), and carries the
+    /// "paradox" tag — the same mechanical hook recommendation 3 gave
+    /// Soldier's "Anomaly Killer" passive, so that passive is relevant
+    /// against the very last fight on the timeline — plus "capstone" so
+    /// content tooling can identify it distinctly from a regular Warden.
+    /// Deterministic per <paramref name="worldSeed"/>, same as every other
+    /// factory here, even though nothing about it is randomized once
+    /// generated (fixed name/trophy) — kept for call-site symmetry with
+    /// <see cref="RegularWarden"/> and in case future content wants to vary it.
+    /// </summary>
+    public static Monster FinalWarden(long worldSeed)
+    {
+        _ = worldSeed;
+        const int year = TimeScale.MaxYear;
+        var tier = TimeScale.TierForYear(year);
+
+        var trophy = new Item(
+            "The Convergence's Paradox Edge",
+            ItemType.Weapon,
+            DisplayTier(year),
+            RarityExtensions.ForPower(FinalWardenTrophyPower),
+            Value: (int)Math.Round(LootScaling.ValueFor(tier, Rarity.Legendary) * 1.5),
+            AttackBonus: (int)Math.Round(LootScaling.EquipBonusFor(tier, FinalWardenTrophyPower)));
+
+        return new Monster(
+            "The Convergence",
+            DisplayTier(year),
+            maxHp: (int)Math.Round(MonsterScaling.BaseHp(tier) * 5),
+            attackPower: (int)Math.Round(MonsterScaling.BaseAttackPower(tier)),
+            defense: (int)Math.Round(MonsterScaling.BaseDefense(tier)),
+            speed: (int)Math.Round(MonsterScaling.BaseSpeed(tier)),
+            xpReward: (int)Math.Round(MonsterScaling.XpReward(tier) * 10),
+            lootTable: [new LootTableEntry(trophy, dropChance: 1.0)],
+            tags: ["paradox", "capstone"],
+            maxTachyons: (int)Math.Round(MonsterScaling.BaseTachyons(tier) * 2),
+            creditReward: (int)Math.Round(MonsterScaling.CreditReward(tier) * 10));
     }
 
     /// <summary>A concrete item from <paramref name="archetype"/> as it would drop / be stocked in <paramref name="year"/>.</summary>

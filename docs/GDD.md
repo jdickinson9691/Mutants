@@ -189,6 +189,13 @@ stretch goal, not in the original).
   guaranteed year-scaled **Legendary trophy** from a pre-collapse tech
   cache, present until you beat it once. It blocks nothing — travelling
   past a Warden year was never restricted.
+  **Year 5000 is always guaranteed a Warden** regardless of where the
+  random placement lands, and it's not just another randomly-scaled one:
+  "The Convergence" (docs/ENDGAME_STRATEGY.md recommendation 4) is a
+  unique, distinctly stronger capstone — 5× HP and 10× XP/Credit reward
+  (vs. a regular Warden's 3×/5×), a higher-power Legendary trophy, and the
+  `"paradox"`/`"capstone"` tags — the literal end of the timeline finally
+  getting a fight to match its own room text.
 - **Persistence**: map layouts are regenerated from the seed, not stored.
   What the save keeps per character is the world seed, the current and
   furthest-reached year, the set of cleared Warden years, and every
@@ -253,9 +260,13 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
   At the old cap a Traveler stopped growing around year 2500 and rode the
   back 5/6 of the timeline with frozen power; levels 31–60 keep the stat
   and HP/Tachyon curves climbing so year 5000 is a reachable target. The
-  **ability trees are unchanged — still 6 tiers, topping out at level 30**
-  (`Leveling.TopAbilityLevel`); levels 31–60 grant no new abilities yet
-  (see §4.2). The XP curve is quadratic through level 25
+  **ability trees now reach a 7th tier at level 35** (Engineer 25 —
+  `Leveling.TopAbilityLevel`, docs/ENDGAME_STRATEGY.md recommendation 2);
+  levels past that (36–60, Engineer 26–60) grant no new abilities (see
+  §4.2). **Each class also gained a second wave of six passives across
+  levels 31–60** (Engineer 31–56 — docs/ENDGAME_STRATEGY.md recommendation
+  1), smaller top-ups on the same hooks as their level-1–28 counterparts
+  so the two stack (see §4.2.1). The XP curve is quadratic through level 25
   (`Leveling.XpCurveKneeLevel`) then holds a flat per-level cost, so the
   deep levels are a linear grind rather than a quadratic wall — levels
   1–25 cost exactly what they did before the raise.
@@ -301,21 +312,25 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
   > effect) — widening what each stat *does* is a separate, not-yet-done
   > follow-up from this fix.
 
-### 4.2 Ability trees (original design, 6 tiers per class = levels 5/10/15/20/25/30)
+### 4.2 Ability trees (original design; 7 tiers per class = levels 5/10/15/20/25/30/35)
 
-> **Level cap 60, ability trees still 6 tiers.** The hard level cap was
-> raised to 60 (§4.1) but the ability trees below were not extended — the
-> last tier still unlocks at level 30 (Engineer 21). Levels 31–60 are
-> stat/HP growth only. Extending the trees with survival-focused deep
-> tiers is a planned follow-up ("Reaching Year 5000" design plan, Step 2).
+> **Level cap 60, ability trees now 7 tiers.** The hard level cap was
+> raised to 60 (§4.1), and a 7th tier was since added at level 35
+> (Engineer 25) per docs/ENDGAME_STRATEGY.md recommendation 2 — a stronger
+> variant of that class's existing kit rather than a wholly new mechanic
+> (`source: "endgame"` in `abilities.json`; see the per-class list below).
+> Levels past the 7th tier (36–60, Engineer 26–60) are still stat/HP
+> growth only. This was "Reaching Year 5000" design-plan Step 2's
+> ability-tree half; §4.2.1 covers the passive-trait half.
 
 > **Engineer exception:** its tree unlocks on an accelerated schedule —
-> **levels 2 / 5 / 9 / 13 / 17 / 21** — because the Engineer is the
-> frailest melee class (18 HP, Intellect-primary) and had no answer to a
-> bad early fight before its kit came online. Dampener (slow the target so
-> you strike first) at level 2 and Sabotage (cut incoming damage) at 9 are
-> the survival tools it needs early (playtest feedback). See
-> `src/ChronoTravelers.Content/abilities.json`.
+> **levels 2 / 5 / 9 / 13 / 17 / 21 / 25** (the level-25 7th tier added
+> per recommendation 2, keeping the same compressed cadence) — because the
+> Engineer is the frailest melee class (18 HP, Intellect-primary) and had
+> no answer to a bad early fight before its kit came online. Dampener
+> (slow the target so you strike first) at level 2 and Sabotage (cut
+> incoming damage) at 9 are the survival tools it needs early (playtest
+> feedback). See `src/ChronoTravelers.Content/abilities.json`.
 
 Example — **Soldier**:
 1. Lv5 — *Suppressing Sweep*: rake fire across the target and up to 2 others crowding it.
@@ -324,6 +339,7 @@ Example — **Soldier**:
 4. Lv20 — *Fire Discipline*: call the shots — nearby allies hit harder for a while.
 5. Lv25 — *Breach Stance*: set behind the shield — incoming damage drops.
 6. Lv30 — *Confirmed Kill*: heavy bonus damage vs. targets below 25% HP.
+7. Lv35 — *Executioner's Volley* (endgame): past Confirmed Kill — even heavier bonus damage vs. a target below 25% HP, at a proportionally higher Tachyon cost.
 
 Example — **Doctor**:
 1. Lv5 — *Triage*: focused single-target heal (Tachyon cost).
@@ -332,11 +348,43 @@ Example — **Doctor**:
 4. Lv20 — *Broad-Spectrum*: field-treat yourself and every ally in the room.
 5. Lv25 — *Crash Cart*: bring a downed ally NPC back on partial vitals (rare, long cooldown).
 6. Lv30 — *Iso Field*: a sterile bubble — a brief window of total immunity.
+7. Lv35 — *Field Sanctuary* (endgame): past Broad-Spectrum — a much larger field heal.
 
-(Spy, Scientist, Engineer get parallel 6-tier trees — full tables live in
+(Spy, Scientist, Engineer get parallel 7-tier trees — full tables live in
 `docs/CONTENT_PLAN.md` so this GDD stays a living-but-stable reference; the
 pattern — 6 tiers, one per 5 levels, escalating from single-target to
-area/group to a capstone — is the standard every class follows.)
+area/group to a capstone, plus a 7th "capstone-plus" endgame tier added
+per docs/ENDGAME_STRATEGY.md recommendation 2 — is the standard every
+class follows: Spy's *Vanishing Act*, Scientist's *Cataclysm*, Engineer's
+*Overload Discharge*.)
+
+### 4.2.1 Passive traits (always-on, no activation/UI/AI decision)
+
+Each class also has a table of **always-on passive traits**
+(`ChronoTravelers.Core.Characters.PassiveTrait`/`PassiveTraits`, no
+content file — see docs/CONTENT_PLAN.md for why) unlocked automatically by
+`Level`, read live wherever their `PassiveHook` applies (`Traveler` for
+most, `Economy.Store` for the two store hooks, `Engine.Npc.MonsterController`
+for the aggro/ambush hooks that live outside a single fight) — never by
+switching on a trait's name. **12 per class**: a first wave of 6 (levels
+1–28, Engineer 1–19), each roughly midway between a pair of active-ability
+unlock levels, and a second wave of 6 (levels 31–60, Engineer 31–56) added
+per docs/ENDGAME_STRATEGY.md recommendation 1 — smaller top-ups on the
+same hooks as their first-wave sibling (so the two stack, e.g. Soldier's
+level-1 Hardened +20% Defense-from-armor and level-33 Reinforced Plating
++10% sum to +30%), matching each class's flavor (Soldier leans defense/
+ambush/armor; Doctor heal/tachyon; Spy economy/speed/aggro; Scientist
+tachyon/caster/crit-economy; Engineer defense/speed/junk/cast-discount).
+
+One second-wave passive per class introduces a genuinely new hook rather
+than topping up an old one: Soldier's level-58 **Anomaly Killer**
+(`PassiveHook.ParadoxDamageBonusPct`, +18% attack damage vs. a
+`"paradox"`-tagged monster) — the mechanical hook for the paradox theme
+(§3.2/`eras.json`'s Chronofracture/Long Now/Final Instant bands, years
+4600+) that recommendation 3 asked for, mirroring how Scientist's existing
+Field Calibration reads the `"caster"` tag. `TimeWorld.Build` tags every
+monster spawned in a paradox-themed era/year, same append pattern as
+`"caster"` (see `TimelineContentFactory.ForSpecies`).
 
 ### 4.3 Restrictions (apply identically to player and NPCs)
 - Weapon/armor equip requires class-tagged gear (a Scientist can't wield the
@@ -765,8 +813,34 @@ yours) using NPCs instead of real concurrent users.
   the player's Tachyon pool ceiling** so a big jump is a stockpiling goal
   rather than a hard block) has made travel practical at every range. A
   full cross-timeline leap is still a ~120-Tachyon commitment you build toward
-  by converting loot. If pacing later feels off, the remaining lever is a
-  "charge a jump over several ticks" mechanic.
+  by converting loot.
+  ~~If pacing later feels off, the remaining lever is a "charge a jump over
+  several ticks" mechanic.~~ **Implemented** (docs/ENDGAME_STRATEGY.md
+  recommendation 5): a jump farther than
+  `Traveler.ChargeTravelThresholdYears` (750 years) still costs the same
+  Tachyons, spent up front, but doesn't arrive immediately — it "charges"
+  for `Traveler.TicksRequiredForChargedTravel(distance)` world ticks (1 at
+  the threshold, +1 per additional 250 years, capped at 10) before
+  `WorldSimulation`'s per-tick `Traveler.AdvancePendingTravel()` call
+  resolves it (`SetCurrentYear`/`PlaceAt`, then a `GameEvent.TimeTraveled`
+  broadcast — the same two calls and event a normal jump uses, just
+  deferred). Calling `travel` again toward the same target while charging
+  is a no-op status query; toward a different target it cancels the old
+  charge (no refund — you already committed those Tachyons) and starts the
+  new one. `TimeTravelResolver.Travel` returns a `TimeTravelResult` with
+  `IsCharging: true` and a `ChargingTargetYear`/`ChargingTicksRequired`
+  instead of a `NewYear` while a charge is in flight; the console front
+  end (`ChronoTravelers.Console`) prints "Charging a jump to `<year>` A.D.
+  — arrival in `<N>` tick(s)." The pending-charge state round-trips
+  through a save (`CharacterSaveData.ChargingTargetYear`/
+  `ChargingTicksRequired`/`ChargingTicksRemaining`, all nullable — an old
+  save with none of them restores to "not charging"). NPCs can never reach
+  750 years in one jump (`NpcController.MaxTravelHop` tops out at 300, 450
+  for a Wanderer), so charging is reachable only by a player-initiated
+  jump; the shared-world server's own `travel` command
+  (`ChronoTravelers.Game.Commands.Travel`) resolves its jumps inline
+  rather than through `TimeTravelResolver` and was left as-is — a
+  follow-up if multiplayer wants the same mechanic.
 - ~~Whether NPC store ownership should be capped (to avoid NPCs monopolizing
   all store slots before the human player can buy in).~~ Resolved (§6.2):
   NPCs may buy and run stores, but never the year's last purchasable slot —

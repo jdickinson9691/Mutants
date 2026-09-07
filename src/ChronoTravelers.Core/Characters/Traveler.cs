@@ -276,6 +276,16 @@ public sealed class Traveler
             PassiveActivationTracker.Record(Class, PassiveHook.CasterDamageBonusPct, bonus);
         }
 
+        // Soldier "Anomaly Killer" (docs/ENDGAME_STRATEGY.md recommendation 3)
+        // — bonus vs. a "paradox"-tagged monster, the mechanical hook for the
+        // late-game paradox theme (years 4600+ — see TimelineContentFactory.ForSpecies).
+        if (target.HasTag("paradox"))
+        {
+            var bonus = PassiveTraits.Sum(Class, Level, PassiveHook.ParadoxDamageBonusPct);
+            multiplier += bonus;
+            PassiveActivationTracker.Record(Class, PassiveHook.ParadoxDamageBonusPct, bonus);
+        }
+
         if (Trait == CreatureTraitKind.Ambusher && target.Health.Max > 0 && target.Health.Current == target.Health.Max)
         {
             multiplier += AmbusherFreshTargetBonusPct;
@@ -353,7 +363,8 @@ public sealed class Traveler
         int currentHp, int maxHp, int currentTachyons, int maxTachyons, int credits,
         int currentYear, int furthestYearReached, Coordinate position,
         IEnumerable<int> defeatedWardenYears,
-        IEnumerable<KeyValuePair<PrimaryStat, int>>? elixirUsesByStat)
+        IEnumerable<KeyValuePair<PrimaryStat, int>>? elixirUsesByStat,
+        int? chargingTargetYear, int? chargingTicksRequired, int? chargingTicksRemaining)
     {
         Name = name;
         Class = characterClass;
@@ -375,6 +386,15 @@ public sealed class Traveler
                 _elixirUsesByStat[stat] = uses;
             }
         }
+
+        // docs/ENDGAME_STRATEGY.md recommendation 5: round-trip an in-flight
+        // charged jump through save/load. All three are null for every save
+        // written before this existed (or one saved while not charging),
+        // which correctly restores to "not charging."
+        if (chargingTargetYear is { } targetYear && chargingTicksRequired is { } required && chargingTicksRemaining is { } remaining)
+        {
+            _pendingTravel = new PendingTravel(targetYear, required, remaining);
+        }
     }
 
     /// <summary>See the private snapshot constructor above — this is its public entry point, used by ChronoTravelers.Engine.Persistence when loading a save.</summary>
@@ -383,7 +403,8 @@ public sealed class Traveler
         int currentHp, int maxHp, int currentTachyons, int maxTachyons, int credits,
         int currentYear, int furthestYearReached, Coordinate position,
         IEnumerable<int> defeatedWardenYears,
-        IEnumerable<KeyValuePair<PrimaryStat, int>>? elixirUsesByStat = null)
+        IEnumerable<KeyValuePair<PrimaryStat, int>>? elixirUsesByStat = null,
+        int? chargingTargetYear = null, int? chargingTicksRequired = null, int? chargingTicksRemaining = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -393,7 +414,8 @@ public sealed class Traveler
         return new Traveler(
             name, characterClass, level, xp, stats,
             currentHp, maxHp, currentTachyons, maxTachyons, credits,
-            currentYear, furthestYearReached, position, defeatedWardenYears, elixirUsesByStat);
+            currentYear, furthestYearReached, position, defeatedWardenYears, elixirUsesByStat,
+            chargingTargetYear, chargingTicksRequired, chargingTicksRemaining);
     }
 
     /// <summary>
@@ -457,6 +479,96 @@ public sealed class Traveler
         }
 
         RangedTarget = null; // a locked target doesn't survive a jump to a different year
+    }
+
+    /// <summary>
+    /// docs/ENDGAME_STRATEGY.md recommendation 5's "charge a jump" mechanic:
+    /// a jump farther than this many years must be charged over several
+    /// world ticks (see <see cref="BeginChargingTravel"/>) rather than
+    /// resolving instantly. <c>Engine.Npc.NpcController.MaxTravelHop</c>
+    /// tops out at 300 (450 for a Wanderer), so an NPC can never reach this
+    /// distance — charging is reachable only by a player-initiated jump.
+    /// </summary>
+    public const int ChargeTravelThresholdYears = 750;
+
+    /// <summary>
+    /// Ticks required to complete a charged jump of <paramref name="distanceYears"/>
+    /// years (already known to exceed <see cref="ChargeTravelThresholdYears"/>):
+    /// 1 tick right at the threshold, +1 tick per additional 250 years,
+    /// capped at 10 ticks so even a full-timeline jump (3000 years) resolves
+    /// in a bounded window rather than an ever-growing one.
+    /// </summary>
+    public static int TicksRequiredForChargedTravel(int distanceYears) =>
+        Math.Clamp(1 + (distanceYears - ChargeTravelThresholdYears) / 250, 1, 10);
+
+    /// <summary>One in-flight charged jump — see <see cref="BeginChargingTravel"/>/<see cref="AdvancePendingTravel"/>. A record struct so <c>with</c>-updating <see cref="TicksRemaining"/> each tick is cheap and doesn't need its own class.</summary>
+    private readonly record struct PendingTravel(int TargetYear, int TicksRequired, int TicksRemaining);
+
+    private PendingTravel? _pendingTravel;
+
+    /// <summary>True while a long-distance jump (see <see cref="ChargeTravelThresholdYears"/>) is charging — the Traveler stays at its current year/position until it completes.</summary>
+    public bool IsChargingTravel => _pendingTravel is not null;
+
+    /// <summary>The year a charging jump is headed to, or null if not charging.</summary>
+    public int? ChargingTargetYear => _pendingTravel?.TargetYear;
+
+    /// <summary>How many ticks the current charge needed in total, or null if not charging.</summary>
+    public int? ChargingTicksRequired => _pendingTravel?.TicksRequired;
+
+    /// <summary>How many ticks remain before the current charge completes, or null if not charging.</summary>
+    public int? ChargingTicksRemaining => _pendingTravel?.TicksRemaining;
+
+    /// <summary>
+    /// Starts (or, called again for the same target, is a harmless no-op
+    /// restart of) a charged jump toward <paramref name="targetYear"/> —
+    /// see <see cref="ChargeTravelThresholdYears"/>. The caller
+    /// (<c>Engine.Simulation.TimeTravelResolver</c>) is responsible for
+    /// having already charged the Tachyon cost; this only records the
+    /// pending-arrival state. Does not itself move the Traveler —
+    /// <see cref="AdvancePendingTravel"/>/<c>WorldSimulation</c> does that
+    /// once the charge completes.
+    /// </summary>
+    public void BeginChargingTravel(int targetYear, int ticksRequired)
+    {
+        if (ticksRequired < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ticksRequired), ticksRequired, "Ticks required must be at least 1.");
+        }
+
+        _pendingTravel = new PendingTravel(targetYear, ticksRequired, ticksRequired);
+    }
+
+    /// <summary>Cancels any in-flight charged jump with no refund (see <c>TimeTravelResolver.Travel</c>'s doc comment for why) — a no-op if nothing is charging.</summary>
+    public void CancelPendingTravel() => _pendingTravel = null;
+
+    /// <summary>
+    /// Advances an in-flight charged jump by one world tick — call once per
+    /// tick (see <c>WorldSimulation.Tick</c>/<c>TickMultiplayer</c>,
+    /// alongside <see cref="AdvanceTachyonDrainTick"/> and friends). Returns
+    /// the resolved target year and clears the pending state the tick the
+    /// charge completes; returns null every other tick, including when
+    /// nothing is charging (the overwhelmingly common case for every NPC,
+    /// which can never reach <see cref="ChargeTravelThresholdYears"/>). The
+    /// caller is responsible for actually calling
+    /// <see cref="SetCurrentYear"/>/<see cref="PlaceAt"/> with the returned
+    /// year — this method only tracks the countdown.
+    /// </summary>
+    public int? AdvancePendingTravel()
+    {
+        if (_pendingTravel is not { } pending)
+        {
+            return null;
+        }
+
+        var remaining = pending.TicksRemaining - 1;
+        if (remaining <= 0)
+        {
+            _pendingTravel = null;
+            return pending.TargetYear;
+        }
+
+        _pendingTravel = pending with { TicksRemaining = remaining };
+        return null;
     }
 
     /// <summary>Whether this Traveler has already beaten the Warden standing watch over <paramref name="year"/> — docs/GDD.md §3.2. Wardens gate nothing; this just stops the trophy fight repeating.</summary>

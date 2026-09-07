@@ -11,6 +11,8 @@
     "tachyonCost": 25, "effect": "BuffSelfDefense", "magnitude": 6 },
   { "class": "Soldier", "tier": 6, "level": 30, "name": "Confirmed Kill", "description": "Heavy bonus damage against anything already below a quarter health.", "source": "gdd",
     "tachyonCost": 30, "effect": "Damage", "magnitude": 2.0, "condition": "TargetBelow25Percent" },
+  { "class": "Soldier", "tier": 7, "level": 35, "name": "Executioner's Volley", "description": "Endgame capstone: empty the magazine into anything already staggered - devastating against a wounded target.", "source": "endgame",
+    "tachyonCost": 36, "effect": "Damage", "magnitude": 3.0, "condition": "TargetBelow25Percent" },
 
   { "class": "Doctor", "tier": 1, "level": 5, "name": "Triage", "description": "Stabilize one wound - a focused heal (Tachyon cost).", "source": "gdd",
     "tachyonCost": 8, "effect": "Heal", "magnitude": 0.35 },
@@ -24,6 +26,8 @@
     "tachyonCost": 0, "effect": "None" },
   { "class": "Doctor", "tier": 6, "level": 30, "name": "Iso Field", "description": "Throw up a sterile bubble - a brief window of total immunity.", "source": "gdd",
     "tachyonCost": 30, "effect": "Shield", "magnitude": 1 },
+  { "class": "Doctor", "tier": 7, "level": 35, "name": "Field Sanctuary", "description": "Endgame capstone: flood the room with restorative charge, well past what Broad-Spectrum can manage.", "source": "endgame",
+    "tachyonCost": 35, "effect": "Heal", "magnitude": 0.75 },
 
   { "class": "Spy", "tier": 1, "level": 5, "name": "First Strike", "description": "Massive bonus damage on the opening hit against an untouched target.", "source": "original",
     "tachyonCost": 8, "effect": "Damage", "magnitude": 2.0, "condition": "TargetUndamaged" },
@@ -37,6 +41,8 @@
     "tachyonCost": 0, "effect": "None" },
   { "class": "Spy", "tier": 6, "level": 30, "name": "Tag and Track", "description": "Paint a target - everything that hits it does more, rest of the fight.", "source": "original",
     "tachyonCost": 30, "effect": "DebuffTargetDefense", "magnitude": 6 },
+  { "class": "Spy", "tier": 7, "level": 35, "name": "Vanishing Act", "description": "Endgame capstone: slip out of sight entirely and line up a strike no armor stops.", "source": "endgame",
+    "tachyonCost": 35, "effect": "GuaranteedCritNextAttack", "magnitude": 3.0 },
 
   { "class": "Scientist", "tier": 1, "level": 5, "name": "Tachyon Lance", "description": "A focused discharge of tunnel-charge - burst single-target damage.", "source": "original",
     "tachyonCost": 8, "effect": "Damage", "magnitude": 1.8 },
@@ -50,6 +56,8 @@
     "tachyonCost": 0, "effect": "RestoreTachyons", "magnitude": 0.25 },
   { "class": "Scientist", "tier": 6, "level": 30, "name": "Rupture", "description": "Capstone: tear a local seam open on top of everything. Long cooldown.", "source": "original",
     "tachyonCost": 30, "effect": "Damage", "magnitude": 3.0 },
+  { "class": "Scientist", "tier": 7, "level": 35, "name": "Cataclysm", "description": "Endgame capstone: past Rupture - a seam torn wide enough to swallow the room whole.", "source": "endgame",
+    "tachyonCost": 36, "effect": "Damage", "magnitude": 3.6 },
 
   { "class": "Engineer", "tier": 1, "level": 2, "name": "Dampener", "description": "Overload the target's own systems with a field brake - a jolting burst of feedback damage.", "source": "original",
     "tachyonCost": 8, "effect": "Damage", "magnitude": 1.5 },
@@ -62,5 +70,7 @@
   { "class": "Engineer", "tier": 5, "level": 17, "name": "Loop Splice", "description": "Splice a half-second back into your line - act twice in a row.", "source": "original",
     "tachyonCost": 25, "effect": "ExtraAttack", "magnitude": 1.0 },
   { "class": "Engineer", "tier": 6, "level": 21, "name": "Phase Out", "description": "Capstone: shunt a non-boss enemy out of the timeline entirely.", "source": "original",
-    "tachyonCost": 30, "effect": "InstantDefeatNonBoss", "magnitude": 0 }
+    "tachyonCost": 30, "effect": "InstantDefeatNonBoss", "magnitude": 0 },
+  { "class": "Engineer", "tier": 7, "level": 25, "name": "Overload Discharge", "description": "Endgame capstone: dump every capacitor at once into a single armor-melting burst.", "source": "endgame",
+    "tachyonCost": 35, "effect": "IgnoreDefenseDamage", "magnitude": 2.5 }
 ]

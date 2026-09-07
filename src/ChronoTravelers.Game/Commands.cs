@@ -305,9 +305,13 @@ internal static class Commands
             if (isWarden)
             {
                 p.RecordWardenDefeat(year);
+                // target.Name rather than a hardcoded "Warden of {year}" —
+                // the year-5000 capstone (docs/ENDGAME_STRATEGY.md
+                // recommendation 4) is named "The Convergence," not "The
+                // Warden of 5000."
                 session.Send(toGround.Count > 0
-                    ? $"The Warden of {year} falls — its haul lies at your feet. (take)"
-                    : $"The Warden of {year} is broken.");
+                    ? $"{target.Name} falls — its haul lies at your feet. (take)"
+                    : $"{target.Name} is broken.");
             }
             else
             {

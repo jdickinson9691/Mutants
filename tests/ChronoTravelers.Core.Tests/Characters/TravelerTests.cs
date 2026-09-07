@@ -789,6 +789,79 @@ public class TravelerTests
     }
 
     [Fact]
+    public void ChargeTravel_BeginAdvanceAndComplete_TracksCountdownAndResolvesTarget()
+    {
+        // docs/ENDGAME_STRATEGY.md recommendation 5.
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        Assert.False(traveler.IsChargingTravel);
+
+        traveler.BeginChargingTravel(4800, ticksRequired: 3);
+        Assert.True(traveler.IsChargingTravel);
+        Assert.Equal(4800, traveler.ChargingTargetYear);
+        Assert.Equal(3, traveler.ChargingTicksRequired);
+        Assert.Equal(3, traveler.ChargingTicksRemaining);
+
+        Assert.Null(traveler.AdvancePendingTravel());
+        Assert.Equal(2, traveler.ChargingTicksRemaining);
+        Assert.Null(traveler.AdvancePendingTravel());
+        Assert.Equal(1, traveler.ChargingTicksRemaining);
+
+        var arrived = traveler.AdvancePendingTravel();
+        Assert.Equal(4800, arrived);
+        Assert.False(traveler.IsChargingTravel);
+    }
+
+    [Fact]
+    public void ChargeTravel_CancelPendingTravel_ClearsTheCharge()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        traveler.BeginChargingTravel(4900, ticksRequired: 5);
+
+        traveler.CancelPendingTravel();
+
+        Assert.False(traveler.IsChargingTravel);
+        Assert.Null(traveler.AdvancePendingTravel());
+    }
+
+    [Fact]
+    public void TicksRequiredForChargedTravel_ScalesWithDistanceAndCapsAtTen()
+    {
+        Assert.Equal(1, Traveler.TicksRequiredForChargedTravel(750));
+        Assert.Equal(2, Traveler.TicksRequiredForChargedTravel(1000));
+        Assert.Equal(10, Traveler.TicksRequiredForChargedTravel(3000));
+    }
+
+    [Fact]
+    public void Restore_RoundTripsAnInFlightChargedJump()
+    {
+        var stats = new StatBlock(20, 15, 10, 12);
+        var traveler = Traveler.Restore(
+            "Rook", CharacterClass.Soldier, level: 7, xp: 555, stats,
+            currentHp: 40, maxHp: 60, currentTachyons: 5, maxTachyons: 30, credits: 250,
+            currentYear: 2900, furthestYearReached: 3200, position: new Coordinate(2, -1),
+            defeatedWardenYears: [],
+            elixirUsesByStat: null,
+            chargingTargetYear: 4900, chargingTicksRequired: 4, chargingTicksRemaining: 2);
+
+        Assert.True(traveler.IsChargingTravel);
+        Assert.Equal(4900, traveler.ChargingTargetYear);
+        Assert.Equal(4, traveler.ChargingTicksRequired);
+        Assert.Equal(2, traveler.ChargingTicksRemaining);
+    }
+
+    [Fact]
+    public void Restore_WithNoChargingDataInTheSave_RestoresToNotCharging()
+    {
+        // Old-save backward compatibility: all three charging fields absent (null).
+        var traveler = Traveler.Restore(
+            "Rook", CharacterClass.Soldier, 1, 0, ClassDefinition.For(CharacterClass.Soldier).BaseStats,
+            30, 30, 20, 20, 0, 1, 1, Coordinate.Origin, []);
+
+        Assert.False(traveler.IsChargingTravel);
+        Assert.Null(traveler.ChargingTargetYear);
+    }
+
+    [Fact]
     public void Restore_RejectsEmptyName()
     {
         Assert.Throws<ArgumentException>(() => Traveler.Restore(
