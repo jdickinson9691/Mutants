@@ -1841,8 +1841,8 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
 /// room (or that year's Warden, stationed at the map's start room in
 /// a Warden year the player hasn't cleared). <paramref name="targetName"/>
 /// picks one when several share the room; empty takes the first.
-/// Interactive and round-by-round via CombatSession — "attack" or "cast
-/// <ability>" each round. On a win the monster is removed from the year's
+/// Interactive and round-by-round via CombatSession — "attack", "cast
+/// <ability>", or "use <item>" each round. On a win the monster is removed from the year's
 /// live population and its loot (table roll + anything it had scavenged)
 /// goes to the player. Returns false if the Traveler was defeated (caller
 /// ends the session). End-of-input mid-fight auto-attacks each remaining
@@ -1911,7 +1911,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
 
     while (!session.IsOver)
     {
-        AnsiConsole.Markup("[green]  (attack)[/] or [green]cast <ability>[/]? > ");
+        AnsiConsole.Markup("[green]  (attack)[/], [green]cast <ability>[/], or [green]use <item>[/]? > ");
         var rawInput = Console.ReadLine();
 
         if (rawInput is not null)
@@ -1941,7 +1941,46 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
                     continue;
                 }
 
-                AnsiConsole.MarkupLine("[red]Type 'attack' or 'cast <ability name>'.[/]");
+                if (trimmed.StartsWith("use", StringComparison.OrdinalIgnoreCase)
+                    || trimmed.StartsWith("eat", StringComparison.OrdinalIgnoreCase)
+                    || trimmed.StartsWith("drink", StringComparison.OrdinalIgnoreCase))
+                {
+                    var verbLength = trimmed.StartsWith("eat", StringComparison.OrdinalIgnoreCase) ? 3
+                        : trimmed.StartsWith("use", StringComparison.OrdinalIgnoreCase) ? 3
+                        : 5;
+                    var itemName = trimmed.Length > verbLength ? trimmed[verbLength..].Trim() : "";
+                    var item = FindInventoryItem(traveler, itemName, static i => i.IsUsable);
+                    if (item is null || !item.IsUsable)
+                    {
+                        AnsiConsole.MarkupLine(itemName.Length == 0
+                            ? "[red]Use what?[/] Type 'inventory' to see what you're carrying."
+                            : $"[red]No usable item matching '{Markup.Escape(itemName)}' in your inventory.[/]");
+                        continue;
+                    }
+
+                    PrimaryStat? chosenStat = null;
+                    if (item.NeedsStatChoice)
+                    {
+                        chosenStat = ReadStatChoice(item.Name);
+                        if (chosenStat is null)
+                        {
+                            AnsiConsole.MarkupLine($"[grey]Left {Markup.Escape(item.Name)} untouched.[/]");
+                            continue;
+                        }
+                    }
+
+                    var useResult = session.UseItem(item, chosenStat);
+                    AnsiConsole.MarkupLine(useResult.Success ? $"[blue]{Markup.Escape(useResult.Message)}[/]" : $"[red]{Markup.Escape(useResult.Message)}[/]");
+                    if (!useResult.Success)
+                    {
+                        continue;
+                    }
+
+                    PrintNewLogLines(session, ref loggedSoFar);
+                    continue;
+                }
+
+                AnsiConsole.MarkupLine("[red]Type 'attack', 'cast <ability name>', or 'use <item name>'.[/]");
                 continue;
             }
         }
@@ -2885,7 +2924,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room (monsters here / nearby, ground loot)");
     AnsiConsole.MarkupLine("  [green]look <dir>[/]          - peek into the adjacent room (what's there, on the floor) without moving");
     AnsiConsole.MarkupLine("  [green]fight[/] (or f, attack, a) [green]<name>[/] - fight a monster in this room (or the Warden at the year's start)");
-    AnsiConsole.MarkupLine("    (each round, type [green]attack[/] or [green]cast <ability>[/])");
+    AnsiConsole.MarkupLine("    (each round, type [green]attack[/], [green]cast <ability>[/], or [green]use <item>[/])");
     AnsiConsole.MarkupLine("  [green]shoot[/]/[green]point <dir>[/] - fire your readied ranged weapon one room away (finite built-in ammo)");
     AnsiConsole.MarkupLine("  [green]take[/] (or grab) [green]<item>[/] - pick up loot off the ground here ('take all' works)");
     AnsiConsole.MarkupLine("  [green]monsters[/] (or mobs)  - list the monsters roaming this year");
