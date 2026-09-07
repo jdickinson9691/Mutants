@@ -1012,28 +1012,38 @@ public class TravelerTests
         Assert.Equal(1.0, plain.AttackDamageMultiplierAgainst(freshTarget), precision: 5);
     }
 
+    /// <summary>docs/GDD.md item #5 — Spy "Black Market Contacts" (ChronoTravelers.Content/abilities.json, tier 5/level 25): "Permanent" store bonus, so it's a level/class check on <see cref="Traveler.StoreDiscountBonus"/> rather than anything cast.</summary>
     [Fact]
-    public void Convert_WithScavengerTrait_GainsABonusOverAPlainTraveler()
+    public void StoreDiscountBonus_SpyBelowLevel25_GetsOnlyThePassiveTraitBonus()
     {
-        // Mirrors MonsterTests' Convert_WithScavengerTrait_GainsABonusOverAPlainMonster —
-        // junk is convert-only now, so Scavenger's sell bonus moved onto
-        // Convert instead (see Traveler.Convert's ScavengerConvertValueBonusPct).
-        // Tachyons.Current defaults to Max, so it has to be drained back to 0
-        // first or Convert's Add has no room to show a difference at all.
-        var plain = new Traveler("Rook", CharacterClass.Soldier);
-        var scavenger = new Traveler("Nyx", CharacterClass.Soldier);
-        scavenger.AssignTrait(CreatureTraitKind.Scavenger);
-        plain.Tachyons.Spend(plain.Tachyons.Current);
-        scavenger.Tachyons.Spend(scavenger.Tachyons.Current);
+        var spy = new Traveler("Static", CharacterClass.Spy); // level 1 — Light Fingers only
 
-        var item1 = Item.Create("Neon Shard", ItemType.Junk, 3, Rarity.Rare);
-        var item2 = Item.Create("Neon Shard", ItemType.Junk, 3, Rarity.Rare);
-        plain.AddToInventory(item1);
-        scavenger.AddToInventory(item2);
+        Assert.Equal(PassiveTraits.Sum(CharacterClass.Spy, 1, PassiveHook.StoreDiscountBonusPct), spy.StoreDiscountBonus, precision: 5);
+    }
 
-        var plainGain = plain.Convert(item1);
-        var scavengerGain = scavenger.Convert(item2);
+    [Fact]
+    public void StoreDiscountBonus_SpyAtLevel25_GainsTheBlackMarketContactsBonusOnTopOfPassives()
+    {
+        var spy = new Traveler("Static", CharacterClass.Spy);
+        for (var i = 1; i < 25; i++)
+        {
+            spy.LevelUp();
+        }
 
-        Assert.True(scavengerGain > plainGain);
+        var expectedPassiveOnly = PassiveTraits.Sum(CharacterClass.Spy, 25, PassiveHook.StoreDiscountBonusPct);
+
+        Assert.True(spy.StoreDiscountBonus > expectedPassiveOnly);
+    }
+
+    [Fact]
+    public void StoreDiscountBonus_NonSpyAtHighLevel_NeverGetsTheBlackMarketContactsBonus()
+    {
+        var soldier = new Traveler("Rook", CharacterClass.Soldier);
+        for (var i = 1; i < 30; i++)
+        {
+            soldier.LevelUp();
+        }
+
+        Assert.Equal(PassiveTraits.Sum(CharacterClass.Soldier, 30, PassiveHook.StoreDiscountBonusPct), soldier.StoreDiscountBonus, precision: 5);
     }
 }

@@ -204,11 +204,7 @@ public sealed class TimeWorld
         var govRoom = rooms[rng.Next(rooms.Count)];
 
         var displayTier = TimelineContentFactory.DisplayTier(year);
-        var themedPool = _itemArchetypes.Where(a => a.SharesThemeWith(era.ItemThemeTags)).ToList();
-        if (themedPool.Count == 0)
-        {
-            themedPool = _itemArchetypes.ToList();
-        }
+        var themedPool = ThemedPoolFor(era);
 
         var government = Store.CreateGovernmentStore($"{era.Name} Depot", homeLevel: year);
         foreach (var archetype in StapleArchetypes(themedPool))
@@ -244,6 +240,52 @@ public sealed class TimeWorld
         }
 
         return slots;
+    }
+
+    /// <summary>The item pool a government depot draws its staples from for <paramref name="era"/> — <see cref="_itemArchetypes"/> filtered to the era's theme tags, falling back to the full catalogue if that leaves nothing. Shared by <see cref="BuildStores"/> (initial seeding) and <see cref="RestockGovernmentDepot"/> (the ongoing background-tick refill) so the two never pick from different pools.</summary>
+    private List<ItemArchetypeDefinition> ThemedPoolFor(EraDefinition era)
+    {
+        var pool = _itemArchetypes.Where(a => a.SharesThemeWith(era.ItemThemeTags)).ToList();
+        return pool.Count > 0 ? pool : _itemArchetypes.ToList();
+    }
+
+    /// <summary>
+    /// Restocks <paramref name="year"/>'s government depot with any staple
+    /// category (heal / attack potion / defense potion / weapon / armor /
+    /// ranged — see <see cref="StapleArchetypes"/>) it's currently missing
+    /// from its shelf — docs/GDD.md §9's background-tick "store
+    /// restocking," and the §6.3 "restocking depot inventory" Credit sink.
+    /// Call periodically for every visited year (see
+    /// ChronoTravelers.Engine.Simulation.WorldSimulation's restock pass). A
+    /// no-op for a year with no government slot (shouldn't happen —
+    /// <see cref="BuildStores"/> always seeds one) or one whose shelf
+    /// already carries every staple category. A vacant or player-owned
+    /// slot is never touched — see <see cref="Store.RestockGovernmentSupply"/>.
+    /// "Missing" is judged by staple name: <see cref="StapleArchetypes"/>
+    /// is a pure function of the era's theme pool (no randomness), so the
+    /// same era always resolves the same named staple for a given category,
+    /// making an exact-name check on the current listings a reliable
+    /// "is this category currently on the shelf" test.
+    /// </summary>
+    public void RestockGovernmentDepot(int year)
+    {
+        var content = GetYear(year);
+        var slot = content.StoreSlots.FirstOrDefault(s => s.Store is { IsGovernmentRun: true });
+        if (slot?.Store is not { } government)
+        {
+            return;
+        }
+
+        var themedPool = ThemedPoolFor(content.Era);
+        foreach (var archetype in StapleArchetypes(themedPool))
+        {
+            if (government.Listings.Any(l => l.Item.Name == archetype.Name))
+            {
+                continue;
+            }
+
+            government.RestockGovernmentSupply(TimelineContentFactory.ForArchetype(archetype, year));
+        }
     }
 
     private IEnumerable<ItemArchetypeDefinition> StapleArchetypes(IReadOnlyList<ItemArchetypeDefinition> pool)

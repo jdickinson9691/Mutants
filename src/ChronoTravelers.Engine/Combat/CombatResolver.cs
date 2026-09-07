@@ -170,6 +170,7 @@ public static class CombatResolver
         var damage = multiplier == 1.0 ? rawDamage : Math.Max(1, (int)Math.Round(rawDamage * multiplier));
         var actualDamage = monster.Health.Damage(damage);
         traveler.RecordAttackLanded();
+        traveler.DegradeEquippedWeapon(); // docs/GDD.md §6.3's "repair costs" Credit sink — see Traveler.DegradeEquippedWeapon.
         log.Add($"{traveler.Name} hits {monster.Name} for {actualDamage} damage.");
     }
 
@@ -178,6 +179,119 @@ public static class CombatResolver
     {
         var damage = RollDamage(monster.EffectiveAttackPower, traveler.EffectiveDefense, random);
         var actualDamage = traveler.TakeDamage(damage, attackerIsEcho: monster.HasTag("echo"));
+        traveler.DegradeEquippedArmor(); // docs/GDD.md §6.3's "repair costs" Credit sink — see Traveler.DegradeEquippedArmor.
         log.Add($"{monster.Name} hits {traveler.Name} for {actualDamage} damage.");
+    }
+
+    /// <summary>
+    /// Fights <paramref name="attacker"/> against <paramref name="defender"/>,
+    /// another Traveler — docs/GDD.md §11's "player-vs-NPC-Traveler combat
+    /// ... covers the spirit of it without needing a netcode layer" (human-
+    /// vs-human PvP stays out of scope; an NPC is a full Traveler, so this
+    /// is what "PvP" means in this engine). Auto-resolves exactly like
+    /// <see cref="Fight"/> rather than the interactive <see cref="CombatSession"/>
+    /// flow, matching how every fight already resolves on the multiplayer
+    /// server (ChronoTravelers.Game.Commands.Fight) and bounding the scope
+    /// of an already-large feature. Basic attacks only on both sides (no
+    /// ability casting) — the same simplification <see cref="Fight"/>
+    /// already makes for the abstract/NPC-grind path.
+    ///
+    /// <see cref="Traveler.AttackDamageMultiplierAgainst"/> only applies
+    /// against a Monster (its low-HP/caster/paradox bonuses read
+    /// Monster-only tags), so it's skipped entirely here — both sides fight
+    /// on <see cref="Traveler.EffectiveAttackPower"/>/<see cref="Traveler.EffectiveDefense"/>
+    /// alone, already inclusive of gear, buffs, and passives.
+    ///
+    /// On an attacker win, <paramref name="defender"/>'s entire
+    /// <see cref="Traveler.Inventory"/> (equipped gear included) becomes
+    /// <see cref="TravelerFightResult.ItemsDropped"/> rather than staying
+    /// with the loser — a defeated NPC is about to be replaced wholesale
+    /// by the next tick's respawn (see
+    /// ChronoTravelers.Engine.Simulation.WorldSimulation.RespawnDeadNpcs),
+    /// so its gear is otherwise gone for good; this is the only chance to
+    /// harvest it. XP and Credits reuse <see cref="MonsterScaling.KillXp"/>/
+    /// <see cref="MonsterScaling.KillCredits"/>'s outlevel-scaled reward,
+    /// treating <paramref name="defender"/>'s own level (÷10, matching
+    /// that a tier-N monster is tuned as a fair fight up to level 10·N —
+    /// see <see cref="MonsterScaling"/>'s doc comment) as its tier:
+    /// Travelers don't have monster tiers, but character level is the one
+    /// apples-to-apples axis both a Monster and a Traveler share, and
+    /// reusing the same tuned/tested curve avoids inventing a second,
+    /// independently-guessed reward formula.
+    /// </summary>
+    public static TravelerFightResult FightTraveler(Traveler attacker, Traveler defender, IRandomSource random)
+    {
+        var log = new List<string>();
+        var attackerActsFirst = attacker.Speed >= defender.Speed;
+        var rounds = 0;
+
+        attacker.ResetPerFightState();
+        defender.ResetPerFightState();
+
+        while (!attacker.Health.IsDead && !defender.Health.IsDead && rounds < MaxRounds)
+        {
+            rounds++;
+
+            if (attackerActsFirst)
+            {
+                AttackTravelerWith(attacker, defender, random, log);
+                if (defender.Health.IsDead)
+                {
+                    break;
+                }
+
+                AttackTravelerWith(defender, attacker, random, log);
+            }
+            else
+            {
+                AttackTravelerWith(defender, attacker, random, log);
+                if (attacker.Health.IsDead)
+                {
+                    break;
+                }
+
+                AttackTravelerWith(attacker, defender, random, log);
+            }
+        }
+
+        var attackerWon = defender.Health.IsDead && !attacker.Health.IsDead;
+
+        if (!attackerWon)
+        {
+            return new TravelerFightResult(AttackerWon: false, Rounds: rounds, XpAwarded: 0, CreditsAwarded: 0, ItemsDropped: [], Log: log);
+        }
+
+        var defenderTier = Math.Max(1, (int)Math.Round(defender.Level / 10.0));
+        var xpAwarded = MonsterScaling.KillXp(MonsterScaling.XpReward(defenderTier), defenderTier, attacker.Level);
+        var creditsAwarded = MonsterScaling.KillCredits(MonsterScaling.CreditReward(defenderTier), defenderTier, attacker.Level);
+
+        var levelsGained = attacker.GainXp(xpAwarded);
+        if (levelsGained > 0)
+        {
+            log.Add($"{attacker.Name} gained {levelsGained} level(s)!");
+        }
+
+        attacker.AddCredits(creditsAwarded);
+
+        var loot = defender.Inventory.ToList();
+
+        return new TravelerFightResult(AttackerWon: true, Rounds: rounds, XpAwarded: xpAwarded, CreditsAwarded: creditsAwarded, ItemsDropped: loot, Log: log);
+    }
+
+    /// <summary>
+    /// One Traveler's attack against another in <see cref="FightTraveler"/>
+    /// — mirrors <see cref="AttackMonster"/>/<see cref="AttackTraveler(Monster, Traveler, IRandomSource, List{string})"/>
+    /// but symmetric (either side can be the one attacking), and skips
+    /// <see cref="Traveler.AttackDamageMultiplierAgainst"/> (see
+    /// <see cref="FightTraveler"/>'s doc comment for why).
+    /// </summary>
+    private static void AttackTravelerWith(Traveler attacker, Traveler defender, IRandomSource random, List<string> log)
+    {
+        var damage = RollDamage(attacker.EffectiveAttackPower, defender.EffectiveDefense, random);
+        var actualDamage = defender.TakeDamage(damage);
+        attacker.RecordAttackLanded();
+        attacker.DegradeEquippedWeapon(); // docs/GDD.md §6.3's "repair costs" Credit sink — see Traveler.DegradeEquippedWeapon.
+        defender.DegradeEquippedArmor(); // docs/GDD.md §6.3's "repair costs" Credit sink — see Traveler.DegradeEquippedArmor.
+        log.Add($"{attacker.Name} hits {defender.Name} for {actualDamage} damage.");
     }
 }

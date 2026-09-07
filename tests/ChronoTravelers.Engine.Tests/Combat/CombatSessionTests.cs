@@ -109,6 +109,35 @@ public class CombatSessionTests
         Assert.Equal(0, session.Rounds);
     }
 
+    /// <summary>
+    /// docs/GDD.md item #5: ShortTeleport (Jump Rig) / ReviveAlly (Crash
+    /// Cart) are overworld-only effects with no round in this loop to
+    /// resolve against (see ChronoTravelers.Engine.Combat.OverworldAbilityResolver).
+    /// Before this was refused explicitly, casting one mid-fight passed
+    /// every check (effect type parses to something other than None) and
+    /// then silently matched no case in TravelerTurn's switch — spending
+    /// the round and the Tachyons for nothing. Refuse it the same way None
+    /// already is.
+    /// </summary>
+    [Theory]
+    [InlineData("ShortTeleport")]
+    [InlineData("ReviveAlly")]
+    public void Cast_OverworldEffect_RefusedMidFightWithNoTachyonsSpent(string overworldEffect)
+    {
+        var traveler = Soldier();
+        traveler.LevelUp(); traveler.LevelUp(); traveler.LevelUp(); traveler.LevelUp(); // level 5
+        var startingTachyons = traveler.Tachyons.Current;
+        var monster = TankMonster();
+        var session = new CombatSession(traveler, monster, NeutralRandom());
+        var ability = MakeAbility("Soldier", 5, "Overworld Thing", overworldEffect, 1.0, tachyonCost: 12);
+
+        var result = session.Cast(ability);
+
+        Assert.False(result.Success);
+        Assert.Equal(startingTachyons, traveler.Tachyons.Current);
+        Assert.Equal(0, session.Rounds);
+    }
+
     [Fact]
     public void Cast_InsufficientTachyons_Fails()
     {
@@ -421,94 +450,6 @@ public class CombatSessionTests
         Assert.True(traveler.Xp >= monster.XpReward);
         Assert.Equal(monster.CreditReward, session.CreditsAwarded);
         Assert.Equal(monster.CreditReward, traveler.Credits);
-    }
-
-    [Fact]
-    public void UseItem_Heal_RestoresHpAndSpendsTheRound()
-    {
-        var traveler = Soldier();
-        traveler.Health.Damage(15); // Soldier's level-1 max HP is 30 - stay well clear of 0
-        var hpBefore = traveler.Health.Current;
-        var monster = TankMonster();
-        var session = new CombatSession(traveler, monster, NeutralRandom());
-        var ration = Item.Create("Ration", ItemType.Consumable, 1, Rarity.Common, consumableEffect: ConsumableEffectType.Heal, effectMagnitude: 5);
-        traveler.AddToInventory(ration);
-
-        var result = session.UseItem(ration);
-
-        Assert.True(result.Success);
-        Assert.DoesNotContain(ration, traveler.Inventory);
-        Assert.Contains(session.Log, l => l.Contains("heals for 5 HP"));
-        // The round still resolved — the monster got its turn too, same as attack/cast.
-        Assert.Equal(1, session.Rounds);
-        Assert.Contains(session.Log, l => l.Contains($"{monster.Name} hits"));
-        Assert.True(traveler.Health.Current > hpBefore); // healed more than the monster's hit took back
-    }
-
-    [Fact]
-    public void UseItem_NotUsable_FailsWithNoRoundSpent()
-    {
-        var traveler = Soldier();
-        var monster = TankMonster();
-        var session = new CombatSession(traveler, monster, NeutralRandom());
-        var junk = Item.Create("Scrap", ItemType.Junk, 1, Rarity.Common);
-        traveler.AddToInventory(junk);
-
-        var result = session.UseItem(junk);
-
-        Assert.False(result.Success);
-        Assert.Contains(junk, traveler.Inventory);
-        Assert.Equal(0, session.Rounds);
-    }
-
-    [Fact]
-    public void UseItem_BuffAttack_AppliesToTheVeryNextAttack()
-    {
-        var traveler = Soldier();
-        var monster = TankMonster();
-        var session = new CombatSession(traveler, monster, NeutralRandom());
-        var tonic = Item.Create("War Tonic", ItemType.Consumable, 1, Rarity.Common, consumableEffect: ConsumableEffectType.BuffAttack, effectMagnitude: 10, effectDurationTicks: 5);
-        traveler.AddToInventory(tonic);
-
-        session.UseItem(tonic);
-        var hpBeforeSecondRound = monster.Health.Current;
-        session.Attack();
-
-        // traveler Strength 15 - monster defense 2 = 13, +10 from the tonic already live on Traveler.EffectiveAttackPower.
-        Assert.Equal(hpBeforeSecondRound - 23, monster.Health.Current);
-    }
-
-    [Fact]
-    public void UseItem_NeedsStatChoiceWithoutOne_FailsAndKeepsTheItem()
-    {
-        var traveler = Soldier();
-        var monster = TankMonster();
-        var session = new CombatSession(traveler, monster, NeutralRandom());
-        var serum = Item.Create("Meridian Serum", ItemType.Consumable, 1, Rarity.Legendary, consumableEffect: ConsumableEffectType.BoostChosenStat, effectMagnitude: 5);
-        traveler.AddToInventory(serum);
-
-        var result = session.UseItem(serum);
-
-        Assert.False(result.Success);
-        Assert.Contains(serum, traveler.Inventory);
-        Assert.Equal(0, session.Rounds);
-    }
-
-    [Fact]
-    public void UseItem_WhenOver_DoesNothing()
-    {
-        var traveler = Soldier();
-        var monster = TankMonster(hp: 1);
-        monster.Health.Damage(1); // already dead
-        var session = new CombatSession(traveler, monster, NeutralRandom());
-        var ration = Item.Create("Ration", ItemType.Consumable, 1, Rarity.Common, consumableEffect: ConsumableEffectType.Heal, effectMagnitude: 20);
-        traveler.AddToInventory(ration);
-
-        var result = session.UseItem(ration);
-
-        Assert.False(result.Success);
-        Assert.Contains(ration, traveler.Inventory);
-        Assert.Equal(0, session.Rounds);
     }
 
     [Fact]

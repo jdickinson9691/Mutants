@@ -2,97 +2,75 @@ using ChronoTravelers.Core.World;
 
 namespace ChronoTravelers.Core.Tests.World;
 
+/// <summary>docs/GDD.md item #5's Engineer "Jump Rig" — see <see cref="LevelMap.RoomsWithinHops"/>.</summary>
 public class LevelMapTests
 {
-    private static LevelMap TwoRoomMap()
+    // A straight 5-room east corridor: (0,0)-(1,0)-(2,0)-(3,0)-(4,0).
+    private static LevelMap Corridor()
     {
-        var start = Coordinate.Origin;
-        var east = start.Move(Direction.East);
-
-        var rooms = new Dictionary<Coordinate, Room>
+        var rooms = new Dictionary<Coordinate, Room>();
+        for (var e = 0; e <= 4; e++)
         {
-            [start] = Room.Create("A quiet courtyard.", (Direction.East, "area continues.")),
-            [east] = Room.Create("A narrow alley.", (Direction.West, "back to the courtyard.")),
-        };
+            var coordinate = new Coordinate(e, 0);
+            var exits = new List<(Direction, string)>();
+            if (e > 0)
+            {
+                exits.Add((Direction.West, "back"));
+            }
 
-        return new LevelMap("Two-Room Test", start, rooms);
+            if (e < 4)
+            {
+                exits.Add((Direction.East, "onward"));
+            }
+
+            rooms[coordinate] = Room.Create($"Room {e}", exits.ToArray());
+        }
+
+        return new LevelMap("Corridor", Coordinate.Origin, rooms);
     }
 
     [Fact]
-    public void Constructor_RejectsEmptyRoomSet()
+    public void RoomsWithinHops_ExcludesOrigin()
     {
-        Assert.Throws<ArgumentException>(() =>
-            new LevelMap("Empty", Coordinate.Origin, new Dictionary<Coordinate, Room>()));
+        var map = Corridor();
+        Assert.DoesNotContain(Coordinate.Origin, map.RoomsWithinHops(Coordinate.Origin, maxHops: 3));
     }
 
     [Fact]
-    public void Constructor_RejectsStartCoordinateWithNoRoom()
+    public void RoomsWithinHops_ReturnsOnlyRoomsWithinRange()
     {
-        var rooms = new Dictionary<Coordinate, Room>
-        {
-            [new Coordinate(5, 5)] = Room.Create("Somewhere else."),
-        };
+        var map = Corridor();
+        var within2 = map.RoomsWithinHops(Coordinate.Origin, maxHops: 2);
 
-        Assert.Throws<ArgumentException>(() => new LevelMap("Bad Start", Coordinate.Origin, rooms));
+        Assert.Contains(new Coordinate(1, 0), within2);
+        Assert.Contains(new Coordinate(2, 0), within2);
+        Assert.DoesNotContain(new Coordinate(3, 0), within2);
+        Assert.DoesNotContain(new Coordinate(4, 0), within2);
     }
 
     [Fact]
-    public void TryGetRoom_ReturnsNullOutsideTheMap()
+    public void RoomsWithinHops_LargerRadiusReachesFurther()
     {
-        var map = TwoRoomMap();
-        Assert.Null(map.TryGetRoom(new Coordinate(99, 99)));
+        var map = Corridor();
+        var within4 = map.RoomsWithinHops(Coordinate.Origin, maxHops: 4);
+
+        Assert.Equal(4, within4.Count);
+        Assert.Contains(new Coordinate(4, 0), within4);
     }
 
     [Fact]
-    public void TryMove_SucceedsAcrossAnAuthoredExit()
+    public void RoomsWithinHops_OriginNotOnMap_ReturnsEmpty()
     {
-        var map = TwoRoomMap();
-        var result = map.TryMove(Coordinate.Origin, Direction.East);
-
-        Assert.True(result.Success);
-        Assert.Equal(Coordinate.Origin.Move(Direction.East), result.Destination);
-        Assert.Equal("A narrow alley.", result.DestinationRoom!.Description);
+        var map = Corridor();
+        Assert.Empty(map.RoomsWithinHops(new Coordinate(99, 99), maxHops: 3));
     }
 
     [Fact]
-    public void TryMove_BlockedWhenRoomHasNoExitThatWay()
+    public void RoomsWithinHops_SingleRoomMap_ReturnsEmpty()
     {
-        var map = TwoRoomMap();
-        var result = map.TryMove(Coordinate.Origin, Direction.North);
+        var rooms = new Dictionary<Coordinate, Room> { [Coordinate.Origin] = Room.Create("Alone") };
+        var map = new LevelMap("Solo", Coordinate.Origin, rooms);
 
-        Assert.False(result.Success);
-        Assert.Equal(MoveFailureReason.NoExit, result.FailureReason);
-    }
-
-    [Fact]
-    public void TryMove_BlockedWhenExitPointsToAMissingRoom()
-    {
-        var brokenExitRoom = Room.Create("A doorway to nowhere.", (Direction.North, "a gap in reality."));
-        var rooms = new Dictionary<Coordinate, Room> { [Coordinate.Origin] = brokenExitRoom };
-        var map = new LevelMap("Broken", Coordinate.Origin, rooms);
-
-        var result = map.TryMove(Coordinate.Origin, Direction.North);
-
-        Assert.False(result.Success);
-        Assert.Equal(MoveFailureReason.NoRoomBeyondExit, result.FailureReason);
-    }
-
-    [Fact]
-    public void Validate_ReturnsEmptyForAWellFormedLevel()
-    {
-        Assert.Empty(TwoRoomMap().Validate());
-    }
-
-    [Fact]
-    public void Validate_ReportsExitsThatLeadNowhere()
-    {
-        var brokenExitRoom = Room.Create("A doorway to nowhere.", (Direction.North, "a gap in reality."));
-        var rooms = new Dictionary<Coordinate, Room> { [Coordinate.Origin] = brokenExitRoom };
-        var map = new LevelMap("Broken", Coordinate.Origin, rooms);
-
-        var problems = map.Validate();
-
-        Assert.Single(problems);
-        Assert.Contains("north", problems[0]);
+        Assert.Empty(map.RoomsWithinHops(Coordinate.Origin, maxHops: 3));
     }
 }

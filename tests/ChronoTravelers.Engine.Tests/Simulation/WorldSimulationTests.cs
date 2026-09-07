@@ -373,6 +373,25 @@ public class WorldSimulationTests
         Assert.Equal(capitalBefore, government.Capital);
     }
 
+    /// <summary>docs/GDD.md §9's background-tick "store restocking" / §6.3's "restocking depot inventory" Credit sink — the mechanics live on TimeWorld.RestockGovernmentDepot/Store.RestockGovernmentSupply (see their own test coverage); this just confirms Tick actually calls into it every tick, like it does the maintenance pass.</summary>
+    [Fact]
+    public void Tick_RestocksASoldOutGovernmentListing()
+    {
+        var world = World();
+        var player = OffGridPlayer("Player", world, 2000);
+        var government = world.GetYear(2000).StoreSlots.Single(s => s.Store is { IsGovernmentRun: true }).Store!;
+        var weaponListing = government.Listings.Single(l => l.Item.Type == ItemType.Weapon);
+        var buyer = NewTraveler("Buyer", world, 2000);
+        buyer.AddCredits(1_000_000);
+        government.SellToTraveler(buyer, weaponListing);
+        Assert.DoesNotContain(government.Listings, l => l.Item.Type == ItemType.Weapon);
+
+        var simulation = new WorldSimulation(world, [], StubRandomSource.Fixed(0.99));
+        simulation.Tick(player);
+
+        Assert.Contains(government.Listings, l => l.Item.Type == ItemType.Weapon);
+    }
+
     [Fact]
     public void Tick_RepossessesAnOwnedStoreAfterTooManyMissedMaintenanceTicks_AndBroadcastsIt()
     {

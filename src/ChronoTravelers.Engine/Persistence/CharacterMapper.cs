@@ -228,6 +228,8 @@ public static class CharacterMapper
         InstanceId = item.InstanceId == Guid.Empty ? "" : item.InstanceId.ToString(),
         IsTimeShard = item.IsTimeShard,
         Range = item.Range,
+        MaxDurability = item.MaxDurability,
+        Durability = item.Durability,
     };
 
     private static Item FromItemSaveData(ItemSaveData data)
@@ -254,13 +256,19 @@ public static class CharacterMapper
                 ? (Guid.TryParse(data.InstanceId, out var id) && id != Guid.Empty ? id : Guid.NewGuid())
                 : Guid.Empty,
             data.IsTimeShard,
-            Range: isRanged ? Math.Clamp(data.Range == 0 ? 1 : data.Range, 1, 4) : 1);
+            Range: isRanged ? Math.Clamp(data.Range == 0 ? 1 : data.Range, 1, 4) : 1,
+            MaxDurability: Math.Max(0, data.MaxDurability));
 
         if (isRanged)
         {
             item.AmmoRemaining = data.AmmoCapacity > 0
                 ? Math.Clamp(data.AmmoRemaining, 0, data.AmmoCapacity)
                 : Math.Max(0, data.AmmoRemaining);
+        }
+
+        if (item.HasDurability)
+        {
+            item.Durability = Math.Clamp(data.Durability, 0, data.MaxDurability);
         }
 
         return item;

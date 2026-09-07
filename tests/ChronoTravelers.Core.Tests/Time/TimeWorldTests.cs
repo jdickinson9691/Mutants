@@ -1,3 +1,5 @@
+using ChronoTravelers.Core.Characters;
+using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Time;
 
@@ -151,6 +153,74 @@ public class TimeWorldTests
         Assert.Contains(listings, l => l.Item.ConsumableEffect == ConsumableEffectType.BuffDefense);
         Assert.Contains(listings, l => l.Item.Type == ItemType.Weapon);
         Assert.Contains(listings, l => l.Item.Type == ItemType.Armor);
+    }
+
+    /// <summary>docs/GDD.md §9's background-tick "store restocking" / §6.3's "restocking depot inventory" Credit sink — see ChronoTravelers.Engine.Tests.Simulation.WorldSimulationTests for the tick-driven call, and ChronoTravelers.Core.Tests.Economy.StoreTests for RestockGovernmentSupply itself.</summary>
+    [Fact]
+    public void RestockGovernmentDepot_RefillsAStapleCategorySoldOut()
+    {
+        var world = World();
+        var government = world.GetYear(3500).StoreSlots.Single(s => s.Store is { IsGovernmentRun: true }).Store!;
+        var weaponListing = government.Listings.Single(l => l.Item.Type == ItemType.Weapon);
+
+        // Simulate the weapon category selling out via a normal purchase.
+        var buyer = new Traveler("Buyer", CharacterClass.Soldier);
+        buyer.AddCredits(1_000_000);
+        Assert.True(government.SellToTraveler(buyer, weaponListing));
+        Assert.DoesNotContain(government.Listings, l => l.Item.Type == ItemType.Weapon);
+
+        world.RestockGovernmentDepot(3500);
+
+        Assert.Contains(government.Listings, l => l.Item.Type == ItemType.Weapon);
+    }
+
+    [Fact]
+    public void RestockGovernmentDepot_SpendsTheDepotsOwnCapital()
+    {
+        var world = World();
+        var government = world.GetYear(3500).StoreSlots.Single(s => s.Store is { IsGovernmentRun: true }).Store!;
+        var weaponListing = government.Listings.Single(l => l.Item.Type == ItemType.Weapon);
+        var buyer = new Traveler("Buyer", CharacterClass.Soldier);
+        buyer.AddCredits(1_000_000);
+        government.SellToTraveler(buyer, weaponListing);
+        var capitalBefore = government.Capital;
+
+        world.RestockGovernmentDepot(3500);
+
+        Assert.True(government.Capital < capitalBefore);
+    }
+
+    [Fact]
+    public void RestockGovernmentDepot_IsANoOp_WhenNothingIsMissing()
+    {
+        var world = World();
+        var government = world.GetYear(3500).StoreSlots.Single(s => s.Store is { IsGovernmentRun: true }).Store!;
+        var listingCountBefore = government.Listings.Count;
+        var capitalBefore = government.Capital;
+
+        world.RestockGovernmentDepot(3500);
+
+        Assert.Equal(listingCountBefore, government.Listings.Count);
+        Assert.Equal(capitalBefore, government.Capital);
+    }
+
+    [Fact]
+    public void RestockGovernmentDepot_NeverTouchesAPlayerOwnedOrVacantSlot()
+    {
+        var world = World();
+        var content = world.GetYear(3500);
+        var vacantSlot = content.StoreSlots.First(s => s.IsAvailableForPurchase);
+        var buyer = new Traveler("Buyer", CharacterClass.Soldier);
+        buyer.AddCredits(1_000_000);
+        vacantSlot.Purchase(buyer);
+        var listingCountBefore = vacantSlot.Store!.Listings.Count;
+
+        world.RestockGovernmentDepot(3500);
+
+        // A fresh player store starts with no listings and RestockGovernmentDepot
+        // only ever acts on the one government-run slot — the player's new
+        // store is untouched, not silently stocked on their behalf.
+        Assert.Equal(listingCountBefore, vacantSlot.Store!.Listings.Count);
     }
 
     [Fact]

@@ -47,4 +47,28 @@ public enum AbilityEffectType
 
     /// <summary>Instantly defeats the monster outright — refused against a warden/boss fight.</summary>
     InstantDefeatNonBoss,
+
+    /// <summary>
+    /// Overworld-only, not a combat effect — refused mid-fight, cast instead
+    /// via the out-of-combat <c>cast &lt;ability&gt;</c> command (see
+    /// ChronoTravelers.Engine.Combat.OverworldAbilityResolver). Teleports
+    /// the caster to a random room within Magnitude exit-hops of their
+    /// current position (docs/GDD.md's Engineer "Jump Rig": "a rigged
+    /// micro-jump — short teleport to escape or reposition").
+    /// </summary>
+    ShortTeleport,
+
+    /// <summary>
+    /// Overworld-only, not a combat effect — refused mid-fight, cast instead
+    /// via the out-of-combat <c>cast &lt;ability&gt;</c> command (see
+    /// ChronoTravelers.Engine.Combat.OverworldAbilityResolver). Heals the
+    /// most wounded living NPC Traveler sharing the caster's room (a
+    /// genuinely 0-HP NPC is replaced by the next tick's respawn far too
+    /// quickly to ever be a usable target — see OverworldAbilityResolver's
+    /// doc comment for why "downed" is read as "badly wounded" instead) up
+    /// to Magnitude of their max HP, if they're not already above it
+    /// (docs/GDD.md's Doctor "Crash Cart": "bring a downed ally back on
+    /// partial vitals").
+    /// </summary>
+    ReviveAlly,
 }

@@ -457,7 +457,15 @@ public static class TimelineContentFactory
             _ => 0,
         };
 
-        return new Item(
+        // docs/GDD.md §6.3's "repair costs" Credit sink (ChronoTravelers.Core.Items.Item.HasDurability)
+        // — only the real content-driven Weapon/Armor path wears down; the
+        // one-off trophy/scavenged-weapon items elsewhere in this file stay
+        // exempt (MaxDurability's 0 default), same as starter gear.
+        var maxDurability = archetype.Type is ItemType.Weapon or ItemType.Armor
+            ? LootScaling.MaxDurabilityFor(tier, archetype.PowerMultiplier)
+            : 0;
+
+        var item = new Item(
             archetype.Name,
             archetype.Type,
             displayTier,
@@ -468,7 +476,10 @@ public static class TimelineContentFactory
             RestrictedClass: archetype.RestrictedClass,
             ConsumableEffect: archetype.Effect,
             EffectMagnitude: archetype.EffectMagnitude,
-            EffectDurationTicks: archetype.EffectDurationTicks);
+            EffectDurationTicks: archetype.EffectDurationTicks,
+            MaxDurability: (int)Math.Round(maxDurability));
+        item.Durability = item.MaxDurability;
+        return item;
     }
 
     /// <summary>The whole-number tier shown on a Monster/Item for a year — clamped to ≥ 1 (year 2000 → 1).</summary>

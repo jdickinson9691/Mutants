@@ -21,6 +21,16 @@ namespace ChronoTravelers.Core.Items;
 /// value-equality. Once <see cref="AmmoRemaining"/> hits 0 the weapon is
 /// <see cref="IsDepleted"/> — no longer fireable, worth only a fraction
 /// (down to 25%) on <see cref="ConvertValue"/> / <see cref="SellValue"/>.
+///
+/// A melee Weapon or a piece of Armor carries its own separate wear model
+/// — <see cref="MaxDurability"/> and a live, mutable <see cref="Durability"/>
+/// — docs/GDD.md §6.3's "repair costs" Credit sink needs something that
+/// actually wears out. Ranged weapons don't use this; their ammo economy
+/// above already models wear. <see cref="MaxDurability"/> = 0 (the
+/// default) means "not tracked" — a Weapon/Armor built before this field
+/// existed, or one deliberately exempted (starter gear — see
+/// ChronoTravelers.Game.CharacterFactory), never degrades and never needs
+/// repair. See <see cref="HasDurability"/> / <see cref="DurabilityEffectiveness"/>.
 /// </summary>
 public sealed record Item(
     string Name,
@@ -39,10 +49,14 @@ public sealed record Item(
     RangedEffectType RangedEffect = RangedEffectType.None,
     Guid InstanceId = default,
     bool IsTimeShard = false,
-    int Range = 1)
+    int Range = 1,
+    int MaxDurability = 0)
 {
     /// <summary>Shots left in a ranged weapon (starts at <see cref="AmmoCapacity"/>). Mutable — decremented by ChronoTravelers.Engine.Combat.RangedResolver. 0 for every non-ranged item.</summary>
     public int AmmoRemaining { get; set; }
+
+    /// <summary>Live wear left, out of <see cref="MaxDurability"/>. Mutable — decremented by ChronoTravelers.Core.Characters.Traveler.DegradeEquippedWeapon/DegradeEquippedArmor, restored by ChronoTravelers.Core.Economy.Store.Repair. Set to MaxDurability at creation; 0 for anything <see cref="HasDurability"/> is false for.</summary>
+    public int Durability { get; set; }
 
     /// <summary>
     /// Builds an item whose Value, AttackBonus, and DefenseBonus are all
@@ -56,15 +70,21 @@ public sealed record Item(
     /// </summary>
     public static Item Create(
         string name, ItemType type, int tier, Rarity rarity, CharacterClass? restrictedClass = null,
-        ConsumableEffectType consumableEffect = ConsumableEffectType.None, double effectMagnitude = 0, int effectDurationTicks = 0) =>
-        new(name, type, tier, rarity,
+        ConsumableEffectType consumableEffect = ConsumableEffectType.None, double effectMagnitude = 0, int effectDurationTicks = 0)
+    {
+        var maxDurability = type is ItemType.Weapon or ItemType.Armor ? LootScaling.MaxDurabilityFor(tier, rarity) : 0;
+        var item = new Item(name, type, tier, rarity,
             Value: LootScaling.ValueFor(tier, rarity),
             AttackBonus: type == ItemType.Weapon ? LootScaling.CombatBonusFor(tier, rarity) : 0,
             DefenseBonus: type == ItemType.Armor ? LootScaling.ArmorCombatBonusFor(tier, rarity) : 0,
             RestrictedClass: restrictedClass,
             ConsumableEffect: consumableEffect,
             EffectMagnitude: effectMagnitude,
-            EffectDurationTicks: effectDurationTicks);
+            EffectDurationTicks: effectDurationTicks,
+            MaxDurability: maxDurability);
+        item.Durability = maxDurability;
+        return item;
+    }
 
     /// <summary>
     /// Builds a ranged weapon — <see cref="ItemType.Ranged"/> with a
@@ -122,14 +142,46 @@ public sealed record Item(
     public bool IsDepleted => IsRanged && AmmoRemaining <= 0;
 
     /// <summary>
+    /// A melee Weapon or Armor piece that actually tracks wear — see the
+    /// class doc comment. False for anything with <see cref="MaxDurability"/>
+    /// still at its 0 default (every non-Weapon/Armor type, ranged weapons,
+    /// and starter gear — see ChronoTravelers.Game.CharacterFactory).
+    /// </summary>
+    public bool HasDurability => Type is ItemType.Weapon or ItemType.Armor && MaxDurability > 0;
+
+    /// <summary>A Weapon/Armor piece worn all the way down — still equippable (docs/GDD.md §4.3's "penalty, not a hard block" philosophy extends here too) but, per <see cref="DurabilityEffectiveness"/>, contributes nothing to combat until repaired (see ChronoTravelers.Core.Economy.Store.Repair).</summary>
+    public bool IsBroken => HasDurability && Durability <= 0;
+
+    /// <summary>
+    /// Combat-contribution multiplier from wear: 1.0 at full Durability,
+    /// scaling straight down to 0.0 once <see cref="IsBroken"/> — no floor,
+    /// unlike <see cref="ValueFraction"/> below. That's deliberate: this
+    /// number prices combat usefulness (a broken weapon should read as "go
+    /// get it repaired," not "still swings for a quarter of its rating"),
+    /// while ValueFraction prices scrap value (worn gear is still worth
+    /// something to a store). 1.0 for anything <see cref="HasDurability"/>
+    /// is false for. Multiplied into
+    /// ChronoTravelers.Core.Characters.Traveler.EffectiveAttackPower /
+    /// EffectiveDefense on top of <see cref="WieldEffectiveness"/>.
+    /// </summary>
+    public double DurabilityEffectiveness =>
+        HasDurability ? Math.Clamp(Durability, 0, MaxDurability) / (double)MaxDurability : 1.0;
+
+    /// <summary>
     /// For a ranged weapon, how much of <see cref="Value"/> is left given
     /// the ammo spent: full when the magazine is full, down to 25% when
-    /// empty. 1.0 for every other item.
+    /// empty. For a Weapon/Armor that <see cref="HasDurability"/>, the same
+    /// 25%-floor curve applied to wear instead of ammo — even a fully
+    /// broken piece is still worth something to a store, it just isn't
+    /// worth fighting with (see <see cref="DurabilityEffectiveness"/> for
+    /// that half). 1.0 for every other item.
     /// </summary>
     public double ValueFraction =>
         IsRanged && AmmoCapacity > 0
             ? 0.25 + 0.75 * (Math.Clamp(AmmoRemaining, 0, AmmoCapacity) / (double)AmmoCapacity)
-            : 1.0;
+            : HasDurability
+                ? 0.25 + 0.75 * DurabilityEffectiveness
+                : 1.0;
 
     private int EffectiveValue => Math.Max(1, (int)Math.Round(Value * ValueFraction));
 

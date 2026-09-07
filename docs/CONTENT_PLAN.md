@@ -44,7 +44,7 @@ file I/O.
       each) own the monster roster, stats, and behavior. The two bandings
       deliberately don't line up.
       **Placed spatially** (GDD §7.1): `YearPopulation.Seed` drops
-      `max(2, roomCount/3)` of the year's roster into its rooms on first
+      `max(4, roomCount*2/5)` of the year's roster into its rooms on first
       entry — plus, in ~half of years, one or two **apex** monsters
       (`TimelineContentFactory.ApexForSpecies`, `Monster.IsApex`, "Frayed
       &lt;species&gt;": ~2.4× HP, ~3.5× XP, gear-heavy loot, near-zero
@@ -53,7 +53,7 @@ file I/O.
       infights / heals them each tick. No per-year placement content — it's
       all derived from the generation's roster + the world seed.
 
-- [x] **Item archetypes** — `item-archetypes.json`. ~95 archetypes: `{ id,
+- [x] **Item archetypes** — `item-archetypes.json`. ~154 archetypes: `{ id,
       name, type, powerMultiplier? | rarity, restrictedClass?, effect?,
       effectMagnitude?, effectDurationTicks?, rangedKind?, ammoCapacity?,
       rangedEffect?, themeTags }`, no tier. `TimelineContentFactory.
@@ -66,21 +66,26 @@ file I/O.
     (`4.4·tier + 1`) by it; `Rarity.ForPower` derives the rarity band;
     `Rarity.DropWeight` makes rare bands scarce on loot tables. Each era
     theme carries a crude → standard → fine ladder plus an occasional
-    master/relic; plus one class-restricted weapon per class (Uncommon).
-    Consumables/junk still author `rarity`.
+    master/relic; plus one class-restricted weapon, one class-restricted
+    armor piece, and one class-restricted ranged weapon per class (all
+    Uncommon, `powerMultiplier: 1.2`). Consumables/junk still author `rarity`.
   - **Ranged weapons** (`type: "Ranged"`, GDD §5): a `rangedKind` of
     `Wand`/`Bow`/`Gun` plus an `ammoCapacity` (the built-in shot count —
     no separate ammo item) and an optional `rangedEffect` (`Weaken` or
     `Stagger`). `EffectMagnitude` doubles as the damage multiplier / effect
-    amount. **Every era theme now has its own 2–4-entry ranged ladder**
-    (`scrap`: Pipe Slugger + the shared Tension Bow; `neon`: Signal Lance
-    (Wand, Weaken) + Riot Taser (Gun, Stagger); `ash`: Flare Cannon;
-    `drowned`: Harpoon Launcher + Depth Charge Emitter (Stagger); `deep`:
-    Arc-Lantern Wand (Weaken) + Vault-Piercer Rifle; `frost`: Rime-Fletched
-    Bow + Cryo Carbine (Stagger); `orbital`: Tesla Arc Rifle, Micro-Thrust
-    Harpoon, Ion Caster (Weaken), plus the shared Slug Carbine; `paradox`:
-    Causal Disruptor (Stagger), Grandfather's Railgun (Weaken), plus the
-    shared Slug Carbine) — replacing the old three-sample-archetype spread.
+    amount. **Every era theme now has its own 3–4-entry ranged ladder**
+    (`scrap`: Pipe Slugger, Junk Railspike, Compactor Cannon (Stagger),
+    plus the shared Tension Bow; `neon`: Signal Lance (Wand, Weaken), Riot
+    Taser (Gun, Stagger), Chrome Repeater; `ash`: Flare Cannon, Ember Lance
+    (Wand, Weaken), Cinder Mortar (Stagger), plus the shared Tension Bow;
+    `drowned`: Harpoon Launcher, Depth Charge Emitter (Wand, Stagger),
+    Tide-Piercer Harpoon; `deep`: Arc-Lantern Wand (Weaken), Vault-Piercer
+    Rifle, Sump Dart Gun, Abyssal Railgun; `frost`: Rime-Fletched Bow, Cryo
+    Carbine (Stagger), Absolute-Zero Carbine; `orbital`: Tesla Arc Rifle,
+    Micro-Thrust Harpoon, Ion Caster (Weaken), plus the shared Slug
+    Carbine; `paradox`: Recursive Bow, Causal Disruptor (Wand, Stagger),
+    Grandfather's Railgun (Weaken), plus the shared Slug Carbine) —
+    replacing the old three-sample-archetype spread.
   - **Consumables are no longer `common`-only.** Beyond the original
     Heal/BuffAttack/BuffDefense trio, `ConsumableEffectType` (see
     `ChronoTravelers.Core.Items`) now also has `BuffSpeed` (a timed Speed/
@@ -88,7 +93,7 @@ file I/O.
     the Tachyon-pool counterpart to Heal), and `HealOverTime` (heals every
     tick for a duration, the timed counterpart to Heal) — see
     `Traveler.Consume` / `Traveler.AdvanceEffectTicks`. Every non-`common`
-    era theme now authors 2–3 themed consumables mixing old and new effect
+    era theme now authors 4 themed consumables mixing old and new effect
     types (e.g. `neon`'s Capacitor Cell is `RestoreTachyons`, `ash`'s
     Smoldering Broth is `HealOverTime`, `scrap`'s Salvaged Stim-Legs is
     `BuffSpeed`), escalating in rarity/magnitude with the theme.
@@ -157,9 +162,29 @@ file I/O.
       original design (`source` field per entry). Mechanical fields
       (`effect`, `magnitude`, `tachyonCost`, `condition`, `tag`,
       `durationRounds`) drive `ChronoTravelers.Engine.Combat.CombatSession`.
-      Three abilities with no honest 1v1 translation (Crash Cart, Black
-      Market Contacts, Jump Rig) are `effect: "None"` and refused at cast
-      time. **A 7th tier per class** (`source: "endgame"`) was added for
+      Three abilities had no honest 1v1 translation into the round-by-round
+      fight loop (Crash Cart, Black Market Contacts, Jump Rig) and shipped
+      `effect: "None"`, refused at cast time. **Implemented (2026-09-07,
+      docs/GDD.md item #5):** none of the three actually needed a combat
+      translation — they're a party/economy/overworld mechanic apiece, so
+      they got real non-combat effects instead. Black Market Contacts is
+      "Permanent" — no cast, it's a flat store-price bonus that folds into
+      `Traveler.StoreDiscountBonus` automatically once a Spy hits level 25,
+      still `effect: "None"` in the catalog since there's nothing to cast.
+      Jump Rig (`effect: "ShortTeleport"`) and Crash Cart (`effect:
+      "ReviveAlly"`) are cast with a new out-of-combat `cast <ability>`
+      command (console and multiplayer server both — the multiplayer
+      server's first ability-casting command of any kind, since `fight`
+      there auto-resolves and never needed one) via
+      `ChronoTravelers.Engine.Combat.OverworldAbilityResolver`: Jump Rig
+      teleports to a random room within 3 exit-hops
+      (`ChronoTravelers.Core.World.LevelMap.RoomsWithinHops`, new); Crash
+      Cart heals the most-wounded living NPC Traveler in the caster's room
+      up to 50% max HP — "downed" read as badly wounded (≤25% max HP)
+      rather than literally 0 HP, since a genuinely dead NPC is replaced by
+      the very next tick's respawn, far too fast a window to ever target in
+      practice (a documented scope call, not the letter of the flavor
+      text). **A 7th tier per class** (`source: "endgame"`) was added for
       the year-3500-5000 endgame — level 35 for Soldier/Doctor/Spy/
       Scientist, level 25 for Engineer's compressed cadence — each a
       stronger variant of that class's existing kit (higher `tachyonCost`

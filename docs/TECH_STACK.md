@@ -41,7 +41,12 @@
 - **Inno Setup** — Windows installer build (scripted, checked into `/installer/`).
 - **GitHub Actions** (`dotnet` + a Windows runner) — CI: build, test, and (on tag) produce the installer as a release asset.
 
-### Suggested repo layout (see also `docs/AGENTS.md`)
+### Repo layout (as built — see also `docs/AGENTS.md`)
+
+This section originally described a *suggested* layout, written before any
+code existed. The project has since been built out well past that plan
+(most notably a second, shared-world multiplayer front end), so this now
+documents what's actually on disk rather than a proposal:
 
 ```
 ChronoTravelers/
@@ -50,14 +55,28 @@ ChronoTravelers/
   src/
     ChronoTravelers.Core/        Domain model: classes, abilities, items, monsters, levels, economy
     ChronoTravelers.Engine/      Tick loop, NPC AI, combat resolution, persistence
-    ChronoTravelers.Console/     Spectre.Console front end / the actual playable app
-    ChronoTravelers.Content/     JSON content data (classes.json, monsters.json, items.json, levels/*.json)
+    ChronoTravelers.Console/     Spectre.Console front end / the standalone single-player app
+    ChronoTravelers.Content/     JSON content data (abilities.json, item-archetypes.json, and the rest of the catalog — see docs/CONTENT_PLAN.md)
+    ChronoTravelers.Game/        Front-end-agnostic game rules shared by the console and server (CharacterFactory, Commands, SharedGame) — added so the two front ends can't drift apart on shared behavior
+    ChronoTravelers.Server/      Headless shared-world multiplayer server, telnet + SignalR — docs/SERVER.md, docs/PLATFORM_STRATEGY.md's Option B
   tests/
     ChronoTravelers.Core.Tests/
     ChronoTravelers.Engine.Tests/
+    ChronoTravelers.Game.Tests/
+    ChronoTravelers.Server.Tests/
+  tools/
+    ChronoTravelers.PlaytestHarness/  Automated battery-test bot used for balance passes (see claude/*.md session notes for example runs)
   installer/             Inno Setup script + assets
   .github/workflows/     CI pipeline
 ```
+
+Two additions past the original plan, both driven by the multiplayer work:
+`ChronoTravelers.Game` (so the console and server front ends share one
+source of truth for game rules instead of each reimplementing them — a gap
+that already caused real drift once, see the starter-armor fix in
+`claude/economy-changes.md`) and `ChronoTravelers.Server` itself. `tools/`
+wasn't part of the original milestone sequencing below either — it grew
+out of later balance-pass work.
 
 ### Minimum viable milestone sequencing
 

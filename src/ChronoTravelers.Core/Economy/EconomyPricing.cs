@@ -44,4 +44,42 @@ public static class EconomyPricing
 
     /// <summary>Credit maintenance one player/NPC-owned store owes for a single world tick, for a store sitting at <paramref name="tier"/> (Time.TimeScale.TierForYear(store.HomeLevel)) — docs/GDD.md §6.2. Never less than 1, so upkeep is never free even in year 2000.</summary>
     public static int MaintenanceCostPerTick(double tier) => Math.Max(1, (int)Math.Round(tier * MaintenanceCostPerTier));
+
+    /// <summary>
+    /// Fraction of a Weapon/Armor's own <see cref="Item.Value"/> that a
+    /// full repair (0 Durability back to <see cref="Item.MaxDurability"/>)
+    /// costs — docs/GDD.md §6.3's "repair costs" Credit sink. Priced as a
+    /// fraction of Value, not a flat per-point rate, so it scales with the
+    /// same tier/rarity curve as everything else in the loot economy.
+    /// Deliberately below 1.0: restoring worn gear should read as cheaper
+    /// than replacing it outright with a fresh drop or store buy, or a
+    /// player would never bother and the sink would go unused.
+    /// </summary>
+    private const double FullRepairCostFraction = 0.5;
+
+    /// <summary>
+    /// Credits to repair <paramref name="item"/> back to full Durability
+    /// right now — <see cref="FullRepairCostFraction"/> of its Value,
+    /// scaled by how worn it actually is (a scratch costs almost nothing;
+    /// a fully broken piece costs the full fraction). 0 for an item that
+    /// doesn't <see cref="Item.HasDurability"/>, or is already at full —
+    /// both read as "nothing to repair" by the caller (see
+    /// ChronoTravelers.Core.Economy.Store.Repair). Never less than 1 Credit
+    /// for a genuinely worn item, so it's never a rounding-error freebie.
+    /// </summary>
+    public static int RepairCost(Item item)
+    {
+        if (!item.HasDurability)
+        {
+            return 0;
+        }
+
+        var missingFraction = 1.0 - item.DurabilityEffectiveness;
+        if (missingFraction <= 0)
+        {
+            return 0;
+        }
+
+        return Math.Max(1, (int)Math.Round(missingFraction * item.Value * FullRepairCostFraction));
+    }
 }

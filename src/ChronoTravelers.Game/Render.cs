@@ -117,7 +117,8 @@ internal static class Render
             var tag = it.Type == Core.Items.ItemType.Weapon ? $" (atk +{it.AttackBonus})"
                 : it.Type == Core.Items.ItemType.Armor ? $" (def +{it.DefenseBonus})"
                 : "";
-            session.Send($"  {i + 1}. {it.Name} [{it.Type}, {it.Rarity}, value {it.Value}]{tag}");
+            var durability = it.HasDurability ? $" [{it.Durability}/{it.MaxDurability} durability{(it.IsBroken ? " — broken, repair" : "")}]" : "";
+            session.Send($"  {i + 1}. {it.Name} [{it.Type}, {it.Rarity}, value {it.Value}]{tag}{durability}");
         }
     }
 

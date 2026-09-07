@@ -58,17 +58,30 @@ classes that account hasn't played. Then you're in the shared world.
 `heal` · `take [all]` · `fight [name]` · `wield <item>` · `convert`/`con` `<item>` ·
 `travel <year | +N | -N>` · `news` · `who` · `say <msg>` · `wait` · `quit`
 
+`abilities`/`spells` lists your class's ability tree. `cast <name>` works
+for exactly two of them — Engineer's `Jump Rig` and Doctor's `Crash Cart`
+(docs/GDD.md §4.2's "Implementation (2026-09-07)" note) — any time, not
+just mid-fight; every other ability is combat-only and this server's
+`fight` already auto-resolves, so there's no round to cast one in.
+
 **Stores** (docs/GDD.md §6, full parity with the console): `stores` (list
 this year's slots) · `shop` (browse the one in your room) · `buy <item>` ·
-`sell <item>` (no store buys junk) / `sell all` (converts junk for Tachyons, works anywhere) · `buy-store` (claim a vacant slot)
+`sell <item>` (no store buys junk) / `sell all` (converts junk for Tachyons, works anywhere) · `repair <item>` (restores a worn weapon/armor's Durability for Credits — §6.3's Credit sink) · `buy-store` (claim a vacant slot)
 · `stock <item> <price>` · `withdraw <item>` · `reprice <item> <price>` ·
 `deposit <credits>` · `charge <credits>` · `collect` (owner-only verbs
 require standing at a store you own; `collect` alone reaches every store
 you own across every year the shared world has visited).
 
 Fights **auto-resolve** (no round-by-round input over a line protocol) and
-the loot drops on the floor — `take` it. Death snaps you back to 2000 A.D.
-at full health. Characters autosave on disconnect and every ~60 s.
+the loot drops on the floor — `take` it. With no monster in your room,
+`fight [name]` instead targets a living NPC Traveler sharing your tile
+(docs/GDD.md §11's "player-vs-NPC-Traveler combat") — win and their whole
+inventory, equipped gear included, drops for you to `take`; lose and it's
+the same death & recall as losing to a monster. Death (docs/GDD.md §3.3,
+shared with the console via `ChronoTravelers.Game.DeathRecall`) drops half your
+unequipped inventory where you fell, costs half your current Tachyons, and
+snaps you back to 2000 A.D. at full health. Characters autosave on
+disconnect and every ~60 s.
 
 ## Not done yet
 

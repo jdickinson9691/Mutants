@@ -20,7 +20,7 @@ backlog.
 - A milestone plan matching `docs/TECH_STACK.md` §"Minimum viable milestone
   sequencing," broken into GitHub issues with acceptance criteria.
 - Sprint/session summaries when work resumes across sessions (since each new
-  Claude session starts cold — see `docs/CONTINUITY.md`).
+  Claude session starts cold — see this file's cross-cutting rule 4, below).
 
 **Must not:** change game design (defers to Design Agent) or approve
 architecture changes unilaterally (defers to Systems Agent).

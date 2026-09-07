@@ -21,6 +21,7 @@ internal static class AudioManager
     private static readonly string AudioDirectory = Path.Combine(AppContext.BaseDirectory, "Audio");
     private static readonly Random Rng = new();
     private static bool _titleThemePlayed;
+    private static bool _introCinematicPlayed;
 
     // A purely local WaveOutEvent has no GC root once PlayFireAndForget
     // returns except its own playback thread - fine in practice, but this
@@ -199,6 +200,32 @@ internal static class AudioManager
 
         _titleThemePlayed = true;
         PlayFireAndForget(TitleThemeFiles[Rng.Next(TitleThemeFiles.Length)]);
+    }
+
+    /// <summary>
+    /// Plays the ~30s opening-cinematic score (<c>Audio/intro_cinematic.wav</c>)
+    /// the first time — and only the first time — <c>Program.cs</c>'s
+    /// <c>PlayIntroCinematic()</c> runs this session. An original,
+    /// procedurally synthesized placeholder track (see docs/AUDIO.md's "The
+    /// audio files" section — same disclosure as the other ten clips):
+    /// a hushed minor-key pad opening, a rising arpeggio and siren-like
+    /// sweep building through the tunnel ride, a sharp dissonant
+    /// noise/sub-bass hit for the accident itself, then a quiet, mournful
+    /// fade — urgent but sad, timed to line up with <c>Program.cs</c>'s
+    /// <c>IntroCinematicScenes()</c> scene list, which sums to ~30000ms of
+    /// frames. Static flag mirrors <see cref="PlayTitleThemeOnce"/> so a
+    /// second call (there shouldn't be one — <c>PlayIntroCinematic()</c> has
+    /// exactly one call site) is a safe no-op rather than a restart/overlap.
+    /// </summary>
+    public static void PlayIntroCinematicOnce()
+    {
+        if (_introCinematicPlayed)
+        {
+            return;
+        }
+
+        _introCinematicPlayed = true;
+        PlayFireAndForget("intro_cinematic.wav");
     }
 
     /// <summary>Call after a successful grid move (one room to the next). Plays a random ambience clip about 1 time in <see cref="MovementSfxOneInN"/> — never on every step.</summary>

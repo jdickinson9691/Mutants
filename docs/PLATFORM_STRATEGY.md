@@ -33,7 +33,7 @@ Architecture confirmed by reading the code directly:
   `WorldSimulation.Tick` takes explicit `Traveler`/NPC lists and a random
   source as parameters — it has no idea a console exists.
 - **`ChronoTravelers.Console`** — the only layer that touches Spectre.Console
-  and stdin/stdout (`Program.cs`, ~76KB, self-documenting file header).
+  and stdin/stdout (`Program.cs`, ~145KB, self-documenting file header).
 - **`ChronoTravelers.Content`** — data-driven JSON catalogs (monster
   species, item archetypes, era bands, store templates, abilities),
   loaded through `ContentLoader` into a `TimeWorld`.
@@ -160,17 +160,28 @@ the code — **the architecture is already most of the way there**:
   telnetted into a BBS, which is a nice nod to the source material and
   isn't hard to bolt onto the same server once the engine is
   network-hosted.
-- **The one real architectural gap**: LiteDB is a single-writer embedded
-  file database — correct for one player's local save, wrong for
-  concurrent multi-client writes. Moving persistence to a server-owned
-  SQLite database (WAL mode is fine for one server process) or Postgres
-  (if you want multiple server instances or cloud elasticity later) is
-  the one genuine "swap the library" cost in this migration.
-- **The other real gap**: there is no account/auth system today — a "save"
-  is just a name in a local LiteDB file. Multiplayer needs at minimum a
-  username+password (or a simpler persistent per-install token) so a
-  character belongs to an account rather than to whoever's PC the save
-  file lives on.
+- **LiteDB, resolved (not a gap any more) — kept, on purpose, not swapped.**
+  This bullet originally flagged LiteDB as a single-writer embedded file
+  database that's correct for one player's local save but wrong for
+  concurrent multi-client writes, and framed moving to a server-owned
+  SQLite/Postgres database as an unavoidable cost of shipping Option B.
+  That's not what happened: `ChronoTravelers.Server` shipped with LiteDB
+  as its `server.db`, single writer, one server process — a deliberate,
+  documented "fine for now" tradeoff, not an oversight (see
+  `docs/SERVER.md`'s own "Persistence at scale" note: "LiteDB is fine for
+  one server process; Postgres is the swap if multiple instances / cloud
+  elasticity are ever needed"). There's exactly one server process today,
+  so the concurrent-multi-writer problem this bullet worried about doesn't
+  actually arise yet. Revisit if/when the game ever needs more than one
+  server instance.
+- **Account/auth, resolved (not a gap any more)**: this bullet originally
+  said there was no account/auth system and multiplayer would need at
+  minimum a username+password. `ChronoTravelers.Server` shipped with
+  exactly that — PBKDF2-hashed password accounts (see the status box
+  above and `docs/SERVER.md`) — so a character now belongs to an account,
+  not to whoever's PC the save file lives on. The remaining, narrower gap
+  is auth *hardening*: `docs/SERVER.md` notes there's no rate limiting on
+  login attempts yet.
 - Server-authoritative combat falls out almost for free: `CombatResolver`,
   `TimeTravelResolver`, and friends already live in `Engine` with no
   console dependency — running them server-side instead of client-side

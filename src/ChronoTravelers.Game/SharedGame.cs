@@ -22,6 +22,7 @@ public sealed class SharedGame
     private readonly WorldSimulation _sim;
     private readonly List<Traveler> _npcs;
     private readonly List<Session> _sessions = [];
+    private readonly IRandomSource _random;
 
     /// <param name="npcClassWeights">
     /// Optional per-class spawn weights (docs/CONTENT_PLAN.md's "config-driven
@@ -46,8 +47,12 @@ public sealed class SharedGame
     {
         World = world;
         _npcs = npcs.ToList();
+        _random = random;
+        _abilities = abilities ?? [];
         _sim = new WorldSimulation(world, _npcs, random, npcClassWeights: npcClassWeights, abilities: abilities);
     }
+
+    private readonly IReadOnlyList<AbilityData> _abilities;
 
     public TimeWorld World { get; }
     public BroadcastChannel Broadcast => _sim.Broadcast;
@@ -63,6 +68,9 @@ public sealed class SharedGame
     }
 
     internal IReadOnlyList<Traveler> Npcs => _npcs;
+
+    /// <summary>The class ability catalog — docs/GDD.md item #5's gap-analysis: <c>Commands.cs</c>'s "cast" needs it to look up an out-of-combat ability by name (see <see cref="Engine.Combat.OverworldAbilityResolver"/>), same catalog <see cref="WorldSimulation"/> already uses for NPC grind fights.</summary>
+    internal IReadOnlyList<AbilityData> Abilities => _abilities;
 
     /// <summary>Adds a player to the world (placed at its year's start room if it isn't on the map), announces the arrival, and returns the session.</summary>
     public Session Join(string account, Traveler player, IGameOutput output)
@@ -181,14 +189,15 @@ public sealed class SharedGame
         session.ShownBroadcast = events.Count;
     }
 
+    /// <summary>docs/GDD.md §3.3's "death & recall" — see <see cref="DeathRecall"/> for the shared mechanic (loot drop, Tachyon penalty, snap-back, heal) both front ends now apply identically.</summary>
     private void Respawn(Session session)
     {
         var player = session.Player;
-        player.SetCurrentYear(TimeScale.MinYear);
-        var start = World.GetYear(TimeScale.MinYear).Map.Start;
-        player.PlaceAt(start);
-        player.Health.Heal(player.Health.Max);
-        session.Send("You were struck down — the surge carries what's left of you back upstream to 2000 A.D. You come to at full health.");
+        var outcome = DeathRecall.Apply(player, World, _random);
+
+        session.Send(outcome.DroppedItems.Count > 0
+            ? $"You were struck down — the surge carries what's left of you back upstream to 2000 A.D., but not everything makes the trip: {string.Join(", ", outcome.DroppedItems.Select(i => i.Name))} spill out where you fell, and you lose {outcome.TachyonsLost} Tachyons in the crossing. You come to at full health."
+            : $"You were struck down — the surge carries what's left of you back upstream to 2000 A.D., costing you {outcome.TachyonsLost} Tachyons in the crossing. You come to at full health.");
         AnnounceExcept(session.Id, $"{player.Name} was pulled back upstream after falling.");
         Render.Room(this, session);
     }

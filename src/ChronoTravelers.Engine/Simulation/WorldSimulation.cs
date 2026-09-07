@@ -170,6 +170,23 @@ public sealed class WorldSimulation
     }
 
     /// <summary>
+    /// One world tick's government-depot restocking for every year visited
+    /// this session — docs/GDD.md §9's background-tick "store restocking."
+    /// Independent of anyone's location, same as <see cref="ApplyStoreMaintenance"/>:
+    /// a depot restocks itself whether or not anyone's standing in it. Silent
+    /// (no broadcast) since it can fire every tick — a "the Depot restocked"
+    /// message every couple of seconds would drown out everything else in
+    /// the feed. Shared by <see cref="Tick"/> and <see cref="TickMultiplayer"/>.
+    /// </summary>
+    private void ApplyGovernmentRestocking()
+    {
+        foreach (var year in World.VisitedYears.ToList())
+        {
+            World.RestockGovernmentDepot(year);
+        }
+    }
+
+    /// <summary>
     /// Advances the world by one tick: passive Tachyon drain and potion-buff
     /// expiry for every living traveler (all NPCs plus
     /// <paramref name="player"/>), then one AI action per living NPC on
@@ -214,6 +231,7 @@ public sealed class WorldSimulation
         }
 
         ApplyStoreMaintenance();
+        ApplyGovernmentRestocking();
 
         var playerAnchorYear = TimeScale.IsValidYear(player.CurrentYear) ? player.CurrentYear : (int?)null;
         RespawnDeadNpcs(playerAnchorYear);
@@ -378,6 +396,7 @@ public sealed class WorldSimulation
             : (int?)null;
 
         ApplyStoreMaintenance();
+        ApplyGovernmentRestocking();
         RespawnDeadNpcs(mpAnchorYear);
 
         for (var i = 0; i < Npcs.Count; i++)

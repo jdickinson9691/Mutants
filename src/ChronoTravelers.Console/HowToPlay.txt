@@ -14,10 +14,12 @@ WHAT YOU'RE TRYING TO DO
   Traveler, past and present.
 
 THE TURN
-  Every command you type advances the world one tick. Tachyons drain a little,
-  monsters drift, other Travelers act, and years you've visited keep
-  simulating whether you're there or not. The world moves whether or not
-  you're typing.
+  Every command you type advances the world one tick: Tachyons drain a
+  little, monsters drift, other Travelers act, and years you've visited
+  keep simulating whether you're there or not. The world also ticks on
+  its own every couple of seconds even while you're just sitting at the
+  prompt deciding what to do next - don't linger somewhere with company
+  you don't trust.
 
 MOVING & LOOKING
   n / s / e / w        move one room
@@ -43,6 +45,25 @@ FIGHTING
   Loot from a kill falls on the floor where it died - nothing lands in
   your pack automatically. Pick it up with  take <item>  or  take all.
   shoot <dir> / point <dir>   fire a readied ranged weapon one room away
+
+  PvP: if there's no monster in your room but a living NPC Traveler is
+  standing there, "fight <name>" targets them instead. NPCs are full
+  Travelers (docs/GDD.md's scope for PvP without netcode), so the fight
+  resolves instantly - no round-by-round prompts - win or lose. Beat one
+  and everything they were carrying, equipped gear included, drops on the
+  floor for you to take; lose and you get the same death & recall as
+  losing to a monster.
+
+ABILITIES OUTSIDE A FIGHT
+  Most class abilities only do something mid-fight ("cast <ability>" while
+  fighting). A couple work the other way - use  cast <ability>  any time,
+  not just in combat:
+    Engineer's Jump Rig    teleports you to a random room up to 3 exits
+                            away - an escape or a shortcut, not a walk.
+    Doctor's Crash Cart     heals the most-wounded living NPC Traveler
+                            standing in your room, if one's below 25% HP.
+  Spy's Black Market Contacts needs no casting at all - once a Spy hits
+  level 25 it's just always-on better store prices.
 
 MONSTERS
   Monsters ignore you until you provoke them - mostly by stepping onto
@@ -84,6 +105,11 @@ STORES
   can also buy an empty storefront and run it - it earns Credits from NPC
   shoppers while you're away.
 
+  Melee weapons and armour wear down with use - fight enough and they'll
+  contribute less, and eventually nothing, until you "repair <item>" at
+  any store. Cost scales with how worn the piece is; ranged weapons don't
+  wear down (they run out of ammo instead).
+
 WARDENS
   Every 50-100 years a Warden stands watch over a pre-collapse tech cache
   - an automated construct with a guaranteed Legendary trophy. It gates
@@ -96,30 +122,5 @@ STAYING ALIVE
   - A store room is a safe haven - shop and heal there.
   - Overreaching downstream is a gamble, not a mistake. Grab better gear
     and jump back if it gets hot.
-
-MULTIPLAYER - a shared, live timeline
-  Chrono Travelers can also run as one persistent world other Travelers
-  join at the same time, ticking on a real clock instead of only while
-  you're typing. Someone has to start the server once (any Windows/.NET
-  machine that stays reachable):
-    dotnet run --project src/ChronoTravelers.Server -- [--port N] [--http-port N]
-  Defaults: telnet on port 4000, the game client on port 5000 - both
-  configurable, along with the DB path/tick rate/world seed
-  (docs/SERVER.md has the full flag list).
-
-  Everyone else connects to that machine. From this same exe:
-    ChronoTravelers.exe --connect http://<server-address>:5000
-  or, from any telnet client:
-    telnet <server-address> 4000
-  Either way you'll create/pick an account and Traveler (a new one is
-  offered only the classes that account hasn't played), then land in the
-  shared world alongside every other connected Traveler and the NPC
-  population.  say <message>  talks to everyone else online.
-
-  It's the same timeline, Tachyons, and monsters, but not full command
-  parity yet: fights auto-resolve there rather than round-by-round
-  attack/cast, and class abilities and ranged weapons aren't wired in
-  over the wire. For the complete single-player command set, just launch
-  the exe with no arguments instead.
 
 Type  help  in game for the full command list.

@@ -13,8 +13,10 @@ using ChronoTravelers.Engine.Content;
 using ChronoTravelers.Engine.Npc;
 using ChronoTravelers.Engine.Persistence;
 using ChronoTravelers.Engine.Simulation;
+using ChronoTravelers.Game;
 using Spectre.Console;
 using System.Text;
+using System.Threading;
 
 // Lore (docs/GDD.md §1): Project Meridian's temporal tunnel - a
 // classified government machine, Time-Tunnel-inspired - tore a standing
@@ -165,6 +167,15 @@ AppDomain.CurrentDomain.ProcessExit += (_, _) => saveOnExit();
 // +/- — see AudioManager.TryApplyVolumeCommand and docs/AUDIO.md.
 AudioManager.LoadSettings();
 
+// The ~30s opening cinematic — a Traveler entering Project Meridian's
+// tunnel and living through the accident that frays it (docs/GDD.md §1) —
+// plays once, right here, before either entry point below renders the
+// title screen. Both branches would otherwise need their own call; this
+// spot runs exactly once no matter which path is taken next, same reason
+// AudioManager.PlayTitleThemeOnce() only needs one call site's worth of
+// dedup logic. Skips itself instantly on a piped/automated run.
+PlayIntroCinematic();
+
 // `--connect <url>` (or `connect <url>`) plays on a shared-world server
 // instead of the local single-player timeline (docs/SERVER.md).
 var connectUrl = ConnectTarget(args);
@@ -291,6 +302,28 @@ var simulation = new WorldSimulation(world, npcs, random, npcClassWeights: npcCl
 var shownBroadcastCount = 0;
 var elsewhereBacklog = 0;
 
+// docs/GDD.md §9 — "a background tick... advances Tachyon drain, NPC
+// actions, and store restocking, while the human player acts
+// asynchronously between ticks by typing commands." Before this, the
+// only tick was the one fired synchronously inside the input loop below
+// (one tick per command) — nothing moved while the player sat at the `>`
+// prompt deciding what to type, unlike the multiplayer server's
+// PeriodicTimer (ChronoTravelers.Server/Program.cs), which ticks purely
+// on a wall-clock cadence regardless of command activity. `worldGate`
+// below protects `traveler`/`world`/`npcs`/`simulation` from the
+// background timer thread and the main thread (blocked on
+// Console.ReadLine()) touching them at once — mirrors
+// ChronoTravelers.Game.SharedGame's `_gate` pattern, the existing
+// precedent in this codebase for the same problem on the multiplayer
+// side.
+var worldGate = new object();
+
+// 2 seconds, matching both the GDD's own "every 2 real-time seconds"
+// framing and the multiplayer server's `--tick-ms` default (2000) — a
+// single-player session now beats to the same clock a multiplayer one
+// does.
+var idleTickInterval = TimeSpan.FromMilliseconds(2000);
+
 // Every NPC is fast-levelled into its spawn year's soft-cap band the
 // instant it's created (NpcPopulation.Create), so record their personal
 // bests right away — otherwise `leaderboard` shows nothing for this
@@ -338,8 +371,100 @@ void SaveOnExit()
 saveOnExit = SaveOnExit;
 travelerIsDead = () => traveler.Health.IsDead;
 
+// Declared here (rather than immediately above the `while` loop, where
+// they conceptually belong) because the idle timer's callback below
+// needs to read `running` — a lambda can only capture a local that's
+// already in scope at the point it's written, so these come first.
 var running = true;
 var returnToMenu = false;
+
+// Runs one world tick and everything that displays as a result — the
+// grey-italic narration line(s), any new broadcast events, and (the part
+// that used to live only after the per-command tick) ambush-death
+// handling. Shared by the per-command tick below and by the background
+// idle timer's callback, so a monster that finishes the player off while
+// they're mid-thought at the prompt gets exactly the same DeathRecall/
+// room-render treatment as one that lands the blow between two typed
+// commands — previously this whole block only ran inline after a
+// command, so a background-triggered death would have had nowhere to go.
+// Caller must hold `worldGate`.
+void ApplyTickAndReport(bool playerActedIdly, bool renderRoomAfterTick)
+{
+    simulation.Tick(traveler, playerActedIdly: playerActedIdly);
+
+    foreach (var line in simulation.LastTickNarration)
+    {
+        AnsiConsole.MarkupLine($"[grey italic]{Markup.Escape(line)}[/]");
+    }
+
+    shownBroadcastCount = RenderNewBroadcastEvents(simulation.Broadcast, shownBroadcastCount, traveler.CurrentYear, ref elsewhereBacklog);
+
+    if (traveler.Health.IsDead)
+    {
+        // A monster sharing the room struck the killing blow this tick
+        // (see MonsterController's ambush). docs/GDD.md §3.3, death &
+        // recall — a setback, not game over (see the HandleFight defeat
+        // branch's comment for the shared mechanic). Reachable from the
+        // background idle timer now too, not just a typed command — an
+        // ambush can land while the player hasn't pressed Enter yet.
+        AnsiConsole.MarkupLine("[red]You're struck down where you stand.[/]");
+        var ambushDeathOutcome = DeathRecall.Apply(traveler, world, random);
+        if (ambushDeathOutcome.DroppedItems.Count > 0)
+        {
+            AnsiConsole.MarkupLine($"[grey]The surge carries what's left of you back upstream to 2000 A.D. — {Markup.Escape(NameList(ambushDeathOutcome.DroppedItems.Select(i => i.Name).ToList()))} spill out where you fell, and the crossing costs you {ambushDeathOutcome.TachyonsLost} Tachyons. You come to at full health.[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[grey]The surge carries what's left of you back upstream to 2000 A.D. — the crossing costs you {ambushDeathOutcome.TachyonsLost} Tachyons. You come to at full health.[/]");
+        }
+
+        RenderRoom(traveler, world);
+    }
+    else if (renderRoomAfterTick)
+    {
+        RenderRoom(traveler, world);
+    }
+}
+
+// The background half of item #7: fires only once the player has gone
+// `idleTickInterval` without submitting a command (see the `.Change(...)`
+// reset after every per-command tick below), so during normal, actively-
+// typed play it never fires at all — it exists purely to close the gap
+// while the player is reading the screen or deciding what to type next,
+// which the old one-tick-per-command model never advanced through. Uses
+// a plain System.Threading.Timer rather than PeriodicTimer (what the
+// multiplayer server uses) specifically because it needs to be reset on
+// activity rather than firing on a fixed period regardless of it; `Change`
+// with `Timeout.InfiniteTimeSpan` as the period gives one-shot semantics
+// that this callback re-arms itself, achieving "N ms after the last
+// command" instead of "every N ms no matter what".
+//
+// Printing narration straight from this callback, even while the main
+// thread is blocked mid-prompt on Console.ReadLine(), is a deliberate
+// choice (confirmed with the player) — genuinely unsolicited output
+// between commands is the actual BBS-door-game feel docs/GDD.md §9 is
+// describing, not a bug to engineer around. The one cosmetic cost: if the
+// player is mid-way through typing a line when a tick lands, the narration
+// can print through/above their in-progress input. Only narration prints
+// here (never a full room re-render, `renderRoomAfterTick: false`) —
+// mirrors how the multiplayer server also only pushes short narration
+// lines to idle sessions each tick, not a full re-render.
+Timer? idleTimer = null;
+idleTimer = new Timer(_ =>
+{
+    lock (worldGate)
+    {
+        if (!running || traveler.Health.IsDead)
+        {
+            return;
+        }
+
+        ApplyTickAndReport(playerActedIdly: true, renderRoomAfterTick: false);
+    }
+
+    idleTimer?.Change(idleTickInterval, Timeout.InfiniteTimeSpan);
+}, null, idleTickInterval, Timeout.InfiniteTimeSpan);
+
 while (running)
 {
     AnsiConsole.Markup("[green]>[/] ");
@@ -369,6 +494,15 @@ while (running)
     // holds when your next command runs — rendering before the tick showed
     // a monster that had already wandered off by the time you typed fight.
     var renderRoomAfterTick = false;
+
+    // Held for the whole command → tick round-trip, not just the tick
+    // itself — the point is that the background idle timer (see its
+    // declaration above) can only ever fire while the main thread is
+    // parked in Console.ReadLine() above, never mid-command, so a typed
+    // command's own reads/writes of traveler/world/npcs/simulation never
+    // race against a background tick touching the same state.
+    lock (worldGate)
+    {
 
     switch (input.ToLowerInvariant())
     {
@@ -467,7 +601,7 @@ while (running)
             // "nothing here" — instead of an "Unrecognized command" error.
             if (command is "fight" or "f" or "attack" or "atk" or "a")
             {
-                if (!HandleFight(traveler, world, random, simulation.Broadcast, abilities, argument))
+                if (!HandleFight(traveler, world, random, simulation.Broadcast, abilities, npcs, argument))
                 {
                     running = false;
                     returnToMenu = true;
@@ -506,6 +640,18 @@ while (running)
                 break;
             }
 
+            if (command is "repair")
+            {
+                HandleRepair(traveler, world, argument);
+                break;
+            }
+
+            if (command is "cast")
+            {
+                HandleOutOfCombatCast(traveler, world, random, npcs, abilities, argument);
+                break;
+            }
+
             if (command is "deposit" or "withdraw" or "reprice" or "stock" or "charge")
             {
                 HandleStoreManagement(traveler, world, command, argument);
@@ -530,27 +676,32 @@ while (running)
 
     if (running && !traveler.Health.IsDead)
     {
-        simulation.Tick(traveler, playerActedIdly: IsIdleCommand(input));
-
-        foreach (var line in simulation.LastTickNarration)
-        {
-            AnsiConsole.MarkupLine($"[grey italic]{Markup.Escape(line)}[/]");
-        }
-
-        shownBroadcastCount = RenderNewBroadcastEvents(simulation.Broadcast, shownBroadcastCount, traveler.CurrentYear, ref elsewhereBacklog);
-
-        if (traveler.Health.IsDead)
-        {
-            // A monster sharing the room struck the killing blow this tick (see MonsterController's ambush).
-            AnsiConsole.MarkupLine("[red]You're struck down where you stand.[/]");
-            running = false;
-            returnToMenu = true;
-        }
-        else if (renderRoomAfterTick)
-        {
-            RenderRoom(traveler, world);
-        }
+        ApplyTickAndReport(playerActedIdly: IsIdleCommand(input), renderRoomAfterTick: renderRoomAfterTick);
     }
+
+    // Every command just re-armed the world with a fresh tick of its own
+    // (above), so the idle timer's countdown to the *next* one starts
+    // over from here — it only ever reaches zero, and fires, once the
+    // player goes a full `idleTickInterval` without submitting another
+    // command.
+    idleTimer?.Change(idleTickInterval, Timeout.InfiniteTimeSpan);
+    } // lock (worldGate)
+}
+
+// Scoped to the gameplay loop only (docs/GDD.md §9's async-tick gap is
+// specifically about the *play* loop) — not character creation, the
+// buy/sell menus, or any other blocking sub-prompt, all of which are
+// brief enough that they don't need their own background ticking, and
+// disposing here means none of them can be surprised by one firing.
+// Disposing under `worldGate`: `running` just flipped to false, but a
+// tick that was already mid-flight in the callback (holding the lock)
+// needs to finish and release it first — taking the lock here waits for
+// that, and any callback that was merely *scheduled* (not yet running)
+// will see `!running` and bail out harmlessly once it does get the lock,
+// even after Dispose() has already returned.
+lock (worldGate)
+{
+    idleTimer.Dispose();
 }
 
 SaveOnExit();
@@ -924,6 +1075,258 @@ static string? ConnectTarget(string[] argv)
 
     return null;
 }
+
+/// <summary>
+/// The ~30s opening cinematic (docs/AUDIO.md's <c>intro_cinematic.wav</c>
+/// supplies the matching urgent-but-sad score) — a silent, frame-by-frame
+/// ASCII animation of a Traveler stepping into Project Meridian's tunnel,
+/// riding it deeper as it destabilizes, and living through the accident
+/// that frays it (docs/GDD.md §1). Called once, right before either entry
+/// point's first <see cref="RenderTitle"/> — see the call site's comment.
+/// Each frame clears the screen and holds for its slice of the ~30s
+/// runtime (see <see cref="IntroCinematicScenes"/>), polling for a
+/// keypress every ~100ms via <see cref="WaitOrSkip"/> so an impatient or
+/// returning player can jump straight to the title screen instead of
+/// sitting through it again. Does nothing at all when stdin is redirected
+/// (piped input / automation) — same guard as <see cref="ReadMenuLine"/>,
+/// since there's no interactive console to skip from and nothing worth
+/// animating to a pipe.
+/// </summary>
+static void PlayIntroCinematic()
+{
+    if (Console.IsInputRedirected)
+    {
+        return;
+    }
+
+    AudioManager.PlayIntroCinematicOnce();
+
+    foreach (var (lines, colour, durationMs) in IntroCinematicScenes())
+    {
+        AnsiConsole.Clear();
+        AnsiConsole.WriteLine();
+        foreach (var line in lines)
+        {
+            AnsiConsole.MarkupLine($"[{colour}]{line}[/]");
+        }
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[grey]— press any key to skip —[/]");
+
+        if (WaitOrSkip(durationMs))
+        {
+            break;
+        }
+    }
+
+    AnsiConsole.Clear();
+}
+
+/// <summary>
+/// Holds for up to <paramref name="ms"/>, checking <see cref="Console.KeyAvailable"/>
+/// every ~100ms. Returns <c>true</c> (having consumed the key with
+/// <see cref="Console.ReadKey(bool)"/> so it doesn't leak into the next
+/// prompt) the instant one arrives, <c>false</c> if the full duration
+/// elapsed untouched.
+/// </summary>
+static bool WaitOrSkip(int ms)
+{
+    const int pollMs = 100;
+    var elapsed = 0;
+    while (elapsed < ms)
+    {
+        if (Console.KeyAvailable)
+        {
+            Console.ReadKey(intercept: true);
+            return true;
+        }
+
+        var step = Math.Min(pollMs, ms - elapsed);
+        Thread.Sleep(step);
+        elapsed += step;
+    }
+
+    return false;
+}
+
+/// <summary>
+/// The cinematic's scene list — (lines, colour, hold-duration-ms) — timed
+/// to line up with <c>intro_cinematic.wav</c>'s own arc (docs/AUDIO.md):
+/// a hushed, sad opening (0-6s) as the Traveler approaches the tunnel; a
+/// rising, anxious middle (6-20s) as it pulls them in deeper and the ride
+/// destabilizes; the accident itself, fast cuts (20-23s); and a quiet,
+/// mournful aftermath fade (23-30s) leading straight into the title
+/// screen. Durations sum to ~30000ms. Built as static frames (not a
+/// generator, unlike <see cref="TimeTunnelBanner"/>) since each one is a
+/// one-off story beat rather than a repeatable ring pattern.
+/// </summary>
+static (string[] Lines, string Colour, int DurationMs)[] IntroCinematicScenes() =>
+[
+    // --- 0.0-3.0s: dormant tunnel, Traveler approaching -------------------
+    ([
+        @"                                                                 ",
+        @"                    ┌───────────────────────┐                    ",
+        @"                    │                       │                    ",
+        @"                    │     · project ·        │                    ",
+        @"                    │     · meridian ·        │                    ",
+        @"                    │                       │                    ",
+        @"                    └───────────┬───────────┘                    ",
+        @"                                │                                 ",
+        @"                              __O                                 ",
+        @"                            _-\<,_                                ",
+        @"                           (_)/  (_)                              ",
+        @"                                                                 ",
+        @"          the gantry crew logs in for one more routine run.       ",
+    ], "#5f87ff", 3000),
+
+    // --- 3.0-6.0s: closer, the tunnel starts to hum -----------------------
+    ([
+        @"                                                                 ",
+        @"              ┌─────────────────────────────────────┐            ",
+        @"              │  \\\                             /// │            ",
+        @"              │    \┌─────────────────────────┐/    │            ",
+        @"              │     │     · T A C H Y O N ·    │     │            ",
+        @"              │    /└─────────────────────────┘\    │            ",
+        @"              │  ///                             \\\ │            ",
+        @"              └─────────────────┬───────────────────┘            ",
+        @"                              __O                                 ",
+        @"                            _-\<,_                                ",
+        @"                           (_)/  (_)                              ",
+        @"                                                                 ",
+        @"       Project Meridian powers up for its first full-power run.  ",
+    ], "#5fd7ff", 3000),
+
+    // --- 6.0-8.5s: stepping into the threshold -----------------------------
+    ([
+        @"          ┌───────────────────────────────────────────────┐      ",
+        @"          │ \\\                                       /// │      ",
+        @"          │    \┌───────────────────────────────────┐/    │      ",
+        @"          │     │ \\\                             /// │     │      ",
+        @"          │     │    \┌─────────────────────────┐/    │     │      ",
+        @"          │     │     │    · T A C H Y O N ·    │     │     │      ",
+        @"          │     │    /└─────────────────────────┘\    │     │      ",
+        @"          │     │ ///            __O            \\\ │     │      ",
+        @"          │     │              _-\<,_               │     │      ",
+        @"          │    /└─────────────(_)/──(_)─────────────┘\    │      ",
+        @"          │ ///                                       \\\ │      ",
+        @"          └───────────────────────────────────────────────┘      ",
+    ], "#5fd7ff", 2500),
+
+    // --- 8.5-11.0s: descending, rings rushing past --------------------------
+    ([
+        @"     ┌─────────────────────────────────────────────────────────┐ ",
+        @"    /│\\\                                                 ///│\ ",
+        @"   / │   \┌───────────────────────────────────────────┐/   │ \ ",
+        @"  /  │    │ \\\                                   /// │    │  \",
+        @"     │    │    \┌─────────────────────────────┐/    │    │    ",
+        @"     │    │     │      · T A C H Y O N ·      │     │    │    ",
+        @"     │    │    /└──────────────O───────────────┘\    │    │    ",
+        @"     │    │ ///                <,>                \\\ │    │    ",
+        @"  \  │   /└──────────────────/─\──────────────────┘\   │  /",
+        @"   \ │ ///                                           \\\ │ /",
+        @"    \│/                                                 \│/",
+    ], "#5fd7ff", 2500),
+
+    // --- 11.0-14.0s: further in, brighter, faster ---------------------------
+    ([
+        @" ═══════════════════════════════════════════════════════════════ ",
+        @"   \\\   ┌───────────────────────────────────────────────┐   /// ",
+        @"     \\\ │    \┌─────────────────────────────────────┐/    │ /// ",
+        @"       \\│     │     \┌───────────────────────────┐/     │  //  ",
+        @"         │     │      │    · T A C H Y O N ·      │      │      ",
+        @"       //│     │     /└────────────O────────────┘\     │  \\  ",
+        @"     /// │    /└──────────────────<,>──────────────────┘\    \\\ ",
+        @"   ///   └───────────────────────/──\───────────────────────┘   \\\",
+        @" ═══════════════════════════════════════════════════════════════ ",
+    ], "#ffd75f", 2000),
+
+    // --- 14.0-16.5s: intensify — the ride starts to shake --------------------
+    ([
+        @" ═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═ ",
+        @"    \\\\   ┌───────────────────────────────────────────┐   ////   ",
+        @"      \\\\ │      \┌─────────────────────────────┐/      │ ////   ",
+        @"          │       │  ! · T A C H Y O N · ! !     │       │        ",
+        @"      ////│      /└──────────────O─────────────┘\      │ \\\\   ",
+        @"    ////  └───────────────────<,>───────────────────────┘   \\\\  ",
+        @" ═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═▬═ ",
+        @"                    — surge detected. hold position. —            ",
+    ], "#ffd75f", 2500),
+
+    // --- 16.5-18.5s: cracking, glitching -------------------------------------
+    ([
+        @" ▓▒░═▬═▬▓▒░▬═▬═▬▓▒░═▬▓▒░═▬═▬▓▒░═▬═▬▓▒░▬═▬═▬▓▒░═▬▓▒░═▬═▬▓▒░═▬═▬▓ ",
+        @"   \X\   ┌──────────────X────────────────────────────┐   /X/    ",
+        @"     \\  │    \┌───────────X-----------X─────────┐/    │  //     ",
+        @"         │     │   ! ! T#CHY?N ! ! !   │     │            ",
+        @"     //  │    /└────────────O──X───────────┘\    │  \\     ",
+        @"   /X/   └────────────────<,>────X──────────────┘   \X\    ",
+        @" ▓▒░═▬═▬▓▒░▬═▬═▬▓▒░═▬▓▒░═▬═▬▓▒░═▬═▬▓▒░▬═▬═▬▓▒░═▬▓▒░═▬═▬▓▒░═▬═▬▓ ",
+        @"               ⚠ C O N T A I N M E N T   F A I L U R E ⚠         ",
+    ], "#ff875f", 2000),
+
+    // --- 18.5-20.0s: heavy glitch, everything fracturing ---------------------
+    ([
+        @" ▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░ ",
+        @"  X X X   ┌────X────X──────X───────X──────┐   X X X ",
+        @"          │  ! ! ! T?CHY#N ! ! !  │          ",
+        @"  X X X   └────X────O────X────<,>────X───────┘   X X X ",
+        @" ▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░XX▓▓▒▒░░ ",
+        @"          T H E   T U N N E L   I S   T E A R I N G   O P E N     ",
+    ], "#ff5f5f", 1500),
+
+    // --- 20.0-20.6s: THE ACCIDENT — the flash ---------------------------------
+    ([
+        @" ################################################################ ",
+        @" ################################################################ ",
+        @" #############################  ################################ ",
+        @" ################################################################ ",
+        @" ################################################################ ",
+    ], "#ffffff", 600),
+
+    // --- 20.6-23.0s: flung, debris, darkness ----------------------------------
+    ([
+        @"                                                                 ",
+        @"        .                    ·                        `          ",
+        @"                  `          .    \,/    `                       ",
+        @"                       .          o                   .          ",
+        @"             `              (_)/ (_)  \                          ",
+        @"                    .                        `        .          ",
+        @"                          `          .                           ",
+        @"                                                                 ",
+        @"                    — the gantry crew fell downstream —           ",
+    ], "grey", 2400),
+
+    // --- 23.0-26.0s: falling through the fray, quiet ---------------------------
+    ([
+        @"                                                                 ",
+        @"                                                                 ",
+        @"                              .                                  ",
+        @"                                        .                        ",
+        @"                    .                             .              ",
+        @"                                    .                            ",
+        @"                          .                    .                 ",
+        @"                                                                 ",
+        @"                                                                 ",
+    ], "#5f87ff", 3000),
+
+    // --- 26.0-29.0s: aftermath narration ----------------------------------------
+    ([
+        @"                                                                 ",
+        @"                                                                 ",
+        @"        the tunnel opened for eight seconds and never fully      ",
+        @"        closed. it frayed the future — and you fell through      ",
+        @"        it, with no way to steer, and no way home.               ",
+        @"                                                                 ",
+        @"                                                                 ",
+    ], "grey", 3000),
+
+    // --- 29.0-30.0s: fade to black ------------------------------------------
+    ([
+        @"                                                                 ",
+        @"                                                                 ",
+        @"                                                                 ",
+    ], "grey", 1000),
+];
 
 /// <summary>
 /// The full-block "CHRONO TRAVELERS" wordmark — the original title screen,
@@ -1645,6 +2048,89 @@ static void HandleSellToStore(Traveler traveler, TimeWorld world, string argumen
     AnsiConsole.MarkupLine($"[yellow]Sold {Markup.Escape(item.Name)} to {Markup.Escape(store.Name)} for {price} Credits.[/]");
 }
 
+/// <summary>Repairs a worn Weapon/Armor back to full Durability at the store in the Traveler's current room — docs/GDD.md §6.3's "repair costs" Credit sink. Server parity (Commands.cs's <c>Repair</c>).</summary>
+static void HandleRepair(Traveler traveler, TimeWorld world, string argument)
+{
+    var storeSlots = world.GetYear(traveler.CurrentYear).StoreSlots;
+    var slot = FindStoreSlotAt(storeSlots, traveler.Position);
+    if (slot?.Store is not { } store)
+    {
+        AnsiConsole.MarkupLine("[red]You need to be at a store to repair gear.[/] Try [yellow]stores[/] to find one.");
+        return;
+    }
+
+    var item = FindInventoryItem(traveler, argument, static i => i.HasDurability);
+    if (item is null)
+    {
+        AnsiConsole.MarkupLine(argument.Length == 0
+            ? "[red]Repair what?[/] Name a weapon or armor piece."
+            : $"[red]No item matching '{Markup.Escape(argument)}' in your inventory.[/]");
+        return;
+    }
+
+    if (!item.HasDurability)
+    {
+        AnsiConsole.MarkupLine($"[grey]{Markup.Escape(item.Name)} doesn't wear down — nothing to repair.[/]");
+        return;
+    }
+
+    if (item.Durability >= item.MaxDurability)
+    {
+        AnsiConsole.MarkupLine($"[grey]{Markup.Escape(item.Name)} is already in full repair.[/]");
+        return;
+    }
+
+    var cost = EconomyPricing.RepairCost(item);
+    if (traveler.Credits < cost)
+    {
+        AnsiConsole.MarkupLine($"[red]Repairing {Markup.Escape(item.Name)} costs {cost} Credits; you have {traveler.Credits}.[/]");
+        return;
+    }
+
+    var paid = store.Repair(traveler, item);
+    AnsiConsole.MarkupLine($"[green]Repaired {Markup.Escape(item.Name)} for {paid} Credits.[/] ({item.Durability}/{item.MaxDurability} durability)");
+}
+
+/// <summary>
+/// docs/GDD.md item #5's gap-analysis finding: Doctor "Crash Cart" and
+/// Engineer "Jump Rig" have an on-demand overworld effect (heal a wounded
+/// NPC in the room / teleport a short distance), not a combat one — cast
+/// any time, not just via "cast" inside a <see cref="CombatSession"/>
+/// fight (see 'abilities'/'spells' for the full list; combat abilities
+/// stay refused here, same as an overworld ability is refused mid-fight).
+/// </summary>
+static void HandleOutOfCombatCast(Traveler traveler, TimeWorld world, IRandomSource random, IReadOnlyList<Traveler> npcs, IReadOnlyList<AbilityData> abilities, string argument)
+{
+    if (argument.Length == 0)
+    {
+        AnsiConsole.MarkupLine("[red]Cast what?[/] Try [yellow]abilities[/] to see your list.");
+        return;
+    }
+
+    var ability = abilities
+        .Where(a => string.Equals(a.Class, traveler.Class.ToString(), StringComparison.OrdinalIgnoreCase) && a.Level <= traveler.Level)
+        .FirstOrDefault(a => string.Equals(a.Name, argument, StringComparison.OrdinalIgnoreCase));
+
+    if (ability is null)
+    {
+        AnsiConsole.MarkupLine($"[red]No ability named '{Markup.Escape(argument)}' available.[/] Type [yellow]abilities[/] outside combat to see your list.");
+        return;
+    }
+
+    var year = traveler.CurrentYear;
+    var result = string.Equals(ability.Effect, "ShortTeleport", StringComparison.OrdinalIgnoreCase)
+        ? OverworldAbilityResolver.TryShortTeleport(traveler, world.GetYear(year).Map, ability, random)
+        : string.Equals(ability.Effect, "ReviveAlly", StringComparison.OrdinalIgnoreCase)
+            ? OverworldAbilityResolver.TryReviveAlly(traveler, npcs.Where(n => !n.Health.IsDead && n.CurrentYear == year && n.Position.Equals(traveler.Position)).ToList(), ability, random)
+            : new OverworldAbilityResolver.Result(false, $"{ability.Name} only works in a fight — try it with 'cast {ability.Name}' once you've engaged something.");
+
+    AnsiConsole.MarkupLine(result.Success ? $"[blue]{Markup.Escape(result.Message)}[/]" : $"[red]{Markup.Escape(result.Message)}[/]");
+    if (result.Success)
+    {
+        RenderStatusBar(traveler, world);
+    }
+}
+
 static void HandleBuyStore(Traveler traveler, TimeWorld world)
 {
     var storeSlots = world.GetYear(traveler.CurrentYear).StoreSlots;
@@ -1855,11 +2341,15 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
 /// Interactive and round-by-round via CombatSession — "attack", "cast
 /// <ability>", or "use <item>" each round. On a win the monster is removed from the year's
 /// live population and its loot (table roll + anything it had scavenged)
-/// goes to the player. Returns false if the Traveler was defeated (caller
-/// ends the session). End-of-input mid-fight auto-attacks each remaining
-/// round.
+/// goes to the player. Always returns true now — a defeat applies
+/// docs/GDD.md §3.3's death & recall (see <see cref="DeathRecall"/>)
+/// in place rather than ending the session; the bool return is kept for
+/// now since callers still branch on it (currently always taking the
+/// "continue" path), so a future genuinely session-ending case doesn't
+/// need every call site rewritten. End-of-input mid-fight auto-attacks
+/// each remaining round.
 /// </summary>
-static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, IReadOnlyList<AbilityData> abilities, string targetName)
+static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, IReadOnlyList<AbilityData> abilities, IReadOnlyList<Traveler> npcs, string targetName)
 {
     var year = traveler.CurrentYear;
     var yearContent = world.GetYear(year);
@@ -1881,7 +2371,21 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
         var here = population.MonstersAt(traveler.Position).ToList();
         if (here.Count == 0)
         {
-            AnsiConsole.MarkupLine("[grey]Nothing here to fight.[/] Monsters roam the rooms — go find one.");
+            // docs/GDD.md §11's "player-vs-NPC-Traveler combat" — no
+            // monster here, but a living NPC sharing the tile is a valid
+            // 'fight' target too (an NPC is a full Traveler). Checked only
+            // as the fallback so a room with both a monster and an NPC
+            // still defaults 'fight' (no argument) to the monster.
+            var npcsHere = npcs.Where(n => !n.Health.IsDead && n.CurrentYear == year && n.Position.Equals(traveler.Position)).ToList();
+            if (npcsHere.Count > 0)
+            {
+                var npcTarget = targetName.Length > 0
+                    ? npcsHere.FirstOrDefault(n => n.Name.Contains(targetName, StringComparison.OrdinalIgnoreCase)) ?? npcsHere[0]
+                    : npcsHere[0];
+                return HandlePvpFight(traveler, npcTarget, world, random, broadcast);
+            }
+
+            AnsiConsole.MarkupLine("[grey]Nothing here to fight.[/] Monsters (and other Travelers) roam the rooms — go find one.");
             return true;
         }
 
@@ -2047,13 +2551,101 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
         return true;
     }
 
-    // docs/GDD.md §3.3 (death & recall) is not implemented yet; a defeat here
-    // just ends the session — the caller (the main loop, on a false return)
-    // saves nothing for a dead Traveler and returns to the title screen
-    // rather than exiting the process.
+    // docs/GDD.md §3.3, death & recall: a setback, not game over — drop
+    // some unequipped inventory where you fell, pay a Tachyon penalty, and
+    // wake up back in year 2000 A.D. at full health. Shared with the
+    // multiplayer server's identical handling (SharedGame.Respawn) via
+    // ChronoTravelers.Game.DeathRecall so the two front ends can't drift.
     AnsiConsole.MarkupLine($"[red]You were defeated by {Markup.Escape(foe)}...[/]");
     broadcast.Publish(GameEvent.Slain(traveler.Name, monster.Name, year, killerIsCreature: true));
-    return false;
+
+    var outcome = DeathRecall.Apply(traveler, world, random);
+    if (outcome.DroppedItems.Count > 0)
+    {
+        AnsiConsole.MarkupLine($"[grey]The surge carries what's left of you back upstream to 2000 A.D. — {Markup.Escape(NameList(outcome.DroppedItems.Select(i => i.Name).ToList()))} spill out where you fell, and the crossing costs you {outcome.TachyonsLost} Tachyons. You come to at full health.[/]");
+    }
+    else
+    {
+        AnsiConsole.MarkupLine($"[grey]The surge carries what's left of you back upstream to 2000 A.D. — the crossing costs you {outcome.TachyonsLost} Tachyons. You come to at full health.[/]");
+    }
+
+    RenderRoom(traveler, world);
+    RenderStatusBar(traveler, world);
+    return true;
+}
+
+/// <summary>
+/// docs/GDD.md §11's "player-vs-NPC-Traveler combat" — an auto-resolving
+/// fight against a living NPC sharing the player's tile, via
+/// <see cref="CombatResolver.FightTraveler"/> rather than the interactive
+/// <see cref="CombatSession"/> (that flow is Monster-coupled throughout —
+/// see CombatSession's own doc comment — and every fight already
+/// auto-resolves on the multiplayer server, so this mirrors that instead
+/// of retrofitting the interactive one). On a win, the NPC's whole
+/// inventory (equipped gear included) hits the floor — see
+/// <see cref="CombatResolver.FightTraveler"/>'s doc comment for why. On a
+/// loss, the same death & recall handling as a monster loss applies (no
+/// special-casing needed: the losing NPC just sits at 0 HP until the next
+/// world tick's WorldSimulation.RespawnDeadNpcs replaces it, same as if a
+/// monster or the tick itself had killed it).
+/// </summary>
+static bool HandlePvpFight(Traveler traveler, Traveler npcTarget, TimeWorld world, IRandomSource random, BroadcastChannel broadcast)
+{
+    var year = traveler.CurrentYear;
+    var population = world.GetYear(year).Population;
+    var levelBefore = traveler.Level;
+
+    AnsiConsole.MarkupLine($"[bold]You square off against {Markup.Escape(npcTarget.Name)}![/] (level {npcTarget.Level})");
+
+    var result = CombatResolver.FightTraveler(traveler, npcTarget, random);
+
+    foreach (var logLine in result.Log)
+    {
+        AnsiConsole.MarkupLine(Markup.Escape(logLine));
+    }
+
+    if (result.AttackerWon)
+    {
+        AnsiConsole.MarkupLine($"[green]You defeated {Markup.Escape(npcTarget.Name)}! +{result.XpAwarded} XP, +{result.CreditsAwarded} Credits.[/]");
+        broadcast.Publish(GameEvent.Slain(npcTarget.Name, traveler.Name, year));
+
+        foreach (var item in result.ItemsDropped)
+        {
+            population.AddGroundLoot(traveler.Position, item);
+        }
+
+        if (result.ItemsDropped.Count > 0)
+        {
+            AnsiConsole.MarkupLine($"[green]{Markup.Escape(npcTarget.Name)} drops {Markup.Escape(NameList(result.ItemsDropped.Select(i => i.Name).ToList()))} on the ground.[/] [grey](take <item>)[/]");
+        }
+
+        if (traveler.Level > levelBefore)
+        {
+            broadcast.Publish(GameEvent.LevelReached(traveler.Name, traveler.Level, year));
+        }
+
+        RenderStatusBar(traveler, world);
+        return true;
+    }
+
+    // Same death & recall path as a monster loss (docs/GDD.md §3.3) — see
+    // HandleFight's identical handling and ChronoTravelers.Game.DeathRecall.
+    AnsiConsole.MarkupLine($"[red]You were defeated by {Markup.Escape(npcTarget.Name)}...[/]");
+    broadcast.Publish(GameEvent.Slain(traveler.Name, npcTarget.Name, year));
+
+    var outcome = DeathRecall.Apply(traveler, world, random);
+    if (outcome.DroppedItems.Count > 0)
+    {
+        AnsiConsole.MarkupLine($"[grey]The surge carries what's left of you back upstream to 2000 A.D. — {Markup.Escape(NameList(outcome.DroppedItems.Select(i => i.Name).ToList()))} spill out where you fell, and the crossing costs you {outcome.TachyonsLost} Tachyons. You come to at full health.[/]");
+    }
+    else
+    {
+        AnsiConsole.MarkupLine($"[grey]The surge carries what's left of you back upstream to 2000 A.D. — the crossing costs you {outcome.TachyonsLost} Tachyons. You come to at full health.[/]");
+    }
+
+    RenderRoom(traveler, world);
+    RenderStatusBar(traveler, world);
+    return true;
 }
 
 static void PrintNewLogLines(CombatSession session, ref int loggedSoFar)
@@ -2220,10 +2812,20 @@ static void RenderAbilities(Traveler traveler, IReadOnlyList<AbilityData> abilit
     foreach (var ability in classAbilities)
     {
         var unlocked = traveler.Level >= ability.Level;
-        var hasCombatEffect = !string.Equals(ability.Effect, "None", StringComparison.OrdinalIgnoreCase);
+        var isOverworld = ability.Effect is "ShortTeleport" or "ReviveAlly";
+        // Spy "Black Market Contacts" is "Permanent" — no cast, so it stays
+        // Effect "None" in the catalog, but it's not inert once unlocked
+        // (see Traveler.StoreDiscountBonus). Named specially rather than a
+        // general "always-on ability" flag, since it's the only one.
+        var isAlwaysOn = string.Equals(ability.Name, "Black Market Contacts", StringComparison.OrdinalIgnoreCase);
+        var hasEffect = isAlwaysOn || !string.Equals(ability.Effect, "None", StringComparison.OrdinalIgnoreCase);
+
         var status = !unlocked
             ? "[grey]locked[/]"
-            : hasCombatEffect ? "[green]ready[/]" : "[yellow]no combat effect[/]";
+            : !hasEffect ? "[yellow]no effect yet[/]"
+            : isAlwaysOn ? "[cyan]always on[/]"
+            : isOverworld ? "[cyan]ready — cast <name> anytime[/]"
+            : "[green]ready — cast <name> in a fight[/]";
 
         table.AddRow(
             ability.Level.ToString(),
@@ -2711,7 +3313,9 @@ static void RenderInventory(Traveler traveler)
                 ? (item.IsDepleted
                     ? $"{item.RangedKind} — spent (convert/sell only)"
                     : $"{item.RangedKind} — {item.AmmoRemaining}/{item.AmmoCapacity} shots" + (item.RangedEffect != RangedEffectType.None ? $", {item.RangedEffect}" : ""))
-                : "",
+                : item.HasDurability
+                    ? $"{item.Durability}/{item.MaxDurability} durability" + (item.IsBroken ? " — broken, repair" : "")
+                    : "",
         };
         table.AddRow(
             (i + 1).ToString(),
@@ -2936,11 +3540,13 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]look <dir>[/]          - peek into the adjacent room (what's there, on the floor) without moving");
     AnsiConsole.MarkupLine("  [green]fight[/] (or f, attack, a) [green]<name>[/] - fight a monster in this room (or the Warden at the year's start)");
     AnsiConsole.MarkupLine("    (each round, type [green]attack[/], [green]cast <ability>[/], or [green]use <item>[/])");
+    AnsiConsole.MarkupLine("    with no monster here, [green]fight <name>[/] instead targets a living NPC Traveler sharing your tile — PvP resolves instantly, win or lose");
     AnsiConsole.MarkupLine("  [green]shoot[/]/[green]point <dir>[/] - fire your readied ranged weapon one room away (finite built-in ammo)");
     AnsiConsole.MarkupLine("  [green]take[/] (or grab) [green]<item>[/] - pick up loot off the ground here ('take all' works)");
     AnsiConsole.MarkupLine("  [green]monsters[/] (or mobs)  - list the monsters roaming this year");
     AnsiConsole.MarkupLine("  [green]heal[/]                - spend Tachyons to recover HP (usable any time)");
     AnsiConsole.MarkupLine("  [green]abilities[/] (or spells) - list this Traveler's abilities unlocked so far");
+    AnsiConsole.MarkupLine("    [green]cast <name>[/]        - use an overworld ability (Jump Rig, Crash Cart) any time, not just in a fight");
     AnsiConsole.MarkupLine("  [green]travel <year>[/]      - jump to a year (2000–5000); costs ceil(0.04·|Δyear|) Tachyons");
     AnsiConsole.MarkupLine("  [green]travel +N[/]/[green]-N[/]      - jump N years forward/back");
     AnsiConsole.MarkupLine("  [green]travel next[/]/[green]prev[/]   - jump to the next/previous Warden year");
@@ -2956,6 +3562,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]buy <item>[/]         - buy a listed item (must be at a store)");
     AnsiConsole.MarkupLine("  [green]sell <item>[/]        - sell one non-junk item to the store here (no store buys junk - use convert)");
     AnsiConsole.MarkupLine("  [green]sell all[/]            - convert every junk item in your pack for Tachyons (works anywhere)");
+    AnsiConsole.MarkupLine("  [green]repair <item>[/]      - restore a worn weapon/armor's Durability (must be at a store)");
     AnsiConsole.MarkupLine("  [green]buy-store[/]           - purchase an empty store slot you're standing in");
     AnsiConsole.MarkupLine("  [green]stock <item> <price>[/] - list your own item for sale at your store");
     AnsiConsole.MarkupLine("  [green]withdraw <item>[/]    - pull a listing back into your inventory");

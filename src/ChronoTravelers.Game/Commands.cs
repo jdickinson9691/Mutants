@@ -132,6 +132,18 @@ internal static class Commands
                 SellToStore(game, session, arg);
                 break;
 
+            case "repair":
+                Repair(game, session, arg);
+                break;
+
+            case "abilities" or "spells":
+                Abilities(game, session);
+                break;
+
+            case "cast":
+                Cast(game, session, arg);
+                break;
+
             case "buy-store":
                 BuyStore(game, session);
                 break;
@@ -153,7 +165,7 @@ internal static class Commands
     private static bool IsIdle(string verb) => verb is
         "look" or "l" or "status" or "stat" or "inventory" or "inv" or "i" or "bag"
         or "monsters" or "mobs" or "who" or "news" or "broadcast" or "help" or "?" or "wait" or "z"
-        or "stores"; // "shop"/buying/selling/store management are doing-something, like the console (Program.cs's IsIdleCommand)
+        or "stores" or "abilities" or "spells"; // "shop"/buying/selling/store management/cast are doing-something, like the console (Program.cs's IsIdleCommand)
 
     private static void Move(SharedGame game, Session session, Direction dir)
     {
@@ -265,6 +277,21 @@ internal static class Commands
 
         if (target is null)
         {
+            // docs/GDD.md §11's "player-vs-NPC-Traveler combat" — no
+            // monster here, but a living NPC sharing the tile is a valid
+            // 'fight' target too (an NPC is a full Traveler). Checked only
+            // as the fallback so a room with both a monster and an NPC
+            // still defaults 'fight' (no argument) to the monster.
+            var npcsHere = game.Npcs.Where(n => !n.Health.IsDead && n.CurrentYear == p.CurrentYear && n.Position.Equals(p.Position)).ToList();
+            if (npcsHere.Count > 0)
+            {
+                var npcTarget = arg.Length > 0
+                    ? npcsHere.FirstOrDefault(n => n.Name.Contains(arg, StringComparison.OrdinalIgnoreCase)) ?? npcsHere[0]
+                    : npcsHere[0];
+                FightNpcTraveler(game, session, npcTarget);
+                return;
+            }
+
             session.Send("Nothing here to fight.");
             return;
         }
@@ -333,6 +360,131 @@ internal static class Commands
             game.Broadcast.Publish(GameEvent.Slain(p.Name, target.Name, year, killerIsCreature: true));
             // Death is handled by SharedGame.Tick (respawn upstream).
         }
+    }
+
+    /// <summary>
+    /// docs/GDD.md §11's "player-vs-NPC-Traveler combat" — auto-resolves
+    /// via <see cref="CombatResolver.FightTraveler"/>, the same auto-
+    /// resolving shape every fight already takes on this server (see
+    /// <see cref="Fight"/>). On a win, the NPC's whole inventory (equipped
+    /// gear included) hits the floor — see FightTraveler's doc comment for
+    /// why. On a loss, death is handled by <see cref="SharedGame.Tick"/>
+    /// exactly like a monster kill (respawn upstream); the losing NPC
+    /// itself needs no special handling either — it just sits at 0 HP
+    /// until the next tick's WorldSimulation.RespawnDeadNpcs replaces it.
+    /// </summary>
+    private static void FightNpcTraveler(SharedGame game, Session session, Traveler npcTarget)
+    {
+        var p = session.Player;
+        var year = p.CurrentYear;
+        var pop = game.World.GetYear(year).Population;
+        var levelBefore = p.Level;
+
+        session.Send($"You square off against {npcTarget.Name} (level {npcTarget.Level})!");
+        var result = CombatResolver.FightTraveler(p, npcTarget, Rng);
+
+        foreach (var logLine in result.Log)
+        {
+            session.Send(logLine);
+        }
+
+        if (result.AttackerWon)
+        {
+            session.Send($"You defeated {npcTarget.Name}! +{result.XpAwarded} XP, +{result.CreditsAwarded} Credits.");
+            game.Broadcast.Publish(GameEvent.Slain(npcTarget.Name, p.Name, year));
+
+            foreach (var it in result.ItemsDropped)
+            {
+                pop.AddGroundLoot(p.Position, it);
+            }
+
+            if (result.ItemsDropped.Count > 0)
+            {
+                session.Send($"{npcTarget.Name} drops {string.Join(", ", result.ItemsDropped.Select(i => i.Name))} on the ground. (take)");
+            }
+
+            if (p.Level > levelBefore)
+            {
+                game.Broadcast.Publish(GameEvent.LevelReached(p.Name, p.Level, year));
+            }
+        }
+        else
+        {
+            session.Send($"You were beaten down by {npcTarget.Name}...");
+            game.Broadcast.Publish(GameEvent.Slain(p.Name, npcTarget.Name, year));
+            // Death is handled by SharedGame.Tick (respawn upstream).
+        }
+    }
+
+    /// <summary>Lists the player's class abilities and whether each is usable — combat-only ("fight" auto-resolves here, so nothing ever actually casts one mid-fight on this server, unlike the console's interactive CombatSession), overworld (cast any time via <see cref="Cast"/>), always-on once unlocked (Spy's Black Market Contacts), or not yet unlocked.</summary>
+    private static void Abilities(SharedGame game, Session session)
+    {
+        var p = session.Player;
+        var classAbilities = game.Abilities
+            .Where(a => string.Equals(a.Class, p.Class.ToString(), StringComparison.OrdinalIgnoreCase))
+            .OrderBy(a => a.Tier)
+            .ToList();
+
+        if (classAbilities.Count == 0)
+        {
+            session.Send("No ability data loaded.");
+            return;
+        }
+
+        session.Send("Abilities:");
+        foreach (var ability in classAbilities)
+        {
+            var unlocked = p.Level >= ability.Level;
+            var isOverworld = ability.Effect is "ShortTeleport" or "ReviveAlly";
+            var isAlwaysOn = string.Equals(ability.Name, "Black Market Contacts", StringComparison.OrdinalIgnoreCase);
+            var hasEffect = isAlwaysOn || !string.Equals(ability.Effect, "None", StringComparison.OrdinalIgnoreCase);
+
+            var status = !unlocked ? "locked"
+                : !hasEffect ? "no effect yet"
+                : isAlwaysOn ? "always on"
+                : isOverworld ? "ready — cast <name> any time"
+                : "combat-only (this server auto-resolves fights, so it never actually casts)";
+
+            session.Send($"  Lv{ability.Level} {ability.Name} ({ability.TachyonCost} Tachyons) — {ability.Description} [{status}]");
+        }
+    }
+
+    /// <summary>
+    /// docs/GDD.md item #5's gap-analysis: Doctor "Crash Cart" and Engineer
+    /// "Jump Rig" are overworld-only abilities (heal a wounded NPC in the
+    /// room / short teleport) — "fight" already auto-resolves on this
+    /// server (no round-by-round casting mid-fight, see <see cref="Fight"/>'s
+    /// doc comment), so this is the only place any ability is ever cast
+    /// here. Combat-effect abilities (Damage, Heal, etc.) are refused —
+    /// see <see cref="Engine.Combat.OverworldAbilityResolver"/>'s messages.
+    /// </summary>
+    private static void Cast(SharedGame game, Session session, string arg)
+    {
+        var p = session.Player;
+        if (arg.Length == 0)
+        {
+            session.Send("Cast what? Try 'abilities' to see your list.");
+            return;
+        }
+
+        var ability = game.Abilities
+            .Where(a => string.Equals(a.Class, p.Class.ToString(), StringComparison.OrdinalIgnoreCase) && a.Level <= p.Level)
+            .FirstOrDefault(a => string.Equals(a.Name, arg, StringComparison.OrdinalIgnoreCase));
+
+        if (ability is null)
+        {
+            session.Send($"No ability named '{arg}' available. Try 'abilities' to see your list.");
+            return;
+        }
+
+        var year = p.CurrentYear;
+        var result = string.Equals(ability.Effect, "ShortTeleport", StringComparison.OrdinalIgnoreCase)
+            ? OverworldAbilityResolver.TryShortTeleport(p, game.World.GetYear(year).Map, ability, Rng)
+            : string.Equals(ability.Effect, "ReviveAlly", StringComparison.OrdinalIgnoreCase)
+                ? OverworldAbilityResolver.TryReviveAlly(p, game.Npcs.Where(n => !n.Health.IsDead && n.CurrentYear == year && n.Position.Equals(p.Position)).ToList(), ability, Rng)
+                : new OverworldAbilityResolver.Result(false, $"{ability.Name} only works in a fight, and fights auto-resolve on this server — it never actually casts.");
+
+        session.Send(result.Message);
     }
 
     private static void Wield(Session session, string arg)
@@ -560,6 +712,49 @@ internal static class Commands
         }
 
         session.Send($"Sold {item.Name} to {store.Name} for {price} Credits.");
+    }
+
+    /// <summary>Repairs a worn Weapon/Armor back to full Durability at the store in the player's current room — docs/GDD.md §6.3's "repair costs" Credit sink. Console parity (Program.cs's <c>HandleRepair</c>).</summary>
+    private static void Repair(SharedGame game, Session session, string arg)
+    {
+        var slot = StoreSlotHere(game, session);
+        if (slot?.Store is not { } store)
+        {
+            session.Send("You need to be at a store to repair gear. Try 'stores' to find one.");
+            return;
+        }
+
+        var item = FindItem(session, arg, static i => i.HasDurability);
+        if (item is null)
+        {
+            session.Send(arg.Length == 0
+                ? "Repair what? Name a weapon or armor piece."
+                : $"No item matching '{arg}' in your inventory.");
+            return;
+        }
+
+        if (!item.HasDurability)
+        {
+            session.Send($"{item.Name} doesn't wear down — nothing to repair.");
+            return;
+        }
+
+        if (item.Durability >= item.MaxDurability)
+        {
+            session.Send($"{item.Name} is already in full repair.");
+            return;
+        }
+
+        var p = session.Player;
+        var cost = EconomyPricing.RepairCost(item);
+        if (p.Credits < cost)
+        {
+            session.Send($"Repairing {item.Name} costs {cost} Credits; you have {p.Credits}.");
+            return;
+        }
+
+        var paid = store.Repair(p, item);
+        session.Send($"Repaired {item.Name} for {paid} Credits. ({item.Durability}/{item.MaxDurability} durability)");
     }
 
     /// <summary>Purchases the empty store slot the player is standing in — console parity (Program.cs's <c>HandleBuyStore</c>).</summary>
@@ -796,9 +991,10 @@ internal static class Commands
     {
         session.Send("Commands: look [dir] · n/s/e/w · monsters · status · inventory · heal · take [all] · fight [name]");
         session.Send("          wield <item> · convert|con <item> · travel <year|+N|-N> · news · who · say <msg> · wait · quit");
-        session.Send("Stores:   stores · shop · buy <item> · sell <item>|all · buy-store · stock <item> <price> · withdraw <item>");
+        session.Send("          abilities · cast <name> (Jump Rig/Crash Cart work any time; other abilities are combat-only and this server auto-resolves fights)");
+        session.Send("Stores:   stores · shop · buy <item> · sell <item>|all · repair <item> · buy-store · stock <item> <price> · withdraw <item>");
         session.Send("          reprice <item> <price> · deposit <credits> · charge <credits> · collect");
-        session.Send("Fights auto-resolve; loot drops on the floor — 'take' it. Type 'quit' to disconnect.");
+        session.Send("Fights auto-resolve; loot drops on the floor — 'take' it. 'fight [name]' also targets a living NPC sharing your tile (PvP). Type 'quit' to disconnect.");
     }
 
     /// <summary>The store slot (if any) at the player's current position, in their current year.</summary>

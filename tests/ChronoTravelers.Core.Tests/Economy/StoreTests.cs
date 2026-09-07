@@ -99,6 +99,50 @@ public class StoreTests
         Assert.Equal(capitalBefore + 15, store.Capital);
     }
 
+    /// <summary>docs/GDD.md §9's background-tick "store restocking" / §6.3's "restocking depot inventory" Credit sink — see ChronoTravelers.Core.Tests.Time.TimeWorldTests for the higher-level "which staple is missing" logic that decides what to pass in here.</summary>
+    [Fact]
+    public void RestockGovernmentSupply_StocksTheItemAndSpendsCapital()
+    {
+        var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
+        var item = Item.Create("Scrap Blade", ItemType.Weapon, 2, Rarity.Common);
+        var capitalBefore = store.Capital;
+
+        var restocked = store.RestockGovernmentSupply(item);
+
+        Assert.True(restocked);
+        Assert.Contains(store.Listings, l => l.Item == item);
+        Assert.True(store.Capital < capitalBefore);
+    }
+
+    [Fact]
+    public void RestockGovernmentSupply_RefusesAPlayerOwnedStore()
+    {
+        var store = new Store("Corner Shop", homeLevel: 1, startingCapital: 1000, owner: NewTraveler());
+        var item = Item.Create("Scrap Blade", ItemType.Weapon, 2, Rarity.Common);
+        var capitalBefore = store.Capital;
+
+        var restocked = store.RestockGovernmentSupply(item);
+
+        Assert.False(restocked);
+        Assert.Empty(store.Listings);
+        Assert.Equal(capitalBefore, store.Capital);
+    }
+
+    [Fact]
+    public void RestockGovernmentSupply_RefusesWhenAlreadyAtMaxListings()
+    {
+        var store = Store.CreateGovernmentStore("Ration Depot", homeLevel: 1);
+        for (var i = 0; i < Store.MaxListings; i++)
+        {
+            store.Stock(Item.Create($"Filler {i}", ItemType.Junk, 1, Rarity.Common), askingPrice: 1);
+        }
+
+        var restocked = store.RestockGovernmentSupply(Item.Create("Scrap Blade", ItemType.Weapon, 2, Rarity.Common));
+
+        Assert.False(restocked);
+        Assert.Equal(Store.MaxListings, store.Listings.Count);
+    }
+
     [Fact]
     public void SellToTraveler_ThrowsForAListingNotAtThisStore()
     {

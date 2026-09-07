@@ -16,9 +16,14 @@ namespace ChronoTravelers.Engine.Content;
 /// doesn't have yet (fights are strictly one Traveler vs. one Monster) —
 /// those are deliberately adapted to a single-target equivalent rather
 /// than left unimplemented; a genuine multi-combatant fight is future
-/// work. A few (Fence's Favor, Mana Well, Blink, Resurrect Lite) have no
-/// combat effect at all — passive/economy/overworld/party mechanics none
-/// of which exist yet — and are marked Effect "None".
+/// work. Spy's Black Market Contacts has no combat effect and stays
+/// Effect "None" — it's a permanent, always-on store-price bonus once
+/// unlocked (see ChronoTravelers.Core.Characters.Traveler.StoreDiscountBonus),
+/// not something to cast. Doctor's Crash Cart and Engineer's Jump Rig
+/// were the same ("party"/"overworld" mechanics this engine didn't have)
+/// until docs/GDD.md item #5 gave them real, non-combat effects — see
+/// ChronoTravelers.Engine.Combat.AbilityEffectType.ReviveAlly/ShortTeleport
+/// and ChronoTravelers.Engine.Combat.OverworldAbilityResolver.
 /// </summary>
 public sealed class AbilityData
 {
@@ -38,8 +43,11 @@ public sealed class AbilityData
     /// One of: Damage, IgnoreDefenseDamage, Heal, BuffSelfAttack,
     /// BuffSelfDefense, DebuffTargetAttack, DebuffTargetDefense,
     /// DebuffTargetSpeed, GuaranteedCritNextAttack, ExtraAttack, Shield,
-    /// DamageOverTime, RestoreTachyons, InstantDefeatNonBoss, None. See
-    /// ChronoTravelers.Engine.Combat.AbilityEffectType for what each does.
+    /// DamageOverTime, RestoreTachyons, InstantDefeatNonBoss, None. The
+    /// last two — ShortTeleport, ReviveAlly — are overworld-only and
+    /// refused mid-fight; every other non-None value is combat-only and
+    /// refused outside one. See ChronoTravelers.Engine.Combat.AbilityEffectType
+    /// for what each does.
     /// </summary>
     public string Effect { get; set; } = "None";
 

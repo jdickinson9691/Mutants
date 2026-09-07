@@ -39,4 +39,12 @@ public sealed class ItemSaveData
 
     /// <summary>How many rooms out (1–4) a ranged item can hit — ChronoTravelers.Core.Items.Item.Range. Ignored for non-ranged items. Additive — old blobs deserialize as 0, which FromSaveData treats as the pre-this-field default of 1 rather than an invalid range.</summary>
     public int Range { get; set; }
+
+    // --- Weapon/Armor durability (docs/GDD.md §6.3; additive — old blobs deserialize as 0/0, i.e. "not tracked", same as any other pre-existing item) ---
+
+    /// <summary>ChronoTravelers.Core.Items.Item.MaxDurability. 0 for anything that doesn't track wear.</summary>
+    public int MaxDurability { get; set; }
+
+    /// <summary>Live wear left — ChronoTravelers.Core.Items.Item.Durability, the whole reason a Weapon/Armor with Durability needs per-instance save state, same as a ranged weapon's AmmoRemaining above.</summary>
+    public int Durability { get; set; }
 }

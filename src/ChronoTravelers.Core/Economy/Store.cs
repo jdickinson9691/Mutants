@@ -308,6 +308,64 @@ public sealed class Store
     }
 
     /// <summary>
+    /// A government depot's own restocking — docs/GDD.md §9's background-
+    /// tick "store restocking," and the §6.3 "restocking depot inventory"
+    /// Credit sink. Only meaningful for a government store
+    /// (<see cref="IsGovernmentRun"/>); a player-owned store restocks by
+    /// the owner's own <see cref="Deposit(Traveler, Item, int)"/> ("stock")
+    /// command, or an NPC owner's automatic tending
+    /// (ChronoTravelers.Engine.Npc.NpcController.TryTendOwnStore) — nobody
+    /// runs an unowned depot in person, so it restocks itself. Buys
+    /// <paramref name="item"/> onto the shelf at
+    /// <see cref="EconomyPricing.DefaultAskingPrice"/>, paying
+    /// <see cref="EconomyPricing.BuyPrice"/> out of its own Capital — the
+    /// same "spend to acquire, mark up to resell" economics as
+    /// <see cref="BuyFromTraveler"/>, just from an abstract wholesale
+    /// supplier instead of a traveler's pack, which is what makes it a
+    /// Credit sink rather than a transfer (a government store's Capital
+    /// isn't circulating currency anyone can collect back out). Returns
+    /// false (charging nothing) for a non-government store or one already
+    /// at <see cref="MaxListings"/>.
+    /// </summary>
+    public bool RestockGovernmentSupply(Item item)
+    {
+        if (!IsGovernmentRun || _listings.Count >= MaxListings)
+        {
+            return false;
+        }
+
+        Capital = Math.Max(0, Capital - EconomyPricing.BuyPrice(item));
+        Stock(item, EconomyPricing.DefaultAskingPrice(item));
+        return true;
+    }
+
+    /// <summary>
+    /// Repairs <paramref name="item"/> back to full Durability for Credits
+    /// — docs/GDD.md §6.3's "repair costs" Credit sink. Unlike
+    /// <see cref="BuyFromTraveler"/>/<see cref="SellToTraveler"/>, the
+    /// Credits paid here don't move into this store's <see cref="Capital"/>
+    /// — like a store's own purchase cost and maintenance, this is Credits
+    /// leaving the economy outright, which is the sink's whole point.
+    /// Returns null (charging nothing) if the item doesn't
+    /// <see cref="Item.HasDurability"/>, is already at full, or
+    /// <paramref name="traveler"/> can't afford <see cref="EconomyPricing.RepairCost"/>.
+    /// Works on any Weapon/Armor handed to it, equipped or not — same as a
+    /// store will buy any non-Junk item off anyone, not just its owner.
+    /// </summary>
+    public int? Repair(Traveler traveler, Item item)
+    {
+        var cost = EconomyPricing.RepairCost(item);
+        if (cost <= 0 || traveler.Credits < cost)
+        {
+            return null;
+        }
+
+        traveler.SpendCredits(cost);
+        item.Durability = item.MaxDurability;
+        return cost;
+    }
+
+    /// <summary>
     /// One world tick's maintenance draw — docs/GDD.md §6.2. A government
     /// store (<see cref="IsGovernmentRun"/>) is exempt and this is always a
     /// no-op for one. Otherwise <paramref name="cost"/> Credits come out

@@ -45,6 +45,11 @@
     <ProjectReference Include="..\ChronoTravelers.Core\ChronoTravelers.Core.csproj" />
     <ProjectReference Include="..\ChronoTravelers.Engine\ChronoTravelers.Engine.csproj" />
     <ProjectReference Include="..\ChronoTravelers.Content\ChronoTravelers.Content.csproj" />
+    <!-- ChronoTravelers.Game.DeathRecall (docs/GDD.md §3.3) — shared with
+         ChronoTravelers.Server so death & recall behaves identically on
+         both front ends. No cycle: ChronoTravelers.Game only references
+         Core and Engine. -->
+    <ProjectReference Include="..\ChronoTravelers.Game\ChronoTravelers.Game.csproj" />
   </ItemGroup>
 
   <ItemGroup>

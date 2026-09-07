@@ -110,4 +110,29 @@ public class CombatResolverTests
         Assert.True(highRollResult.Rounds <= lowRollResult.Rounds,
             "Higher damage-variance rolls should win in the same number of rounds or fewer.");
     }
+
+    /// <summary>docs/GDD.md §6.3's "repair costs" Credit sink needs actual wear from actual fighting — see ChronoTravelers.Core.Tests.Items.DurabilityTests for the rest of the Durability model's coverage.</summary>
+    [Fact]
+    public void Fight_LandingAndTakingHits_WearsDownEquippedWeaponAndArmor()
+    {
+        var traveler = new Traveler("Rook", CharacterClass.Soldier);
+        var weapon = Item.Create("Scrap Blade", ItemType.Weapon, tier: 3, Rarity.Common);
+        var armor = Item.Create("Scrap Vest", ItemType.Armor, tier: 3, Rarity.Common);
+        traveler.AddToInventory(weapon);
+        traveler.Wield(weapon);
+        traveler.AddToInventory(armor);
+        traveler.Wield(armor);
+        var weaponDurabilityBefore = weapon.Durability;
+        var armorDurabilityBefore = armor.Durability;
+
+        // A monster tough enough to trade several rounds with the traveler,
+        // so both sides land at least one hit before the fight ends.
+        var monster = new Monster("Sparring Dummy", tier: 1, maxHp: 200, attackPower: 3, defense: 0, speed: 1, xpReward: 10);
+
+        var result = CombatResolver.Fight(traveler, monster, NeutralRandom());
+
+        Assert.True(result.Rounds > 1, "Need multiple rounds for both a landed and a taken hit.");
+        Assert.True(weapon.Durability < weaponDurabilityBefore, "Weapon should wear down from landed hits.");
+        Assert.True(armor.Durability < armorDurabilityBefore, "Armor should wear down from taken hits.");
+    }
 }

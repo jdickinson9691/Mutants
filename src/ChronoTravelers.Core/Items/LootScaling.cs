@@ -112,6 +112,34 @@ public static class LootScaling
     public static double ArmorCombatBonusFor(double tier, Rarity rarity) =>
         ArmorEquipBonusFor(tier, RepresentativeMultiplier(rarity));
 
+    /// <summary>
+    /// A Weapon/Armor's <see cref="Item.MaxDurability"/> at
+    /// <paramref name="tier"/> — docs/GDD.md §6.3's "repair costs" Credit
+    /// sink needs something that actually wears out. Same shape as the
+    /// other equip-bonus curves (a per-tier baseline scaled by the
+    /// archetype's powerMultiplier) but its own, much shallower slope:
+    /// durability is a maintenance rhythm, not a power stat, so it
+    /// shouldn't run away at high tiers the way AttackBonus does. A
+    /// baseline Common tier-1 piece sits around 20 (a modest number of
+    /// fights before it's worth a repair trip); a Legendary deep-future
+    /// relic tops out in the low hundreds. Original tuning pending Design
+    /// Agent sign-off, like every other curve here.
+    /// </summary>
+    public static double MaxDurabilityFor(double tier, double powerMultiplier)
+    {
+        if (tier < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(tier), tier, "Tier must be at least 1.");
+        }
+
+        var mult = Math.Clamp(powerMultiplier, MinPowerMultiplier, MaxPowerMultiplier);
+        return (1.5 * tier + 18) * mult;
+    }
+
+    /// <summary>Back-compat shim mirroring <see cref="CombatBonusFor(double, Rarity)"/>, for <see cref="Item.Create"/>'s Weapon/Armor branches and sandbox fixtures.</summary>
+    public static double MaxDurabilityFor(double tier, Rarity rarity) =>
+        MaxDurabilityFor(tier, RepresentativeMultiplier(rarity));
+
     public static int TierBaseValue(int tier) => Round(TierBaseValue((double)tier));
 
     public static int ValueFor(int tier, Rarity rarity) => Round(ValueFor((double)tier, rarity));
@@ -123,6 +151,10 @@ public static class LootScaling
     public static int EquipBonusFor(int tier, double powerMultiplier) => Round(EquipBonusFor((double)tier, powerMultiplier));
 
     public static int ArmorEquipBonusFor(int tier, double powerMultiplier) => Round(ArmorEquipBonusFor((double)tier, powerMultiplier));
+
+    public static int MaxDurabilityFor(int tier, Rarity rarity) => Round(MaxDurabilityFor((double)tier, rarity));
+
+    public static int MaxDurabilityFor(int tier, double powerMultiplier) => Round(MaxDurabilityFor((double)tier, powerMultiplier));
 
     // Plain Math.Round (banker's rounding) so the int overloads match the
     // previous (int)Math.Round(...) behaviour exactly.

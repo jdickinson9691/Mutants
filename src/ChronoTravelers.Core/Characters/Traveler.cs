@@ -190,7 +190,7 @@ public sealed class Traveler
             var basePower = Stats.Get(ClassDefinition.PrimaryStat);
             var weaponBonus = EquippedWeapon is null
                 ? 0
-                : (int)Math.Round(EquippedWeapon.AttackBonus * EquippedWeapon.WieldEffectiveness(Class, OffClassPenaltyReduction));
+                : (int)Math.Round(EquippedWeapon.AttackBonus * EquippedWeapon.WieldEffectiveness(Class, OffClassPenaltyReduction) * EquippedWeapon.DurabilityEffectiveness);
 
             var passiveBonus = basePower + weaponBonus + TemporaryAttackBonus;
 
@@ -238,6 +238,27 @@ public sealed class Traveler
 
     /// <summary>Call once per attack this Traveler lands — advances Juggernaut Momentum's stack (see <see cref="_consecutiveHitStacks"/>). A no-op for every class without that passive.</summary>
     public void RecordAttackLanded() => _consecutiveHitStacks = Math.Min(MaxConsecutiveHitStacks, _consecutiveHitStacks + 1);
+
+    /// <summary>How much Durability a landed/taken hit costs the equipped weapon/armor — docs/GDD.md §6.3's "repair costs" Credit sink needs actual wear to price against. One point per hit keeps the numbers on <see cref="Items.LootScaling.MaxDurabilityFor(double, double)"/>'s curve meaningful (tens of hits before repair matters) without a second tuning knob.</summary>
+    private const int DurabilityLossPerHit = 1;
+
+    /// <summary>Wears down the equipped weapon by <see cref="DurabilityLossPerHit"/> — call once per attack this Traveler lands (see ChronoTravelers.Engine.Combat.CombatResolver.AttackMonster). No-op for an unarmed hit, a ranged weapon (its own ammo economy already models wear), or any weapon that doesn't <see cref="Items.Item.HasDurability"/>.</summary>
+    public void DegradeEquippedWeapon()
+    {
+        if (EquippedWeapon is { HasDurability: true } weapon)
+        {
+            weapon.Durability = Math.Max(0, weapon.Durability - DurabilityLossPerHit);
+        }
+    }
+
+    /// <summary>Wears down the equipped armor by <see cref="DurabilityLossPerHit"/> — call once per attack landed against this Traveler (see ChronoTravelers.Engine.Combat.CombatResolver.AttackTraveler), whether or not the hit was fully mitigated. No-op for no armor, or armor that doesn't <see cref="Items.Item.HasDurability"/>.</summary>
+    public void DegradeEquippedArmor()
+    {
+        if (EquippedArmor is { HasDurability: true } armor)
+        {
+            armor.Durability = Math.Max(0, armor.Durability - DurabilityLossPerHit);
+        }
+    }
 
     /// <summary>Resets fight-scoped passive state (Juggernaut Momentum's streak, Unbreakable's once-per-fight charge) — call at the start of every fight.</summary>
     public void ResetPerFightState()
@@ -319,7 +340,7 @@ public sealed class Traveler
             // registered for a Soldier wearing anything below roughly +8).
             var rawArmorBonus = EquippedArmor is null
                 ? 0.0
-                : EquippedArmor.DefenseBonus * EquippedArmor.WieldEffectiveness(Class, OffClassPenaltyReduction);
+                : EquippedArmor.DefenseBonus * EquippedArmor.WieldEffectiveness(Class, OffClassPenaltyReduction) * EquippedArmor.DurabilityEffectiveness;
             rawArmorBonus *= 1 + PassiveTraits.Sum(Class, Level, PassiveHook.ArmorDefenseBonusPct);
             var armorBonus = (int)Math.Round(rawArmorBonus);
 
@@ -773,8 +794,26 @@ public sealed class Traveler
     /// <summary>Multiplier applied to aggro this Traveler causes nearby monsters to gain (Spy "Low Profile") — 1.0 with no passive, down toward 0 as reduction stacks.</summary>
     public double AggroGainMultiplier => Math.Max(0, 1.0 - PassiveTraits.Sum(Class, Level, PassiveHook.AggroGainReductionPct));
 
-    /// <summary>Store discount-when-buying / bonus-when-selling from Spy's "Light Fingers"/"Silent Partner" — see <see cref="Economy.Store"/>.</summary>
-    public double StoreDiscountBonus => PassiveTraits.Sum(Class, Level, PassiveHook.StoreDiscountBonusPct);
+    /// <summary>Level Spy's "Black Market Contacts" ability (docs/GDD.md item #5's gap-analysis; ChronoTravelers.Content/abilities.json, tier 5) unlocks — see <see cref="StoreDiscountBonus"/>. Kept here rather than in the ability catalog's Magnitude field: it's "Permanent" (the catalog entry stays Effect "None", nothing to cast), so this is a level/class gate the same shape as a <see cref="PassiveTrait"/>'s unlock level, just sourced from an ability entry instead — see ContentDtos.cs's AbilityData doc comment.</summary>
+    private const int BlackMarketContactsUnlockLevel = 25;
+
+    /// <summary>Flat store-price bonus from Black Market Contacts, once unlocked — folded into <see cref="StoreDiscountBonus"/> alongside Light Fingers/Silent Partner/Underworld Ties/Broker's Network's stacking <see cref="PassiveHook.StoreDiscountBonusPct"/> total (20% by level 58), so a level-58 Spy tops out at 28%.</summary>
+    private const double BlackMarketContactsBonusPct = 0.08;
+
+    /// <summary>Store discount-when-buying / bonus-when-selling — stacks Spy's "Light Fingers"/"Silent Partner"/"Underworld Ties"/"Broker's Network" passives with the flat "Black Market Contacts" ability bonus (see <see cref="BlackMarketContactsUnlockLevel"/>) once unlocked — see <see cref="Economy.Store"/>.</summary>
+    public double StoreDiscountBonus
+    {
+        get
+        {
+            var bonus = PassiveTraits.Sum(Class, Level, PassiveHook.StoreDiscountBonusPct);
+            if (Class == CharacterClass.Spy && Level >= BlackMarketContactsUnlockLevel)
+            {
+                bonus += BlackMarketContactsBonusPct;
+            }
+
+            return bonus;
+        }
+    }
 
     /// <summary>Chance [0,1) an ability cast costs no Tachyons at all (Scientist "Stable Core") — the caller rolls it before charging <see cref="EffectiveCastCost"/>.</summary>
     public double FreeCastChance => PassiveTraits.Sum(Class, Level, PassiveHook.FreeCastChancePct);

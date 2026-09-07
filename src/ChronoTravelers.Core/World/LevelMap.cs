@@ -68,6 +68,54 @@ public sealed class LevelMap
     }
 
     /// <summary>
+    /// Every room reachable from <paramref name="origin"/> within
+    /// <paramref name="maxHops"/> exits (breadth-first over each room's
+    /// declared exits, same connectivity <see cref="TryMove"/> walks one
+    /// step at a time) — <paramref name="origin"/> itself excluded. Backs
+    /// Engineer's "Jump Rig" ability (a short teleport rather than a normal
+    /// walk — see ChronoTravelers.Engine.Combat.OverworldAbilityResolver).
+    /// Empty if <paramref name="origin"/> isn't a room on this map, or if
+    /// every room within range has already been visited (impossible in
+    /// practice for <paramref name="maxHops"/> ≥ 1 on any level with more
+    /// than one room, since <see cref="Validate"/> guarantees every
+    /// declared exit leads to a real room).
+    /// </summary>
+    public IReadOnlyList<Coordinate> RoomsWithinHops(Coordinate origin, int maxHops)
+    {
+        if (!_rooms.ContainsKey(origin))
+        {
+            return [];
+        }
+
+        var distanceFromOrigin = new Dictionary<Coordinate, int> { [origin] = 0 };
+        var queue = new Queue<Coordinate>();
+        queue.Enqueue(origin);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            var distance = distanceFromOrigin[current];
+            if (distance >= maxHops)
+            {
+                continue;
+            }
+
+            foreach (var direction in GetRoom(current).ExitDescriptions.Keys)
+            {
+                var neighbor = current.Move(direction);
+                if (_rooms.ContainsKey(neighbor) && !distanceFromOrigin.ContainsKey(neighbor))
+                {
+                    distanceFromOrigin[neighbor] = distance + 1;
+                    queue.Enqueue(neighbor);
+                }
+            }
+        }
+
+        distanceFromOrigin.Remove(origin);
+        return distanceFromOrigin.Keys.ToList();
+    }
+
+    /// <summary>
     /// Validates level authoring: every exit a room declares must lead to a
     /// registered room. Returns a human-readable problem for each broken
     /// exit found (empty if the level is well-formed).

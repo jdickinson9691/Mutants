@@ -101,13 +101,16 @@ stay capped.)
   replicates the "quasi semi-flawed but usable" economy the original was
   known for, without the exploitable parts.
 - **Tachyon pool size** was scaled up end-to-end for the downstream push: the
-  starting pool (`ClassDefinition.BaseTachyons`) tripled (+200%, Soldier
-  20→60 … Scientist 34→102) and per-level growth (`TachyonsPerLevel`) ×6
-  (+500%, 4→24 for melee, 5→30 for the casters). A thin pool meant a botched
-  overreach couldn't afford the retreat home and spiralled into a no-fuel
-  death, and the old per-level trickle never re-opened the buffer. A level-10
-  Soldier's nominal pool is now 276 (was 56). The pool is uncapped regardless;
-  these numbers only set the starting fill and the passive-regen ceiling.
+  starting pool (`ClassDefinition.BaseTachyons`) tripled (+200%) and per-level
+  growth (`TachyonsPerLevel`) ×6 (+500%, 4→24 for melee, 5→30 for the
+  casters), then every class's starting pool was given a further flat +40
+  on top once playtesting showed even the tripled pool ran dry after ~5–6
+  fights (Soldier 20→60→100 … Scientist 34→102→142). A thin pool meant a
+  botched overreach couldn't afford the retreat home and spiralled into a
+  no-fuel death, and the old per-level trickle never re-opened the buffer. A
+  level-10 Soldier's nominal pool is now 316 (was 56). The pool is uncapped
+  regardless; these numbers only set the starting fill and the
+  passive-regen ceiling.
 - Time travel cost = `max(8, ceil(0.04 * |target_year - current_year|))`
   Tachyons, symmetric (retreating toward the present costs the same as
   advancing). Original tuning (0.2 → 0.1 → 0.04 across playtests; then an
@@ -158,7 +161,7 @@ stretch goal, not in the original).
 - **Each year has its own grid map**, generated deterministically from a
   per-save **world seed** plus the year — the same year always produces the
   same layout, so it can be a pure function of the save with nothing about
-  the geometry stored. Room descriptions are drawn from ~15 authored
+  the geometry stored. Room descriptions are drawn from 14 authored
   **era bands** (The Fallout Belt → … → The Final Instant) that tile the
   3000 years; a year takes its theme and monster/loot pools from its band.
 - Command: `travel <year>` (any year 2000–5000), `travel +N` / `travel -N`
@@ -208,6 +211,20 @@ stretch goal, not in the original).
   upstream to the year 2000 A.D. with an Tachyon penalty. No source material
   describes death handling, so this is original, tuned to punish but not
   erase progress.
+  > **Implementation (2026-09-07):** `ChronoTravelers.Game.DeathRecall`,
+  > shared by both front ends (the console's combat-defeat and
+  > world-tick-ambush death paths, and the multiplayer server's
+  > `SharedGame.Respawn`) so they can't drift apart on it. The "portion" is
+  > half (rounded down) of the Traveler's *unequipped* inventory — the
+  > currently wielded weapon, armor, and ranged weapon are never drop
+  > candidates, so a recalled Traveler can still defend itself — dropped as
+  > real ground loot (`YearPopulation.AddGroundLoot`) at the exact room/year
+  > of death, `take`-able by anyone who finds it later, exactly like a
+  > monster's own drop. The Tachyon penalty is half of current Tachyons,
+  > rounded to the nearest whole. Level, stats, Credits, and equipped gear
+  > are untouched; HP is restored to full on arrival at year 2000's start
+  > room. Dying no longer ends the console session either — it's a setback
+  > you keep playing through, not a game-over screen.
 
 ## 4. Character classes
 
@@ -264,7 +281,7 @@ than one) to honor the wiki's explicit 5-name list; differentiated by role
   `Leveling.TopAbilityLevel`, docs/ENDGAME_STRATEGY.md recommendation 2);
   levels past that (36–60, Engineer 26–60) grant no new abilities (see
   §4.2). **Each class also gained a second wave of six passives across
-  levels 31–60** (Engineer 31–56 — docs/ENDGAME_STRATEGY.md recommendation
+  levels 33–58** (Engineer 31–56 — docs/ENDGAME_STRATEGY.md recommendation
   1), smaller top-ups on the same hooks as their level-1–28 counterparts
   so the two stack (see §4.2.1). The XP curve is quadratic through level 25
   (`Leveling.XpCurveKneeLevel`) then holds a flat per-level cost, so the
@@ -358,6 +375,36 @@ per docs/ENDGAME_STRATEGY.md recommendation 2 — is the standard every
 class follows: Spy's *Vanishing Act*, Scientist's *Cataclysm*, Engineer's
 *Overload Discharge*.)
 
+> **Implementation (2026-09-07) — the three non-combat abilities.** Crash
+> Cart above, Spy's *Black Market Contacts* (Lv25: "permanent, better buy
+> and sell prices at every store"), and Engineer's *Jump Rig* (Lv5: "a
+> rigged micro-jump — short teleport to escape or reposition") shipped as
+> `effect: "None"` — docs/CONTENT_PLAN.md flagged them as having no honest
+> translation into the round-by-round fight loop. None of the three
+> actually needed one: each is a party/economy/overworld mechanic, not a
+> combat one. **Black Market Contacts** needs no cast at all — it's a flat
+> +8% store-price bonus (`Traveler.StoreDiscountBonus`) that turns on
+> automatically once a Spy hits level 25, stacking with the Light
+> Fingers/Silent Partner/Underworld Ties/Broker's Network passives (§4.2.1)
+> for up to 28% total by level 58; the catalog entry stays `effect: "None"`
+> since there's genuinely nothing to cast. **Jump Rig** and **Crash Cart**
+> are cast with a new out-of-combat `cast <ability>` command — both the
+> console and the multiplayer server, `fight`'s auto-resolve there meant it
+> never previously needed any ability-casting command at all — via
+> `ChronoTravelers.Engine.Combat.OverworldAbilityResolver`: Jump Rig
+> (`effect: "ShortTeleport"`) teleports to a random room within 3 exit-hops
+> of the caster's current position (`LevelMap.RoomsWithinHops`, new — real
+> teleport, not a walk, so it isn't blocked by anything in between); Crash
+> Cart (`effect: "ReviveAlly"`) heals the most-wounded living NPC Traveler
+> sharing the caster's room up to 50% max HP. **Judgment call, flagged:**
+> "downed" is read as badly wounded (≤25% max HP) rather than literally 0
+> HP — a genuinely dead NPC is replaced wholesale by the very next world
+> tick's respawn (§3.3-adjacent machinery, `WorldSimulation.RespawnDeadNpcs`),
+> nowhere near enough of a window for a player to notice a kill and react
+> with a cast before the "ally" is simply a different NPC. Targeting the
+> room's worst-off-but-still-standing NPC instead is the interpretation
+> that's actually usable in play.
+
 ### 4.2.1 Passive traits (always-on, no activation/UI/AI decision)
 
 Each class also has a table of **always-on passive traits**
@@ -368,7 +415,7 @@ most, `Economy.Store` for the two store hooks, `Engine.Npc.MonsterController`
 for the aggro/ambush hooks that live outside a single fight) — never by
 switching on a trait's name. **12 per class**: a first wave of 6 (levels
 1–28, Engineer 1–19), each roughly midway between a pair of active-ability
-unlock levels, and a second wave of 6 (levels 31–60, Engineer 31–56) added
+unlock levels, and a second wave of 6 (levels 33–58, Engineer 31–56) added
 per docs/ENDGAME_STRATEGY.md recommendation 1 — smaller top-ups on the
 same hooks as their first-wave sibling (so the two stack, e.g. Soldier's
 level-1 Hardened +20% Defense-from-armor and level-33 Reinforced Plating
@@ -417,8 +464,12 @@ monster spawned in a paradox-themed era/year, same append pattern as
 - **Drop composition**: a regular monster's table is built by category so
   a kill always pays and occasionally supplies you — a **guaranteed
   sell/convert fodder** piece (a junk item, drop chance 1.0), a real
-  chance at a second (~0.35), then a **piece of gear** (weapon / armour /
-  ranged, rarity-weighted) at ~0.35, then a **consumable** at ~0.20. Every
+  chance at a second (~0.35), then a **weapon/ranged** roll (rarity-weighted)
+  at ~0.35, a separate, independent **armour** roll at ~0.25, then a
+  **consumable** at ~0.20. Weapon/ranged and armour roll independently
+  (playtest finding) rather than sharing one combined "gear" slot — a
+  single shared roll, skewed by how weapon/ranged-heavy the archetype
+  catalog is, left most species unable to ever drop armour at all. Every
   kill leaves at least one thing on the body worth taking — and the drop
   roll has a hard backstop (`LootDropRoller.RollForKill`): if every entry
   somehow misses it forces the likeliest one, and a monster with no table
@@ -500,7 +551,7 @@ monster spawned in a paradox-themed era/year, same append pattern as
     power*, not authored.** Each archetype carries a `powerMultiplier`
     (~0.5 "crude" → 1.0 "standard" → ~1.8 "fine" → ~2.9 "relic"); it
     scales the per-tier combat baseline (`LootScaling.EquipBonusFor`,
-    band ≈ 0.5×–3.5×), and `Rarity.ForPower` names the band. So the
+    clamped to a 0.3×–3.0× band), and `Rarity.ForPower` names the band. So the
     weakest weapon in a year does roughly half a baseline hit and the
     best does several times it, and its rarity label always matches its
     damage.
@@ -591,6 +642,48 @@ sinks exist (store purchase cost, restocking depot inventory, repair costs)
 so currency doesn't purely inflate. Store maintenance (§6.2) is another such
 sink, drawn from the same Credit economy — an owned store nobody ever funds
 eventually stops being an asset at all.
+
+> **Implementation (2026-09-07):** "Repair costs" is now a real mechanic,
+> not just a line item. A melee Weapon or Armor piece (ranged weapons are
+> exempt — their existing ammo-depletion economy already models wear)
+> carries its own Durability that ticks down by 1 with every hit it lands
+> or takes in combat (`ChronoTravelers.Core.Characters.Traveler.DegradeEquippedWeapon`/
+> `DegradeEquippedArmor`). As it wears, its combat contribution scales down
+> linearly to nothing at 0 Durability (`Item.DurabilityEffectiveness`) —
+> still equippable (the same "penalty, not a hard block" philosophy as
+> off-class gear in §4.3), just useless in a fight until repaired. Its
+> scrap/sale value degrades on the gentler 25%-floor curve the ranged-ammo
+> model already uses (`Item.ValueFraction`), so a broken piece is still
+> worth something to a store even if it's worthless in a fight. `repair
+> <item>` at any store (`ChronoTravelers.Core.Economy.Store.Repair`)
+> restores full Durability for Credits — priced at up to half the item's
+> own Value depending on how worn it is
+> (`EconomyPricing.RepairCost`/`FullRepairCostFraction`), and, like store
+> purchase cost and maintenance, those Credits leave the economy outright
+> rather than moving into the store's Capital. Starter gear
+> (`ChronoTravelers.Game.CharacterFactory`) is deliberately built without
+> Durability tracking, so a fresh character's opening loadout never breaks
+> on them. The 1-point-per-hit wear rate and the 50%-of-Value repair
+> ceiling are original tuning, like every other combat/economy curve in
+> this document — not derived from a specified formula.
+
+> **Implementation (2026-09-07):** "Restocking depot inventory" is now
+> real too. Every world tick, `ChronoTravelers.Engine.Simulation.WorldSimulation`'s
+> new restock pass (`ApplyGovernmentRestocking`, run alongside the
+> existing maintenance pass) checks every visited year's *government* depot
+> — never a player-owned store, which restocks by the owner's own `stock`
+> command or an NPC owner's automatic tending (§7's `TryTendOwnStore`) —
+> for any of its six staple categories (heal / attack potion / defense
+> potion / weapon / armor / ranged) currently missing from the shelf, and
+> refills it (`TimeWorld.RestockGovernmentDepot`). The depot pays
+> `EconomyPricing.BuyPrice` for the new stock out of its own Capital
+> (`Store.RestockGovernmentSupply`) — the same "acquire, then mark up to
+> resell" economics as a normal purchase from a traveler, just from an
+> abstract wholesale supplier instead of a pack, which is what makes it a
+> Credit sink and not a transfer: a government store's Capital isn't
+> circulating currency any player can collect back out. Silent (no
+> broadcast) since it can fire every tick — a message every couple of
+> seconds would drown out the rest of the feed.
 
 ## 7. NPC simulation ("simulated players")
 
@@ -692,26 +785,40 @@ saved):
 - **Monster fights stay relevant** — four linked knobs (with the HP-per-
   level taper in §4.1), tuned so a same-tier fight costs real HP without
   the early game getting harsh:
-  - `MonsterScaling.BaseAttackPower` is **superlinear**,
-    `3 + 2·tier + 0.3·tier²` — near-identical to the old `3 + 2·tier` at
-    the low end, ramping hard late (tier 9 ≈ 45 vs the old 21).
-  - `MonsterScaling.BaseHp` is **superlinear** too, `20 + 8·tier + tier²`
-    (tier 9 ≈ 173 vs the old 92). A level-cap character's attack used to
-    one-shot a deep regular monster, so however hard it hit it only ever
-    landed one swing; now a far-future fight is a two-plus-round exchange.
-  - `CombatResolver.RollDamage` applies an **armour-penetration floor**: a
-    hit always lands ≥ 30% of the attacker's power before variance, so
-    heavy armour steeply reduces damage but can't zero it. Only bites
-    against a well-armoured defender (i.e. the player); monster-vs-monster
-    and player-vs-monster are unchanged.
+  - `MonsterScaling.BaseAttackPower` / `BaseHp` / `BaseDefense` are no
+    longer independently hand-tuned polynomials — a second, superseding
+    tuning pass **derives them from what a level-matched character's own
+    attack/defense actually are** at that tier (`ReferencePlayerAttack`/
+    `ReferencePlayerDefense`, averaged across the five classes), so the
+    two sides of combat can't silently drift apart again. A regular
+    monster's defense is 30% of the level-matched player's own attack
+    (`DefenseFractionOfPlayerAttack`); its attack power is the
+    level-matched player's own defense divided by 0.70
+    (`AttackToPlayerDefenseRatio`); its HP is set to exactly
+    `HitsToKillMonster` (3.0) of the player's own mitigated hits. At tier
+    9 (level 60) that's a regular monster with ~84 attack, ~52 defense,
+    and ~401 HP (vs. tier 1's ~11 attack / ~6 defense / ~48 HP).
+  - `CombatResolver.RollDamage` mitigates with a smooth, ratio-based
+    diminishing-returns curve (`attack² / (attack + defense)`), not a
+    floor: full attack lands when defence is 0, half lands when defence
+    equals attack, and it keeps falling — never to a hard floor or to 0 —
+    as defence climbs further past it. This replaced an earlier
+    `max(attack − defense, 0.30 × attack)` armour-penetration floor that
+    turned out to be the permanent state of nearly every fight at every
+    tier (a flat 2–4 damage regardless of how deep the timeline got) once
+    attack and defense were tuned on separate numeric scales.
   - **Deep-tier starter weapons** (`TimelineContentFactory`,
     `MaybeStarterWeapon`): from tier 4 up, a monster has a rising chance
     (~15% → ~85%) of spawning already wielding a modest weapon — adds to
     its `EffectiveAttackPower`, drops as loot on death, deterministic per
     species/year.
-  - Net: an armed tier-9 regular is a ~2-round fight that costs ~45% of a
-    level-appropriate HP pool; unarmed ~18%. Apex / Warden HP scale with
-    the new curve (tier-9 apex ≈ 415, Warden ≈ 520) into longer fights.
+  - Net: a regular monster now costs almost exactly `HitsToKillMonster`
+    (3.0) of a level-matched character's own mitigated hits, by
+    construction, at any tier — an armed monster (tier 4+) gets extra
+    swings back at the player on top, but doesn't change how many hits it
+    takes to fell it. Apex / Warden HP scale off that same baseline
+    (tier-9 regular ≈ 401 HP; apex ≈ 962, Warden ≈ 1203) into longer
+    fights.
 - A few years also seed one or two **apex** monsters (`Monster.IsApex`,
   named "Frayed &lt;species&gt;"): much tougher (~2.4× HP, harder hits,
   ~3.5× XP, a loot table that reliably yields real gear biased to the
@@ -749,7 +856,7 @@ saved):
   its carried items plus a loot-table roll drop on that room's floor,
   exactly as when a player kills it, and it posts to the same kill-feed.
 - A slow **respawn trickle** keeps an emptied year refilling toward a soft
-  cap (~a third of its rooms) without ever overflowing.
+  cap (~2/5 of its rooms, minimum 4) without ever overflowing.
 - **Every year that's been instantiated this session keeps simulating**,
   not just the player's. The player's year runs the full loop (drift plus
   aggro / shadowing / ambush / player-local narration); every other year
@@ -784,6 +891,66 @@ typing commands — this reproduces the "the world moves whether you're
 typing or not" feel BBS door games had (other users' actions interleaved with
 yours) using NPCs instead of real concurrent users.
 
+> **Implementation (2026-09-07).** Until now only the multiplayer server
+> actually did this — `ChronoTravelers.Server`'s `PeriodicTimer` ticks
+> every `--tick-ms` (default 2000ms) purely on a wall clock, independent
+> of whether/when any session types a command. The single-player console
+> instead ticked once per typed command and never otherwise — a "turn"
+> model, not the async one this section describes: nothing advanced while
+> the player sat reading the screen deciding what to do next.
+>
+> `ChronoTravelers.Console/Program.cs` now runs a background
+> `System.Threading.Timer` alongside the existing per-command tick, on the
+> same 2-second cadence as the server's default. It's self-resetting, not
+> a fixed period: every typed command re-arms it for another 2 seconds, so
+> during normal, actively-typed play it never actually fires — it only
+> goes off once the player has gone a full 2 seconds without submitting
+> anything, which is exactly the gap the old model never advanced through.
+> A background-triggered tick always ticks with `playerActedIdly: true`
+> (no command happened, so by definition it's an idle beat), and is
+> capable of the same ambush death the per-command path always was —
+> narration and the death/DeathRecall handling were pulled into one
+> shared routine so a monster that finishes the player off while they're
+> mid-thought at the prompt gets identical treatment to one that lands the
+> blow between two typed commands, rather than that path only existing for
+> the command-triggered case.
+>
+> The two tick sources (main thread, blocked on `Console.ReadLine()`
+> between commands; timer thread, firing on its own schedule) share the
+> Traveler/world/NPC/simulation state, so a lock guards both — the same
+> `_gate`-around-every-mutating-entry-point pattern
+> `ChronoTravelers.Game.SharedGame` already uses for the equivalent
+> problem on the multiplayer side. The lock is held for a whole typed
+> command's processing, not just its tick, so the background timer can
+> only ever fire while the player is actually idle at the prompt, never
+> mid-command.
+>
+> One deliberate, player-facing consequence: a background tick's
+> narration prints immediately, even while `Console.ReadLine()` is
+> blocked mid-prompt waiting on the player — the genuine "something just
+> happened without you doing anything" BBS-door feel this section asks
+> for, not a bug to design around. The console-only cost is cosmetic: if
+> the player is mid-way through typing a line when a tick lands, the
+> narration can print through/above their in-progress input. Only the
+> narration line(s) print from a background tick, never a full room
+> re-render — mirrors how the multiplayer server also only pushes short
+> narration to idle sessions each tick rather than re-sending the whole
+> room. The timer runs only during the main gameplay loop (started once
+> the character/world are ready, disposed on `menu`/`quit`) — not during
+> character creation or the buy/sell menus, which are brief blocking
+> sub-prompts that don't need it.
+>
+> Scope call, flagged: no new automated tests cover the timer wiring
+> itself. `Program.cs` is top-level statements with no existing seam for
+> unit-testing its control flow (no other console behavior — `HandleFight`,
+> `HandleMove`, etc. — has test coverage either, for the same reason), and
+> extracting it into a testable class was judged out of scope for this
+> item. The logic that actually matters for correctness — what a tick
+> does, and the "lingered" ambush check `playerActedIdly` feeds into
+> (`WorldSimulation.Tick`) — is unchanged and already has full test
+> coverage; what's new here is purely *when* that existing, already-tested
+> method gets called from.
+
 ## 10. UI / presentation
 
 - Pure text, ANSI-style color coding preserved where it aids readability
@@ -801,11 +968,48 @@ yours) using NPCs instead of real concurrent users.
   who" broadcast messages; v1 can allow player-vs-NPC-Traveler combat (since
   NPCs are full Travelers) which covers the spirit of it without needing a
   netcode layer.
+
+  > **Implementation (2026-09-07).** `fight <name>` (console) now also
+  > targets a living NPC Traveler sharing the player's tile when no monster
+  > is there to fight instead — checked only as that fallback, so a room
+  > with both still defaults to the monster. The fight auto-resolves via a
+  > new `ChronoTravelers.Engine.Combat.CombatResolver.FightTraveler`,
+  > mirroring the shape every fight already takes on the multiplayer server
+  > (`ChronoTravelers.Game.Commands.Fight`) rather than retrofitting the
+  > interactive, Monster-coupled `CombatSession` used for console monster
+  > fights — no round-by-round "attack or cast" prompts for a PvP bout,
+  > just the full log printed at once. `ChronoTravelers.Game.Commands.cs`'s
+  > `Fight` gained the identical NPC-targeting fallback for the multiplayer
+  > server. Both sides fight on `EffectiveAttackPower`/`EffectiveDefense`
+  > alone (gear, buffs, and passives already folded in) — the Monster-only
+  > tag-based bonuses in `Traveler.AttackDamageMultiplierAgainst` don't
+  > apply to a Traveler opponent, so they're skipped rather than guessed
+  > at. On a win, the loser's entire inventory (equipped weapon/armor
+  > included) drops to the floor for the winner to `take` — since a
+  > defeated NPC is wholesale replaced by the next tick's respawn
+  > (`WorldSimulation.RespawnDeadNpcs`), this is the only chance to harvest
+  > its gear, otherwise lost for good. XP/Credits reuse
+  > `MonsterScaling.KillXp`/`KillCredits`'s existing outlevel-scaled
+  > formula, treating the defeated NPC's own level (÷10) as its "tier" —
+  > Travelers have no monster tier, but character level is the one
+  > apples-to-apples axis both share, and this avoids a second,
+  > independently-tuned reward curve. On a loss, the human player gets the
+  > same §3.3 death & recall as losing to a monster (no special-casing
+  > needed); a losing NPC needs no special handling either — it just sits
+  > at 0 HP until the next tick's respawn replaces it, exactly as if a
+  > monster (or the world tick itself) had killed it. **Judgment calls,
+  > flagged:** basic attacks only, no ability casting, on either side (the
+  > same simplification the abstract/NPC-grind `CombatResolver.Fight`
+  > already makes); a ranged weapon can't be aimed at an NPC (`fight`'s
+  > ranged-lock-on only ever targets a Monster) — PvP is melee-only for
+  > now; human-vs-human PvP remains explicitly out of scope, unchanged by
+  > this — only player-vs-NPC-Traveler is implemented.
+
 - Mobile/console ports.
 
 ## 12. Open design questions for follow-up
 
-- Number and boundaries of the era bands across 2000–5000 (currently ~15;
+- Number and boundaries of the era bands across 2000–5000 (currently 14;
   more, finer bands would give tighter thematic progression).
 - Travel throughput: a jump is paid from the instantaneous Tachyon pool.
   Playtest tuning (coefficient 0.2 → 0.04, +1 TachyonsPerLevel across all

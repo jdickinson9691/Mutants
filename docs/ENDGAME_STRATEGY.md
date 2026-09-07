@@ -15,7 +15,7 @@ unlocked automatically by `Level`, no activation/UI/AI decision (docs/GDD.md
 §4.2.1). Each class had six (levels 1–28, Engineer 1–19), each roughly
 midway between a pair of active-ability unlock levels.
 
-Each class now has **twelve**: a second wave of six across levels 31–60
+Each class now has **twelve**: a second wave of six across levels 33–58
 (Engineer 31–56, on its compressed schedule). Second-wave passives are
 smaller top-ups on the **same** `PassiveHook` as a first-wave sibling, so
 the two stack via `PassiveTraits.Sum` (e.g. Soldier's level-1 *Hardened*

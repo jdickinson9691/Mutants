@@ -178,6 +178,18 @@ public sealed class CombatSession
             return new AbilityCastResult(false, $"{ability.Name} has no effect in combat yet — it's a passive/party/overworld mechanic this engine doesn't model. No Tachyons spent.");
         }
 
+        // ShortTeleport (Jump Rig) / ReviveAlly (Crash Cart) are overworld
+        // effects with no round in this loop to resolve against — see
+        // ChronoTravelers.Engine.Combat.OverworldAbilityResolver, cast via
+        // the out-of-combat 'cast <ability>' command instead. Refusing
+        // them here (rather than falling through TravelerTurn's switch
+        // with no matching case, silently spending the round and the
+        // Tachyons for nothing) matches how None is already refused above.
+        if (effectType is AbilityEffectType.ShortTeleport or AbilityEffectType.ReviveAlly)
+        {
+            return new AbilityCastResult(false, $"{ability.Name} doesn't work mid-fight — it's an overworld ability. Try 'cast {ability.Name}' outside combat instead. No Tachyons spent.");
+        }
+
         if (effectType == AbilityEffectType.InstantDefeatNonBoss && !AllowBanish)
         {
             return new AbilityCastResult(false, $"{ability.Name} has no effect against a warden. No Tachyons spent.");
@@ -385,6 +397,7 @@ public sealed class CombatSession
         var damage = Math.Max(1, (int)Math.Round(baseDamage * damageMultiplier * passiveMultiplier));
         var actualDamage = Monster.Health.Damage(damage);
         Traveler.RecordAttackLanded();
+        Traveler.DegradeEquippedWeapon(); // docs/GDD.md §6.3's "repair costs" Credit sink — see Traveler.DegradeEquippedWeapon. This interactive per-round path doesn't go through CombatResolver.AttackMonster, so it needs its own call.
         _log.Add($"{Traveler.Name} hits {Monster.Name} for {actualDamage} damage.");
     }
 
@@ -400,6 +413,7 @@ public sealed class CombatSession
         }
 
         var actualDamage = Traveler.TakeDamage(incoming, attackerIsEcho: Monster.HasTag("echo"));
+        Traveler.DegradeEquippedArmor(); // docs/GDD.md §6.3's "repair costs" Credit sink — see Traveler.DegradeEquippedArmor. Mirrors CombatResolver.AttackTraveler's call (this interactive per-round path doesn't go through it).
         _log.Add($"{Monster.Name} hits {Traveler.Name} for {actualDamage} damage.");
     }
 
