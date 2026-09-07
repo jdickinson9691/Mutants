@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Characters;
+using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Items;
@@ -52,6 +53,17 @@ public static class NpcController
 
     /// <summary>An owner tops up maintenance once the store's reserve dips below this many Credits.</summary>
     private const int MaintenanceReserveTarget = 60;
+
+    /// <summary>
+    /// An NPC repairs an equipped Weapon/Armor (see <see cref="TryRepairGear"/>)
+    /// once its <see cref="Item.DurabilityEffectiveness"/> drops below this —
+    /// i.e. it's lost more than half its combat contribution to wear. Not
+    /// every tick it's a point down: an NPC tops off when the piece is
+    /// genuinely degraded, the same rhythm a sensible player keeps (a full
+    /// repair is priced under the item's own value — docs/GDD.md §6.3 —
+    /// so it's always worth it over replacing).
+    /// </summary>
+    private const double RepairDurabilityThreshold = 0.5;
 
     /// <summary>Credits an owner deposits into its own store's Capital in one tending action — the funding half of the loop that lets the store later buy from travelers via <see cref="Store.BuyFromTraveler"/>. See <see cref="CapitalReserveTarget"/>.</summary>
     private const int CapitalTopUpAmount = 150;
@@ -489,22 +501,38 @@ public static class NpcController
     /// <summary>
     /// The best currently-unequipped Weapon/Armor/Ranged item in the pack
     /// that beats what's in that slot right now, by the same
-    /// WieldEffectiveness-scaled bonus combat actually uses (so an
-    /// off-class find has to clear a higher bar) — at most one per tick,
-    /// same "one action" rule as everything else here. A depleted ranged
-    /// weapon never counts as a candidate, AND counts as a current value of
-    /// 0 (same as an empty slot) when it's the one currently equipped — a
-    /// spent weapon can't fire, so it must never out-rank a fresh pickup
-    /// just for having a bigger AttackBonus (a real bug: an NPC that
-    /// depleted a strong ranged weapon would sit there melee-only forever,
-    /// never re-arming with a weaker-but-live one). An empty slot counts as
-    /// a current value of 0 too, so anything wieldable and not-worse always
-    /// wins an empty slot.
+    /// WieldEffectiveness- and Durability-scaled bonus combat actually uses
+    /// (so an off-class find has to clear a higher bar) — at most one per
+    /// tick, same "one action" rule as everything else here. A depleted
+    /// ranged weapon never counts as a candidate, AND counts as a current
+    /// value of 0 (same as an empty slot) when it's the one currently
+    /// equipped — a spent weapon can't fire, so it must never out-rank a
+    /// fresh pickup just for having a bigger AttackBonus (a real bug: an NPC
+    /// that depleted a strong ranged weapon would sit there melee-only
+    /// forever, never re-arming with a weaker-but-live one). A badly-worn
+    /// melee Weapon/Armor is scaled by <see cref="Item.DurabilityEffectiveness"/>
+    /// for the same reason — a broken piece contributing nothing to combat
+    /// mustn't block a fresh pickup on raw bonus alone (the NPC prefers to
+    /// repair it — see <see cref="TryRepairGear"/> — but if it can't afford
+    /// that, swapping to a live spare beats fighting with a dead one). An
+    /// empty slot counts as a current value of 0 too, so anything wieldable
+    /// and not-worse always wins an empty slot.
     /// </summary>
     private static Item? FindUpgrade(Traveler npc)
     {
         Item? best = null;
         var bestGain = 0.0;
+
+        static double EffectiveBonus(Item item, CharacterClass wielderClass)
+        {
+            var raw = item.Type switch
+            {
+                ItemType.Weapon or ItemType.Ranged => item.AttackBonus,
+                ItemType.Armor => item.DefenseBonus,
+                _ => 0,
+            };
+            return raw * item.WieldEffectiveness(wielderClass) * item.DurabilityEffectiveness;
+        }
 
         foreach (var item in npc.Inventory)
         {
@@ -515,17 +543,12 @@ public static class NpcController
 
             var current = item.Type switch
             {
-                ItemType.Weapon => npc.EquippedWeapon is { } w ? w.AttackBonus * w.WieldEffectiveness(npc.Class) : 0,
-                ItemType.Armor => npc.EquippedArmor is { } a ? a.DefenseBonus * a.WieldEffectiveness(npc.Class) : 0,
-                ItemType.Ranged => npc.EquippedRanged is { IsDepleted: false } r ? r.AttackBonus * r.WieldEffectiveness(npc.Class) : 0,
+                ItemType.Weapon => npc.EquippedWeapon is { } w ? EffectiveBonus(w, npc.Class) : 0,
+                ItemType.Armor => npc.EquippedArmor is { } a ? EffectiveBonus(a, npc.Class) : 0,
+                ItemType.Ranged => npc.EquippedRanged is { IsDepleted: false } r ? EffectiveBonus(r, npc.Class) : 0,
                 _ => double.MaxValue, // not a slot we manage here - never "an upgrade"
             };
-            var candidate = item.Type switch
-            {
-                ItemType.Weapon or ItemType.Ranged => item.AttackBonus * item.WieldEffectiveness(npc.Class),
-                ItemType.Armor => item.DefenseBonus * item.WieldEffectiveness(npc.Class),
-                _ => 0.0,
-            };
+            var candidate = EffectiveBonus(item, npc.Class);
 
             var gain = candidate - current;
             if (gain > bestGain)
@@ -539,15 +562,26 @@ public static class NpcController
     }
 
     /// <summary>
-    /// One store-related action per tick, in priority order: tend a store
-    /// this NPC already owns here (<see cref="TryTendOwnStore"/>), else
-    /// consider buying an empty slot (<see cref="TryPurchaseStoreSlot"/>),
-    /// else fall back to ordinary shopping at whatever's occupied
+    /// One store-related action per tick, in priority order: repair a
+    /// badly-worn equipped Weapon/Armor (<see cref="TryRepairGear"/> — a
+    /// survival concern, so it comes first), then tend a store this NPC
+    /// already owns here (<see cref="TryTendOwnStore"/>), else consider
+    /// buying an empty slot (<see cref="TryPurchaseStoreSlot"/>), else fall
+    /// back to ordinary shopping at whatever's occupied
     /// (<see cref="TryTrade"/>) — docs/GDD.md §7's "path to a store to
-    /// trade ... occasionally visit/stock a store it owns."
+    /// trade ... occasionally visit/stock a store it owns," plus §6.3's
+    /// repair Credit sink.
     /// </summary>
     private static NpcTickResult? TryStoreVisit(Traveler npc, IReadOnlyList<StoreSlot> storeSlots, IRandomSource random)
     {
+        var occupiedStores = storeSlots.Where(s => s.Store is not null).Select(s => s.Store!).ToList();
+
+        var repairResult = occupiedStores.Count > 0 ? TryRepairGear(npc, occupiedStores) : null;
+        if (repairResult is not null)
+        {
+            return repairResult;
+        }
+
         var ownedSlot = storeSlots.FirstOrDefault(s => s.Store?.Owner == npc);
         if (ownedSlot is not null)
         {
@@ -566,8 +600,47 @@ public static class NpcController
             }
         }
 
-        var occupiedStores = storeSlots.Where(s => s.Store is not null).Select(s => s.Store!).ToList();
         return occupiedStores.Count > 0 ? TryTrade(npc, occupiedStores, random) : null;
+    }
+
+    /// <summary>
+    /// Repairs the more badly-worn of the NPC's equipped Weapon / Armor —
+    /// docs/GDD.md §6.3's repair Credit sink, the NPC-side counterpart to
+    /// the player's <c>repair</c> command. Fires only when a piece has lost
+    /// more than half its combat contribution to wear
+    /// (<see cref="RepairDurabilityThreshold"/>) and the NPC can afford
+    /// <see cref="EconomyPricing.RepairCost"/>; ranged weapons and
+    /// starter/Time-Shard gear never wear (<see cref="Item.HasDurability"/>),
+    /// so they're never candidates. Any occupied store will do — repair
+    /// isn't owner-gated (<see cref="Store.Repair"/>). One piece per tick,
+    /// same "one action" rule as the rest of the store loop. Returns null
+    /// (do something else) when nothing's worn enough or it can't pay.
+    /// Consumes no randomness — the gate is the wear threshold, not a roll —
+    /// so scripted-RNG callers are unaffected.
+    /// </summary>
+    private static NpcTickResult? TryRepairGear(Traveler npc, IReadOnlyList<Store> stores)
+    {
+        var worst = new[] { npc.EquippedWeapon, npc.EquippedArmor }
+            .Where(i => i is { HasDurability: true } && i.DurabilityEffectiveness < RepairDurabilityThreshold)
+            .OrderBy(i => i!.DurabilityEffectiveness)
+            .FirstOrDefault();
+
+        if (worst is null)
+        {
+            return null;
+        }
+
+        var cost = EconomyPricing.RepairCost(worst);
+        if (cost <= 0 || npc.Credits < cost)
+        {
+            return null;
+        }
+
+        var store = stores[0];
+        var paid = store.Repair(npc, worst);
+        return paid is { } spent
+            ? new NpcTickResult(npc.Name, NpcGoal.Repair, Detail: $"repaired {worst.Name} at {store.Name} for {spent} Credits")
+            : null;
     }
 
     /// <summary>

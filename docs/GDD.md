@@ -709,13 +709,18 @@ Since v1 has no network multiplayer, the world needs to feel alive:
 - Each NPC runs a lightweight behavior loop each tick: assess Tachyon level (seek
   conversion fodder or a store if low), assess HP (retreat/heal if low),
   otherwise pursue its current goal — wear a better weapon/armor/ranged item
-  already sitting in its pack the instant it's looted (no store needed),
-  tend a store it already owns here (pay down Credit maintenance, stock
-  surplus gear, collect Capital — §6.2), occasionally buy an open store slot
-  if it doesn't own one (never the year's last one), trade at a year's store
-  (selling genuine surplus gear it can't use before falling back to excess
-  junk, and buying a weapon if unarmed), grind monsters in its year, or hop
-  along the timeline. A local-pool NPC not
+  already sitting in its pack the instant it's looted (now judged by the
+  same wield- **and Durability**-scaled bonus combat uses, so a near-broken
+  piece can lose to a fresh weaker one — no store needed), pay a store to
+  repair a badly-worn equipped Weapon/Armor (below half its combat
+  contribution — §6.3's repair sink, first among the store actions since a
+  worn weapon is a survival problem), tend a store it already owns here (pay
+  down Credit maintenance, stock surplus gear, collect Capital — §6.2),
+  occasionally buy an open store slot if it doesn't own one (never the
+  year's last one), trade at a year's store (selling genuine surplus gear it
+  can't use before falling back to excess junk, and buying a weapon if
+  unarmed), grind monsters in its year, or hop along the timeline. A
+  local-pool NPC not
   already at the anchor year rolls a much higher travel chance and, when it
   rolls, heads straight for the anchor — the full jump if it can afford the
   Tachyon cost, otherwise the biggest hop toward it it can afford, so the

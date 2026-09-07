@@ -927,4 +927,85 @@ public class NpcControllerTests
         Assert.Equal(NpcGoal.Trade, result.Goal);
         Assert.Equal(freshRanged, npc.EquippedRanged);
     }
+
+    // --- NPC gear repair (docs/GDD.md §6.3) -----------------------------------
+
+    [Fact]
+    public void Act_EquippedWeaponBadlyWorn_RepairsItAtAStore()
+    {
+        var npc = FreshNpc();
+        npc.AddCredits(1000);
+        var weapon = Item.Create("Fine Blade", ItemType.Weapon, tier: 3, Rarity.Rare);
+        npc.AddToInventory(weapon);
+        npc.Wield(weapon);
+        weapon.Durability = weapon.MaxDurability / 4; // effectiveness 0.25, under the 0.5 repair threshold
+        var creditsBefore = npc.Credits;
+        var store = Store.CreateGovernmentStore("Fix-It Depot", homeLevel: 1);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(store)]);
+
+        Assert.Equal(NpcGoal.Repair, result.Goal);
+        Assert.Equal(weapon.MaxDurability, weapon.Durability); // restored to full
+        Assert.True(npc.Credits < creditsBefore); // paid for it
+    }
+
+    [Fact]
+    public void Act_WornGearButNoCreditsToRepair_DoesNotRepair()
+    {
+        var npc = FreshNpc(); // 0 Credits
+        var weapon = Item.Create("Fine Blade", ItemType.Weapon, tier: 5, Rarity.Legendary);
+        npc.AddToInventory(weapon);
+        npc.Wield(weapon);
+        weapon.Durability = 3; // badly worn, but the NPC can't pay to fix it
+        var store = Store.CreateGovernmentStore("Fix-It Depot", homeLevel: 1);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(store)]);
+
+        Assert.NotEqual(NpcGoal.Repair, result.Goal);
+        Assert.True(weapon.Durability < weapon.MaxDurability); // never got restored (the fallthrough grind may still wear it a touch)
+    }
+
+    [Fact]
+    public void Act_FreshGearAtAStore_NeverRepairs()
+    {
+        // Regression: the repair check runs first in the store loop, so it
+        // must be a strict no-op for gear that isn't actually worn — a
+        // fresh Item.Create weapon starts at full Durability. (The NPC still
+        // falls through to a grind, which can earn Credits and shave a
+        // durability point — so assert only that repair itself didn't fire.)
+        var npc = FreshNpc();
+        npc.AddCredits(1000);
+        var weapon = Item.Create("Fine Blade", ItemType.Weapon, tier: 3, Rarity.Rare);
+        npc.AddToInventory(weapon);
+        npc.Wield(weapon);
+        var store = Store.CreateGovernmentStore("Fix-It Depot", homeLevel: 1);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5), [OccupiedSlot(store)]);
+
+        Assert.NotEqual(NpcGoal.Repair, result.Goal);
+        Assert.True(npc.Credits >= 1000); // no Credits SPENT (a grind win may add some)
+    }
+
+    [Fact]
+    public void Act_EquippedWeaponWornPastWhatALiveSpareOffers_SwapsToTheSpare()
+    {
+        // FindUpgrade is now Durability-aware: a near-broken equipped weapon
+        // that contributes almost nothing in combat must not out-rank a
+        // fresh (weaker on paper) spare on raw AttackBonus alone. Repairing
+        // it would be the first choice, but with no store here the swap is
+        // the sane fallback rather than fighting with a dead weapon.
+        var npc = FreshNpc();
+        var worn = Item.Create("Vault Cleaver", ItemType.Weapon, tier: 6, Rarity.Legendary); // big raw AttackBonus
+        npc.AddToInventory(worn);
+        npc.Wield(worn);
+        worn.Durability = 1; // effectiveness ~0 — contributes nothing
+
+        var freshSpare = Item.Create("Rusty Shiv", ItemType.Weapon, tier: 1, Rarity.Common); // tiny raw AttackBonus, full durability
+        npc.AddToInventory(freshSpare);
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.5));
+
+        Assert.Equal(NpcGoal.Upgrade, result.Goal);
+        Assert.Equal(freshSpare, npc.EquippedWeapon);
+    }
 }

@@ -20,6 +20,9 @@ public enum NpcGoal
     /// <summary>Visited a store this tick — sold excess junk or surplus gear, or bought a needed weapon.</summary>
     Trade,
 
+    /// <summary>Paid a store to repair a badly-worn equipped Weapon/Armor back to full Durability — docs/GDD.md §6.3's repair Credit sink. Kept distinct from <see cref="Trade"/> so tooling can tell "kept its gear serviceable" apart from ordinary buying/selling.</summary>
+    Repair,
+
     /// <summary>Bought an empty store slot, or tended one already owned — paid Credit maintenance, stocked surplus gear, or collected Capital. Docs/GDD.md §6.2/§7.</summary>
     OwnStore,
 

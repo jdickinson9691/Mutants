@@ -39,6 +39,7 @@ public static class ReportPrinter
         PrintAggregateAbilityUsage(runs);
         PrintAggregatePassiveUsage(characterClass, runs);
         PrintAggregateConsumableUsage(runs);
+        PrintAggregateRepairUsage(runs);
         PrintAggregateRangedUsage(runs);
         PrintAggregateTraitCounts(runs);
         PrintNpcStoreActivity(runs);
@@ -60,11 +61,12 @@ public static class ReportPrinter
         Console.WriteLine("========================================================");
         Console.WriteLine($" Shared world — {result.TotalTicks} ticks to last-bot death");
         Console.WriteLine("========================================================");
-        Console.WriteLine("  Class          Outcome         Level  Year   Kills");
+        Console.WriteLine("  Class          Outcome         Level  Year   Kills  Repairs(Cr)      Broke?");
         foreach (var r in result.PerClass)
         {
             var outcome = r.DiedDuringRun ? $"died t{r.TicksSurvived}" : "alive at cap";
-            Console.WriteLine($"  {r.CharacterName,-14} {outcome,-15} {r.FinalLevel,-6} {r.FinalYear,-6} {r.Kills}");
+            var repairs = $"{r.RepairsPerformed}({r.CreditsSpentOnRepair})";
+            Console.WriteLine($"  {r.CharacterName,-14} {outcome,-15} {r.FinalLevel,-6} {r.FinalYear,-6} {r.Kills,-6} {repairs,-15} {(r.EquippedGearBrokeAtLeastOnce ? "yes" : "no")}");
         }
 
         PrintNpcStoreActivity([result.World]);
@@ -146,6 +148,7 @@ public static class ReportPrinter
         Console.WriteLine($"  Total XP:       {r.TotalXp}");
         Console.WriteLine($"  Max hit taken:  {r.MaxHitTaken}");
         Console.WriteLine($"  Ambushes seen:  {r.AmbushesObserved}");
+        Console.WriteLine($"  Gear repairs:    {r.RepairsPerformed} ({r.CreditsSpentOnRepair} Credits){(r.EquippedGearBrokeAtLeastOnce ? "  [equipped gear broke at least once]" : "")}");
         Console.WriteLine($"  Credits/Tachyons at end: {r.FinalCredits} / {r.FinalTachyons}");
         Console.WriteLine($"  Equipped {(r.DiedDuringRun ? "on death" : "at end")}:");
         Console.WriteLine($"    Weapon: {r.EquippedWeaponAtEnd ?? "(none)"}");
@@ -287,6 +290,24 @@ public static class ReportPrinter
         {
             Console.WriteLine($"  {effect,-28} inCombat={inCombat,-4} outOfCombat={outOfCombat}");
         }
+    }
+
+    /// <summary>How the durability/repair loop (docs/GDD.md §6.3) played out across the battery — total store repairs, Credits sunk into them, and how many runs ever fought with fully-broken gear (repair cadence fell behind wear).</summary>
+    private static void PrintAggregateRepairUsage(IReadOnlyList<RunReport> runs)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- Aggregate gear repair across all runs ---");
+        var repairs = runs.Sum(r => r.RepairsPerformed);
+        var credits = runs.Sum(r => r.CreditsSpentOnRepair);
+        var brokeRuns = runs.Count(r => r.EquippedGearBrokeAtLeastOnce);
+
+        if (repairs == 0 && brokeRuns == 0)
+        {
+            Console.WriteLine("  (no gear ever needed repair — starter/Time-Shard gear only, or runs too short to wear anything)");
+            return;
+        }
+
+        Console.WriteLine($"  Repairs: {repairs}   Credits spent: {credits}   Runs that fought with broken gear: {brokeRuns}/{runs.Count}");
     }
 
     private static void PrintAggregateRangedUsage(IReadOnlyList<RunReport> runs)

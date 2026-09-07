@@ -1,6 +1,7 @@
 using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Diagnostics;
+using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Time;
@@ -412,9 +413,10 @@ public static class PlaytestRunner
         else
         {
             s.TicksSinceMonster++;
+            NoteBrokenGear(bot, report);
             TryHealOrConsume(bot, s.Aggression, report);
             TryPickUpAndWieldBetterGear(bot, population);
-            TryShop(bot, year);
+            TryShop(bot, year, report);
 
             if (bot.CurrentYear < TimeScale.MaxYear && ShouldTravel(bot, s.TicksSinceMonster, random))
             {
@@ -701,12 +703,40 @@ public static class PlaytestRunner
         }
     }
 
-    private static void TryShop(Traveler bot, YearContent year)
+    private static void TryShop(Traveler bot, YearContent year, RunReport report)
     {
         var slot = year.StoreSlots.FirstOrDefault(s => s.Location.Equals(bot.Position) && s.Store is not null);
         if (slot?.Store is not { } store)
         {
             return;
+        }
+
+        // Repair whatever the bot is fighting with FIRST — docs/GDD.md §6.3's
+        // durability/repair loop. Worn Weapon/Armor loses combat contribution
+        // (Item.DurabilityEffectiveness, no floor) until repaired, and a real
+        // player would top it up on a store visit before anything else. Only
+        // the equipped pieces matter; a spare in the pack is dead weight
+        // whether it's worn or not. Starter gear and ranged weapons never
+        // have durability (Item.HasDurability), so those are skipped.
+        foreach (var gear in new[] { bot.EquippedWeapon, bot.EquippedArmor })
+        {
+            if (gear is not { HasDurability: true } || gear.Durability >= gear.MaxDurability)
+            {
+                continue;
+            }
+
+            var cost = EconomyPricing.RepairCost(gear);
+            if (cost <= 0 || bot.Credits < cost)
+            {
+                continue;
+            }
+
+            var paid = store.Repair(bot, gear);
+            if (paid is { } spent)
+            {
+                report.RepairsPerformed++;
+                report.CreditsSpentOnRepair += spent;
+            }
         }
 
         foreach (var item in bot.Inventory
@@ -726,6 +756,20 @@ public static class PlaytestRunner
         if (weaponListing is not null && store.SellToTraveler(bot, weaponListing))
         {
             bot.Wield(weaponListing.Item);
+        }
+    }
+
+    /// <summary>Flags <see cref="RunReport.EquippedGearBrokeAtLeastOnce"/> if the bot is currently fighting with a fully-worn Weapon/Armor — i.e. the repair cadence (see <see cref="TryShop"/>) fell behind wear. Cheap; call each tick.</summary>
+    private static void NoteBrokenGear(Traveler bot, RunReport report)
+    {
+        if (report.EquippedGearBrokeAtLeastOnce)
+        {
+            return;
+        }
+
+        if (bot.EquippedWeapon is { IsBroken: true } || bot.EquippedArmor is { IsBroken: true })
+        {
+            report.EquippedGearBrokeAtLeastOnce = true;
         }
     }
 
@@ -751,12 +795,18 @@ public static class PlaytestRunner
 
     private static void GiveStarterKit(Traveler bot)
     {
-        // Matches ChronoTravelers.Console's fresh-character starter kit exactly
-        // (Program.cs), so the harness's arrival-year experience isn't
-        // artificially easier or harder than a real player's.
+        // Matches ChronoTravelers.Game.CharacterFactory.NewTraveler exactly
+        // (which both the console and the server build a fresh character
+        // through), so the harness's arrival-year experience isn't
+        // artificially easier or harder than a real player's. Both starter
+        // pieces are bare `new Item(...)` — MaxDurability 0, so they never
+        // wear out or need repair (Item.HasDurability).
         var starterWeapon = new Item("Standard-Issue Baton", ItemType.Weapon, 1, Rarity.Common, Value: 5, AttackBonus: 10);
         bot.AddToInventory(starterWeapon);
         bot.Wield(starterWeapon);
+        var starterArmor = new Item("Standard-Issue Vest", ItemType.Armor, 1, Rarity.Common, Value: 5, DefenseBonus: 8);
+        bot.AddToInventory(starterArmor);
+        bot.Wield(starterArmor);
         for (var i = 0; i < 3; i++)
         {
             bot.AddToInventory(Item.Create("Field Ration", ItemType.Consumable, 1, Rarity.Common,

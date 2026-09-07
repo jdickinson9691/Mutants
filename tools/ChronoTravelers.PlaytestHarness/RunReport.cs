@@ -105,6 +105,13 @@ public sealed class RunReport
     public int FinalCredits { get; set; }
     public int FinalTachyons { get; set; }
 
+    /// <summary>Store repairs the bot performed this run (docs/GDD.md §6.3's durability/repair loop — <c>Store.Repair</c>), and the Credits spent on them. The bot repairs its equipped Weapon/Armor whenever it's at a store, worn, and can afford it — see <c>PlaytestRunner.TryShop</c>.</summary>
+    public int RepairsPerformed { get; set; }
+    public int CreditsSpentOnRepair { get; set; }
+
+    /// <summary>True if the bot's equipped Weapon or Armor ever hit 0 Durability (<c>Item.IsBroken</c>) before it could get to a store — a sign the repair cadence isn't keeping up with wear (or the bot spent too long away from a store).</summary>
+    public bool EquippedGearBrokeAtLeastOnce { get; set; }
+
     /// <summary>Weapon/armor/ranged wielded at run's end (on death, that's exactly what the bot went down holding) — null for an empty slot. See <c>PlaytestRunner.DescribeItem</c>.</summary>
     public string? EquippedWeaponAtEnd { get; set; }
     public string? EquippedArmorAtEnd { get; set; }
