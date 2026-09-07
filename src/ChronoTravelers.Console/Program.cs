@@ -262,11 +262,22 @@ else
     //    isn't bare-fisted. A fresh L1 loses the arrival year's first 1v1
     //    unarmed — its damage-per-hit can't out-trade a tier-1 monster's
     //    HP before its own ~30 HP runs out; +10 attack tips it.
+    //  - a basic armor piece, wielded, for the same reason on defense:
+    //    with no armor, EffectiveDefense was Agility-only (as low as 3 for
+    //    Doctor/Scientist), and the world-tick ambush halves that already-
+    //    thin number before combat even starts, with no ambush-mitigation
+    //    passive existing before level 7/23 — a near-guaranteed early death
+    //    for Doctor/Scientist/Spy/Engineer on every seed. Mirrors the fix
+    //    in ChronoTravelers.Game/CharacterFactory.cs (this console front
+    //    end builds its own starter kit rather than sharing that one).
     //  - a few field rations so the first year isn't a pure attrition race
     //    before you can loot or buy any HP recovery of your own.
     var starterWeapon = new Item("Standard-Issue Baton", ItemType.Weapon, 1, Rarity.Common, Value: 5, AttackBonus: 10);
     traveler.AddToInventory(starterWeapon);
     traveler.Wield(starterWeapon);
+    var starterArmor = new Item("Standard-Issue Vest", ItemType.Armor, 1, Rarity.Common, Value: 5, DefenseBonus: 8);
+    traveler.AddToInventory(starterArmor);
+    traveler.Wield(starterArmor);
     for (var i = 0; i < 3; i++)
     {
         traveler.AddToInventory(Item.Create("Field Ration", ItemType.Consumable, 1, Rarity.Common,

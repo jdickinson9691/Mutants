@@ -19,7 +19,22 @@ public static class CharacterFactory
         return offered.Count > 0 ? offered : Enum.GetValues<CharacterClass>().ToList();
     }
 
-    /// <summary>A fresh Traveler with the console's starter kit: a wielded basic melee weapon (so the opening year-2000 fight isn't bare-fisted — playtested) plus three Field Rations.</summary>
+    /// <summary>
+    /// A fresh Traveler with the console's starter kit: a wielded basic
+    /// melee weapon (so the opening year-2000 fight isn't bare-fisted —
+    /// playtested) plus three Field Rations.
+    ///
+    /// Also a wielded basic armor piece — every class previously started
+    /// with <c>EquippedArmor == null</c>, so <see cref="Traveler.EffectiveDefense"/>
+    /// was Agility-only (as low as 3 for Doctor/Scientist). Combined with
+    /// <c>MonsterController.ResolveAmbush</c> halving that already-thin
+    /// number before combat even starts, and no ambush-mitigation passive
+    /// existing before level 7/23, this made a level-1 double-hit (ambush,
+    /// then a same-or-faster monster's first strike) a near-guaranteed
+    /// death for Doctor/Scientist/Spy/Engineer on every seed — not RNG,
+    /// structural. Granting a real starter armor item lifts the whole
+    /// floor the same way the starter weapon already does for Attack.
+    /// </summary>
     public static Traveler NewTraveler(string name, CharacterClass characterClass)
     {
         var traveler = new Traveler(name, characterClass);
@@ -27,6 +42,10 @@ public static class CharacterFactory
         var starterWeapon = new Item("Standard-Issue Baton", ItemType.Weapon, 1, Rarity.Common, Value: 5, AttackBonus: 10);
         traveler.AddToInventory(starterWeapon);
         traveler.Wield(starterWeapon);
+
+        var starterArmor = new Item("Standard-Issue Vest", ItemType.Armor, 1, Rarity.Common, Value: 5, DefenseBonus: 8);
+        traveler.AddToInventory(starterArmor);
+        traveler.Wield(starterArmor);
 
         for (var i = 0; i < 3; i++)
         {
