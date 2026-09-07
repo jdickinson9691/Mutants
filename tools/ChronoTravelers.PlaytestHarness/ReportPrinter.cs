@@ -1,6 +1,7 @@
 using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Traits;
+using ChronoTravelers.Engine.Npc;
 
 namespace ChronoTravelers.PlaytestHarness;
 
@@ -40,6 +41,96 @@ public static class ReportPrinter
         PrintAggregateConsumableUsage(runs);
         PrintAggregateRangedUsage(runs);
         PrintAggregateTraitCounts(runs);
+        PrintNpcStoreActivity(runs);
+    }
+
+    /// <summary>One class's report from a shared-world (simul) session — no per-class aggregates or NPC store section (that's world-level, printed once by <see cref="PrintSimultaneousWorldSummary"/>).</summary>
+    public static void PrintSimultaneousClassReport(RunReport report)
+    {
+        Console.WriteLine("========================================================");
+        Console.WriteLine($" {report.CharacterName}");
+        Console.WriteLine("========================================================");
+        PrintRun(0, report);
+        Console.WriteLine();
+    }
+
+    /// <summary>The shared-world half of a simul session: last-bot survival line, NPC store commerce, NPC trait effects — all one world, one dataset.</summary>
+    public static void PrintSimultaneousWorldSummary(SimultaneousResult result)
+    {
+        Console.WriteLine("========================================================");
+        Console.WriteLine($" Shared world — {result.TotalTicks} ticks to last-bot death");
+        Console.WriteLine("========================================================");
+        Console.WriteLine("  Class          Outcome         Level  Year   Kills");
+        foreach (var r in result.PerClass)
+        {
+            var outcome = r.DiedDuringRun ? $"died t{r.TicksSurvived}" : "alive at cap";
+            Console.WriteLine($"  {r.CharacterName,-14} {outcome,-15} {r.FinalLevel,-6} {r.FinalYear,-6} {r.Kills}");
+        }
+
+        PrintNpcStoreActivity([result.World]);
+        PrintNpcTraitEffects([result.World]);
+    }
+
+    /// <summary>
+    /// Whether background NPCs actually trade at each other's shopfronts
+    /// (not just at the government Depot) and run stores of their own —
+    /// NpcController routes a Trade to a random <em>occupied</em> store in
+    /// the year, owner-agnostic, so an NPC-owned store is a valid target;
+    /// this counts how often that happens. "&lt;name&gt;'s Store" = another
+    /// traveller's shopfront; "&lt;era&gt; Depot" = government.
+    /// </summary>
+    private static void PrintNpcStoreActivity(IReadOnlyList<RunReport> runs)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- NPC store activity across all runs ---");
+
+        var atNpcStore = runs.Sum(r => r.NpcTradesAtPlayerOrNpcStore);
+        var atGovStore = runs.Sum(r => r.NpcTradesAtGovernmentStore);
+        var slotBuys = runs.Sum(r => r.NpcStoreSlotPurchases);
+        var tendActions = runs.Sum(r => r.NpcOwnStoreTendActions);
+        var totalTrades = atNpcStore + atGovStore;
+
+        Console.WriteLine($"  NPC Trade actions:        {totalTrades}  (at another traveller's store: {atNpcStore}, at the government Depot: {atGovStore})");
+        if (totalTrades > 0)
+        {
+            Console.WriteLine($"  Share at an NPC-run store: {100.0 * atNpcStore / totalTrades:F0}%");
+        }
+
+        Console.WriteLine($"  NPC store-slot purchases: {slotBuys}");
+        Console.WriteLine($"  NPC own-store tending:    {tendActions}  (maintenance / capital top-up / stocking / markdown / collection)");
+
+        var goalTotals = new Dictionary<NpcGoal, int>();
+        foreach (var r in runs)
+        {
+            foreach (var (goal, count) in r.NpcActionCounts)
+            {
+                goalTotals[goal] = goalTotals.GetValueOrDefault(goal) + count;
+            }
+        }
+
+        if (goalTotals.Count > 0)
+        {
+            var grand = goalTotals.Values.Sum();
+            Console.WriteLine("  Full NPC action mix:");
+            foreach (var (goal, count) in goalTotals.OrderByDescending(kv => kv.Value))
+            {
+                Console.WriteLine($"    {goal,-14} {count,-7} ({100.0 * count / grand:F0}%)");
+            }
+        }
+
+        var samples = runs.SelectMany(r => r.NpcStoreActivitySamples).Take(20).ToList();
+        if (samples.Count > 0)
+        {
+            Console.WriteLine("  Sample store events:");
+            foreach (var s in samples)
+            {
+                Console.WriteLine($"    {s}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("  (no NPC store events recorded this battery)");
+        }
     }
 
     private static void PrintRun(int index, RunReport r)

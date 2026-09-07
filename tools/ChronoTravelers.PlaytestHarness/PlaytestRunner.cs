@@ -106,29 +106,20 @@ public static class PlaytestRunner
 
         var simulation = new WorldSimulation(world, npcs, random, npcClassWeights: npcClassWeights, abilities: allAbilities);
 
+        var state = new BotState(characterClass, worldSeed, allAbilities, aggression, verboseFatal);
+        var bot = state.Bot;
+        var report = state.Report;
+
         // Keyed by reference: a respawned NPC is a brand-new Traveler
         // instance (WorldSimulation.RespawnDeadNpcs replaces the slot, it
         // doesn't reset one in place), so this naturally starts a dead
         // NPC's replacement back at 0 kills — matching how its Trait/Level/
         // Credits already reflect only its current incarnation.
         var npcKillCounts = new Dictionary<Traveler, int>();
-        simulation.OnNpcAct = (npc, result) =>
-        {
-            if (result.Fight is { TravelerWon: true })
-            {
-                npcKillCounts[npc] = npcKillCounts.GetValueOrDefault(npc) + 1;
-            }
-        };
+        simulation.OnNpcAct = (npc, result) => RecordNpcAct(report, npc, result, npcKillCounts);
 
-        var bot = new Traveler($"{characterClass}Bot", characterClass);
         GiveStarterKit(bot);
         bot.PlaceAt(world.GetYear(bot.CurrentYear).Map.Start);
-
-        var classAbilities = allAbilities
-            .Where(a => string.Equals(a.Class, characterClass.ToString(), StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        var report = new RunReport { CharacterName = bot.Name, WorldSeed = worldSeed };
 
         void OnPassiveActivation(CharacterClass cls, PassiveHook hook, double magnitude)
         {
@@ -137,22 +128,320 @@ public static class PlaytestRunner
                 return;
             }
 
-            var usage = report.PassiveUsage.TryGetValue(hook, out var u) ? u : report.PassiveUsage[hook] = new PassiveUsage();
-            usage.Activations++;
-            usage.TotalMagnitude += magnitude;
+            RecordPassive(report, hook, magnitude);
         }
 
         var previousListener = PassiveActivationTracker.Listener;
         PassiveActivationTracker.Listener = OnPassiveActivation;
         try
         {
-            RunLoop(bot, world, simulation, random, classAbilities, maxTicks, report, aggression, verboseFatal);
+            for (var tick = 0; tick < maxTicks; tick++)
+            {
+                if (bot.Health.IsDead)
+                {
+                    report.DiedDuringRun = true;
+                    break;
+                }
+
+                var idle = StepBot(state, world, random);
+
+                state.HpBeforeTick = bot.Health.Current;
+                simulation.Tick(bot, playerActedIdly: idle);
+
+                var tickDamage = state.HpBeforeTick - bot.Health.Current;
+                if (tickDamage > 0)
+                {
+                    report.AmbushesObserved++;
+                    report.RecordHit(tickDamage);
+                }
+
+                report.TicksRun = tick + 1;
+                if (!bot.Health.IsDead)
+                {
+                    report.TicksSurvived = tick + 1;
+                }
+            }
         }
         finally
         {
             PassiveActivationTracker.Listener = previousListener;
         }
 
+        FinalizeReport(report, bot, characterClass, world, npcs, npcKillCounts, populateNpcOutcomes: true);
+        return report;
+    }
+
+    /// <summary>
+    /// Plays every class in <paramref name="classes"/> as its own bot in
+    /// ONE shared world, stepping all living bots each tick and resolving
+    /// them together through <see cref="WorldSimulation.TickMultiplayer"/>
+    /// (the same path a real shared-world host uses), until the last bot
+    /// dies or <paramref name="maxTicks"/> is hit. NPCs are drawn from all
+    /// five classes (nothing is excluded, since every class is now a
+    /// player) — so NPC-side passive activations of a class that's also
+    /// being played are folded into that class's report; NPCs are few and
+    /// mostly grinding/retreating, so the contribution is small, but the
+    /// economy hooks (ConvertValue, StoreDiscount) carry the most of it.
+    /// The returned <see cref="SimultaneousResult.World"/> holds the shared
+    /// NPC store-activity and NPC-outcome data (one world, one dataset).
+    /// </summary>
+    public static SimultaneousResult RunSimultaneous(IReadOnlyList<CharacterClass> classes, long worldSeed, int maxTicks, string contentDirectory, IReadOnlyList<AbilityData> allAbilities, double aggression = 1.0, bool verboseFatal = false)
+    {
+        var world = LoadWorld(contentDirectory, worldSeed);
+        var random = new SystemRandomSource(new Random(unchecked((int)worldSeed)));
+
+        var npcClassWeights = Enum.GetValues<CharacterClass>().ToDictionary(c => c, _ => 1.0);
+        var npcs = NpcPopulation.Spawn(NpcPopulation.LocalPopulationTarget, world, random, npcClassWeights).ToList();
+        var simulation = new WorldSimulation(world, npcs, random, npcClassWeights: npcClassWeights, abilities: allAbilities);
+
+        var worldReport = new RunReport { CharacterName = "SharedWorld", WorldSeed = worldSeed };
+        var npcKillCounts = new Dictionary<Traveler, int>();
+        simulation.OnNpcAct = (npc, result) => RecordNpcAct(worldReport, npc, result, npcKillCounts);
+
+        var states = classes.Select(c => new BotState(c, worldSeed, allAbilities, aggression, verboseFatal)).ToList();
+        foreach (var s in states)
+        {
+            GiveStarterKit(s.Bot);
+            s.Bot.PlaceAt(world.GetYear(s.Bot.CurrentYear).Map.Start);
+        }
+
+        var reportByClass = states.ToDictionary(s => s.Bot.Class, s => s.Report);
+
+        void OnPassiveActivation(CharacterClass cls, PassiveHook hook, double magnitude)
+        {
+            if (reportByClass.TryGetValue(cls, out var r))
+            {
+                RecordPassive(r, hook, magnitude);
+            }
+        }
+
+        var previousListener = PassiveActivationTracker.Listener;
+        PassiveActivationTracker.Listener = OnPassiveActivation;
+        var totalTicks = 0;
+        try
+        {
+            for (var tick = 0; tick < maxTicks; tick++)
+            {
+                var living = states.Where(s => !s.Bot.Health.IsDead).ToList();
+                if (living.Count == 0)
+                {
+                    break;
+                }
+
+                totalTicks = tick + 1;
+
+                foreach (var s in living)
+                {
+                    s.TickState.ActedIdly = StepBot(s, world, random);
+                    s.HpBeforeTick = s.Bot.Health.Current;
+                }
+
+                simulation.TickMultiplayer(living.Select(s => s.TickState).ToList());
+
+                foreach (var s in living)
+                {
+                    var tickDamage = s.HpBeforeTick - s.Bot.Health.Current;
+                    if (tickDamage > 0)
+                    {
+                        s.Report.AmbushesObserved++;
+                        s.Report.RecordHit(tickDamage);
+                    }
+
+                    s.Report.TicksRun = tick + 1;
+                    if (!s.Bot.Health.IsDead)
+                    {
+                        s.Report.TicksSurvived = tick + 1;
+                    }
+                    else if (!s.DeathRecorded)
+                    {
+                        s.Report.DiedDuringRun = true;
+                        s.DeathRecorded = true;
+                    }
+                }
+            }
+        }
+        finally
+        {
+            PassiveActivationTracker.Listener = previousListener;
+        }
+
+        foreach (var s in states)
+        {
+            FinalizeReport(s.Report, s.Bot, s.Bot.Class, world, npcs, npcKillCounts, populateNpcOutcomes: false);
+        }
+
+        // NPC outcomes / trait counts are a world-level fact — record once.
+        var ownedStoreOwners = world.VisitedYears
+            .SelectMany(y => world.GetYear(y).StoreSlots)
+            .Select(s => s.Store?.Owner)
+            .Where(owner => owner is not null)
+            .ToHashSet();
+        foreach (var npc in npcs)
+        {
+            worldReport.NpcTraitsObserved[npc.Trait] = worldReport.NpcTraitsObserved.GetValueOrDefault(npc.Trait) + 1;
+            worldReport.NpcOutcomes.Add(new NpcOutcome(npc.Trait, npc.Level, npc.Credits, npc.Inventory.Count, npc.FurthestYearReached, ownedStoreOwners.Contains(npc), npcKillCounts.GetValueOrDefault(npc)));
+        }
+
+        return new SimultaneousResult
+        {
+            PerClass = states.Select(s => s.Report).ToList(),
+            World = worldReport,
+            TotalTicks = totalTicks,
+        };
+    }
+
+    private static void RecordPassive(RunReport report, PassiveHook hook, double magnitude)
+    {
+        var usage = report.PassiveUsage.TryGetValue(hook, out var u) ? u : report.PassiveUsage[hook] = new PassiveUsage();
+        usage.Activations++;
+        usage.TotalMagnitude += magnitude;
+    }
+
+    /// <summary>The single-tick decision logic for one bot — everything the inline RunLoop body did EXCEPT the WorldSimulation tick call (single-player does <see cref="WorldSimulation.Tick"/>; the simultaneous runner batches every bot into one <see cref="WorldSimulation.TickMultiplayer"/>). Returns the playerActedIdly flag.</summary>
+    internal static bool StepBot(BotState s, TimeWorld world, IRandomSource random)
+    {
+        var bot = s.Bot;
+        var report = s.Report;
+
+        var year = world.GetYear(bot.CurrentYear);
+        var population = year.Population;
+        var idle = true;
+
+        var monster = population.MonstersAt(bot.Position).FirstOrDefault(m => !m.Health.IsDead);
+
+        // Mid-chase: already locked a ranged target and no longer sharing a
+        // room with anything — try for a clear shot this tick, or reposition
+        // and try again next tick.
+        if (s.RangedTarget is { Health.IsDead: false } && monster is null && bot.EquippedRanged is { IsDepleted: false } chaseWeapon)
+        {
+            idle = false;
+            s.TicksSinceMonster = 0;
+
+            var shotDirection = RangedTargeting.FindClearShotDirection(year.Map, bot.Position, chaseWeapon.Range, s.RangedTarget.Position);
+            if (shotDirection is not null)
+            {
+                FireRangedWeapon(bot, s.RangedTarget, chaseWeapon, random, report, population);
+                s.RangedChaseTicks = 0;
+                if (s.RangedTarget.Health.IsDead || chaseWeapon.IsDepleted)
+                {
+                    if (s.RangedTarget.Health.IsDead)
+                    {
+                        population.RemoveMonster(s.RangedTarget);
+                    }
+                    else
+                    {
+                        s.RangedGaveUpOn.Add(s.RangedTarget);
+                    }
+
+                    bot.SetRangedTarget(null);
+                    s.RangedTarget = null;
+                }
+            }
+            else
+            {
+                s.RangedChaseTicks++;
+                var direction = PickExit(year.Map, bot.Position, random);
+                if (direction is { } d && year.Map.TryMove(bot.Position, d) is { Success: true, Destination: { } dest })
+                {
+                    bot.MoveTo(dest);
+                }
+
+                if (s.RangedChaseTicks > ShadowGiveUpTicks)
+                {
+                    s.RangedGaveUpOn.Add(s.RangedTarget);
+                    bot.SetRangedTarget(null);
+                    s.RangedTarget = null;
+                }
+            }
+
+            return idle;
+        }
+
+        if (s.RangedTarget is not null)
+        {
+            bot.SetRangedTarget(null);
+            s.RangedTarget = null;
+        }
+
+        // Below MonsterController.StartRoomGraceMaxLevel a fresh character
+        // has ~28-30 HP and no gear — only deliberately court an ambush
+        // (shadow a monster) once past that protected window.
+        if (monster is not null && !ReferenceEquals(monster, s.ShadowTarget) && s.ShadowTarget is null
+            && bot.Level > MonsterController.StartRoomGraceMaxLevel && random.NextDouble() >= EngageChance)
+        {
+            s.ShadowTarget = monster;
+            s.ShadowTicks = 0;
+        }
+
+        var hpFraction = bot.Health.Max > 0 ? bot.Health.Current / (double)bot.Health.Max : 1.0;
+        if (monster is not null && ReferenceEquals(monster, s.ShadowTarget) && s.ShadowTicks < ShadowGiveUpTicks && hpFraction > ShadowAbortHpFraction)
+        {
+            s.ShadowTicks++;
+            s.TicksSinceMonster++;
+        }
+        else if (monster is not null)
+        {
+            idle = false;
+            s.TicksSinceMonster = 0;
+            s.ShadowTarget = null;
+
+            if (bot.EquippedRanged is { IsDepleted: false } && !s.RangedGaveUpOn.Contains(monster))
+            {
+                bot.SetRangedTarget(monster);
+                s.RangedTarget = monster;
+                s.RangedChaseTicks = 0;
+                var direction = PickExit(year.Map, bot.Position, random);
+                if (direction is { } d && year.Map.TryMove(bot.Position, d) is { Success: true, Destination: { } dest })
+                {
+                    bot.MoveTo(dest);
+                }
+            }
+            else
+            {
+                FightBot.Fight(bot, monster, s.ClassAbilities, random, report, population, s.VerboseFatal);
+                if (monster.Health.IsDead)
+                {
+                    population.RemoveMonster(monster);
+                }
+            }
+        }
+        else if (random.NextDouble() < IdleTurnChance)
+        {
+            s.TicksSinceMonster++;
+        }
+        else
+        {
+            s.TicksSinceMonster++;
+            TryHealOrConsume(bot, s.Aggression, report);
+            TryPickUpAndWieldBetterGear(bot, population);
+            TryShop(bot, year);
+
+            if (bot.CurrentYear < TimeScale.MaxYear && ShouldTravel(bot, s.TicksSinceMonster, random))
+            {
+                var target = Math.Min(TimeScale.MaxYear, bot.CurrentYear + TravelStepMin + (int)(random.NextDouble() * (TravelStepMax - TravelStepMin)));
+                if (TimeTravelResolver.Travel(bot, world, target, random).Success)
+                {
+                    idle = false;
+                    s.TicksSinceMonster = 0;
+                }
+            }
+
+            if (idle)
+            {
+                var direction = PickExit(year.Map, bot.Position, random);
+                if (direction is { } d && year.Map.TryMove(bot.Position, d) is { Success: true, Destination: { } dest })
+                {
+                    bot.MoveTo(dest);
+                    idle = false;
+                }
+            }
+        }
+
+        return idle;
+    }
+
+    private static void FinalizeReport(RunReport report, Traveler bot, CharacterClass characterClass, TimeWorld world, IReadOnlyList<Traveler> npcs, Dictionary<Traveler, int> npcKillCounts, bool populateNpcOutcomes)
+    {
         report.FinalLevel = bot.Level;
         report.FinalYear = bot.CurrentYear;
         report.FurthestYearReached = bot.FurthestYearReached;
@@ -162,16 +451,21 @@ public static class PlaytestRunner
         report.EquippedArmorAtEnd = DescribeItem(bot.EquippedArmor);
         report.EquippedRangedAtEnd = DescribeItem(bot.EquippedRanged);
 
-        var ownedStoreOwners = world.VisitedYears
-            .SelectMany(y => world.GetYear(y).StoreSlots)
-            .Select(s => s.Store?.Owner)
-            .Where(owner => owner is not null)
-            .ToHashSet();
-
-        foreach (var npc in npcs)
+        // The simultaneous path records NpcOutcomes / NpcTraitsObserved
+        // once into its shared-world report instead of per class.
+        if (populateNpcOutcomes)
         {
-            report.NpcTraitsObserved[npc.Trait] = report.NpcTraitsObserved.GetValueOrDefault(npc.Trait) + 1;
-            report.NpcOutcomes.Add(new NpcOutcome(npc.Trait, npc.Level, npc.Credits, npc.Inventory.Count, npc.FurthestYearReached, ownedStoreOwners.Contains(npc), npcKillCounts.GetValueOrDefault(npc)));
+            var ownedStoreOwners = world.VisitedYears
+                .SelectMany(y => world.GetYear(y).StoreSlots)
+                .Select(s => s.Store?.Owner)
+                .Where(owner => owner is not null)
+                .ToHashSet();
+
+            foreach (var npc in npcs)
+            {
+                report.NpcTraitsObserved[npc.Trait] = report.NpcTraitsObserved.GetValueOrDefault(npc.Trait) + 1;
+                report.NpcOutcomes.Add(new NpcOutcome(npc.Trait, npc.Level, npc.Credits, npc.Inventory.Count, npc.FurthestYearReached, ownedStoreOwners.Contains(npc), npcKillCounts.GetValueOrDefault(npc)));
+            }
         }
 
         foreach (var passive in PassiveTraits.Unlocked(characterClass, bot.Level))
@@ -181,210 +475,54 @@ public static class PlaytestRunner
                 report.UnlockedButUnobserved.Add(passive.Name);
             }
         }
-
-        return report;
     }
 
-    private static void RunLoop(Traveler bot, TimeWorld world, WorldSimulation simulation, IRandomSource random, List<AbilityData> classAbilities, int maxTicks, RunReport report, double aggression, bool verboseFatal)
+    /// <summary>Folds one NPC's per-tick action into <paramref name="report"/> — kill count plus the NPC store-commerce split (see RunReport's NPC-store fields).</summary>
+    private static void RecordNpcAct(RunReport report, Traveler npc, NpcTickResult result, Dictionary<Traveler, int> npcKillCounts)
     {
-        var ticksSinceMonster = 0;
-        Monster? shadowTarget = null;
-        var shadowTicks = 0;
-
-        // A monster this run already gave up chasing a shot on (weapon ran
-        // dry mid-chase, or ShadowGiveUpTicks elapsed without ever lining
-        // up) — melee it like normal from here on instead of retrying
-        // ranged forever against a monster that keeps drifting back into
-        // the bot's room. Reference-keyed since Monster has no natural id.
-        var rangedGaveUpOn = new HashSet<Monster>(ReferenceEqualityComparer.Instance);
-        Monster? rangedTarget = null;
-        var rangedChaseTicks = 0;
-
-        for (var tick = 0; tick < maxTicks; tick++)
+        if (result.Fight is { TravelerWon: true })
         {
-            if (bot.Health.IsDead)
+            npcKillCounts[npc] = npcKillCounts.GetValueOrDefault(npc) + 1;
+        }
+
+        report.NpcActionCounts[result.Goal] = report.NpcActionCounts.GetValueOrDefault(result.Goal) + 1;
+
+        // An NPC-owned (or player-owned) store is always named "<name>'s
+        // Store" (StoreSlot.Purchase); the year's always-open government
+        // store is "<era> Depot" (TimeWorld.Build). So a Trade detail
+        // mentioning "'s Store" is an NPC buying from / selling to another
+        // traveller's shopfront — exactly the NPC-to-NPC store commerce
+        // we're checking for.
+        if (result.Goal == NpcGoal.Trade && result.Detail is { } tradeDetail)
+        {
+            if (tradeDetail.Contains("'s Store", StringComparison.Ordinal))
             {
-                report.DiedDuringRun = true;
-                break;
-            }
-
-            var year = world.GetYear(bot.CurrentYear);
-            var population = year.Population;
-            var idle = true;
-
-            var monster = population.MonstersAt(bot.Position).FirstOrDefault(m => !m.Health.IsDead);
-
-            // Mid-chase: already locked a ranged target (see below) and no
-            // longer sharing a room with anything — try for a clear shot
-            // this tick, or reposition and try again next tick. Takes
-            // priority over the ordinary shadow/fight/grind branching
-            // below, which only ever sees an empty room while this runs.
-            if (rangedTarget is { Health.IsDead: false } && monster is null && bot.EquippedRanged is { IsDepleted: false } chaseWeapon)
-            {
-                idle = false;
-                ticksSinceMonster = 0;
-
-                var shotDirection = RangedTargeting.FindClearShotDirection(year.Map, bot.Position, chaseWeapon.Range, rangedTarget.Position);
-                if (shotDirection is not null)
-                {
-                    FireRangedWeapon(bot, rangedTarget, chaseWeapon, random, report, population);
-                    rangedChaseTicks = 0;
-                    if (rangedTarget.Health.IsDead || chaseWeapon.IsDepleted)
-                    {
-                        if (rangedTarget.Health.IsDead)
-                        {
-                            population.RemoveMonster(rangedTarget);
-                        }
-                        else
-                        {
-                            rangedGaveUpOn.Add(rangedTarget); // out of ammo, not dead — melee it if paths cross again
-                        }
-
-                        bot.SetRangedTarget(null);
-                        rangedTarget = null;
-                    }
-                }
-                else
-                {
-                    rangedChaseTicks++;
-                    var direction = PickExit(year.Map, bot.Position, random);
-                    if (direction is { } d && year.Map.TryMove(bot.Position, d) is { Success: true, Destination: { } dest })
-                    {
-                        bot.MoveTo(dest);
-                    }
-
-                    if (rangedChaseTicks > ShadowGiveUpTicks)
-                    {
-                        rangedGaveUpOn.Add(rangedTarget);
-                        bot.SetRangedTarget(null);
-                        rangedTarget = null;
-                    }
-                }
+                report.NpcTradesAtPlayerOrNpcStore++;
             }
             else
             {
-                if (rangedTarget is not null)
-                {
-                    // Weapon depleted or target died by other means between
-                    // ticks (ambush, off-year churn can't reach it, but a
-                    // stray FightBot melee against a *different* co-located
-                    // monster this tick could still leave a stale lock) —
-                    // clear it so the branches below see a clean slate.
-                    bot.SetRangedTarget(null);
-                    rangedTarget = null;
-                }
-
-                // Below MonsterController.StartRoomGraceMaxLevel a fresh
-                // character has ~28-30 HP and no gear — the same window the
-                // game itself protects from monster movement into safe rooms.
-                // Letting the bot deliberately court an ambush on top of that
-                // organic early hazard (rather than fight/flee immediately)
-                // turned every class's early runs into a near-certain instawipe
-                // (verified: 4/5 classes died within ~40 ticks on every single
-                // run of a battery). Only shadow once past that window.
-                if (monster is not null && !ReferenceEquals(monster, shadowTarget) && shadowTarget is null
-                    && bot.Level > MonsterController.StartRoomGraceMaxLevel && random.NextDouble() >= EngageChance)
-                {
-                    shadowTarget = monster;
-                    shadowTicks = 0;
-                }
-
-                var hpFraction = bot.Health.Max > 0 ? bot.Health.Current / (double)bot.Health.Max : 1.0;
-                if (monster is not null && ReferenceEquals(monster, shadowTarget) && shadowTicks < ShadowGiveUpTicks && hpFraction > ShadowAbortHpFraction)
-                {
-                    // Deliberately leaving this specific monster alone — stays
-                    // put (doesn't even roll movement) so its aggro can climb
-                    // toward Hostile instead of the bot wandering off and
-                    // resetting the clock. See EngageChance's doc comment.
-                    shadowTicks++;
-                    ticksSinceMonster++;
-                }
-                else if (monster is not null)
-                {
-                    idle = false;
-                    ticksSinceMonster = 0;
-                    shadowTarget = null;
-
-                    // Armed with a live ranged weapon and haven't already
-                    // written this specific monster off — lock it and back
-                    // off one room to open a firing lane instead of meleeing
-                    // this tick (mirrors ChronoTravelers.Console's HandleFight:
-                    // 'fight' with a ranged weapon readied locks the target
-                    // rather than swinging).
-                    if (bot.EquippedRanged is { IsDepleted: false } freshWeapon && !rangedGaveUpOn.Contains(monster))
-                    {
-                        bot.SetRangedTarget(monster);
-                        rangedTarget = monster;
-                        rangedChaseTicks = 0;
-                        var direction = PickExit(year.Map, bot.Position, random);
-                        if (direction is { } d && year.Map.TryMove(bot.Position, d) is { Success: true, Destination: { } dest })
-                        {
-                            bot.MoveTo(dest);
-                        }
-                    }
-                    else
-                    {
-                        FightBot.Fight(bot, monster, classAbilities, random, report, population, verboseFatal);
-                        if (monster.Health.IsDead)
-                        {
-                            population.RemoveMonster(monster);
-                        }
-                    }
-                }
-                else if (random.NextDouble() < IdleTurnChance)
-                {
-                    // A deliberate no-op turn — idle stays true and nothing else
-                    // happens this tick. See IdleTurnChance's doc comment.
-                    ticksSinceMonster++;
-                }
-                else
-                {
-                    ticksSinceMonster++;
-                    TryHealOrConsume(bot, aggression, report);
-                    TryPickUpAndWieldBetterGear(bot, population);
-                    TryShop(bot, year);
-
-                    if (bot.CurrentYear < TimeScale.MaxYear && ShouldTravel(bot, ticksSinceMonster, random))
-                    {
-                        var target = Math.Min(TimeScale.MaxYear, bot.CurrentYear + TravelStepMin + (int)(random.NextDouble() * (TravelStepMax - TravelStepMin)));
-                        if (TimeTravelResolver.Travel(bot, world, target, random).Success)
-                        {
-                            idle = false;
-                            ticksSinceMonster = 0;
-                        }
-                    }
-
-                    if (idle)
-                    {
-                        var direction = PickExit(year.Map, bot.Position, random);
-                        if (direction is { } d && year.Map.TryMove(bot.Position, d) is { Success: true, Destination: { } dest })
-                        {
-                            bot.MoveTo(dest);
-                            idle = false;
-                        }
-                    }
-                }
+                report.NpcTradesAtGovernmentStore++;
             }
 
-            // Any damage from the fight branch above is already recorded
-            // per-round inside FightBot.Fight itself (see RunReport.RecordHit's
-            // doc comment); nothing else this tick deals damage, so this is
-            // purely for the ambush check below.
-            var hpAfterAction = bot.Health.Current;
-
-            simulation.Tick(bot, playerActedIdly: idle);
-
-            var tickDamage = hpAfterAction - bot.Health.Current;
-            if (tickDamage > 0)
+            if (report.NpcStoreActivitySamples.Count < 30)
             {
-                report.AmbushesObserved++;
-                report.RecordHit(tickDamage);
+                report.NpcStoreActivitySamples.Add($"{npc.Name}: {tradeDetail}");
+            }
+        }
+        else if (result.Goal == NpcGoal.OwnStore && result.Detail is { } ownDetail)
+        {
+            if (ownDetail.StartsWith("bought ", StringComparison.Ordinal))
+            {
+                report.NpcStoreSlotPurchases++;
+            }
+            else
+            {
+                report.NpcOwnStoreTendActions++;
             }
 
-            report.TicksRun = tick + 1;
-            if (!bot.Health.IsDead)
+            if (report.NpcStoreActivitySamples.Count < 30)
             {
-                report.TicksSurvived = tick + 1;
+                report.NpcStoreActivitySamples.Add($"{npc.Name}: {ownDetail}");
             }
         }
     }

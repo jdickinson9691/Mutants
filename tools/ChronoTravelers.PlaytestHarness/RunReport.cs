@@ -1,6 +1,7 @@
 using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Traits;
+using ChronoTravelers.Engine.Npc;
 
 namespace ChronoTravelers.PlaytestHarness;
 
@@ -52,6 +53,14 @@ public sealed class ConsumableUsage
 /// less" finding this was built to chase down).
 /// </summary>
 public sealed record NpcOutcome(CreatureTraitKind Trait, int Level, int Credits, int InventoryCount, int FurthestYearReached, bool OwnsStore, int KillCount);
+
+/// <summary>Result of <see cref="PlaytestRunner.RunSimultaneous"/> — the per-class reports plus one shared-world report holding NPC store activity and NPC outcomes (one world, one dataset).</summary>
+public sealed class SimultaneousResult
+{
+    public required List<RunReport> PerClass { get; init; }
+    public required RunReport World { get; init; }
+    public int TotalTicks { get; set; }
+}
 
 /// <summary>Everything the harness recorded for one bot playthrough of one class.</summary>
 public sealed class RunReport
@@ -129,4 +138,22 @@ public sealed class RunReport
 
     /// <summary>Each spawned NPC's final state, for measuring a trait's actual effect (Credits, Level, inventory, store ownership) rather than just its spawn rate.</summary>
     public List<NpcOutcome> NpcOutcomes { get; } = [];
+
+    /// <summary>Count of every <see cref="NpcGoal"/> an NPC resolved this run (via WorldSimulation.OnNpcAct) — the raw activity mix behind the store numbers below.</summary>
+    public Dictionary<NpcGoal, int> NpcActionCounts { get; } = [];
+
+    /// <summary>NPC <see cref="NpcGoal.Trade"/> actions (buy/sell) that landed at ANOTHER traveller's store ("&lt;name&gt;'s Store") rather than the year's government Depot — the direct measure of NPC-to-NPC store commerce.</summary>
+    public int NpcTradesAtPlayerOrNpcStore { get; set; }
+
+    /// <summary>NPC <see cref="NpcGoal.Trade"/> actions that landed at the year's government Depot instead.</summary>
+    public int NpcTradesAtGovernmentStore { get; set; }
+
+    /// <summary>Times an NPC bought a vacant store slot this run (<see cref="NpcGoal.OwnStore"/>, "bought ...").</summary>
+    public int NpcStoreSlotPurchases { get; set; }
+
+    /// <summary>Times an NPC tended a store it owns (paid maintenance / deposited capital / stocked / marked down / collected) — <see cref="NpcGoal.OwnStore"/>, everything that isn't a slot purchase.</summary>
+    public int NpcOwnStoreTendActions { get; set; }
+
+    /// <summary>A capped sample of the actual store-activity detail strings, for eyeballing what's happening.</summary>
+    public List<string> NpcStoreActivitySamples { get; } = [];
 }

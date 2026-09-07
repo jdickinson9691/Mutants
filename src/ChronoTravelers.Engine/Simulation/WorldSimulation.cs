@@ -54,7 +54,8 @@ public sealed class WorldSimulation
     /// per-tick behavior with its identity (e.g. trait) without
     /// duplicating this tick's Tachyon-drain/respawn/store-maintenance
     /// bookkeeping just to get at it. Null (the default) costs nothing;
-    /// no production caller sets one. Not invoked by <see cref="TickMultiplayer"/>.
+    /// no production caller sets one. Fired from both <see cref="Tick"/>
+    /// and <see cref="TickMultiplayer"/>.
     /// </summary>
     public Action<Traveler, NpcTickResult>? OnNpcAct;
 
@@ -394,6 +395,7 @@ public sealed class WorldSimulation
             var yearBefore = npc.CurrentYear;
             var pullToAnchor = i < NpcPopulation.LocalPopulationTarget;
             var result = NpcController.Act(npc, yearContent.Map, _random, yearContent.StoreSlots, yearContent.MonsterRoster, World, mpAnchorYear, pullToAnchor, _abilities);
+            OnNpcAct?.Invoke(npc, result);
 
             if (result.Fight is { } fight)
             {

@@ -43,6 +43,36 @@ var verboseFatal = args.Length > 5 && args[5] is "1" or "true";
 var contentDirectory = Path.Combine(AppContext.BaseDirectory, "Content");
 var abilities = LoadAbilities(contentDirectory);
 
+// "simul" / "together": play EVERY class as its own bot in ONE shared
+// world (WorldSimulation.TickMultiplayer), running each `runs` times on
+// successive seeds, until the last bot in that world dies. `runs` here is
+// how many shared-world sessions to play, not per-class playthroughs.
+if (string.Equals(classArg, "simul", StringComparison.OrdinalIgnoreCase)
+    || string.Equals(classArg, "together", StringComparison.OrdinalIgnoreCase))
+{
+    var simulClasses = Enum.GetValues<CharacterClass>().ToList();
+    for (var session = 0; session < runs; session++)
+    {
+        var seed = baseSeed + session;
+        Console.WriteLine("########################################################");
+        Console.WriteLine($" Shared-world session {session + 1}/{runs} (seed {seed}) — all {simulClasses.Count} classes played simultaneously");
+        Console.WriteLine("########################################################");
+        Console.WriteLine();
+
+        var result = PlaytestRunner.RunSimultaneous(simulClasses, seed, maxTicks, contentDirectory, abilities, aggression, verboseFatal);
+
+        foreach (var report in result.PerClass)
+        {
+            ReportPrinter.PrintSimultaneousClassReport(report);
+        }
+
+        ReportPrinter.PrintSimultaneousWorldSummary(result);
+        Console.WriteLine();
+    }
+
+    return 0;
+}
+
 var classes = string.Equals(classArg, "all", StringComparison.OrdinalIgnoreCase)
     ? Enum.GetValues<CharacterClass>().ToList()
     : [ParseClass(classArg)];
@@ -112,5 +142,6 @@ static IReadOnlyList<AbilityData> LoadAbilities(string contentDirectory)
 
 static void PrintUsage()
 {
-    Console.WriteLine("Usage: PlaytestHarness <Soldier|Doctor|Spy|Scientist|Engineer|all> [runs] [ticksPerRun] [seed] [aggression] [verboseFatal]");
+    Console.WriteLine("Usage: PlaytestHarness <Soldier|Doctor|Spy|Scientist|Engineer|all|simul> [runs] [ticksPerRun] [seed] [aggression] [verboseFatal]");
+    Console.WriteLine("  simul: all 5 classes played simultaneously in one shared world (TickMultiplayer), 'runs' sessions, each to last-bot-death.");
 }
