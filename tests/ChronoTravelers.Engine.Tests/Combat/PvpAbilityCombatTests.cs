@@ -173,4 +173,32 @@ public class PvpAbilityCombatTests
 
         Assert.Contains(result.Log, l => l.Contains("restores")); // RestoreTachyons' log line
     }
+
+    [Fact]
+    public void Fight_ShieldAbility_AHurtCasterPicksItOverAWeakerDamageOption()
+    {
+        var attacker = Soldier("Ada");
+        var defender = Soldier("Bo");
+        // Attacker deep in the red (a full one-hit absorb is worth most
+        // there) but with the HP pool to survive long enough to act; a
+        // near-harmless defender so the fight doesn't end before the cast.
+        attacker.Health.SetMax(1_000_000);
+        attacker.Health.Heal(1_000_000);
+        attacker.Health.Damage(900_000); // 10% HP
+        defender.Health.SetMax(1_000_000);
+        defender.Health.Heal(1_000_000);
+
+        // Shield vs a deliberately weak Damage option — the old flat
+        // Shield=4 lost to any Damage ability (score >= 10), so Smoke and
+        // Mirrors was never cast; the HP-scaled score now wins while hurt.
+        var abilities = new List<AbilityData>
+        {
+            MakeAbility("Soldier", level: 1, "Smoke and Mirrors", "Shield", magnitude: 0),
+            MakeAbility("Soldier", level: 1, "Feeble Jab", "Damage", magnitude: 1, tachyonCost: 1),
+        };
+
+        var result = PvpAbilityCombat.Fight(attacker, defender, abilities, NeutralRandom());
+
+        Assert.Contains(result.Log, l => l.Contains("is shielded"));
+    }
 }

@@ -777,6 +777,36 @@ public class NpcControllerTests
         Assert.Contains(result.Fight!.Log, l => l.Contains("bolstered")); // "Weak" (BuffSelfDefense)'s log line
     }
 
+    [Fact]
+    public void Act_WithAbilities_AHurtNpcCastsAShieldOverAWeakerDamageOption()
+    {
+        var npc = FreshNpc();
+        npc.Tachyons.SetMax(100_000);
+        npc.Tachyons.Add(100_000);
+        npc.Health.SetMax(1000);
+        npc.Health.Heal(1000);
+        npc.Health.Damage(650); // 35% HP — above Act's 30% Retreat gate, below the 40% emergency threshold
+
+        // Shield used to score a flat 4, so any Damage ability (>= 10)
+        // buried it — a Shield-only class's mitigation was never cast. The
+        // HP-scaled score ((1 - 0.35) * 25 = 16.25) now beats the weak jab.
+        var abilities = new List<AbilityData>
+        {
+            MakeAbility("Soldier", level: 1, "Smoke and Mirrors", "Shield", magnitude: 0, tachyonCost: 1),
+            MakeAbility("Soldier", level: 1, "Feeble Jab", "Damage", magnitude: 1, tachyonCost: 1),
+        };
+
+        var tankyRoster = new List<Func<Monster>>
+        {
+            () => new Monster("Dummy", tier: 1, maxHp: 1_000_000, attackPower: 0, defense: 0, speed: 1, xpReward: 0),
+        };
+
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.0), monsterRoster: tankyRoster, abilities: abilities);
+
+        Assert.NotNull(result.Fight);
+        Assert.Contains(result.Fight!.Log, l => l.Contains("is shielded"));
+    }
+
     // --- CreatureTraitKind hooks -----------------------------------------
 
     [Fact]

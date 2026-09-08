@@ -401,9 +401,12 @@ public static class NpcController
     /// GDD-specified formula, original tuning meant to approximate how a
     /// reasonable player would spend Tachyons: an outright win button
     /// (<see cref="AbilityEffectType.InstantDefeatNonBoss"/>) always wins,
-    /// Heal scales with how hurt the NPC actually is, a Damage-family
-    /// ability whose <c>Condition</c> is currently met gets a bonus for
-    /// not being wasted, and Restore Tachyons scales smoothly with how much
+    /// Heal and Shield both scale with how hurt the NPC actually is (a
+    /// full one-hit absorb is an emergency pick, not a flat minor one — the
+    /// old flat score left a Shield-only class's mitigation permanently
+    /// unused), a Damage-family ability whose <c>Condition</c> is currently
+    /// met gets a bonus for not being wasted, and Restore Tachyons scales
+    /// smoothly with how much
     /// Tachyon headroom there actually is to restore — a battery-test
     /// finding (2026-09-08) caught the previous version of this last case,
     /// a hard `Current &lt; Max * 0.3` gate, effectively unreachable: Max
@@ -444,7 +447,11 @@ public static class NpcController
             AbilityEffectType.DebuffTargetSpeed => 5,
             AbilityEffectType.BuffSelfAttack => 5,
             AbilityEffectType.BuffSelfDefense => 4,
-            AbilityEffectType.Shield => 4,
+            // Same HP-scaled curve as Heal: a full absorb of the next hit
+            // is an emergency-grade play, not a flat minor pick. A battery-
+            // test finding (2026-09-08) caught the old flat 4 leaving Spy's
+            // Smoke and Mirrors — its only mitigation ability — never cast.
+            AbilityEffectType.Shield => (1.0 - hpFraction) * 25,
             // Smooth curve, not a hard Current < Max*0.3 gate — see this
             // method's doc comment for why the old gate was effectively
             // unreachable at real Tachyon-pool sizes.

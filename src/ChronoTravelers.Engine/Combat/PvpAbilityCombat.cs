@@ -252,7 +252,10 @@ public static class PvpAbilityCombat
             AbilityEffectType.DebuffTargetSpeed => 5,
             AbilityEffectType.BuffSelfAttack => 5,
             AbilityEffectType.BuffSelfDefense => 4,
-            AbilityEffectType.Shield => 4,
+            // HP-scaled like Heal — see Npc.NpcController.ScoreAbility's doc
+            // comment; a flat 4 left a Shield-only class's mitigation
+            // (Spy's Smoke and Mirrors) never cast.
+            AbilityEffectType.Shield => (1.0 - hpFraction) * 25,
             // Smooth curve, not a hard Current < Max*0.3 gate — see
             // Npc.NpcController.ScoreAbility's doc comment for why the old
             // gate was effectively unreachable at real Tachyon-pool sizes.

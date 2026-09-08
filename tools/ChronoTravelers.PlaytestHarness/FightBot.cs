@@ -191,7 +191,11 @@ public static class FightBot
             AbilityEffectType.DebuffTargetSpeed => 5,
             AbilityEffectType.BuffSelfAttack => 5,
             AbilityEffectType.BuffSelfDefense => 4,
-            AbilityEffectType.Shield => 4,
+            // Same HP-scaled curve as Heal — a full absorb of the next hit
+            // is an emergency-grade play, and for a class whose only
+            // mitigation is a Shield (Spy's Smoke and Mirrors) a flat 4
+            // meant it was never cast at all. See NpcController.ScoreAbility.
+            AbilityEffectType.Shield => (1.0 - hpFraction) * 25,
             AbilityEffectType.RestoreTachyons => (1.0 - tachyonFraction) * 15,
             _ => -1,
         };
