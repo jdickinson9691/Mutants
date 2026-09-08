@@ -38,10 +38,10 @@ public sealed class BotState
     /// <summary>Set once when this bot's death has been folded into <see cref="Report"/> so the simultaneous loop doesn't double-count it every later tick.</summary>
     public bool DeathRecorded;
 
-    public BotState(CharacterClass characterClass, long worldSeed, IReadOnlyList<AbilityData> allAbilities, double aggression, bool verboseFatal)
+    public BotState(CharacterClass characterClass, long worldSeed, IReadOnlyList<AbilityData> allAbilities, double aggression, bool verboseFatal, string nameSuffix = "")
     {
-        Bot = new Traveler($"{characterClass}Bot", characterClass);
-        Report = new RunReport { CharacterName = Bot.Name, WorldSeed = worldSeed };
+        Bot = new Traveler($"{characterClass}Bot{nameSuffix}", characterClass);
+        Report = new RunReport { CharacterName = Bot.Name, WorldSeed = worldSeed, Class = characterClass };
         ClassAbilities = allAbilities
             .Where(a => string.Equals(a.Class, characterClass.ToString(), StringComparison.OrdinalIgnoreCase))
             .ToList();

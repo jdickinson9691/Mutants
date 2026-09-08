@@ -199,14 +199,34 @@ public static class PlaytestRunner
         var npcKillCounts = new Dictionary<Traveler, int>();
         simulation.OnNpcAct = (npc, result) => RecordNpcAct(worldReport, npc, result, npcKillCounts);
 
-        var states = classes.Select(c => new BotState(c, worldSeed, allAbilities, aggression, verboseFatal)).ToList();
+        // `classes` may list a class more than once (the 2-per-class
+        // battery — see Program.cs's "battery" mode). Number the duplicates
+        // so each bot's report has a distinct name ("SoldierBot#1" /
+        // "SoldierBot#2"); a class that appears once keeps its bare name.
+        var perClassTotal = classes.GroupBy(c => c).ToDictionary(g => g.Key, g => g.Count());
+        var perClassSeen = new Dictionary<CharacterClass, int>();
+        var states = classes.Select(c =>
+        {
+            var n = perClassSeen[c] = perClassSeen.GetValueOrDefault(c) + 1;
+            var suffix = perClassTotal[c] > 1 ? $"#{n}" : "";
+            return new BotState(c, worldSeed, allAbilities, aggression, verboseFatal, suffix);
+        }).ToList();
+
         foreach (var s in states)
         {
             GiveStarterKit(s.Bot);
             s.Bot.PlaceAt(world.GetYear(s.Bot.CurrentYear).Map.Start);
         }
 
-        var reportByClass = states.ToDictionary(s => s.Bot.Class, s => s.Report);
+        // PassiveActivationTracker.Listener only carries the class, not the
+        // Traveler instance, so two bots of the same class can't be told
+        // apart here — every same-class activation is pooled onto the first
+        // instance's report (the other's PassiveUsage stays empty by
+        // design). Callers that aggregate per class sum across both, so the
+        // pooled total is still correct at the class level.
+        var reportByClass = states
+            .GroupBy(s => s.Bot.Class)
+            .ToDictionary(g => g.Key, g => g.First().Report);
 
         void OnPassiveActivation(CharacterClass cls, PassiveHook hook, double magnitude)
         {
@@ -452,6 +472,16 @@ public static class PlaytestRunner
         report.EquippedWeaponAtEnd = DescribeItem(bot.EquippedWeapon);
         report.EquippedArmorAtEnd = DescribeItem(bot.EquippedArmor);
         report.EquippedRangedAtEnd = DescribeItem(bot.EquippedRanged);
+
+        report.FinalInventoryCount = bot.Inventory.Count;
+        foreach (var item in bot.Inventory)
+        {
+            var described = DescribeItem(item);
+            if (described is not null)
+            {
+                report.FinalInventory.Add(described);
+            }
+        }
 
         // The simultaneous path records NpcOutcomes / NpcTraitsObserved
         // once into its shared-world report instead of per class.

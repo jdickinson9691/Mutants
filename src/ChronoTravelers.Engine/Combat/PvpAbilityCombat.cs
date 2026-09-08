@@ -166,6 +166,13 @@ public static class PvpAbilityCombat
         if (chosen is null || !TryCast(self, opponent, chosen, random, log))
         {
             PerformAttack(self, opponent, random, log);
+            self.LastAbilityName = null;
+            self.RepeatStreak = 0;
+        }
+        else
+        {
+            self.RepeatStreak = string.Equals(chosen.Name, self.LastAbilityName, StringComparison.Ordinal) ? self.RepeatStreak + 1 : 0;
+            self.LastAbilityName = chosen.Name;
         }
     }
 
@@ -191,6 +198,15 @@ public static class PvpAbilityCombat
             }
 
             var score = ScoreAbility(ability, self, opponent, hpFraction);
+            if (self.RepeatStreak > 0 && string.Equals(ability.Name, self.LastAbilityName, StringComparison.Ordinal) && !IsExemptFromRepeatPenalty(ability))
+            {
+                // Variety pressure so one strong-scoring ability doesn't win
+                // every round of the fight forever — see Npc.NpcController's
+                // identical fix (its RepeatPenaltyDivisorBase doc comment)
+                // for the full battery-test finding this addresses.
+                score /= 1 + self.RepeatStreak;
+            }
+
             if (score > bestScore)
             {
                 bestScore = score;
@@ -201,7 +217,12 @@ public static class PvpAbilityCombat
         return best;
     }
 
-    /// <summary>Same heuristic as <see cref="Npc.NpcController"/>'s <c>ScoreAbility</c>, minus the Monster-tag "TargetTagged" condition (a Traveler has no tags to check) — see that method's doc comment for the reasoning behind each weight.</summary>
+    /// <summary>See <see cref="Npc.NpcController"/>'s identical helper's doc comment for why these two are exempt from the repeat-streak penalty.</summary>
+    private static bool IsExemptFromRepeatPenalty(AbilityData ability) =>
+        Enum.TryParse<AbilityEffectType>(ability.Effect, ignoreCase: true, out var effect)
+        && effect is AbilityEffectType.Heal or AbilityEffectType.RestoreTachyons;
+
+    /// <summary>Same heuristic as <see cref="Npc.NpcController"/>'s <c>ScoreAbility</c>, minus the Monster-tag "TargetTagged" condition (a Traveler has no tags to check) — see that method's doc comment for the reasoning behind each weight, including the RestoreTachyons curve fix.</summary>
     private static double ScoreAbility(AbilityData ability, Side self, Side opponent, double hpFraction)
     {
         if (!Enum.TryParse<AbilityEffectType>(ability.Effect, ignoreCase: true, out var effect))
@@ -216,6 +237,7 @@ public static class PvpAbilityCombat
             _ => false,
         };
         var conditionBonus = !string.IsNullOrEmpty(ability.Condition) && conditionMet ? 5.0 : 0.0;
+        var tachyonFraction = self.Traveler.Tachyons.Max > 0 ? self.Traveler.Tachyons.Current / (double)self.Traveler.Tachyons.Max : 1.0;
 
         return effect switch
         {
@@ -231,7 +253,10 @@ public static class PvpAbilityCombat
             AbilityEffectType.BuffSelfAttack => 5,
             AbilityEffectType.BuffSelfDefense => 4,
             AbilityEffectType.Shield => 4,
-            AbilityEffectType.RestoreTachyons => self.Traveler.Tachyons.Current < self.Traveler.Tachyons.Max * 0.3 ? 15 : 0,
+            // Smooth curve, not a hard Current < Max*0.3 gate — see
+            // Npc.NpcController.ScoreAbility's doc comment for why the old
+            // gate was effectively unreachable at real Tachyon-pool sizes.
+            AbilityEffectType.RestoreTachyons => (1.0 - tachyonFraction) * 15,
             _ => -1,
         };
     }
@@ -428,6 +453,10 @@ public static class PvpAbilityCombat
         public double CritMultiplier = 1.0;
         public int DotDamagePerRound;
         public int DotRoundsRemaining;
+
+        /// <summary>Repeat-streak state for the variety-pressure penalty in <see cref="ChooseAbility"/> — see <see cref="Npc.NpcController"/>'s identical fields' doc comment for why this exists.</summary>
+        public string? LastAbilityName;
+        public int RepeatStreak;
 
         public int EffectiveAttack => Traveler.EffectiveAttackPower + AttackBonus - IncomingAttackPenalty;
         public int EffectiveDefense => Math.Max(0, Traveler.EffectiveDefense + DefenseBonus - IncomingDefensePenalty);

@@ -1,5 +1,4 @@
 using ChronoTravelers.Core.Characters;
-using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Engine;
@@ -15,12 +14,8 @@ namespace ChronoTravelers.PlaytestHarness;
 /// — the same priority order <c>NpcController.ChooseAbility</c> uses for NPC
 /// grind fights, minus its per-round "even bother casting" chance roll,
 /// since this harness wants maximum ability-usage data per run, not a
-/// realistic-looking cast rate), else a plain attack. Below
-/// <see cref="EmergencyItemUseHpFraction"/> a carried Heal consumable takes
-/// priority over both (see <see cref="CombatSession.UseItem"/>) — real
-/// coverage for the in-combat item-use option, not just an attack/cast
-/// choice. Loot from a win falls to the ground at the bot's position, same
-/// as a real fight.
+/// realistic-looking cast rate), else a plain attack. Loot from a win falls
+/// to the ground at the bot's position, same as a real fight.
 /// </summary>
 public static class FightBot
 {
@@ -35,18 +30,6 @@ public static class FightBot
     /// attacks to finish the monster.
     /// </summary>
     private const int MaxRounds = 300;
-
-    /// <summary>
-    /// HP fraction below which the bot drinks a carried Heal consumable
-    /// instead of attacking/casting that round — deliberately lower than
-    /// Heal-ability's own priority curve (<see cref="ScoreAbility"/> scores
-    /// Heal at up to 25, well below a Damage ability's typical score at
-    /// full HP-loss) so an available class Heal ability still gets first
-    /// crack at moderate damage; an item is the fallback once things are
-    /// genuinely dire (Tachyons may already be gone) or the class has no
-    /// Heal ability at all.
-    /// </summary>
-    private const double EmergencyItemUseHpFraction = 0.3;
 
     /// <summary>Effect types that land a hit on their own round — everything else (Heal, a buff/debuff, Shield, Restore Tachyons, even the crit setup) deals zero damage that round. See <c>lastCastDealtDamage</c>.</summary>
     private static readonly HashSet<AbilityEffectType> DamageDealingEffects =
@@ -105,29 +88,6 @@ public static class FightBot
                 else
                 {
                     usage.Failures++;
-                }
-            }
-
-            // Fallback below the ability-Heal priority curve (see
-            // EmergencyItemUseHpFraction's doc comment): only reached when
-            // no ability was cast this round at all (none unlocked,
-            // affordable, or scoring high enough — including a class with
-            // no Heal ability whatsoever, or one that's out of Tachyons).
-            if (!castLanded)
-            {
-                var hpFraction = bot.Health.Max > 0 ? hpBeforeRound / (double)bot.Health.Max : 1.0;
-                if (hpFraction < EmergencyItemUseHpFraction)
-                {
-                    var healItem = bot.Inventory.FirstOrDefault(i => i.IsUsable && i.ConsumableEffect == ConsumableEffectType.Heal);
-                    if (healItem is not null)
-                    {
-                        var useResult = session.UseItem(healItem);
-                        if (useResult.Success)
-                        {
-                            report.RecordConsumableUse(ConsumableEffectType.Heal, inCombat: true);
-                            castLanded = true;
-                        }
-                    }
                 }
             }
 
@@ -192,7 +152,21 @@ public static class FightBot
         return best;
     }
 
-    /// <summary>Same priority order as <c>NpcController.ScoreAbility</c> — an outright win button always wins, Heal scales with how hurt the bot is, a conditioned Damage ability gets a bonus when its condition is currently met, Restore Tachyons only matters when the pool is actually low.</summary>
+    /// <summary>
+    /// Same priority order as <c>NpcController.ScoreAbility</c> — an
+    /// outright win button always wins, Heal scales with how hurt the bot
+    /// is, a conditioned Damage ability gets a bonus when its condition is
+    /// currently met, Restore Tachyons scales smoothly with how much
+    /// Tachyon headroom there is (not a hard 30%-of-max gate — this
+    /// harness's own battery run is what caught that gate as effectively
+    /// unreachable at real Tachyon-pool sizes; see <c>NpcController.ScoreAbility</c>'s
+    /// doc comment for the full finding). This harness deliberately doesn't
+    /// port <c>NpcController</c>'s repeat-streak variety penalty — see this
+    /// class's own doc comment: it wants maximum ability-usage data per
+    /// run, not a realistic-looking cast rate, and already has its own
+    /// same-purpose guard (<c>justCastNonDamage</c> in <see cref="Fight"/>)
+    /// against a non-damage ability looping the fight forever.
+    /// </summary>
     private static double ScoreAbility(AbilityData ability, Traveler bot, Monster monster, double hpFraction)
     {
         if (!Enum.TryParse<AbilityEffectType>(ability.Effect, ignoreCase: true, out var effect))
@@ -201,6 +175,7 @@ public static class FightBot
         }
 
         var conditionBonus = !string.IsNullOrEmpty(ability.Condition) && ConditionCurrentlyMet(ability.Condition, ability.Tag, monster) ? 5.0 : 0.0;
+        var tachyonFraction = bot.Tachyons.Max > 0 ? bot.Tachyons.Current / (double)bot.Tachyons.Max : 1.0;
 
         return effect switch
         {
@@ -217,7 +192,7 @@ public static class FightBot
             AbilityEffectType.BuffSelfAttack => 5,
             AbilityEffectType.BuffSelfDefense => 4,
             AbilityEffectType.Shield => 4,
-            AbilityEffectType.RestoreTachyons => bot.Tachyons.Current < bot.Tachyons.Max * 0.3 ? 15 : 0,
+            AbilityEffectType.RestoreTachyons => (1.0 - tachyonFraction) * 15,
             _ => -1,
         };
     }

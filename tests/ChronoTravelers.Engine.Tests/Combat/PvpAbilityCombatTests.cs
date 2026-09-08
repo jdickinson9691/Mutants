@@ -120,4 +120,57 @@ public class PvpAbilityCombatTests
         Assert.Contains(result.Log, l => l.Contains(attackerBow.Name));
         Assert.Contains(result.Log, l => l.Contains(defenderBow.Name));
     }
+
+    // --- ability-casting AI (battery-test tuning pass, 2026-09-08) ---
+
+    [Fact]
+    public void Fight_RepeatStreakPenalty_EventuallyLetsALowerScoringAbilityWin()
+    {
+        var attacker = Soldier("Ada");
+        var defender = Soldier("Bo");
+        attacker.Tachyons.Add(100_000);
+        // Huge HP pools on both sides (Heal alone clamps to Max, so raise
+        // Max first) so neither drops before the repeat-streak penalty has
+        // had several rounds to shift the pick off "Strong".
+        attacker.Health.SetMax(1_000_000);
+        attacker.Health.Heal(1_000_000);
+        defender.Health.SetMax(1_000_000);
+        defender.Health.Heal(1_000_000);
+
+        // "Strong" (score 9 + 20 = 29) always beats "Weak" (score 4) on a
+        // bare comparison — before the repeat-streak penalty, "Weak" would
+        // never appear in the log at all, the same shape as the
+        // battery-test finding that Spy's Nerve Agent crowded out the rest
+        // of its kit.
+        var abilities = new List<AbilityData>
+        {
+            MakeAbility("Soldier", level: 1, "Strong", "Damage", magnitude: 20, tachyonCost: 1),
+            MakeAbility("Soldier", level: 1, "Weak", "BuffSelfDefense", magnitude: 1),
+        };
+
+        var result = PvpAbilityCombat.Fight(attacker, defender, abilities, NeutralRandom());
+
+        Assert.Contains(result.Log, l => l.Contains("bolstered")); // "Weak" (BuffSelfDefense)'s log line
+    }
+
+    [Fact]
+    public void Fight_RestoreTachyonsAbility_CanCastWellBeforeThePoolIsNearlyEmpty()
+    {
+        var attacker = Soldier("Ada");
+        var defender = Soldier("Bo");
+        defender.Health.Heal(1_000_000);
+        attacker.Tachyons.SetMax(1000);
+        attacker.Tachyons.Add(1000);
+        attacker.Tachyons.Spend(300); // 70% full — well above the old, effectively-unreachable "below 30% of max" gate
+
+        // Charge-Siphon-shaped: free to cast, restores a fraction of max.
+        var abilities = new List<AbilityData>
+        {
+            MakeAbility("Soldier", level: 1, "Charge Siphon", "RestoreTachyons", magnitude: 0.25),
+        };
+
+        var result = PvpAbilityCombat.Fight(attacker, defender, abilities, NeutralRandom());
+
+        Assert.Contains(result.Log, l => l.Contains("restores")); // RestoreTachyons' log line
+    }
 }

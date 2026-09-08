@@ -261,6 +261,27 @@ public static class NpcController
     private const int AbilityFightMaxRounds = 200;
 
     /// <summary>
+    /// Battery-test finding (2026-09-08): <see cref="ScoreAbility"/>'s
+    /// per-effect-type scores are static, so once an ability's effect type
+    /// out-scores everything else in a class's kit, it wins the
+    /// <c>score &gt; bestScore</c> comparison in <see cref="ChooseAbility"/>
+    /// every single round for the rest of the fight — a class's whole
+    /// second half of its kit (including endgame capstones) can go
+    /// permanently unused this way. This divides the score of whichever
+    /// ability was picked last round by <c>1 + repeatStreak</c> each time
+    /// it repeats, so a strictly-better option still wins the first
+    /// comparison but yields to something else once it's been leaned on for
+    /// a few rounds running — variety pressure, not a hard cooldown (an
+    /// ability with no real competition can still win every round if
+    /// nothing else scores high enough even after the penalty).
+    /// <see cref="AbilityEffectType.Heal"/>/<see cref="AbilityEffectType.RestoreTachyons"/>
+    /// are exempt (see <see cref="IsExemptFromRepeatPenalty"/>) — spamming a
+    /// heal while genuinely low, or a free Tachyon restore, is the correct
+    /// play, not a variety problem to solve.
+    /// </summary>
+    private const int RepeatPenaltyDivisorBase = 1;
+
+    /// <summary>
     /// Plays one grind fight round-by-round through <see cref="CombatSession"/>
     /// — the same engine backing the player's own interactive `fight` — so
     /// an NPC's class abilities (unlocked by level, gated by Tachyons,
@@ -287,14 +308,28 @@ public static class NpcController
         var session = new CombatSession(npc, monster, random);
         var rounds = 0;
 
+        // Repetition state for the variety-pressure penalty — see
+        // RepeatPenaltyDivisorBase's doc comment. Reset to "no streak"
+        // whenever a round falls back to a plain attack, since that's not a
+        // repeated ability choice.
+        string? lastAbilityName = null;
+        var repeatStreak = 0;
+
         while (!session.IsOver && rounds < AbilityFightMaxRounds)
         {
             rounds++;
 
-            var chosen = usableAbilities.Count > 0 ? ChooseAbility(npc, monster, usableAbilities, random) : null;
+            var chosen = usableAbilities.Count > 0 ? ChooseAbility(npc, monster, usableAbilities, random, lastAbilityName, repeatStreak) : null;
             if (chosen is null || !session.Cast(chosen).Success)
             {
                 session.Attack();
+                lastAbilityName = null;
+                repeatStreak = 0;
+            }
+            else
+            {
+                repeatStreak = string.Equals(chosen.Name, lastAbilityName, StringComparison.Ordinal) ? repeatStreak + 1 : 0;
+                lastAbilityName = chosen.Name;
             }
         }
 
@@ -315,9 +350,12 @@ public static class NpcController
     /// (self-preservation first); otherwise it rolls
     /// <see cref="AbilityCastChance"/> for whether to bother at all, then
     /// takes the highest-<see cref="ScoreAbility"/> option the NPC can
-    /// currently afford. Returns null with nothing affordable/usable.
+    /// currently afford, after applying the repeat-streak penalty
+    /// (<paramref name="lastAbilityName"/>/<paramref name="repeatStreak"/> —
+    /// see <see cref="RepeatPenaltyDivisorBase"/>) to whichever ability was
+    /// cast last round. Returns null with nothing affordable/usable.
     /// </summary>
-    private static AbilityData? ChooseAbility(Traveler npc, Monster monster, IReadOnlyList<AbilityData> usableAbilities, IRandomSource random)
+    private static AbilityData? ChooseAbility(Traveler npc, Monster monster, IReadOnlyList<AbilityData> usableAbilities, IRandomSource random, string? lastAbilityName, int repeatStreak)
     {
         var hpFraction = npc.Health.Max > 0 ? npc.Health.Current / (double)npc.Health.Max : 1.0;
         var isEmergency = hpFraction < EmergencyHealHpFraction;
@@ -338,6 +376,11 @@ public static class NpcController
             }
 
             var score = ScoreAbility(ability, npc, monster, hpFraction);
+            if (repeatStreak > 0 && string.Equals(ability.Name, lastAbilityName, StringComparison.Ordinal) && !IsExemptFromRepeatPenalty(ability))
+            {
+                score /= RepeatPenaltyDivisorBase + repeatStreak;
+            }
+
             if (score > bestScore)
             {
                 bestScore = score;
@@ -348,6 +391,11 @@ public static class NpcController
         return best;
     }
 
+    /// <summary>See <see cref="RepeatPenaltyDivisorBase"/>'s doc comment for why these two are exempt from the repeat-streak penalty.</summary>
+    private static bool IsExemptFromRepeatPenalty(AbilityData ability) =>
+        Enum.TryParse<AbilityEffectType>(ability.Effect, ignoreCase: true, out var effect)
+        && effect is AbilityEffectType.Heal or AbilityEffectType.RestoreTachyons;
+
     /// <summary>
     /// A rough "how good is this cast right now" heuristic — not a
     /// GDD-specified formula, original tuning meant to approximate how a
@@ -355,8 +403,19 @@ public static class NpcController
     /// (<see cref="AbilityEffectType.InstantDefeatNonBoss"/>) always wins,
     /// Heal scales with how hurt the NPC actually is, a Damage-family
     /// ability whose <c>Condition</c> is currently met gets a bonus for
-    /// not being wasted, and Restore Tachyons only matters when the pool is
-    /// actually low. Effect types this engine can't act on
+    /// not being wasted, and Restore Tachyons scales smoothly with how much
+    /// Tachyon headroom there actually is to restore — a battery-test
+    /// finding (2026-09-08) caught the previous version of this last case,
+    /// a hard `Current &lt; Max * 0.3` gate, effectively unreachable: Max
+    /// grows every level while a short fight's in-combat spend doesn't
+    /// scale with it, so the 30%-of-max floor was rarely if ever crossed at
+    /// higher levels, and an ability like Scientist's zero-cost "Charge
+    /// Siphon" (free to cast, so nothing to lose by casting it whenever
+    /// there's real room) never competed. The smooth curve below mirrors
+    /// Heal's own shape and peaks at the same value the old gate granted
+    /// when nearly empty, so it still loses to a genuinely urgent Heal/
+    /// Damage-family pick, just no longer needs an all-or-nothing threshold
+    /// to ever fire at all. Effect types this engine can't act on
     /// (<see cref="AbilityEffectType.None"/> or an unparseable string)
     /// score below the zero floor <see cref="ChooseAbility"/> requires, so
     /// they're never picked.
@@ -369,6 +428,7 @@ public static class NpcController
         }
 
         var conditionBonus = !string.IsNullOrEmpty(ability.Condition) && ConditionCurrentlyMet(ability.Condition, ability.Tag, monster) ? 5.0 : 0.0;
+        var tachyonFraction = npc.Tachyons.Max > 0 ? npc.Tachyons.Current / (double)npc.Tachyons.Max : 1.0;
 
         return effect switch
         {
@@ -385,7 +445,10 @@ public static class NpcController
             AbilityEffectType.BuffSelfAttack => 5,
             AbilityEffectType.BuffSelfDefense => 4,
             AbilityEffectType.Shield => 4,
-            AbilityEffectType.RestoreTachyons => npc.Tachyons.Current < npc.Tachyons.Max * 0.3 ? 15 : 0,
+            // Smooth curve, not a hard Current < Max*0.3 gate — see this
+            // method's doc comment for why the old gate was effectively
+            // unreachable at real Tachyon-pool sizes.
+            AbilityEffectType.RestoreTachyons => (1.0 - tachyonFraction) * 15,
             _ => -1,
         };
     }

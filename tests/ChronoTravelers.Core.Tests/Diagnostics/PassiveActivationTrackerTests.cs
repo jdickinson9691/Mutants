@@ -61,7 +61,10 @@ public class PassiveActivationTrackerTests
     [Fact]
     public void TakeDamage_SoldierSecondWind_ReportsAnActivationOnlyBelowThirtyPercentHp()
     {
-        var soldier = LeveledTraveler(CharacterClass.Soldier, 8); // Second Wind unlocked
+        // Second Wind moved from level 8 to 18 — swapped with Thick Hide —
+        // in the 2026-09-08 ambush-timing fix; see PassiveTraits.All.
+        var soldier = LeveledTraveler(CharacterClass.Soldier, 18); // Second Wind unlocked
+        soldier.Health.Heal(soldier.Health.Max); // LevelUp raises max without refilling — start from genuine full HP
         var activations = new List<double>();
         PassiveActivationTracker.Listener = (cls, hook, magnitude) =>
         {

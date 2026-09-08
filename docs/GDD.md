@@ -433,6 +433,62 @@ Field Calibration reads the `"caster"` tag. `TimeWorld.Build` tags every
 monster spawned in a paradox-themed era/year, same append pattern as
 `"caster"` (see `TimelineContentFactory.ForSpecies`).
 
+> **Implementation (2026-09-08): battery-test tuning pass.** An automated
+> multi-run playtest battery (`tools/ChronoTravelers.PlaytestHarness`)
+> surfaced several class-balance and AI-decision gaps; four were fixed:
+>
+> - **Ambush timing.** Every class's ambush-mitigation passive unlocked at
+>   level 18-23 — well past the level 1-17 window where ambush deaths were
+>   most common — and Scientist had none at all, ever. Soldier's Thick
+>   Hide, Doctor's Trauma Ward, and Spy's Fleet-Footed moved from their
+>   original 18/23/23 slots down to level 8 (a straight swap with whatever
+>   passive used to occupy that slot — Second Wind/Resonant Calm/Quick
+>   Reflexes moved the other way, same 6-slot schedule, nothing added or
+>   removed for these three classes). Scientist gained a new level-6
+>   **Contingency Protocol** (`AmbushDodgeChancePct`, 15%) — a 7th
+>   first-wave slot rather than displacing one of its six existing
+>   Tachyon-economy passives, the one deliberate asymmetry in this fix.
+> - **Spy's missing sustain.** Spy was the only class with zero Heal/
+>   Shield/defense-buff anywhere in its kit. Level-10 **Ghost Protocol**
+>   (`GuaranteedCritNextAttack`) — functionally redundant with the
+>   level-35 capstone **Vanishing Act**, same effect type — became
+>   **Smoke and Mirrors** (`Shield`), Spy's first mitigation tool, closing
+>   both the sustain gap and the redundancy in one change.
+> - **AI ability-scoring, static ranking.** `NpcController.ScoreAbility`
+>   (also `PvpAbilityCombat.cs`'s ported copy) scores each effect type with
+>   a fixed number, so once one ability's effect type out-scores the rest
+>   of a class's kit, it wins every round for the rest of the fight —
+>   observed starving Spy's Nerve Agent (DamageOverTime, unlocks level 15)
+>   crowding out everything after it, including the level-35 capstone.
+>   `ChooseAbility` now divides an ability's score by `1 + repeatStreak`
+>   each round it repeats — variety pressure, not a hard cooldown, and
+>   Heal/RestoreTachyons are exempt (spamming a genuine heal or a free
+>   Tachyon restore is correct play, not a variety problem).
+>   `tools/ChronoTravelers.PlaytestHarness/FightBot.cs` deliberately does
+>   **not** get this change — its own doc comment explains it wants
+>   maximum ability-usage data per battery run, not a realistic cast rate,
+>   and already has its own guard against runaway single-ability loops.
+> - **Charge Siphon (Scientist) never cast.** Its `RestoreTachyons` score
+>   used a hard `Current < Max * 0.3` gate that was effectively
+>   unreachable at real Tachyon-pool sizes (Max grows every level; a short
+>   fight's in-combat spend doesn't scale with it). Replaced with a smooth
+>   curve — `(1 - tachyonFraction) * 15`, mirroring Heal's own shape —
+>   across all three `ScoreAbility` copies (`NpcController.cs`,
+>   `PvpAbilityCombat.cs`, and the playtest harness's `FightBot.cs`, which
+>   is where this was actually caught).
+>
+> **Not changed, flagged as intentional or a downstream symptom rather
+> than a bug:** the melee-classes'-repair-bill finding (Soldier/Doctor
+> simply survive more fights per run, so they rack up more cumulative
+> Durability loss — expected to shrink once the ambush/AI fixes above
+> reduce how lopsided survival is, not a formula problem); early-game
+> lethality at the damage-formula level (the level-1-vs-tier-1 margin is
+> already generous by design — see `MonsterScaling.cs`'s own tuning
+> comment — "most common death" is largely a frequency-of-exposure
+> artifact of every run passing through level 1); and ranged-weapon ammo
+> depletion (no reload mechanic is correct, documented design — see §5/§6.3
+> — fire it down, then sell/convert and pick up or buy a fresh one).
+
 ### 4.3 Restrictions (apply identically to player and NPCs)
 - Weapon/armor equip requires class-tagged gear (a Scientist can't wield the
   Soldier's breaching maul at full effectiveness — non-class gear works at a

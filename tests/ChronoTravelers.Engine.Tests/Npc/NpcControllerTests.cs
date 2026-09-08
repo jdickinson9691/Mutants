@@ -726,6 +726,57 @@ public class NpcControllerTests
         Assert.Contains(result.Fight!.Log, line => line.Contains("hits", StringComparison.OrdinalIgnoreCase));
     }
 
+    // --- ability-casting AI (battery-test tuning pass, 2026-09-08) ---
+
+    private static AbilityData MakeAbility(
+        string @class, int level, string name, string effect, double magnitude, int tachyonCost = 0) => new()
+    {
+        Class = @class,
+        Tier = 1,
+        Level = level,
+        Name = name,
+        Description = "test ability",
+        Effect = effect,
+        Magnitude = magnitude,
+        TachyonCost = tachyonCost,
+    };
+
+    [Fact]
+    public void Act_WithAbilities_RepeatStreakPenaltyEventuallyLetsALowerScoringAbilityWin()
+    {
+        var npc = FreshNpc();
+        npc.Tachyons.SetMax(100_000);
+        npc.Tachyons.Add(100_000);
+
+        // "Strong" (score 9 + 20 = 29) always beats "Weak" (score 4) on a
+        // bare comparison — before the repeat-streak penalty, ScoreAbility
+        // is static per effect type, so "Strong" would win every single
+        // round of the fight below and "Weak" would never appear in the
+        // log at all (the exact shape of the battery-test finding that
+        // Spy's Nerve Agent crowded out the rest of its kit).
+        var abilities = new List<AbilityData>
+        {
+            MakeAbility("Soldier", level: 1, "Strong", "Damage", magnitude: 20, tachyonCost: 1),
+            MakeAbility("Soldier", level: 1, "Weak", "BuffSelfDefense", magnitude: 1),
+        };
+
+        // Tanky and harmless enough that the fight runs the full
+        // AbilityFightMaxRounds cap rather than ending early either way.
+        var tankyRoster = new List<Func<Monster>>
+        {
+            () => new Monster("Dummy", tier: 1, maxHp: 1_000_000, attackPower: 0, defense: 0, speed: 1, xpReward: 0),
+        };
+
+        // Fixed(0.0) guarantees every round both attempts to cast (well
+        // under AbilityCastChance) and rolls minimum damage variance —
+        // deterministic, and irrelevant to which ability wins the score
+        // comparison either way.
+        var result = NpcController.Act(npc, TestLevelMap, StubRandomSource.Fixed(0.0), monsterRoster: tankyRoster, abilities: abilities);
+
+        Assert.NotNull(result.Fight);
+        Assert.Contains(result.Fight!.Log, l => l.Contains("bolstered")); // "Weak" (BuffSelfDefense)'s log line
+    }
+
     // --- CreatureTraitKind hooks -----------------------------------------
 
     [Fact]

@@ -27,12 +27,17 @@ public class PassiveTraitTests
     }
 
     [Fact]
-    public void All_HasSixtyEntries_TwelvePerClass()
+    public void All_HasTwelvePerClass_PlusScientistsExtraEarlyAmbushPassive()
     {
-        Assert.Equal(60, PassiveTraits.All.Count);
+        // 12 per class (6 first-wave + 6 second-wave), except Scientist,
+        // which gained a 7th first-wave slot (level-6 Contingency Protocol)
+        // in the 2026-09-08 ambush-timing fix rather than displacing one of
+        // its six Tachyon-economy passives — see PassiveTraits.All.
+        Assert.Equal(61, PassiveTraits.All.Count);
         foreach (CharacterClass characterClass in Enum.GetValues<CharacterClass>())
         {
-            Assert.Equal(12, PassiveTraits.All.Count(p => p.Class == characterClass));
+            var expected = characterClass == CharacterClass.Scientist ? 13 : 12;
+            Assert.Equal(expected, PassiveTraits.All.Count(p => p.Class == characterClass));
         }
     }
 
@@ -89,28 +94,32 @@ public class PassiveTraitTests
     }
 
     [Fact]
-    public void Speed_SpyQuickReflexes_AddsThreeAtLevelEight()
+    public void Speed_SpyQuickReflexes_AddsThreeAtLevelTwentyThree()
     {
         // Speed is just Agility + flat passive bonus, so isolate the
         // passive from the ordinary Agility growth that also lands on the
-        // level-7 -> 8 level-up: at Lv7 there's no Speed passive yet, at
-        // Lv8 Quick Reflexes adds exactly +3 on top of Agility.
-        var atSeven = LeveledTraveler(CharacterClass.Spy, 7);
-        var atEight = LeveledTraveler(CharacterClass.Spy, 8);
+        // level-22 -> 23 level-up: at Lv22 there's no Speed passive yet, at
+        // Lv23 Quick Reflexes adds exactly +3 on top of Agility. (Quick
+        // Reflexes moved from level 8 to 23 — swapped with Fleet-Footed —
+        // in the 2026-09-08 ambush-timing fix; see PassiveTraits.All.)
+        var atTwentyTwo = LeveledTraveler(CharacterClass.Spy, 22);
+        var atTwentyThree = LeveledTraveler(CharacterClass.Spy, 23);
 
-        Assert.Equal(atSeven.Stats.Agility, atSeven.Speed);
-        Assert.Equal(atEight.Stats.Agility + 3, atEight.Speed);
+        Assert.Equal(atTwentyTwo.Stats.Agility, atTwentyTwo.Speed);
+        Assert.Equal(atTwentyThree.Stats.Agility + 3, atTwentyThree.Speed);
     }
 
     [Fact]
     public void TakeDamage_SoldierSecondWind_ReducesDamageBelowThirtyPercentHp()
     {
-        var soldier = LeveledTraveler(CharacterClass.Soldier, 8); // Second Wind unlocked
+        // Second Wind moved from level 8 to 18 — swapped with Thick Hide —
+        // in the 2026-09-08 ambush-timing fix; see PassiveTraits.All.
+        var soldier = LeveledTraveler(CharacterClass.Soldier, 18); // Second Wind unlocked
         var maxHp = soldier.Health.Max;
         soldier.Health.Damage(maxHp - (int)(maxHp * 0.25)); // drop to 25% HP
         var reducedDamage = soldier.TakeDamage(10);
 
-        var soldierFull = LeveledTraveler(CharacterClass.Soldier, 8);
+        var soldierFull = LeveledTraveler(CharacterClass.Soldier, 18);
         var fullHpDamage = soldierFull.TakeDamage(10);
 
         Assert.True(reducedDamage < fullHpDamage); // 10% reduction applied only while below 30% HP
@@ -119,10 +128,12 @@ public class PassiveTraitTests
     [Fact]
     public void TakeDamage_DoctorResonantCalm_ReducesEchoDamageOnly()
     {
-        var doctor = LeveledTraveler(CharacterClass.Doctor, 8); // Resonant Calm unlocked
+        // Resonant Calm moved from level 8 to 23 — swapped with Trauma
+        // Ward — in the 2026-09-08 ambush-timing fix; see PassiveTraits.All.
+        var doctor = LeveledTraveler(CharacterClass.Doctor, 23); // Resonant Calm unlocked
         var echoDamage = doctor.TakeDamage(10, attackerIsEcho: true);
 
-        var doctor2 = LeveledTraveler(CharacterClass.Doctor, 8);
+        var doctor2 = LeveledTraveler(CharacterClass.Doctor, 23);
         var normalDamage = doctor2.TakeDamage(10, attackerIsEcho: false);
 
         Assert.True(echoDamage < normalDamage);
@@ -278,10 +289,10 @@ public class PassiveTraitTests
     [Fact]
     public void AmbushDodgeChance_And_AmbushNegateChance_ReadTheRightPassives()
     {
-        var spy = LeveledTraveler(CharacterClass.Spy, 23); // Fleet-Footed unlocked
+        var spy = LeveledTraveler(CharacterClass.Spy, 8); // Fleet-Footed unlocked (moved from 23 to 8 — 2026-09-08 ambush-timing fix)
         Assert.Equal(0.20, spy.AmbushDodgeChance, precision: 5);
 
-        var doctor = LeveledTraveler(CharacterClass.Doctor, 23); // Trauma Ward unlocked
+        var doctor = LeveledTraveler(CharacterClass.Doctor, 8); // Trauma Ward unlocked (moved from 23 to 8)
         Assert.Equal(0.20, doctor.AmbushNegateChance, precision: 5);
 
         var freshSpy = new Traveler("Spy", CharacterClass.Spy);

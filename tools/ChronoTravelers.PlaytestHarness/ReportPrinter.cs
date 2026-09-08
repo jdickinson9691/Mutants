@@ -74,6 +74,145 @@ public static class ReportPrinter
     }
 
     /// <summary>
+    /// The pooled read-out for a "battery" run (Program.cs) — every
+    /// back-to-back shared-world session folded together. Two bots per
+    /// class, so each class's numbers pool both instances across every
+    /// session. Sections mirror what the single-class battery reports
+    /// (abilities / passives / consumables / ranged), plus a per-class
+    /// survival+economy table and an equipment-on-death roll-up. Passive
+    /// activations are per class, not per bot (see
+    /// <see cref="PlaytestRunner.RunSimultaneous"/>).
+    /// </summary>
+    public static void PrintBatteryReport(IReadOnlyList<SimultaneousResult> sessions, TimeSpan elapsed, int copiesPerClass)
+    {
+        var allLives = sessions.SelectMany(s => s.PerClass).ToList();
+        var worldReports = sessions.Select(s => s.World).ToList();
+        var cappedSessions = sessions.Count(s => s.PerClass.Any(r => !r.DiedDuringRun));
+
+        Console.WriteLine("########################################################");
+        Console.WriteLine(" BATTERY REPORT");
+        Console.WriteLine("########################################################");
+        Console.WriteLine($"  Wall-clock:        {elapsed:hh\\:mm\\:ss}");
+        Console.WriteLine($"  Sessions:          {sessions.Count}  ({cappedSessions} had at least one bot alive at the tick cap)");
+        Console.WriteLine($"  Bots per session:  {copiesPerClass * 5}  ({copiesPerClass} x 5 classes)");
+        Console.WriteLine($"  Total bot-lives:   {allLives.Count}");
+        Console.WriteLine($"  Avg ticks/session: {(sessions.Count > 0 ? sessions.Average(s => s.TotalTicks) : 0):F0}");
+        Console.WriteLine();
+
+        Console.WriteLine("--- Per-class survival & progression (pooled over every life) ---");
+        Console.WriteLine($"  {"Class",-10} {"lives",-6} {"died",-10} {"avgSurv",-9} {"avgLvl",-7} {"avgYear",-8} {"furthest",-9} {"avgKills",-9} {"avgXP",-8} {"maxHit",-7} {"amb/life"}");
+        foreach (var cls in Enum.GetValues<CharacterClass>())
+        {
+            var lives = allLives.Where(r => r.Class == cls).ToList();
+            if (lives.Count == 0)
+            {
+                continue;
+            }
+
+            var died = lives.Count(r => r.DiedDuringRun);
+            var deadLives = lives.Where(r => r.DiedDuringRun).ToList();
+            var avgSurv = deadLives.Count > 0 ? deadLives.Average(r => r.TicksSurvived) : 0;
+            Console.WriteLine($"  {cls,-10} {lives.Count,-6} {$"{died} ({100.0 * died / lives.Count:F0}%)",-10} " +
+                $"{avgSurv,-9:F0} {lives.Average(r => r.FinalLevel),-7:F1} {lives.Average(r => r.FinalYear),-8:F0} " +
+                $"{lives.Average(r => r.FurthestYearReached),-9:F0} {lives.Average(r => r.Kills),-9:F1} " +
+                $"{lives.Average(r => r.TotalXp),-8:F0} {lives.Max(r => r.MaxHitTaken),-7} {lives.Average(r => r.AmbushesObserved):F1}");
+        }
+        Console.WriteLine("  (avgSurv = mean tick of death, over the lives that died only)");
+
+        Console.WriteLine();
+        Console.WriteLine("--- Per-class economy (pooled over every life) ---");
+        Console.WriteLine($"  {"Class",-10} {"avgCredits",-11} {"avgTachyons",-12} {"repairs",-8} {"repairCr",-9} {"brokeGear",-10} {"avgInv"}");
+        foreach (var cls in Enum.GetValues<CharacterClass>())
+        {
+            var lives = allLives.Where(r => r.Class == cls).ToList();
+            if (lives.Count == 0)
+            {
+                continue;
+            }
+
+            var broke = lives.Count(r => r.EquippedGearBrokeAtLeastOnce);
+            Console.WriteLine($"  {cls,-10} {lives.Average(r => r.FinalCredits),-11:F0} {lives.Average(r => r.FinalTachyons),-12:F0} " +
+                $"{lives.Sum(r => r.RepairsPerformed),-8} {lives.Sum(r => r.CreditsSpentOnRepair),-9} " +
+                $"{$"{broke} ({100.0 * broke / lives.Count:F0}%)",-10} {lives.Average(r => r.FinalInventoryCount):F1}");
+        }
+
+        foreach (var cls in Enum.GetValues<CharacterClass>())
+        {
+            var lives = allLives.Where(r => r.Class == cls).ToList();
+            if (lives.Count == 0)
+            {
+                continue;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("========================================================");
+            Console.WriteLine($" {cls} — {lives.Count} lives across {sessions.Count} sessions");
+            Console.WriteLine("========================================================");
+            PrintAggregateAbilityUsage(lives);
+            PrintAggregatePassiveUsage(cls, lives);
+            PrintAggregateConsumableUsage(lives);
+            PrintAggregateRangedUsage(lives);
+            PrintEquipmentOnDeath(lives);
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("========================================================");
+        Console.WriteLine(" Shared world (NPC economy) — pooled over every session");
+        Console.WriteLine("========================================================");
+        PrintNpcStoreActivity(worldReports);
+        PrintNpcTraitEffects(worldReports);
+    }
+
+    /// <summary>
+    /// What every bot that died was holding when it went down — the exact
+    /// loadout (weapon / armor / ranged), whether any equipped piece had
+    /// broken first, and how full the pack was. Grouped by identical
+    /// loadout so a recurring "died with X" pattern stands out; a capped
+    /// sample of individual deaths follows for detail.
+    /// </summary>
+    private static void PrintEquipmentOnDeath(IReadOnlyList<RunReport> lives)
+    {
+        Console.WriteLine();
+        Console.WriteLine("  --- Equipment on death ---");
+        var deaths = lives.Where(r => r.DiedDuringRun).ToList();
+        if (deaths.Count == 0)
+        {
+            Console.WriteLine("    (no deaths for this class — every life reached the tick cap)");
+            return;
+        }
+
+        var brokeCount = deaths.Count(r => r.EquippedGearBrokeAtLeastOnce);
+        Console.WriteLine($"    {deaths.Count} death(s); {brokeCount} ({100.0 * brokeCount / deaths.Count:F0}%) had an equipped piece break beforehand.");
+
+        var byLoadout = deaths
+            .GroupBy(r => (W: r.EquippedWeaponAtEnd ?? "(none)", A: r.EquippedArmorAtEnd ?? "(none)", R: r.EquippedRangedAtEnd ?? "(none)"))
+            .OrderByDescending(g => g.Count())
+            .ToList();
+
+        Console.WriteLine("    Most common death loadouts:");
+        foreach (var g in byLoadout.Take(6))
+        {
+            Console.WriteLine($"      x{g.Count(),-3} W:{g.Key.W}  |  A:{g.Key.A}  |  R:{g.Key.R}");
+        }
+
+        var sample = deaths
+            .OrderBy(r => r.TicksSurvived)
+            .Take(12)
+            .ToList();
+        Console.WriteLine("    Sample deaths (earliest first):");
+        foreach (var r in sample)
+        {
+            Console.WriteLine($"      {r.CharacterName,-14} seed {r.WorldSeed,-8} died t{r.TicksSurvived,-6} lvl {r.FinalLevel,-3} yr {r.FinalYear,-5} " +
+                $"inv {r.FinalInventoryCount}{(r.EquippedGearBrokeAtLeastOnce ? "  [gear broke]" : "")}");
+            Console.WriteLine($"        W:{r.EquippedWeaponAtEnd ?? "(none)"}  A:{r.EquippedArmorAtEnd ?? "(none)"}  R:{r.EquippedRangedAtEnd ?? "(none)"}");
+            if (r.FinalInventory.Count > 0)
+            {
+                Console.WriteLine($"        pack: {string.Join(", ", r.FinalInventory)}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Whether background NPCs actually trade at each other's shopfronts
     /// (not just at the government Depot) and run stores of their own —
     /// NpcController routes a Trade to a random <em>occupied</em> store in

@@ -1,4 +1,5 @@
 using ChronoTravelers.Core.Characters;
+using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Traits;
 using ChronoTravelers.Engine.Npc;
@@ -68,6 +69,9 @@ public sealed class RunReport
     public required string CharacterName { get; init; }
     public required long WorldSeed { get; init; }
 
+    /// <summary>The class this bot played — null for the shared-world (<see cref="SimultaneousResult.World"/>) report, which isn't tied to one class. Lets a battery pool every session's reports for one class without parsing <see cref="CharacterName"/>.</summary>
+    public CharacterClass? Class { get; init; }
+
     public int FinalLevel { get; set; }
     public int FinalYear { get; set; }
     public int FurthestYearReached { get; set; }
@@ -116,6 +120,10 @@ public sealed class RunReport
     public string? EquippedWeaponAtEnd { get; set; }
     public string? EquippedArmorAtEnd { get; set; }
     public string? EquippedRangedAtEnd { get; set; }
+
+    /// <summary>Every item in the bot's pack at run's end (on death, what it was carrying when it went down) — each formatted by <c>PlaytestRunner.DescribeItem</c>. <see cref="FinalInventoryCount"/> is just its length, kept separate so the summary tables don't have to hold the list.</summary>
+    public int FinalInventoryCount { get; set; }
+    public List<string> FinalInventory { get; } = [];
 
     public Dictionary<string, AbilityUsage> AbilityUsage { get; } = [];
     public Dictionary<PassiveHook, PassiveUsage> PassiveUsage { get; } = [];

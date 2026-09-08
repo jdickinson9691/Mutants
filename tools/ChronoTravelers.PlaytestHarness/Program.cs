@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ChronoTravelers.Core.Classes;
 using ChronoTravelers.Engine.Content;
 using ChronoTravelers.PlaytestHarness;
@@ -34,10 +35,13 @@ if (args.Length < 1)
 }
 
 var classArg = args[0];
-var runs = args.Length > 1 ? int.Parse(args[1]) : 3;
-var maxTicks = args.Length > 2 ? int.Parse(args[2]) : 3000;
-var baseSeed = args.Length > 3 ? long.Parse(args[3]) : 1000;
-var aggression = args.Length > 4 ? double.Parse(args[4]) : 1.0;
+// Tolerant parses: "battery" reinterprets these positionals (arg[1] is
+// minutes, a double) and handles them in its own branch below, so a
+// non-int arg[1] must not blow up here before we get there.
+var runs = args.Length > 1 && int.TryParse(args[1], out var runsArg) ? runsArg : 3;
+var maxTicks = args.Length > 2 && int.TryParse(args[2], out var maxTicksArg) ? maxTicksArg : 3000;
+var baseSeed = args.Length > 3 && long.TryParse(args[3], out var baseSeedArg) ? baseSeedArg : 1000;
+var aggression = args.Length > 4 && double.TryParse(args[4], out var aggressionArg) ? aggressionArg : 1.0;
 var verboseFatal = args.Length > 5 && args[5] is "1" or "true";
 
 var contentDirectory = Path.Combine(AppContext.BaseDirectory, "Content");
@@ -70,6 +74,55 @@ if (string.Equals(classArg, "simul", StringComparison.OrdinalIgnoreCase)
         Console.WriteLine();
     }
 
+    return 0;
+}
+
+// "battery": the 2-per-class shared-world tuning battery. Ten bots (two of
+// every class) in ONE shared world via WorldSimulation.TickMultiplayer,
+// each session played to last-bot death or a tick cap, launching fresh
+// sessions back to back until `minutes` of wall-clock elapse — then one
+// pooled report across every session (abilities, passives, economy,
+// combat, equipment-on-death). Passives are pooled per class rather than
+// per bot, since PassiveActivationTracker is class-keyed (see RunSimultaneous).
+//
+//   battery [minutes] [tickCapPerSession] [seed] [aggression] [verboseFatal]
+if (string.Equals(classArg, "battery", StringComparison.OrdinalIgnoreCase))
+{
+    var minutes = args.Length > 1 ? double.Parse(args[1]) : 60.0;
+    var tickCap = args.Length > 2 ? int.Parse(args[2]) : 15_000;
+    var seed = args.Length > 3 ? long.Parse(args[3]) : 1000L;
+    var batteryAggression = args.Length > 4 ? double.Parse(args[4]) : 1.0;
+    var batteryVerboseFatal = args.Length > 5 && args[5] is "1" or "true";
+
+    const int CopiesPerClass = 2;
+    var batteryClasses = Enum.GetValues<CharacterClass>()
+        .SelectMany(c => Enumerable.Repeat(c, CopiesPerClass))
+        .ToList();
+
+    Console.WriteLine("########################################################");
+    Console.WriteLine($" Shared-world BATTERY — {CopiesPerClass} of each class ({batteryClasses.Count} bots), back-to-back sessions for {minutes:F0} min");
+    Console.WriteLine($" tick cap/session {tickCap}, base seed {seed}, aggression {batteryAggression:F2}");
+    Console.WriteLine("########################################################");
+    Console.WriteLine();
+
+    var sw = Stopwatch.StartNew();
+    var sessions = new List<SimultaneousResult>();
+    var sessionIndex = 0;
+    while (sw.Elapsed.TotalMinutes < minutes)
+    {
+        var sessionSeed = seed + sessionIndex;
+        var result = PlaytestRunner.RunSimultaneous(batteryClasses, sessionSeed, tickCap, contentDirectory, abilities, batteryAggression, batteryVerboseFatal);
+        sessions.Add(result);
+        sessionIndex++;
+
+        var deaths = result.PerClass.Count(r => r.DiedDuringRun);
+        var hitCap = result.PerClass.Any(r => !r.DiedDuringRun);
+        Console.WriteLine($"  session {sessionIndex,-4} seed {sessionSeed,-8} {result.TotalTicks,6} ticks  {deaths,2}/{result.PerClass.Count} died{(hitCap ? "  (tick cap hit)" : "")}   [{sw.Elapsed:hh\\:mm\\:ss}]");
+    }
+
+    sw.Stop();
+    Console.WriteLine();
+    ReportPrinter.PrintBatteryReport(sessions, sw.Elapsed, CopiesPerClass);
     return 0;
 }
 
@@ -142,6 +195,8 @@ static IReadOnlyList<AbilityData> LoadAbilities(string contentDirectory)
 
 static void PrintUsage()
 {
-    Console.WriteLine("Usage: PlaytestHarness <Soldier|Doctor|Spy|Scientist|Engineer|all|simul> [runs] [ticksPerRun] [seed] [aggression] [verboseFatal]");
-    Console.WriteLine("  simul: all 5 classes played simultaneously in one shared world (TickMultiplayer), 'runs' sessions, each to last-bot-death.");
+    Console.WriteLine("Usage: PlaytestHarness <Soldier|Doctor|Spy|Scientist|Engineer|all|simul|battery> [runs] [ticksPerRun] [seed] [aggression] [verboseFatal]");
+    Console.WriteLine("  simul:   all 5 classes played simultaneously in one shared world (TickMultiplayer), 'runs' sessions, each to last-bot-death.");
+    Console.WriteLine("  battery: 2 of each class (10 bots) in one shared world, back-to-back sessions for [minutes] (default 60), then one pooled report.");
+    Console.WriteLine("           battery [minutes] [tickCapPerSession] [seed] [aggression] [verboseFatal]");
 }
