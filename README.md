@@ -16,10 +16,13 @@ and level up — the surface team is still looking.
 
 ## Status
 
-All 8 milestones of the planned sequence (see Roadmap below) are built:
-a playable console game with combat, loot, an NPC economy, time travel,
-save/load with leaderboards, and a Windows installer build/release
-pipeline.
+**Beta — v0.2.0.** All 8 milestones of the planned sequence (see Roadmap
+below) are built: a playable console game with combat, loot, an NPC
+economy, time travel, save/load with leaderboards, and a Windows installer
+build/release pipeline. The 0.2 line adds the year-5000 endgame,
+Traveler-vs-Traveler ability combat, server-side ranged fire, charged
+long-distance jumps, an automated multi-class playtest battery, and a
+class-balance tuning pass driven by it.
 
 The world is a **continuous 2000–5000 A.D. timeline** (not discrete
 levels): you `travel` to any year for an Tachyon cost proportional to the

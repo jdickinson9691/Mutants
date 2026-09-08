@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>ChronoTravelers.Server</AssemblyName>
     <Product>ChronoTravelers Server</Product>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>Lüdinn Entertainment</Authors>
     <Company>Lüdinn Entertainment</Company>
   </PropertyGroup>
