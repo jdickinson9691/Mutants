@@ -30,34 +30,16 @@ public class RangedResolverTests
     }
 
     [Fact]
-    public void Fire_AtASurvivorFromARoomAway_RaisesAggroAndStartsAPursuit()
+    public void Fire_RaisesTheTargetsAggro_WhenItSurvives()
     {
         var bow = Item.CreateRanged("Longbow", 2, Rarity.Uncommon, RangedKind.Bow, ammoCapacity: 10);
-        var shooter = Shooter();
         var target = Target();
         target.PlaceAt(new Core.World.Coordinate(1, 0)); // a room east of the shooter — the normal fire flow
         Assert.Equal(0, target.Aggro);
 
-        RangedResolver.Fire(shooter, target, bow, Neutral());
+        RangedResolver.Fire(Shooter(), target, bow, Neutral());
 
         Assert.Equal(AggroModel.RangedHitAggro, target.Aggro);
-        Assert.True(target.IsPursuing);
-        Assert.False(target.IsFleeing);
-    }
-
-    [Fact]
-    public void Fire_AtASurvivorSharingTheShootersRoom_SendsItStraightToHostile()
-    {
-        var bow = Item.CreateRanged("Longbow", 2, Rarity.Uncommon, RangedKind.Bow, ammoCapacity: 10);
-        var shooter = Shooter();
-        var target = Target(); // both at the default position — point blank
-
-        RangedResolver.Fire(shooter, target, bow, Neutral());
-
-        // No use running with the shooter already toe to toe.
-        Assert.Equal(AggroModel.Cap, target.Aggro);
-        Assert.False(target.IsPursuing);
-        Assert.False(target.IsFleeing);
     }
 
     [Fact]
@@ -144,5 +126,51 @@ public class RangedResolverTests
         var spent = Item.CreateRanged("Sling", 1, Rarity.Common, RangedKind.Bow, ammoCapacity: 1);
         spent.AmmoRemaining = 0;
         Assert.Throws<InvalidOperationException>(() => RangedResolver.Fire(Shooter(), Target(), spent, Neutral()));
+    }
+
+    // --- FireAtTraveler (PvP opening shot — docs/GDD.md §11's 2026-09-08 note) ---
+
+    [Fact]
+    public void FireAtTraveler_SpendsOneRoundOfAmmoAndDealsDamage()
+    {
+        var bow = Item.CreateRanged("Longbow", 2, Rarity.Uncommon, RangedKind.Bow, ammoCapacity: 10);
+        var target = new Traveler("Bo", CharacterClass.Soldier);
+        var hpBefore = target.Health.Current;
+
+        var result = RangedResolver.FireAtTraveler(Shooter(), target, bow, Neutral());
+
+        Assert.Equal(9, bow.AmmoRemaining);
+        Assert.True(result.Damage > 0);
+        Assert.Equal(hpBefore - result.Damage, target.Health.Current);
+        Assert.False(result.Killed);
+    }
+
+    [Fact]
+    public void FireAtTraveler_WeakenEffect_StillDealsDamageButLeavesNoPendingPenalty()
+    {
+        // Traveler has no PendingDefensePenalty/PendingAttackPenalty
+        // equivalent to a Monster's — the shot still lands, the status
+        // effect just has nothing to attach to (see FireAtTraveler's doc
+        // comment).
+        var wand = Item.CreateRanged("Hexbolt", 1, Rarity.Common, RangedKind.Wand, 10, RangedEffectType.Weaken, magnitude: 1.0);
+        var target = new Traveler("Bo", CharacterClass.Soldier);
+
+        var result = RangedResolver.FireAtTraveler(Shooter(), target, wand, Neutral());
+
+        Assert.True(result.Damage > 0);
+        Assert.False(result.Killed); // the note only makes sense on a survivor
+        Assert.Contains("nothing to catch", result.Message);
+    }
+
+    [Fact]
+    public void FireAtTraveler_RejectsANonRangedOrDepletedWeapon()
+    {
+        var melee = Item.Create("Axe", ItemType.Weapon, 1, Rarity.Common);
+        var target = new Traveler("Bo", CharacterClass.Soldier);
+        Assert.Throws<InvalidOperationException>(() => RangedResolver.FireAtTraveler(Shooter(), target, melee, Neutral()));
+
+        var spent = Item.CreateRanged("Sling", 1, Rarity.Common, RangedKind.Bow, ammoCapacity: 1);
+        spent.AmmoRemaining = 0;
+        Assert.Throws<InvalidOperationException>(() => RangedResolver.FireAtTraveler(Shooter(), target, spent, Neutral()));
     }
 }

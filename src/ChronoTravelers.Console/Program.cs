@@ -701,7 +701,7 @@ while (running)
 // even after Dispose() has already returned.
 lock (worldGate)
 {
-    idleTimer.Dispose();
+    idleTimer?.Dispose();
 }
 
 SaveOnExit();
@@ -1993,25 +1993,40 @@ static void HandleBuyFromStore(Traveler traveler, TimeWorld world, string argume
 
 static void HandleSellToStore(Traveler traveler, TimeWorld world, string argument)
 {
-    // 'sell all' / 'sell junk' — converts every Junk item for Tachyons.
-    // Junk is convert-only now (no store ever buys it), so — unlike a
-    // named-item sale below — this needs no store and works anywhere.
+    var storeSlots = world.GetYear(traveler.CurrentYear).StoreSlots;
+    var slot = FindStoreSlotAt(storeSlots, traveler.Position);
+    if (slot?.Store is not { } store)
+    {
+        AnsiConsole.MarkupLine("[red]You need to be at a store to sell.[/] Try [yellow]convert[/] to destroy an item for Tachyons instead, or [yellow]stores[/] to find one.");
+        return;
+    }
+
+    // 'sell all' / 'sell junk' — clears the vendor trash (Junk items only;
+    // gear and consumables you keep unless you name them).
     if (argument.Trim() is "all" or "junk" or "*")
     {
         var junk = traveler.Inventory.Where(i => i.Type == ItemType.Junk).ToList();
         if (junk.Count == 0)
         {
-            AnsiConsole.MarkupLine("[grey]No junk to convert.[/] Name an item to sell that instead.");
+            AnsiConsole.MarkupLine("[grey]No junk to sell.[/] Name an item to sell that instead.");
             return;
         }
 
         var total = 0;
+        var count = 0;
         foreach (var j in junk)
         {
-            total += traveler.Convert(j);
+            var got = store.BuyFromTraveler(traveler, j);
+            if (got is null)
+            {
+                break;
+            }
+
+            total += got.Value;
+            count++;
         }
 
-        AnsiConsole.MarkupLine($"[yellow]Converted {junk.Count} junk item(s) for {total} Tachyons.[/]");
+        AnsiConsole.MarkupLine($"[yellow]Sold {count} junk item(s) to {Markup.Escape(store.Name)} for {total} Credits.[/]");
         return;
     }
 
@@ -2019,22 +2034,8 @@ static void HandleSellToStore(Traveler traveler, TimeWorld world, string argumen
     if (item is null)
     {
         AnsiConsole.MarkupLine(argument.Length == 0
-            ? "[red]Sell what?[/] Type [yellow]inventory[/] to see what you're carrying, or [yellow]sell all[/] to convert junk."
+            ? "[red]Sell what?[/] Type [yellow]inventory[/] to see what you're carrying, or [yellow]sell all[/] to dump junk."
             : $"[red]No item matching '{Markup.Escape(argument)}' in your inventory.[/]");
-        return;
-    }
-
-    if (item.Type == ItemType.Junk)
-    {
-        AnsiConsole.MarkupLine($"[red]{Markup.Escape(item.Name)} is junk[/] — it can only be converted for Tachyons, not sold. Try [yellow]convert {Markup.Escape(item.Name)}[/] or [yellow]sell all[/].");
-        return;
-    }
-
-    var storeSlots = world.GetYear(traveler.CurrentYear).StoreSlots;
-    var slot = FindStoreSlotAt(storeSlots, traveler.Position);
-    if (slot?.Store is not { } store)
-    {
-        AnsiConsole.MarkupLine("[red]You need to be at a store to sell.[/] Try [yellow]convert[/] to destroy an item for Tachyons instead, or [yellow]stores[/] to find one.");
         return;
     }
 
@@ -2338,8 +2339,8 @@ static void HandleStoreManagement(Traveler traveler, TimeWorld world, string com
 /// room (or that year's Warden, stationed at the map's start room in
 /// a Warden year the player hasn't cleared). <paramref name="targetName"/>
 /// picks one when several share the room; empty takes the first.
-/// Interactive and round-by-round via CombatSession — "attack", "cast
-/// <ability>", or "use <item>" each round. On a win the monster is removed from the year's
+/// Interactive and round-by-round via CombatSession — "attack" or "cast
+/// <ability>" each round. On a win the monster is removed from the year's
 /// live population and its loot (table roll + anything it had scavenged)
 /// goes to the player. Always returns true now — a defeat applies
 /// docs/GDD.md §3.3's death & recall (see <see cref="DeathRecall"/>)
@@ -2382,7 +2383,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
                 var npcTarget = targetName.Length > 0
                     ? npcsHere.FirstOrDefault(n => n.Name.Contains(targetName, StringComparison.OrdinalIgnoreCase)) ?? npcsHere[0]
                     : npcsHere[0];
-                return HandlePvpFight(traveler, npcTarget, world, random, broadcast);
+                return HandlePvpFight(traveler, npcTarget, world, random, broadcast, abilities);
             }
 
             AnsiConsole.MarkupLine("[grey]Nothing here to fight.[/] Monsters (and other Travelers) roam the rooms — go find one.");
@@ -2426,7 +2427,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
 
     while (!session.IsOver)
     {
-        AnsiConsole.Markup("[green]  (attack)[/], [green]cast <ability>[/], or [green]use <item>[/]? > ");
+        AnsiConsole.Markup("[green]  (attack)[/] or [green]cast <ability>[/]? > ");
         var rawInput = Console.ReadLine();
 
         if (rawInput is not null)
@@ -2456,46 +2457,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
                     continue;
                 }
 
-                if (trimmed.StartsWith("use", StringComparison.OrdinalIgnoreCase)
-                    || trimmed.StartsWith("eat", StringComparison.OrdinalIgnoreCase)
-                    || trimmed.StartsWith("drink", StringComparison.OrdinalIgnoreCase))
-                {
-                    var verbLength = trimmed.StartsWith("eat", StringComparison.OrdinalIgnoreCase) ? 3
-                        : trimmed.StartsWith("use", StringComparison.OrdinalIgnoreCase) ? 3
-                        : 5;
-                    var itemName = trimmed.Length > verbLength ? trimmed[verbLength..].Trim() : "";
-                    var item = FindInventoryItem(traveler, itemName, static i => i.IsUsable);
-                    if (item is null || !item.IsUsable)
-                    {
-                        AnsiConsole.MarkupLine(itemName.Length == 0
-                            ? "[red]Use what?[/] Type 'inventory' to see what you're carrying."
-                            : $"[red]No usable item matching '{Markup.Escape(itemName)}' in your inventory.[/]");
-                        continue;
-                    }
-
-                    PrimaryStat? chosenStat = null;
-                    if (item.NeedsStatChoice)
-                    {
-                        chosenStat = ReadStatChoice(item.Name);
-                        if (chosenStat is null)
-                        {
-                            AnsiConsole.MarkupLine($"[grey]Left {Markup.Escape(item.Name)} untouched.[/]");
-                            continue;
-                        }
-                    }
-
-                    var useResult = session.UseItem(item, chosenStat);
-                    AnsiConsole.MarkupLine(useResult.Success ? $"[blue]{Markup.Escape(useResult.Message)}[/]" : $"[red]{Markup.Escape(useResult.Message)}[/]");
-                    if (!useResult.Success)
-                    {
-                        continue;
-                    }
-
-                    PrintNewLogLines(session, ref loggedSoFar);
-                    continue;
-                }
-
-                AnsiConsole.MarkupLine("[red]Type 'attack', 'cast <ability name>', or 'use <item name>'.[/]");
+                AnsiConsole.MarkupLine("[red]Type 'attack' or 'cast <ability name>'.[/]");
                 continue;
             }
         }
@@ -2589,7 +2551,7 @@ static bool HandleFight(Traveler traveler, TimeWorld world, IRandomSource random
 /// world tick's WorldSimulation.RespawnDeadNpcs replaces it, same as if a
 /// monster or the tick itself had killed it).
 /// </summary>
-static bool HandlePvpFight(Traveler traveler, Traveler npcTarget, TimeWorld world, IRandomSource random, BroadcastChannel broadcast)
+static bool HandlePvpFight(Traveler traveler, Traveler npcTarget, TimeWorld world, IRandomSource random, BroadcastChannel broadcast, IReadOnlyList<AbilityData> abilities)
 {
     var year = traveler.CurrentYear;
     var population = world.GetYear(year).Population;
@@ -2597,7 +2559,14 @@ static bool HandlePvpFight(Traveler traveler, Traveler npcTarget, TimeWorld worl
 
     AnsiConsole.MarkupLine($"[bold]You square off against {Markup.Escape(npcTarget.Name)}![/] (level {npcTarget.Level})");
 
-    var result = CombatResolver.FightTraveler(traveler, npcTarget, random);
+    // Routes through PvpAbilityCombat instead of CombatResolver.FightTraveler
+    // so PvP actually uses each side's class kit (ability casting, plus one
+    // opening shot each for a readied ranged weapon) instead of basic
+    // attacks only — see that class's doc comment for why this couldn't
+    // just reuse the interactive CombatSession (Monster-coupled throughout)
+    // or a bare loop over CombatResolver.FightTraveler (no ability support
+    // at all). Reward/loot shape is identical either way.
+    var result = PvpAbilityCombat.Fight(traveler, npcTarget, abilities, random);
 
     foreach (var logLine in result.Log)
     {
@@ -2937,8 +2906,8 @@ static void HandleTravel(Traveler traveler, TimeWorld world, IRandomSource rando
 
     if (result.IsCharging)
     {
-        // docs/ENDGAME_STRATEGY.md recommendation 5: a jump past
-        // Traveler.ChargeTravelThresholdYears doesn't arrive immediately —
+        // docs/ENDGAME_STRATEGY.md recommendation 5: a jump of
+        // Traveler.ChargeTravelThresholdYears years or more doesn't arrive immediately —
         // Tachyons are already spent, and WorldSimulation.Tick's
         // AdvancePendingTravel call completes the jump a few ticks later.
         AnsiConsole.MarkupLine(
@@ -3539,7 +3508,7 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]look[/] (or l)         - redescribe the current room (monsters here / nearby, ground loot)");
     AnsiConsole.MarkupLine("  [green]look <dir>[/]          - peek into the adjacent room (what's there, on the floor) without moving");
     AnsiConsole.MarkupLine("  [green]fight[/] (or f, attack, a) [green]<name>[/] - fight a monster in this room (or the Warden at the year's start)");
-    AnsiConsole.MarkupLine("    (each round, type [green]attack[/], [green]cast <ability>[/], or [green]use <item>[/])");
+    AnsiConsole.MarkupLine("    (each round, type [green]attack[/] or [green]cast <ability>[/])");
     AnsiConsole.MarkupLine("    with no monster here, [green]fight <name>[/] instead targets a living NPC Traveler sharing your tile — PvP resolves instantly, win or lose");
     AnsiConsole.MarkupLine("  [green]shoot[/]/[green]point <dir>[/] - fire your readied ranged weapon one room away (finite built-in ammo)");
     AnsiConsole.MarkupLine("  [green]take[/] (or grab) [green]<item>[/] - pick up loot off the ground here ('take all' works)");
@@ -3553,15 +3522,14 @@ static void RenderHelp()
     AnsiConsole.MarkupLine("  [green]inventory[/] (or inv, i, bag) - list what you're carrying");
     AnsiConsole.MarkupLine("  [green]npcs[/] (or who)       - list the other Travelers out in the timeline");
     AnsiConsole.MarkupLine("  [green]news[/] (or broadcast) - show recent kill-feed events");
-    AnsiConsole.MarkupLine("  [green]convert[/] (or con) [green]<item>[/] - destroy an item for Tachyons (junk items are convert-only; a spent ranged weapon is worth a fraction)");
+    AnsiConsole.MarkupLine("  [green]convert[/] (or con) [green]<item>[/] - destroy an item for Tachyons (a spent ranged weapon is worth a fraction)");
     AnsiConsole.MarkupLine("  [green]wield <item>[/]       - equip a weapon, armor, or ranged (wand/bow/gun) item");
     AnsiConsole.MarkupLine("  [green]use[/]/[green]eat[/]/[green]drink <item>[/] - consume a potion or food item");
     AnsiConsole.MarkupLine("    ('<item>' is either its inventory number or its name)");
     AnsiConsole.MarkupLine("  [green]stores[/]              - list every store this year");
     AnsiConsole.MarkupLine("  [green]shop[/]                - browse the store in your current room");
     AnsiConsole.MarkupLine("  [green]buy <item>[/]         - buy a listed item (must be at a store)");
-    AnsiConsole.MarkupLine("  [green]sell <item>[/]        - sell one non-junk item to the store here (no store buys junk - use convert)");
-    AnsiConsole.MarkupLine("  [green]sell all[/]            - convert every junk item in your pack for Tachyons (works anywhere)");
+    AnsiConsole.MarkupLine("  [green]sell <item>[/] / [green]sell all[/] - sell one item, or dump all junk, to the store here");
     AnsiConsole.MarkupLine("  [green]repair <item>[/]      - restore a worn weapon/armor's Durability (must be at a store)");
     AnsiConsole.MarkupLine("  [green]buy-store[/]           - purchase an empty store slot you're standing in");
     AnsiConsole.MarkupLine("  [green]stock <item> <price>[/] - list your own item for sale at your store");

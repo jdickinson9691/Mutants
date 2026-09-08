@@ -24,3 +24,8 @@ saves/
 ## OS
 .DS_Store
 Thumbs.db
+
+## Local-only Claude session output (implementation write-ups also live in
+## the attached Claude Project as the source of truth - this folder is just
+## a local convenience copy, not part of the repo's source tree)
+Claude outputs/

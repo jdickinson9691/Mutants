@@ -58,11 +58,39 @@ classes that account hasn't played. Then you're in the shared world.
 `heal` · `take [all]` · `fight [name]` · `wield <item>` · `convert`/`con` `<item>` ·
 `travel <year | +N | -N>` · `news` · `who` · `say <msg>` · `wait` · `quit`
 
+A jump past `Traveler.ChargeTravelThresholdYears` (750 years) charges over
+several world ticks instead of arriving instantly — same as the console
+(docs/ENDGAME_STRATEGY.md recommendation 5, docs/GDD.md §12): Tachyons are
+spent up front, `travel` reports "Charging a jump to `<year>` A.D. —
+arrival in `<N>` tick(s)", and `WorldSimulation.TickMultiplayer` completes
+the jump (and broadcasts it) a few ticks later. Calling `travel` again
+toward the same target while charging is a no-op status query; toward a
+different target cancels the old charge (no refund) and starts the new one.
+
+`wield` a wand/bow/gun, then `fight [name]` a monster in your room — with a
+ranged weapon readied, `fight` locks the monster in as your ranged target
+instead of engaging melee (`draw a bead on...`) rather than resolving a
+fight immediately. From there `point <dir>` (wands) or `shoot <dir>` /
+`fire <dir>` (bows/guns) fires at the locked target down a straight,
+unbroken chain of exits that way, out to the weapon's own range —
+kiting: line up, back off, keep firing, same as the console
+(docs/GDD.md §5). The lock-on/kite flow above is Monster-only — PvP
+(`fight` against an NPC Traveler, below) instead fires one opening shot
+per side automatically, before the fight resolves, if that side has a
+readied, loaded ranged weapon (docs/GDD.md §11's "Implementation
+(2026-09-08)" note) — there's no room to kite across in a single
+auto-resolved fight.
+
 `abilities`/`spells` lists your class's ability tree. `cast <name>` works
 for exactly two of them — Engineer's `Jump Rig` and Doctor's `Crash Cart`
 (docs/GDD.md §4.2's "Implementation (2026-09-07)" note) — any time, not
-just mid-fight; every other ability is combat-only and this server's
-`fight` already auto-resolves, so there's no round to cast one in.
+just mid-fight, and this server's `fight` against a monster still just
+auto-resolves basic attacks with no round of your own to cast one in.
+PvP (`fight` against an NPC Traveler, below) is the exception: it now
+casts abilities on both sides automatically as part of that auto-resolve
+(docs/GDD.md §11's "Implementation (2026-09-08)" note) via an AI chooser,
+not a prompt — there's still no interactive round for a human on either
+side of a PvP bout, same as before.
 
 **Stores** (docs/GDD.md §6, full parity with the console): `stores` (list
 this year's slots) · `shop` (browse the one in your room) · `buy <item>` ·
@@ -77,7 +105,12 @@ the loot drops on the floor — `take` it. With no monster in your room,
 `fight [name]` instead targets a living NPC Traveler sharing your tile
 (docs/GDD.md §11's "player-vs-NPC-Traveler combat") — win and their whole
 inventory, equipped gear included, drops for you to `take`; lose and it's
-the same death & recall as losing to a monster. Death (docs/GDD.md §3.3,
+the same death & recall as losing to a monster. This PvP fight uses each
+side's class abilities (an AI chooser picks a round's cast, same
+self-preservation/rationing heuristic the NPC AI uses elsewhere) and one
+opening ranged shot per side if readied (docs/GDD.md §11's "Implementation
+(2026-09-08)" note) — not the basic-attack-only fight it used to be. Death
+(docs/GDD.md §3.3,
 shared with the console via `ChronoTravelers.Game.DeathRecall`) drops half your
 unequipped inventory where you fell, costs half your current Tachyons, and
 snaps you back to 2000 A.D. at full health. Characters autosave on
@@ -85,11 +118,14 @@ disconnect and every ~60 s.
 
 ## Not done yet
 
-- **Command parity.** Stores/shopping (including player-owned stores) are
-  now at parity with the console (see *Commands* above). Still missing:
-  interactive `cast`/abilities, ranged `shoot`, a `look`-after-tick
-  nicety. The console keeps its own fuller command loop for now;
-  consolidating the two onto the Game layer is the follow-up refactor.
+- **Command parity.** Stores/shopping (including player-owned stores),
+  ranged combat (`shoot`/`point`/`fire`, see *Commands* above), and PvP
+  ability casting/ranged (see PvP paragraph above) are now at parity with
+  the console. Still missing: interactive mid-fight ability casting against
+  a *monster* (moot here — `fight` already auto-resolves those, so there's
+  no round to cast one in) and a `look`-after-tick nicety. The console
+  keeps its own fuller command loop for now; consolidating the two onto the
+  Game layer is the follow-up refactor.
 - **Persistence at scale.** LiteDB is fine for one server process; Postgres
   is the swap if multiple instances / cloud elasticity are ever needed.
 - **Auth hardening.** Passwords are PBKDF2-hashed but there's no rate

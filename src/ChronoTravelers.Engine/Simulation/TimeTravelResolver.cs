@@ -15,7 +15,7 @@ namespace ChronoTravelers.Engine.Simulation;
 /// handled by the fight flow, not here.
 ///
 /// <b>Charged jumps</b> (docs/ENDGAME_STRATEGY.md recommendation 5): a jump
-/// farther than <see cref="Traveler.ChargeTravelThresholdYears"/> years
+/// of <see cref="Traveler.ChargeTravelThresholdYears"/> years or more
 /// still costs the same Tachyons, paid up front here, but doesn't arrive
 /// immediately — it starts charging (<see cref="Traveler.BeginChargingTravel"/>)
 /// and <c>Engine.Simulation.WorldSimulation</c>'s per-tick
@@ -64,7 +64,7 @@ public static class TimeTravelResolver
         }
 
         var distance = Math.Abs(targetYear - traveler.CurrentYear);
-        if (distance > Traveler.ChargeTravelThresholdYears)
+        if (distance >= Traveler.ChargeTravelThresholdYears)
         {
             // A different target while already charging cancels the old
             // charge (no refund — see this class's doc comment) and starts

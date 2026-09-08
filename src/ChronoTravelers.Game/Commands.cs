@@ -1,12 +1,14 @@
 using ChronoTravelers.Core.Characters;
 using ChronoTravelers.Core.Economy;
 using ChronoTravelers.Core.Events;
+using ChronoTravelers.Core.Monsters;
 using ChronoTravelers.Core.Tachyons;
 using ChronoTravelers.Core.Items;
 using ChronoTravelers.Core.Time;
 using ChronoTravelers.Core.World;
 using ChronoTravelers.Engine;
 using ChronoTravelers.Engine.Combat;
+using ChronoTravelers.Engine.Simulation;
 
 namespace ChronoTravelers.Game;
 
@@ -102,6 +104,10 @@ internal static class Commands
 
             case "fight" or "f" or "attack" or "a" or "kill":
                 Fight(game, session, arg);
+                break;
+
+            case "shoot" or "point" or "fire":
+                Shoot(game, session, verb, arg);
                 break;
 
             case "wield" or "equip":
@@ -296,6 +302,20 @@ internal static class Commands
             return;
         }
 
+        // A readied ranged weapon changes what 'fight' means, same as the
+        // console (Program.cs's identical check): instead of closing to
+        // auto-resolved melee, it locks this monster in as
+        // p.RangedTarget so 'shoot'/'point'/'fire <direction>' can snipe
+        // it from up to the weapon's Range rooms away (see Shoot). Only
+        // for a Monster target — PvP (FightNpcTraveler, below) stays
+        // melee-only, docs/GDD.md §11's scope cut.
+        if (p.EquippedRanged is not null)
+        {
+            p.SetRangedTarget(target);
+            session.Send($"You draw a bead on {(isWarden ? "" : "the ")}{target.Name}. (tier {target.Tier}) shoot/point/fire <direction> to fire, or unwield your ranged weapon to melee instead.");
+            return;
+        }
+
         var levelBefore = p.Level;
         session.Send($"You close on the {target.Name} (tier {target.Tier})!");
         var result = CombatResolver.Fight(p, target, Rng);
@@ -381,7 +401,13 @@ internal static class Commands
         var levelBefore = p.Level;
 
         session.Send($"You square off against {npcTarget.Name} (level {npcTarget.Level})!");
-        var result = CombatResolver.FightTraveler(p, npcTarget, Rng);
+        // Routes through PvpAbilityCombat instead of CombatResolver.FightTraveler
+        // so PvP actually uses each side's class kit (ability casting, plus
+        // one opening shot each for a readied ranged weapon) instead of
+        // basic attacks only — see that class's doc comment. game.Abilities
+        // is the same full catalog Commands.Abilities/Cast already read;
+        // PvpAbilityCombat filters it per side by each Traveler's own Class.
+        var result = PvpAbilityCombat.Fight(p, npcTarget, game.Abilities, Rng);
 
         foreach (var logLine in result.Log)
         {
@@ -413,6 +439,139 @@ internal static class Commands
             session.Send($"You were beaten down by {npcTarget.Name}...");
             game.Broadcast.Publish(GameEvent.Slain(p.Name, npcTarget.Name, year));
             // Death is handled by SharedGame.Tick (respawn upstream).
+        }
+    }
+
+    /// <summary>
+    /// Fires the readied ranged weapon (<c>Traveler.EquippedRanged</c>) at
+    /// <c>Traveler.RangedTarget</c> — the monster locked in by a prior
+    /// 'fight' (see <see cref="Fight"/>) — in a given exit direction:
+    /// 'point &lt;dir&gt;' for a Wand, 'shoot &lt;dir&gt;' / 'fire &lt;dir&gt;' for a
+    /// Bow/Gun. Ported from the console's identical <c>HandleShoot</c>
+    /// (Program.cs) so the multiplayer server has the same ranged-combat
+    /// parity every other command already has — this was the one command
+    /// docs/SERVER.md's "Not done yet" list still named. The shot travels a
+    /// straight, unbroken chain of room exits that way, up to the weapon's
+    /// Range (1-4 rooms); it only ever hits the locked target specifically —
+    /// if the corridor breaks early or the target isn't out that way within
+    /// range, nothing fires and no ammo is spent. A hit spends one round of
+    /// the weapon's built-in ammo via <see cref="RangedResolver"/>, which
+    /// also sets the target's fight/pursue/flee reaction. On a kill, XP and
+    /// loot are awarded here — the loot lands on the target's room floor,
+    /// since the player never walked in.
+    /// </summary>
+    private static void Shoot(SharedGame game, Session session, string verb, string arg)
+    {
+        var p = session.Player;
+        var weapon = p.EquippedRanged;
+        if (weapon is null)
+        {
+            session.Send("You have no ranged weapon readied. Wield a wand, bow, or gun first.");
+            return;
+        }
+
+        if (weapon.IsDepleted)
+        {
+            session.Send($"Your {weapon.Name} is spent — convert or sell it.");
+            return;
+        }
+
+        var target = p.RangedTarget;
+        if (target is null || target.Health.IsDead)
+        {
+            p.SetRangedTarget(null);
+            session.Send("You have nothing lined up. 'fight <name>' a monster first to draw a bead on it.");
+            return;
+        }
+
+        var direction = DirectionExtensions.Parse(arg.Trim());
+        if (direction is null)
+        {
+            session.Send($"{verb} which way? Try '{verb} north'.");
+            return;
+        }
+
+        var year = p.CurrentYear;
+        var content = game.World.GetYear(year);
+        var map = content.Map;
+        var pop = content.Population;
+
+        var current = p.Position;
+        var found = false;
+        for (var step = 0; step < weapon.Range; step++)
+        {
+            var move = map.TryMove(current, direction.Value);
+            if (!move.Success)
+            {
+                break; // the corridor doesn't reach any farther that way
+            }
+
+            current = move.Destination!.Value;
+            if (target.Position.Equals(current))
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            session.Send($"No clear shot at {target.Name} that way. (no shot spent)");
+            return;
+        }
+
+        var targetRoom = current;
+        var targetIsWarden = ReferenceEquals(target, pop.Warden);
+        var levelBefore = p.Level;
+
+        var result = RangedResolver.Fire(p, target, weapon, Rng);
+        session.Send(result.Message);
+        session.Send($"{weapon.Name}: {weapon.AmmoRemaining}/{weapon.AmmoCapacity} shots left.");
+
+        if (!result.Killed)
+        {
+            return;
+        }
+
+        p.SetRangedTarget(null); // dead — nothing left to lock onto
+
+        game.Broadcast.Publish(GameEvent.Slain(target.Name, p.Name, year, victimIsCreature: true));
+        var xpAwarded = MonsterScaling.KillXp(target.XpReward, target.Tier, p.Level);
+        p.GainXp(xpAwarded);
+        var creditsAwarded = MonsterScaling.KillCredits(target.CreditReward, target.Tier, p.Level);
+        p.AddCredits(creditsAwarded);
+
+        var drops = LootDropRoller.RollForKill(target, Rng).Concat(target.Inventory).ToList();
+
+        if (targetIsWarden)
+        {
+            p.RecordWardenDefeat(year);
+            foreach (var drop in drops)
+            {
+                pop.AddGroundLoot(targetRoom, drop);
+            }
+
+            // target.Name rather than a hardcoded "Warden of {year}" — the
+            // year-5000 capstone (docs/ENDGAME_STRATEGY.md recommendation
+            // 4) is named "The Convergence," not "The Warden of 5000."
+            session.Send($"You drop {target.Name} from afar — its trophy lies to the {direction.Value.Name()}. +{xpAwarded} XP, +{creditsAwarded} Credits.");
+        }
+        else
+        {
+            pop.RemoveMonster(target);
+            foreach (var drop in drops)
+            {
+                pop.AddGroundLoot(targetRoom, drop);
+            }
+
+            session.Send(drops.Count > 0
+                ? $"The {target.Name} drops. +{xpAwarded} XP, +{creditsAwarded} Credits. Its loot is on the floor to the {direction.Value.Name()} — walk in and take it."
+                : $"The {target.Name} drops. +{xpAwarded} XP, +{creditsAwarded} Credits.");
+        }
+
+        if (p.Level > levelBefore)
+        {
+            game.Broadcast.Publish(GameEvent.LevelReached(p.Name, p.Level, year));
         }
     }
 
@@ -526,6 +685,23 @@ internal static class Commands
         session.Send($"Converted {item.Name} for {gained} Tachyons. ({session.Player.Tachyons.Current} Tachyons)");
     }
 
+    /// <summary>
+    /// Routes through <see cref="TimeTravelResolver"/> — the same resolver
+    /// the console uses (Program.cs's <c>HandleTravel</c>) — instead of
+    /// resolving every jump inline, so a jump of
+    /// <see cref="Traveler.ChargeTravelThresholdYears"/> years (750) or more gets
+    /// the same "charge over several ticks" treatment on this server as it
+    /// already does in single-player (docs/ENDGAME_STRATEGY.md
+    /// recommendation 5). This was a real gap, not cosmetic: before this,
+    /// every jump here — however far — resolved instantly, which meant a
+    /// player could reach any year in one command with no charge delay at
+    /// all. Completing a charge once it's under way was never the gap —
+    /// <c>WorldSimulation.TickMultiplayer</c>'s per-player
+    /// <c>AdvancePendingTravel()</c> call, and its own
+    /// <see cref="GameEvent.TimeTraveled"/> broadcast on arrival, already
+    /// existed and needed no changes; only the "start a charge in the first
+    /// place" half was missing here.
+    /// </summary>
     private static void Travel(SharedGame game, Session session, string arg)
     {
         var p = session.Player;
@@ -546,26 +722,46 @@ internal static class Commands
         }
 
         target = Math.Clamp(target, TimeScale.MinYear, TimeScale.MaxYear);
-        if (target == p.CurrentYear)
+        if (target == p.CurrentYear && !p.IsChargingTravel)
         {
             session.Send("You're already there.");
             return;
         }
 
-        var cost = TachyonEconomy.TimeTravelCost(p.CurrentYear, target);
-        if (!p.Tachyons.CanAfford(cost))
+        var from = p.CurrentYear;
+        var levelBefore = p.Level;
+        var result = TimeTravelResolver.Travel(p, game.World, target, Rng);
+
+        if (result.IsCharging)
         {
-            session.Send($"Not enough Tachyons ({cost} needed, you have {p.Tachyons.Current}).");
+            // Tachyons are already spent (TimeTravelResolver.Travel pays up
+            // front) — arrival, the year change, and the TimeTraveled
+            // broadcast all happen several ticks later, inside
+            // WorldSimulation.TickMultiplayer.
+            session.Send($"Charging a jump to {result.ChargingTargetYear} A.D. — arrival in {result.ChargingTicksRequired} tick(s). ({result.TachyonsSpent} Tachyons)");
             return;
         }
 
-        p.Tachyons.Spend(cost);
-        var from = p.CurrentYear;
-        p.SetCurrentYear(target);
-        p.PlaceAt(game.World.GetYear(target).Map.Start);
+        if (!result.Success)
+        {
+            session.Send(result.FailureReason switch
+            {
+                TimeTravelFailureReason.YearOutOfRange => $"{target} is off the timeline ({TimeScale.MinYear}-{TimeScale.MaxYear}).",
+                TimeTravelFailureReason.InsufficientTachyons =>
+                    $"Not enough Tachyons ({TachyonEconomy.TimeTravelCost(p.CurrentYear, target)} needed, you have {p.Tachyons.Current}).",
+                _ => "Travel failed.",
+            });
+            return;
+        }
+
+        if (p.Level > levelBefore)
+        {
+            game.Broadcast.Publish(GameEvent.LevelReached(p.Name, p.Level, target));
+        }
+
         game.Broadcast.Publish(GameEvent.TimeTraveled(p.Name, target));
         game.AnnounceExcept(session.Id, $"{p.Name} rode a surge from {from} to {target} A.D.");
-        session.Send($"You travel to {target} A.D. — {game.World.GetYear(target).Era.Name}. ({cost} Tachyons)");
+        session.Send($"You travel to {target} A.D. — {game.World.GetYear(target).Era.Name}. ({result.TachyonsSpent} Tachyons)");
         Render.Room(game, session);
     }
 
@@ -991,6 +1187,7 @@ internal static class Commands
     {
         session.Send("Commands: look [dir] · n/s/e/w · monsters · status · inventory · heal · take [all] · fight [name]");
         session.Send("          wield <item> · convert|con <item> · travel <year|+N|-N> · news · who · say <msg> · wait · quit");
+        session.Send("          shoot|point|fire <dir> — fires a wielded ranged weapon at the target 'fight' locked in");
         session.Send("          abilities · cast <name> (Jump Rig/Crash Cart work any time; other abilities are combat-only and this server auto-resolves fights)");
         session.Send("Stores:   stores · shop · buy <item> · sell <item>|all · repair <item> · buy-store · stock <item> <price> · withdraw <item>");
         session.Send("          reprice <item> <price> · deposit <credits> · charge <credits> · collect");

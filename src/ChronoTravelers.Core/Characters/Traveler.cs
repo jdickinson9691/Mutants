@@ -504,7 +504,7 @@ public sealed class Traveler
 
     /// <summary>
     /// docs/ENDGAME_STRATEGY.md recommendation 5's "charge a jump" mechanic:
-    /// a jump farther than this many years must be charged over several
+    /// a jump of this many years or more must be charged over several
     /// world ticks (see <see cref="BeginChargingTravel"/>) rather than
     /// resolving instantly. <c>Engine.Npc.NpcController.MaxTravelHop</c>
     /// tops out at 300 (450 for a Wanderer), so an NPC can never reach this
@@ -514,7 +514,7 @@ public sealed class Traveler
 
     /// <summary>
     /// Ticks required to complete a charged jump of <paramref name="distanceYears"/>
-    /// years (already known to exceed <see cref="ChargeTravelThresholdYears"/>):
+    /// years (already known to be at least <see cref="ChargeTravelThresholdYears"/>):
     /// 1 tick right at the threshold, +1 tick per additional 250 years,
     /// capped at 10 ticks so even a full-timeline jump (3000 years) resolves
     /// in a bounded window rather than an ever-growing one.

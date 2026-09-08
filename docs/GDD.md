@@ -709,18 +709,13 @@ Since v1 has no network multiplayer, the world needs to feel alive:
 - Each NPC runs a lightweight behavior loop each tick: assess Tachyon level (seek
   conversion fodder or a store if low), assess HP (retreat/heal if low),
   otherwise pursue its current goal — wear a better weapon/armor/ranged item
-  already sitting in its pack the instant it's looted (now judged by the
-  same wield- **and Durability**-scaled bonus combat uses, so a near-broken
-  piece can lose to a fresh weaker one — no store needed), pay a store to
-  repair a badly-worn equipped Weapon/Armor (below half its combat
-  contribution — §6.3's repair sink, first among the store actions since a
-  worn weapon is a survival problem), tend a store it already owns here (pay
-  down Credit maintenance, stock surplus gear, collect Capital — §6.2),
-  occasionally buy an open store slot if it doesn't own one (never the
-  year's last one), trade at a year's store (selling genuine surplus gear it
-  can't use before falling back to excess junk, and buying a weapon if
-  unarmed), grind monsters in its year, or hop along the timeline. A
-  local-pool NPC not
+  already sitting in its pack the instant it's looted (no store needed),
+  tend a store it already owns here (pay down Credit maintenance, stock
+  surplus gear, collect Capital — §6.2), occasionally buy an open store slot
+  if it doesn't own one (never the year's last one), trade at a year's store
+  (selling genuine surplus gear it can't use before falling back to excess
+  junk, and buying a weapon if unarmed), grind monsters in its year, or hop
+  along the timeline. A local-pool NPC not
   already at the anchor year rolls a much higher travel chance and, when it
   rolls, heads straight for the anchor — the full jump if it can afford the
   Tachyon cost, otherwise the biggest hop toward it it can afford, so the
@@ -1009,6 +1004,46 @@ yours) using NPCs instead of real concurrent users.
   > ranged-lock-on only ever targets a Monster) — PvP is melee-only for
   > now; human-vs-human PvP remains explicitly out of scope, unchanged by
   > this — only player-vs-NPC-Traveler is implemented.
+
+  > **Implementation (2026-09-08): ability casting + ranged.** Both flagged
+  > simplifications above are closed. PvP now runs through a new
+  > `ChronoTravelers.Engine.Combat.PvpAbilityCombat.Fight`, not
+  > `CombatResolver.FightTraveler` (still used by the abstract/NPC-grind
+  > path, unchanged) — a symmetric, ability-aware auto-resolver rather than
+  > a retrofit of the interactive `CombatSession` (still Monster-coupled
+  > throughout, and PvP still has no round-by-round prompt to retrofit it
+  > into). Each side's usable abilities (filtered from the same catalog
+  > `cast`/`abilities` already read, by that Traveler's own Class/Level) are
+  > offered every round through an AI chooser ported from
+  > `Npc.NpcController`'s `ChooseAbility`/`ScoreAbility` heuristic —
+  > self-preservation (an emergency Heal below 40% HP) first, then a 60%
+  > roll per round to bother casting at all, weighted toward whatever scores
+  > highest and is currently affordable. `AbilityEffectType.InstantDefeatNonBoss`
+  > (an outright banish) is deliberately left out of the usable set — it
+  > would make a duel a coin flip on who drew it, the opposite of the point
+  > — along with `ShortTeleport`/`ReviveAlly`, which are overworld-only and
+  > already refused mid-fight everywhere else. Buff/debuff/shield/crit/DoT
+  > state is now tracked per side (`PvpAbilityCombat`'s private `Side`
+  > class) rather than hardcoded to "the traveler," since either combatant
+  > can now buff itself or debuff the other.
+  >
+  > Ranged is a single opening shot per side, via new
+  > `ChronoTravelers.Engine.Combat.RangedResolver.FireAtTraveler`, fired
+  > automatically before the melee/ability exchange begins if that side has
+  > a readied, loaded ranged weapon — not the lock-on-then-kite flow
+  > `RangedResolver.Fire` supports against a Monster, since PvP still
+  > auto-resolves in one call with no interactive rounds or rooms to kite
+  > across. `RangedEffectType.Weaken`/`Stagger` don't carry over (they rely
+  > on Monster-only `PendingDefensePenalty`/`PendingAttackPenalty` fields) —
+  > the shot still deals its damage, just without the status effect, noted
+  > in the returned message rather than silently dropped.
+  >
+  > Both front ends changed identically: the console's `HandlePvpFight` and
+  > the multiplayer server's `Commands.FightNpcTraveler` both now call
+  > `PvpAbilityCombat.Fight` with the same ability catalog each already had
+  > in hand for `cast`/`abilities`. Reward/loot shape (winner's XP/Credits
+  > off the loser's level-derived tier, loser's whole inventory dropped) is
+  > unchanged from before this fix.
 
 - Mobile/console ports.
 

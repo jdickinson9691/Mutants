@@ -379,6 +379,121 @@ public class CommandsTests
         Assert.True(rec.Any("struck down"));
     }
 
+    // --- ranged combat (shoot/point/fire) ---------------------------------
+
+    [Fact]
+    public void Fight_WithARangedWeaponWielded_LocksTheTargetInsteadOfResolvingMelee()
+    {
+        var game = NewGame(out _);
+        var rec = new Recorder();
+        var session = game.Join("a", NewSoldier(), rec);
+        var bow = Item.CreateRanged("Longbow", 2, Rarity.Uncommon, RangedKind.Bow, ammoCapacity: 10);
+        session.Player.AddToInventory(bow);
+        session.Player.Wield(bow);
+
+        var monster = new Monster("Straw Dummy", tier: 1, maxHp: 200, attackPower: 1, defense: 0, speed: 1, xpReward: 10);
+        monster.PlaceAt(session.Player.Position);
+        game.World.GetYear(session.Player.CurrentYear).Population.AddMonster(monster);
+
+        rec.Clear();
+        game.Execute(session, "fight");
+
+        Assert.Same(monster, session.Player.RangedTarget);
+        Assert.True(rec.Any("draw a bead"));
+        // No melee round ran — the lock-in is a no-op on both sides' HP.
+        Assert.Equal(200, monster.Health.Current);
+        Assert.Equal(session.Player.Health.Max, session.Player.Health.Current);
+    }
+
+    [Fact]
+    public void Shoot_AtALockedTargetDownACorridor_HitsItAndSpendsAmmo()
+    {
+        var game = NewGame(out var world);
+        var rec = new Recorder();
+        var session = game.Join("a", NewSoldier(), rec);
+        var weapon = Item.CreateRanged("Longbow", 2, Rarity.Uncommon, RangedKind.Bow, ammoCapacity: 10, range: 2);
+        session.Player.AddToInventory(weapon);
+        session.Player.Wield(weapon);
+
+        var map = world.GetYear(session.Player.CurrentYear).Map;
+        var room = map.GetRoom(session.Player.Position);
+        var dir = room.ExitDescriptions.Keys.First();
+        var neighbor = map.TryMove(session.Player.Position, dir).Destination!.Value;
+
+        var monster = new Monster("Straw Dummy", tier: 1, maxHp: 200, attackPower: 1, defense: 0, speed: 1, xpReward: 10);
+        monster.PlaceAt(neighbor);
+        world.GetYear(session.Player.CurrentYear).Population.AddMonster(monster);
+        session.Player.SetRangedTarget(monster);
+
+        rec.Clear();
+        game.Execute(session, $"shoot {dir.Name()}");
+
+        Assert.Equal(9, weapon.AmmoRemaining);
+        Assert.True(monster.Health.Current < 200);
+        Assert.True(rec.Any("shots left"));
+    }
+
+    [Fact]
+    public void Shoot_WithNoTargetLocked_SaysNothingLinedUp()
+    {
+        var game = NewGame(out _);
+        var rec = new Recorder();
+        var session = game.Join("a", NewSoldier(), rec);
+        var bow = Item.CreateRanged("Longbow", 2, Rarity.Uncommon, RangedKind.Bow, ammoCapacity: 10);
+        session.Player.AddToInventory(bow);
+        session.Player.Wield(bow);
+
+        rec.Clear();
+        game.Execute(session, "shoot north");
+
+        Assert.True(rec.Any("nothing lined up"));
+    }
+
+    [Fact]
+    public void Shoot_WithNoRangedWeaponWielded_SaysSo()
+    {
+        var game = NewGame(out _);
+        var rec = new Recorder();
+        var session = game.Join("a", NewSoldier(), rec);
+
+        rec.Clear();
+        game.Execute(session, "shoot north");
+
+        Assert.True(rec.Any("no ranged weapon readied"));
+    }
+
+    [Fact]
+    public void Shoot_KillingTheTarget_AwardsXpAndCreditsAndDropsLootOnItsFloor()
+    {
+        var game = NewGame(out var world);
+        var rec = new Recorder();
+        var session = game.Join("a", NewSoldier(), rec);
+        // maxHp: 1 below guarantees a kill regardless of the attack roll —
+        // RangedResolver.Fire floors damage at 1 (Math.Max(1, ...)).
+        var weapon = Item.CreateRanged("Railgun", 5, Rarity.Rare, RangedKind.Gun, ammoCapacity: 10, range: 2);
+        session.Player.AddToInventory(weapon);
+        session.Player.Wield(weapon);
+
+        var map = world.GetYear(session.Player.CurrentYear).Map;
+        var room = map.GetRoom(session.Player.Position);
+        var dir = room.ExitDescriptions.Keys.First();
+        var neighbor = map.TryMove(session.Player.Position, dir).Destination!.Value;
+
+        var monster = new Monster("Straw Dummy", tier: 1, maxHp: 1, attackPower: 1, defense: 0, speed: 1, xpReward: 40, creditReward: 10);
+        monster.PlaceAt(neighbor);
+        var pop = world.GetYear(session.Player.CurrentYear).Population;
+        pop.AddMonster(monster);
+        session.Player.SetRangedTarget(monster);
+        var xpBefore = session.Player.Xp;
+
+        rec.Clear();
+        game.Execute(session, $"shoot {dir.Name()}");
+
+        Assert.True(session.Player.Xp > xpBefore);
+        Assert.Null(session.Player.RangedTarget);
+        Assert.True(rec.Any("drops"));
+    }
+
     // --- convert ---------------------------------------------------------------
 
     [Fact]
@@ -489,6 +604,62 @@ public class CommandsTests
 
         Assert.True(rec.Any("Not enough Tachyons"));
         Assert.Equal(2000, session.Player.CurrentYear);
+    }
+
+    [Fact]
+    public void Travel_PastTheChargeThreshold_StartsChargingInsteadOfArrivingImmediately()
+    {
+        var game = NewGame(out _);
+        var rec = new Recorder();
+        var session = game.Join("a", NewSoldier(), rec); // starts at year 2000
+        session.Player.Tachyons.Add(1000);
+        var tachyonsBefore = session.Player.Tachyons.Current;
+
+        rec.Clear();
+        // Exactly Traveler.ChargeTravelThresholdYears (750) away.
+        game.Execute(session, "travel 2750");
+
+        Assert.True(rec.Any("Charging a jump"));
+        Assert.Equal(2000, session.Player.CurrentYear); // hasn't arrived yet
+        Assert.True(session.Player.IsChargingTravel);
+        Assert.Equal(2750, session.Player.ChargingTargetYear);
+        Assert.True(session.Player.Tachyons.Current < tachyonsBefore); // paid up front
+    }
+
+    [Fact]
+    public void Travel_ChargingJump_CompletesAfterEnoughTicks()
+    {
+        var game = NewGame(out _);
+        var rec = new Recorder();
+        var session = game.Join("a", NewSoldier(), rec);
+        session.Player.Tachyons.Add(1000);
+
+        game.Execute(session, "travel 2750");
+        Assert.True(session.Player.IsChargingTravel);
+
+        rec.Clear();
+        game.Tick(); // 750 years == the threshold itself needs exactly 1 tick
+
+        Assert.False(session.Player.IsChargingTravel);
+        Assert.Equal(2750, session.Player.CurrentYear);
+    }
+
+    [Fact]
+    public void Travel_TowardTheSameChargingTarget_IsANoOpStatusQuery_NoDoubleSpend()
+    {
+        var game = NewGame(out _);
+        var rec = new Recorder();
+        var session = game.Join("a", NewSoldier(), rec);
+        session.Player.Tachyons.Add(1000);
+
+        game.Execute(session, "travel 2750");
+        var tachyonsAfterFirstCharge = session.Player.Tachyons.Current;
+
+        rec.Clear();
+        game.Execute(session, "travel 2750");
+
+        Assert.True(rec.Any("Charging a jump"));
+        Assert.Equal(tachyonsAfterFirstCharge, session.Player.Tachyons.Current);
     }
 
     // --- move announcements ---------------------------------------------------
