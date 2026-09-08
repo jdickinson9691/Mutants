@@ -27,29 +27,33 @@ public class PassiveTraitTests
     }
 
     [Fact]
-    public void All_HasTwelvePerClass_PlusScientistsExtraEarlyAmbushPassive()
+    public void All_HasSixtyFiveEntries_ThirteenPerClass()
     {
-        // 12 per class (6 first-wave + 6 second-wave), except Scientist,
-        // which gained a 7th first-wave slot (level-6 Contingency Protocol)
-        // in the 2026-09-08 ambush-timing fix rather than displacing one of
-        // its six Tachyon-economy passives — see PassiveTraits.All.
-        Assert.Equal(61, PassiveTraits.All.Count);
+        // Was 60 (12 per class) before the 2026-09-08 ambush-timing fix.
+        // Second pass added one genuinely new early slot per class
+        // (Battlefield Awareness/Triage Instincts/Danger Sense/Contingency
+        // Protocol — Scientist's was the original, level-6 at the time);
+        // third pass added Engineer's own new slot (Boot-Camp Reflexes)
+        // once the others were retimed to level 1. 60 + 5 = 65, 13 each.
+        Assert.Equal(65, PassiveTraits.All.Count);
         foreach (CharacterClass characterClass in Enum.GetValues<CharacterClass>())
         {
-            var expected = characterClass == CharacterClass.Scientist ? 13 : 12;
-            Assert.Equal(expected, PassiveTraits.All.Count(p => p.Class == characterClass));
+            Assert.Equal(13, PassiveTraits.All.Count(p => p.Class == characterClass));
         }
     }
 
     [Fact]
     public void Unlocked_OnlyIncludesPassivesAtOrBelowLevel()
     {
+        // Soldier now has two level-1 passives (Hardened + the 2026-09-08
+        // third-pass Battlefield Awareness — an added slot, not a swap, so
+        // both coexist at level 1) — counts below bumped by one accordingly.
         Assert.Empty(PassiveTraits.Unlocked(CharacterClass.Soldier, 0));
-        Assert.Single(PassiveTraits.Unlocked(CharacterClass.Soldier, 1));
-        Assert.Equal(2, PassiveTraits.Unlocked(CharacterClass.Soldier, 8).Count());
-        Assert.Equal(6, PassiveTraits.Unlocked(CharacterClass.Soldier, 30).Count());
-        // Second wave (docs/ENDGAME_STRATEGY.md rec. 1): all 12 are unlocked by the level cap.
-        Assert.Equal(12, PassiveTraits.Unlocked(CharacterClass.Soldier, 60).Count());
+        Assert.Equal(2, PassiveTraits.Unlocked(CharacterClass.Soldier, 1).Count());
+        Assert.Equal(3, PassiveTraits.Unlocked(CharacterClass.Soldier, 8).Count());
+        Assert.Equal(7, PassiveTraits.Unlocked(CharacterClass.Soldier, 30).Count());
+        // Second wave (docs/ENDGAME_STRATEGY.md rec. 1): all 13 are unlocked by the level cap.
+        Assert.Equal(13, PassiveTraits.Unlocked(CharacterClass.Soldier, 60).Count());
     }
 
     [Fact]
@@ -94,32 +98,37 @@ public class PassiveTraitTests
     }
 
     [Fact]
-    public void Speed_SpyQuickReflexes_AddsThreeAtLevelTwentyThree()
+    public void Speed_SpyQuickReflexes_AddsThreeAtLevelEight()
     {
         // Speed is just Agility + flat passive bonus, so isolate the
         // passive from the ordinary Agility growth that also lands on the
-        // level-22 -> 23 level-up: at Lv22 there's no Speed passive yet, at
-        // Lv23 Quick Reflexes adds exactly +3 on top of Agility. (Quick
-        // Reflexes moved from level 8 to 23 — swapped with Fleet-Footed —
-        // in the 2026-09-08 ambush-timing fix; see PassiveTraits.All.)
-        var atTwentyTwo = LeveledTraveler(CharacterClass.Spy, 22);
-        var atTwentyThree = LeveledTraveler(CharacterClass.Spy, 23);
+        // level-7 -> 8 level-up: at Lv7 there's no Speed passive yet, at
+        // Lv8 Quick Reflexes adds exactly +3 on top of Agility. (Reverted
+        // to its original level 8 in the 2026-09-08 ambush-timing fix's
+        // second pass — the first pass's straight swap with Fleet-Footed
+        // cost as much early Speed as it gained early ambush mitigation;
+        // Spy's ambush coverage now comes from an added level-6 slot
+        // instead — see PassiveTraits.All.)
+        var atSeven = LeveledTraveler(CharacterClass.Spy, 7);
+        var atEight = LeveledTraveler(CharacterClass.Spy, 8);
 
-        Assert.Equal(atTwentyTwo.Stats.Agility, atTwentyTwo.Speed);
-        Assert.Equal(atTwentyThree.Stats.Agility + 3, atTwentyThree.Speed);
+        Assert.Equal(atSeven.Stats.Agility, atSeven.Speed);
+        Assert.Equal(atEight.Stats.Agility + 3, atEight.Speed);
     }
 
     [Fact]
     public void TakeDamage_SoldierSecondWind_ReducesDamageBelowThirtyPercentHp()
     {
-        // Second Wind moved from level 8 to 18 — swapped with Thick Hide —
-        // in the 2026-09-08 ambush-timing fix; see PassiveTraits.All.
-        var soldier = LeveledTraveler(CharacterClass.Soldier, 18); // Second Wind unlocked
+        // Reverted to its original level 8 in the 2026-09-08 ambush-timing
+        // fix's second pass — see Speed_SpyQuickReflexes_AddsThreeAtLevelEight's
+        // comment above for why. Soldier's ambush coverage now comes from
+        // an added level-6 slot instead of a swap with this one.
+        var soldier = LeveledTraveler(CharacterClass.Soldier, 8); // Second Wind unlocked
         var maxHp = soldier.Health.Max;
         soldier.Health.Damage(maxHp - (int)(maxHp * 0.25)); // drop to 25% HP
         var reducedDamage = soldier.TakeDamage(10);
 
-        var soldierFull = LeveledTraveler(CharacterClass.Soldier, 18);
+        var soldierFull = LeveledTraveler(CharacterClass.Soldier, 8);
         var fullHpDamage = soldierFull.TakeDamage(10);
 
         Assert.True(reducedDamage < fullHpDamage); // 10% reduction applied only while below 30% HP
@@ -128,12 +137,14 @@ public class PassiveTraitTests
     [Fact]
     public void TakeDamage_DoctorResonantCalm_ReducesEchoDamageOnly()
     {
-        // Resonant Calm moved from level 8 to 23 — swapped with Trauma
-        // Ward — in the 2026-09-08 ambush-timing fix; see PassiveTraits.All.
-        var doctor = LeveledTraveler(CharacterClass.Doctor, 23); // Resonant Calm unlocked
+        // Reverted to its original level 8 in the 2026-09-08 ambush-timing
+        // fix's second pass — see Speed_SpyQuickReflexes_AddsThreeAtLevelEight's
+        // comment above for why. Doctor's ambush coverage now comes from
+        // an added level-6 slot instead of a swap with this one.
+        var doctor = LeveledTraveler(CharacterClass.Doctor, 8); // Resonant Calm unlocked
         var echoDamage = doctor.TakeDamage(10, attackerIsEcho: true);
 
-        var doctor2 = LeveledTraveler(CharacterClass.Doctor, 23);
+        var doctor2 = LeveledTraveler(CharacterClass.Doctor, 8);
         var normalDamage = doctor2.TakeDamage(10, attackerIsEcho: false);
 
         Assert.True(echoDamage < normalDamage);
@@ -289,14 +300,49 @@ public class PassiveTraitTests
     [Fact]
     public void AmbushDodgeChance_And_AmbushNegateChance_ReadTheRightPassives()
     {
-        var spy = LeveledTraveler(CharacterClass.Spy, 8); // Fleet-Footed unlocked (moved from 23 to 8 — 2026-09-08 ambush-timing fix)
-        Assert.Equal(0.20, spy.AmbushDodgeChance, precision: 5);
+        // Spy's AmbushDodgeChance at level 23 combines the original
+        // Fleet-Footed (0.20, reverted to its original level — 2026-09-08
+        // ambush-timing fix, second pass) with the new level-1 Danger
+        // Sense (0.15, third pass) it's had since character creation.
+        var spy = LeveledTraveler(CharacterClass.Spy, 23);
+        Assert.Equal(0.35, spy.AmbushDodgeChance, precision: 5);
 
-        var doctor = LeveledTraveler(CharacterClass.Doctor, 8); // Trauma Ward unlocked (moved from 23 to 8)
+        var doctor = LeveledTraveler(CharacterClass.Doctor, 23); // Trauma Ward unlocked (reverted to its original level 23)
         Assert.Equal(0.20, doctor.AmbushNegateChance, precision: 5);
 
+        // A fresh, level-1 Spy already has Danger Sense (third pass:
+        // retimed from level 6 to level 1 to close the level 1-5 gap the
+        // second pass's fix left open) — no longer 0.0 at creation.
         var freshSpy = new Traveler("Spy", CharacterClass.Spy);
-        Assert.Equal(0.0, freshSpy.AmbushDodgeChance, precision: 5);
+        Assert.Equal(0.15, freshSpy.AmbushDodgeChance, precision: 5);
+    }
+
+    [Fact]
+    public void AmbushDodgeChance_EveryClass_HasCoverageFromLevelOne()
+    {
+        // 2026-09-08 ambush-timing fix, third pass: the new ambush-dodge
+        // slot added in the second pass (Battlefield Awareness/Triage
+        // Instincts/Danger Sense/Contingency Protocol) started at level 6,
+        // which still left level 1-5 — where CharacterFactory's starter-
+        // gear death-cluster finding lives — with zero mitigation for
+        // anyone. Retimed to level 1, and Engineer (previously first
+        // covered at level 7 via Redundant Systems) got its own new
+        // level-1 slot, Boot-Camp Reflexes, to match: every class now has
+        // ambush-dodge coverage from character creation.
+        var expectedByClass = new Dictionary<CharacterClass, double>
+        {
+            [CharacterClass.Soldier] = 0.15,
+            [CharacterClass.Doctor] = 0.15,
+            [CharacterClass.Spy] = 0.15,
+            [CharacterClass.Scientist] = 0.15,
+            [CharacterClass.Engineer] = 0.15, // Boot-Camp Reflexes; Redundant Systems (0.20) still unlocks separately at level 7
+        };
+
+        foreach (var (cls, expected) in expectedByClass)
+        {
+            var fresh = LeveledTraveler(cls, 1);
+            Assert.Equal(expected, fresh.AmbushDodgeChance, precision: 5);
+        }
     }
 
     [Fact]

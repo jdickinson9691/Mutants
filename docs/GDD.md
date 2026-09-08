@@ -439,15 +439,36 @@ monster spawned in a paradox-themed era/year, same append pattern as
 >
 > - **Ambush timing.** Every class's ambush-mitigation passive unlocked at
 >   level 18-23 — well past the level 1-17 window where ambush deaths were
->   most common — and Scientist had none at all, ever. Soldier's Thick
->   Hide, Doctor's Trauma Ward, and Spy's Fleet-Footed moved from their
->   original 18/23/23 slots down to level 8 (a straight swap with whatever
->   passive used to occupy that slot — Second Wind/Resonant Calm/Quick
->   Reflexes moved the other way, same 6-slot schedule, nothing added or
->   removed for these three classes). Scientist gained a new level-6
->   **Contingency Protocol** (`AmbushDodgeChancePct`, 15%) — a 7th
->   first-wave slot rather than displacing one of its six existing
->   Tachyon-economy passives, the one deliberate asymmetry in this fix.
+>   most common — and Scientist had none at all, ever. **Revised same day,
+>   after a second battery run flagged the first pass as a wash**: that
+>   first attempt swapped Soldier's Thick Hide, Doctor's Trauma Ward, and
+>   Spy's Fleet-Footed down to level 8 against whatever passive already
+>   held that slot (Second Wind/Resonant Calm/Quick Reflexes moving the
+>   other way) — a straight trade that cost the displaced passive exactly
+>   what it gained the ambush one, no net improvement to early survival.
+>   Reverted: those three are back at their original 18/23/23 levels, and
+>   every class (Soldier/Doctor/Spy/Scientist) instead gets a genuinely new
+>   slot — **Battlefield Awareness**/**Triage Instincts**/**Danger Sense**/
+>   **Contingency Protocol** (all `AmbushDodgeChancePct`, 15%) — a 7th
+>   first-wave passive across the board rather than a displacement.
+>   **Revised again the same day, third pass**: the new slot itself started
+>   at level 6, which still left level 1-5 — the exact window the user's
+>   own read of the battery data flagged next, a starter-gear death cluster
+>   at ~13-16% of every class's deaths — with zero ambush mitigation for
+>   anyone. `Item`/`CharacterFactory` investigation ruled out an off-class
+>   wield penalty on the starter gear (it carries no `RestrictedClass`, so
+>   `WieldEffectiveness` is already 1.0) and confirmed the per-class
+>   `EffectiveDefense` numbers (Soldier/Spy 14, Doctor/Scientist/Engineer
+>   11-12 at level 1) are working as designed, just naturally lower for the
+>   low-Agility classes — so the fix is timing, not a bug. Retimed the four
+>   slots above to level 1 (alongside each class's existing level-1
+>   passive — an added slot, not a swap, same rule as the rest of this fix)
+>   and gave Engineer a matching new level-1 slot, **Boot-Camp Reflexes**
+>   (`AmbushDodgeChancePct`, 15%) — Engineer's existing Redundant Systems
+>   (level 7) is its own first-wave passive on its accelerated schedule, not
+>   a bonus slot, so swapping it down would have repeated the second pass's
+>   straight-trade mistake. Every class now has 7 first-wave passives and
+>   ambush-dodge coverage from character creation.
 > - **Spy's missing sustain.** Spy was the only class with zero Heal/
 >   Shield/defense-buff anywhere in its kit. Level-10 **Ghost Protocol**
 >   (`GuaranteedCritNextAttack`) — functionally redundant with the

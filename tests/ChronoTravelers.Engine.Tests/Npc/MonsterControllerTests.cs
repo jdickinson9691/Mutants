@@ -643,7 +643,12 @@ public class MonsterControllerTests
         pop.AddMonster(lurker);
         var broadcast = new BroadcastChannel();
 
-        Tick(pop, map, player, StubRandomSource.Fixed(0.0), playerLingered: true, broadcast: broadcast);
+        // Fixed(0.99), not 0.0: a level-1 Soldier now has a 15% ambush-dodge
+        // chance (Battlefield Awareness, 2026-09-08 ambush-timing fix, third
+        // pass) — 0.0 would dodge the ambush outright instead of letting it
+        // land. 0.99 clears that roll (and every other roll this fixture
+        // makes) while staying deterministic.
+        Tick(pop, map, player, StubRandomSource.Fixed(0.99), playerLingered: true, broadcast: broadcast);
 
         Assert.Equal(Coordinate.Origin, lurker.Position);
         Assert.True(player.Health.Current < fullHp);
@@ -704,7 +709,10 @@ public class MonsterControllerTests
         int HpDropAfterATick()
         {
             var before = player.Health.Current;
-            Tick(pop, map, player, StubRandomSource.Fixed(0.0), playerLingered: true);
+            // Fixed(0.99): clears the level-1 Soldier's ambush-dodge roll
+            // (see the comment on the ambush test above) so the cooldown
+            // logic itself, not the dodge chance, is what's under test.
+            Tick(pop, map, player, StubRandomSource.Fixed(0.99), playerLingered: true);
             return before - player.Health.Current;
         }
 
@@ -1076,8 +1084,11 @@ public class MonsterControllerTests
         var plainHpBefore = player1.Health.Current;
         var ambusherHpBefore = player2.Health.Current;
 
-        Tick(plainPop, map, player1, StubRandomSource.Fixed(0.0), playerLingered: true);
-        Tick(ambusherPop, map, player2, StubRandomSource.Fixed(0.0), playerLingered: true);
+        // Fixed(0.99) on both sides: clears the level-1 Soldier's ambush-
+        // dodge roll (see the comment on the ambush test above) equally for
+        // both players, so the comparison isolates the Ambusher multiplier.
+        Tick(plainPop, map, player1, StubRandomSource.Fixed(0.99), playerLingered: true);
+        Tick(ambusherPop, map, player2, StubRandomSource.Fixed(0.99), playerLingered: true);
 
         var plainDamage = plainHpBefore - player1.Health.Current;
         var ambusherDamage = ambusherHpBefore - player2.Health.Current;

@@ -130,20 +130,36 @@ public static class PassiveTraits
 {
     public static readonly IReadOnlyList<PassiveTrait> All =
     [
-        // --- Soldier (passives at 1/8/13/18/23/28, between active levels 5/10/15/20/25/30) ---
-        // Battery-test finding (2026-09-08): every class's ambush-mitigation
-        // passive unlocked too late (level 18-23) to help the level 1-17
-        // window where ambush deaths were most common, and Scientist had
-        // none at all. Thick Hide/Trauma Ward/Fleet-Footed below were moved
-        // from their original level-18/23/23 slots to level 8, swapping
-        // places with the passive that used to be there — same 6-slot
-        // schedule, just reordered, nothing added or removed for these
-        // three classes. See docs/GDD.md §4.2.1's "Implementation
-        // (2026-09-08)" note.
+        // --- Soldier (passives at 1/6/8/13/18/23/28, between active levels 5/10/15/20/25/30) ---
+        // Battery-test finding (2026-09-08), revised same day after a
+        // second battery run: every class's ambush-mitigation passive
+        // unlocked too late (level 18-23) to help the level 1-17 window
+        // where ambush deaths were most common, and Scientist had none at
+        // all. The first fix swapped Thick Hide/Trauma Ward/Fleet-Footed
+        // down to level 8 against whatever passive already held that slot
+        // — but a straight swap costs the displaced passive (Second Wind/
+        // Resonant Calm/Quick Reflexes) exactly what it gains the ambush
+        // one, no net improvement to early survival. Reverted: those three
+        // are back at their original levels, and instead every class gets
+        // a genuinely new early slot (Scientist's original level-6
+        // Contingency Protocol, now joined by one per remaining class) —
+        // an added 7th first-wave passive across the board, not an
+        // asymmetry unique to Scientist anymore.
+        //
+        // Third pass, same day: the new slot itself started at level 6,
+        // which still left level 1-5 with zero ambush mitigation for
+        // everyone — and CharacterFactory's own starter-gear death-cluster
+        // finding (a level-1 double-hit: ambush, then a same-or-faster
+        // monster's first strike) sits entirely inside that gap. Retimed
+        // to level 1, alongside the level-1 passive each class already
+        // has (no displacement — a second level-1 slot, same "add, don't
+        // swap" rule as the rest of this fix). See docs/GDD.md §4.2.1's
+        // "Implementation (2026-09-08)" note.
         new(CharacterClass.Soldier, 1, "Hardened", "+20% Defense from equipped armor.", PassiveHook.ArmorDefenseBonusPct, 0.20),
-        new(CharacterClass.Soldier, 8, "Thick Hide", "-25% damage taken from an ambush.", PassiveHook.AmbushDamageReductionPct, 0.25),
+        new(CharacterClass.Soldier, 1, "Battlefield Awareness", "15% chance to dodge an ambush entirely.", PassiveHook.AmbushDodgeChancePct, 0.15),
+        new(CharacterClass.Soldier, 8, "Second Wind", "-10% damage taken while below 30% HP.", PassiveHook.LowHpDamageReductionPct, 0.10),
         new(CharacterClass.Soldier, 13, "Juggernaut Momentum", "+2% attack per consecutive round landed this fight, capped at 10 stacks.", PassiveHook.ConsecutiveHitAttackBonusPct, 0.02),
-        new(CharacterClass.Soldier, 18, "Second Wind", "-10% damage taken while below 30% HP.", PassiveHook.LowHpDamageReductionPct, 0.10),
+        new(CharacterClass.Soldier, 18, "Thick Hide", "-25% damage taken from an ambush.", PassiveHook.AmbushDamageReductionPct, 0.25),
         new(CharacterClass.Soldier, 23, "Weapon Discipline", "Off-class weapon penalty halved.", PassiveHook.OffClassPenaltyReductionPct, 0.5),
         new(CharacterClass.Soldier, 28, "Unbreakable", "Once per fight, a killing blow leaves 1 HP instead.", PassiveHook.DeathProofOncePerFight, 1.0),
 
@@ -155,14 +171,15 @@ public static class PassiveTraits
         new(CharacterClass.Soldier, 53, "Battlefield Medic", "Regenerate 0.5% of max HP per world tick (stacks with Vital Reserves-style passives).", PassiveHook.MaxHpRegenPerTickPct, 0.005),
         new(CharacterClass.Soldier, 58, "Anomaly Killer", "+18% attack damage vs. a \"paradox\"-tagged monster.", PassiveHook.ParadoxDamageBonusPct, 0.18),
 
-        // --- Doctor (passives at 1/8/13/18/23/28, between active levels 5/10/15/20/25/30) ---
-        // Trauma Ward moved from level 23 to 8, swapping with Resonant Calm
-        // — see Soldier's comment above for why.
+        // --- Doctor (passives at 1/6/8/13/18/23/28, between active levels 5/10/15/20/25/30) ---
+        // Trauma Ward reverted to level 23 (see Soldier's comment above);
+        // Triage Instincts is Doctor's new added slot, retimed to level 1.
         new(CharacterClass.Doctor, 1, "Bedside Manner", "+25% HP restored by Heal.", PassiveHook.HealRatioBonusPct, 0.25),
-        new(CharacterClass.Doctor, 8, "Trauma Ward", "20% chance to negate an ambush entirely.", PassiveHook.AmbushNegateChancePct, 0.20),
+        new(CharacterClass.Doctor, 1, "Triage Instincts", "15% chance to dodge an ambush entirely.", PassiveHook.AmbushDodgeChancePct, 0.15),
+        new(CharacterClass.Doctor, 8, "Resonant Calm", "-15% damage taken from an echo.", PassiveHook.EchoDamageReductionPct, 0.15),
         new(CharacterClass.Doctor, 13, "Steady Hands", "+20% HP restored by consumables.", PassiveHook.ConsumableHealBonusPct, 0.20),
         new(CharacterClass.Doctor, 18, "Overwatch", "+15% Tachyon regen rate.", PassiveHook.TachyonRegenRateBonusPct, 0.15),
-        new(CharacterClass.Doctor, 23, "Resonant Calm", "-15% damage taken from an echo.", PassiveHook.EchoDamageReductionPct, 0.15),
+        new(CharacterClass.Doctor, 23, "Trauma Ward", "20% chance to negate an ambush entirely.", PassiveHook.AmbushNegateChancePct, 0.20),
         new(CharacterClass.Doctor, 28, "Vital Reserves", "Regenerate 1% of max HP per world tick.", PassiveHook.MaxHpRegenPerTickPct, 0.01),
 
         // --- Doctor, second wave (docs/ENDGAME_STRATEGY.md rec. 1): passives at 33/38/43/48/53/58 ---
@@ -173,17 +190,16 @@ public static class PassiveTraits
         new(CharacterClass.Doctor, 53, "Field Immunity", "+15% chance to negate an ambush entirely (stacks with Trauma Ward).", PassiveHook.AmbushNegateChancePct, 0.15),
         new(CharacterClass.Doctor, 58, "Regenerative Field", "Regenerate an extra 0.75% of max HP per world tick (stacks with Vital Reserves).", PassiveHook.MaxHpRegenPerTickPct, 0.0075),
 
-        // --- Spy (passives at 1/8/13/18/23/28, between active levels 5/10/15/20/25/30) ---
-        // Fleet-Footed moved from level 23 to 8, swapping with Quick
-        // Reflexes — see Soldier's comment above for why. (Quick Reflexes'
-        // flat Speed bonus was already close to redundant against monster
-        // Speed growth even before this move — see the same 2026-09-08
-        // note — so losing its earlier unlock costs Spy little.)
+        // --- Spy (passives at 1/6/8/13/18/23/28, between active levels 5/10/15/20/25/30) ---
+        // Fleet-Footed reverted to level 23, Quick Reflexes back to level 8
+        // (see Soldier's comment above); Danger Sense is Spy's new added
+        // slot, retimed to level 1.
         new(CharacterClass.Spy, 1, "Light Fingers", "5% store discount when buying, 5% bonus when selling.", PassiveHook.StoreDiscountBonusPct, 0.05),
-        new(CharacterClass.Spy, 8, "Fleet-Footed", "20% chance to dodge an ambush entirely.", PassiveHook.AmbushDodgeChancePct, 0.20),
+        new(CharacterClass.Spy, 1, "Danger Sense", "15% chance to dodge an ambush entirely.", PassiveHook.AmbushDodgeChancePct, 0.15),
+        new(CharacterClass.Spy, 8, "Quick Reflexes", "+3 Speed.", PassiveHook.FlatSpeedBonus, 3),
         new(CharacterClass.Spy, 13, "Opportunist", "+15% attack damage vs. a target below 40% HP.", PassiveHook.LowHpTargetAttackBonusPct, 0.15),
         new(CharacterClass.Spy, 18, "Low Profile", "-20% aggro gained by nearby monsters.", PassiveHook.AggroGainReductionPct, 0.20),
-        new(CharacterClass.Spy, 23, "Quick Reflexes", "+3 Speed.", PassiveHook.FlatSpeedBonus, 3),
+        new(CharacterClass.Spy, 23, "Fleet-Footed", "20% chance to dodge an ambush entirely.", PassiveHook.AmbushDodgeChancePct, 0.20),
         new(CharacterClass.Spy, 28, "Silent Partner", "Light Fingers' store discount/bonus doubles to 10%.", PassiveHook.StoreDiscountBonusPct, 0.05),
 
         // --- Spy, second wave (docs/ENDGAME_STRATEGY.md rec. 1): passives at 33/38/43/48/53/58 ---
@@ -200,11 +216,14 @@ public static class PassiveTraits
         // too late (see Soldier's comment above). Rather than bump one of
         // Scientist's existing Tachyon-economy passives out to make room
         // (all six are part of its distinct identity, none an obvious cut),
-        // this adds a 7th early slot instead — the one deliberate asymmetry
-        // in this fix; every other class still has exactly 6 first-wave
-        // passives. See docs/GDD.md §4.2.1's "Implementation (2026-09-08)" note.
+        // this adds a 7th early slot instead — the same treatment Soldier/
+        // Doctor/Spy also got once the original fix's straight-swap
+        // approach was reconsidered, and Engineer got in turn once the slot
+        // itself was retimed to level 1 (see Soldier's comment above): every
+        // class now has 7 first-wave passives, no asymmetry left anywhere.
+        // See docs/GDD.md §4.2.1's "Implementation (2026-09-08)" note.
         new(CharacterClass.Scientist, 1, "Tunnel Sense", "+10% Tachyon value when converting items.", PassiveHook.ConvertValueBonusPct, 0.10),
-        new(CharacterClass.Scientist, 6, "Contingency Protocol", "15% chance to dodge an ambush entirely.", PassiveHook.AmbushDodgeChancePct, 0.15),
+        new(CharacterClass.Scientist, 1, "Contingency Protocol", "15% chance to dodge an ambush entirely.", PassiveHook.AmbushDodgeChancePct, 0.15),
         new(CharacterClass.Scientist, 8, "Efficient Circuits", "+15% Tachyon regen rate.", PassiveHook.TachyonRegenRateBonusPct, 0.15),
         new(CharacterClass.Scientist, 13, "Overcurrent", "+10% attack while at or above 50% of nominal max Tachyons.", PassiveHook.HighTachyonAttackBonusPct, 0.10),
         new(CharacterClass.Scientist, 18, "Insulated Coils", "+15% slower Tachyon drain.", PassiveHook.TachyonDrainRateReductionPct, 0.15),
@@ -221,6 +240,18 @@ public static class PassiveTraits
 
         // --- Engineer (accelerated schedule: passives at 1/4/7/11/15/19, between active levels 2/5/9/13/17/21) ---
         new(CharacterClass.Engineer, 1, "Field-Tested Gear", "Off-class weapon penalty halved.", PassiveHook.OffClassPenaltyReductionPct, 0.5),
+        // Battery-test finding (2026-09-08), third pass: retiming the four
+        // other classes' new ambush-dodge slot from level 6 down to level 1
+        // (see Soldier's comment above) left Engineer as the one class with
+        // no ambush coverage before level 7 — Redundant Systems, below,
+        // predates this pass entirely and is Engineer's own 3rd-of-6
+        // passive on its accelerated schedule, not a bonus slot; swapping
+        // it down would repeat the straight-trade mistake the user already
+        // flagged. So Engineer gets a genuine new level-1 slot too, the
+        // same treatment as the other four — its 7th first-wave passive,
+        // matching theirs. See docs/GDD.md §4.2.1's "Implementation
+        // (2026-09-08)" note.
+        new(CharacterClass.Engineer, 1, "Boot-Camp Reflexes", "15% chance to dodge an ambush entirely.", PassiveHook.AmbushDodgeChancePct, 0.15),
         new(CharacterClass.Engineer, 4, "Overclocked Reflexes", "+3 Speed.", PassiveHook.FlatSpeedBonus, 3),
         new(CharacterClass.Engineer, 7, "Redundant Systems", "20% chance to dodge an ambush entirely.", PassiveHook.AmbushDodgeChancePct, 0.20),
         new(CharacterClass.Engineer, 11, "Improvised Plating", "+3 flat Defense.", PassiveHook.FlatDefenseBonus, 3),
